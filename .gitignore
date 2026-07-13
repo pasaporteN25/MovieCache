@@ -1,0 +1,19 @@
+.catalog-cache/
+.catalog-state/
+__pycache__/
+*.py[cod]
+*.bak.json
+*.log
+
+# Personal catalogs and generated reports.
+/scripts/*.json
+/scripts/*.csv
+/scripts/*.txt
+/catalog-view.html
+
+# Local scanner configuration can contain machine-specific paths.
+/scanner.json
+
+# Alternate Git metadata/bundles used when .git is managed as read-only.
+/.repo-git/
+/*.bundle

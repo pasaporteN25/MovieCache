@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Movie Inbox</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Movie Inbox</h1>
+        <span id="count">0</span>
+      </header>
+
+      <label>
+        Titulo
+        <input id="title" type="text" autocomplete="off">
+      </label>
+
+      <label>
+        URL
+        <input id="url" type="url" autocomplete="off">
+      </label>
+
+      <div class="row">
+        <label>
+          Tipo
+          <select id="kind">
+            <option value="pelicula">Pelicula</option>
+            <option value="serie">Serie</option>
+            <option value="anime">Anime</option>
+            <option value="documental">Documental</option>
+          </select>
+        </label>
+
+        <label>
+          Estado
+          <select id="status">
+            <option value="to_watch">Pendiente</option>
+            <option value="watched">Vista</option>
+          </select>
+        </label>
+      </div>
+
+      <label>
+        Tags
+        <input id="tags" type="text" placeholder="noir, sci-fi, argentina">
+      </label>
+
+      <label>
+        Notas
+        <textarea id="notes" rows="3"></textarea>
+      </label>
+
+      <button id="save" class="primary">Guardar pestana</button>
+
+      <section>
+        <div class="actions">
+          <button id="exportCsv">CSV</button>
+          <button id="exportJson">JSON</button>
+          <button id="clear">Vaciar</button>
+        </div>
+      </section>
+
+      <section class="settings">
+        <label class="check">
+          <input id="autoExportEnabled" type="checkbox">
+          Exportar automaticamente
+        </label>
+        <label>
+          Cada
+          <input id="autoExportDays" type="number" min="1" max="365" value="7">
+          dias
+        </label>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

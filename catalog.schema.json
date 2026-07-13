@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://movie-inbox.local/catalog.schema.json",
+  "title": "Movie Inbox catalog",
+  "type": "object",
+  "required": ["schema_version", "items"],
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/catalogItem"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "localFile": {
+      "type": "object",
+      "required": ["path", "name", "size_bytes", "modified_at", "part"],
+      "properties": {
+        "path": {"type": "string"},
+        "name": {"type": "string"},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "modified_at": {"type": "string"},
+        "part": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "metadataSource": {
+      "type": "object",
+      "required": ["source", "url", "updated_at", "inferred"],
+      "properties": {
+        "source": {"type": "string"},
+        "url": {"type": "string"},
+        "updated_at": {"type": "string"},
+        "inferred": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "catalogItem": {
+      "type": "object",
+      "required": [
+        "id", "title", "kind", "status", "en_catalogo", "local_files",
+        "metadata_sources", "locked_fields"
+      ],
+      "properties": {
+        "id": {"type": "string"},
+        "url": {"type": "string"},
+        "source": {"type": "string"},
+        "title": {"type": "string"},
+        "original_title": {"type": "string"},
+        "spanish_title": {"type": "string"},
+        "english_title": {"type": "string"},
+        "alternative_titles": {"type": "array", "items": {"type": "string"}},
+        "kind": {"enum": ["pelicula", "serie", "anime", "documental"]},
+        "status": {"enum": ["to_watch", "watched"]},
+        "watched_at": {"type": "string"},
+        "rating": {"type": "integer", "minimum": 0, "maximum": 10},
+        "year": {"type": "string"},
+        "description": {"type": "string"},
+        "wikipedia_url": {"type": "string"},
+        "imdb_url": {"type": "string"},
+        "filmaffinity_url": {"type": "string"},
+        "wikipedia_title": {"type": "string"},
+        "wikidata_id": {"type": "string"},
+        "genres": {"type": "array", "items": {"type": "string"}},
+        "directors": {"type": "array", "items": {"type": "string"}},
+        "writers": {"type": "array", "items": {"type": "string"}},
+        "cast": {"type": "array", "items": {"type": "string"}},
+        "page_image": {"type": "string"},
+        "wikipedia_extract": {"type": "string"},
+        "en_catalogo": {"type": "boolean"},
+        "local_files": {"type": "array", "items": {"$ref": "#/$defs/localFile"}},
+        "local_name": {"type": "string"},
+        "local_path": {"type": "string"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "string"},
+        "review": {"type": "string"},
+        "metadata_sources": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/metadataSource"}
+        },
+        "locked_fields": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "title", "original_title", "spanish_title", "english_title",
+              "alternative_titles", "kind", "year", "description",
+              "wikipedia_title", "wikidata_id", "genres", "directors",
+              "writers", "cast", "page_image", "wikipedia_extract"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "added_at": {"type": "string"}
+      },
+      "additionalProperties": true
+    }
+  }
+}

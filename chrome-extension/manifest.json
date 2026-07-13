@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Movie Inbox",
+  "description": "Guarda peliculas y series desde la pestana actual y exporta CSV/JSON.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "alarms", "downloads", "storage", "tabs"],
+  "action": {
+    "default_title": "Movie Inbox",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
+
