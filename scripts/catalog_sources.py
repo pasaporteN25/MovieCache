@@ -15,6 +15,8 @@ from typing import Any, Callable
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from catalog_titles import infer_year
+
 
 SEARCH_CACHE_TTL_SECONDS = 15 * 60
 SEARCH_CACHE_MAX_ENTRIES = 128
@@ -368,11 +370,6 @@ def result_index(row: Any) -> int:
 
 def clean_text(value: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(value)).strip()
-
-
-def infer_year(value: str) -> str:
-    match = re.search(r"\b(19\d{2}|20\d{2})\b", value or "")
-    return match.group(1) if match else ""
 
 
 def utc_now() -> str:

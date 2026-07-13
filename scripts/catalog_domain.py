@@ -7,6 +7,7 @@ import hashlib
 import html
 import re
 import unicodedata
+from collections.abc import Mapping, MutableMapping
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
@@ -18,13 +19,19 @@ from catalog_schema import (
     normalize_local_files,
     normalize_metadata_sources,
 )
+from catalog_models import CatalogItem
+from catalog_primitives import normalize_bool, normalize_kind, normalize_rating, normalize_status
 
 
-KNOWN_LINK_HOSTS = ("wikipedia.org", "imdb.com", "filmaffinity.com")
+KNOWN_LINK_HOSTS = {
+    "wikipedia": "wikipedia.org",
+    "imdb": "imdb.com",
+    "filmaffinity": "filmaffinity.com",
+}
 LIST_FIELDS = {"alternative_titles", "genres", "directors", "writers", "cast"}
 
 
-def normalize_item(row: dict[str, Any]) -> dict[str, Any]:
+def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
     item = dict(row)
     item["local_files"] = normalize_local_files(
         item.get("local_files"),
@@ -44,6 +51,13 @@ def normalize_item(row: dict[str, Any]) -> dict[str, Any]:
     item["cast"] = normalize_tags(item.get("cast") or item.get("actors") or item.get("actor"))
     item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
     item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
+    alias_values = {
+        "original_title": item.get("original_title") or item.get("originalTitle"),
+        "spanish_title": item.get("spanish_title") or item.get("spanishTitle"),
+        "english_title": item.get("english_title") or item.get("englishTitle"),
+        "watched_at": item.get("watched_at") or item.get("watchedAt"),
+    }
+    item.update(alias_values)
     string_fields = {
         "id",
         "url",
@@ -79,12 +93,12 @@ def normalize_item(row: dict[str, Any]) -> dict[str, Any]:
         seed = item["url"] or item["local_path"] or item["local_name"] or f"{item['title']} {item['year']}".strip()
         item["id"] = stable_id(seed) if seed else ""
     item["metadata_sources"] = ensure_metadata_sources(item)
-    return item
-
-
-def normalize_status(value: Any) -> str:
-    text = str(value or "to_watch").strip().lower()
-    return text if text in {"to_watch", "watched"} else "to_watch"
+    for alias in (
+        "addedAt", "originalTitle", "spanishTitle", "englishTitle", "alternativeTitles",
+        "watchedAt", "genre", "director", "writer", "screenwriters", "actors", "actor",
+    ):
+        item.pop(alias, None)
+    return CatalogItem.from_mapping(item)
 
 
 def normalize_date(value: Any) -> str:
@@ -94,34 +108,6 @@ def normalize_date(value: Any) -> str:
 
 def today_date() -> str:
     return datetime.now().date().isoformat()
-
-
-def normalize_rating(value: Any) -> int:
-    try:
-        rating = int(float(str(value or 0).strip()))
-    except (TypeError, ValueError):
-        return 0
-    return max(0, min(10, rating))
-
-
-def normalize_kind(value: Any) -> str:
-    text = str(value or "pelicula").strip().lower()
-    mapping = {
-        "movie": "pelicula",
-        "film": "pelicula",
-        "película": "pelicula",
-        "pelicula": "pelicula",
-        "series": "serie",
-        "tvseries": "serie",
-        "tv series": "serie",
-        "episode": "serie",
-        "tv episode": "serie",
-        "serie": "serie",
-        "anime": "anime",
-        "documentary": "documental",
-        "documental": "documental",
-    }
-    return mapping.get(text, "pelicula")
 
 
 def normalize_tags(value: Any) -> list[str]:
@@ -145,12 +131,6 @@ def merge_lists(primary: list[str], secondary: list[str]) -> list[str]:
     return merged
 
 
-def normalize_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    return str(value or "").strip().lower() in {"1", "true", "yes", "si", "sí"}
-
-
 def stable_id(value: str) -> str:
     return hashlib.sha1(value.encode("utf-8")).hexdigest()[:12]
 
@@ -159,30 +139,69 @@ def canonical_url(url: str) -> str:
     value = str(url or "").strip()
     if not value:
         return ""
-    parsed = urlparse(value)
-    if not parsed.netloc:
+    try:
+        parsed = urlparse(value)
+        hostname = _normalized_hostname(parsed)
+    except (UnicodeError, ValueError):
         return ""
+    if parsed.scheme.lower() not in {"http", "https"} or not hostname:
+        return ""
+    if parsed.username or parsed.password:
+        return ""
+    try:
+        port = parsed.port
+    except ValueError:
+        return ""
+    host = hostname.removeprefix("www.")
+    default_port = 443 if parsed.scheme.lower() == "https" else 80
+    authority = f"[{host}]" if ":" in host else host
+    if port and port != default_port:
+        authority = f"{authority}:{port}"
     path = parsed.path.rstrip("/") or "/"
-    return f"{parsed.scheme.lower() or 'https'}://{parsed.netloc.lower()}{path}"
+    return f"{parsed.scheme.lower()}://{authority}{path}"
 
 
 def trusted_external_url(url: str) -> str:
     canonical = canonical_url(url)
-    return canonical if any(host in canonical for host in KNOWN_LINK_HOSTS) else ""
+    return canonical if external_source_name(canonical) else ""
 
 
-def source_url_field(source: str, url: str = "") -> str:
-    text = f"{source} {url}".lower()
-    if "wikipedia" in text:
-        return "wikipedia_url"
-    if "imdb" in text:
-        return "imdb_url"
-    if "filmaffinity" in text:
-        return "filmaffinity_url"
+def external_source_name(url: str) -> str:
+    try:
+        parsed = urlparse(str(url or ""))
+        scheme = parsed.scheme.lower()
+        if scheme not in {"http", "https"} or parsed.username or parsed.password:
+            return ""
+        port = parsed.port
+        default_port = 443 if scheme == "https" else 80
+        if port and port != default_port:
+            return ""
+        hostname = _normalized_hostname(parsed).removeprefix("www.")
+    except (UnicodeError, ValueError):
+        return ""
+    for source, expected_host in KNOWN_LINK_HOSTS.items():
+        if hostname == expected_host or hostname.endswith(f".{expected_host}"):
+            return source
     return ""
 
 
-def external_urls(item: dict[str, Any]) -> set[str]:
+def _normalized_hostname(parsed: Any) -> str:
+    hostname = parsed.hostname or ""
+    if ":" in hostname:
+        return hostname.lower().rstrip(".")
+    return hostname.encode("idna").decode("ascii").lower().rstrip(".")
+
+
+def source_url_field(source: str, url: str = "") -> str:
+    source_name = str(source or "").strip().lower()
+    if source_name not in KNOWN_LINK_HOSTS:
+        source_name = external_source_name(url)
+    if source_name:
+        return f"{source_name}_url"
+    return ""
+
+
+def external_urls(item: Mapping[str, Any]) -> set[str]:
     urls = {
         trusted_external_url(str(item.get("url") or "")),
         trusted_external_url(str(item.get("wikipedia_url") or "")),
@@ -192,7 +211,7 @@ def external_urls(item: dict[str, Any]) -> set[str]:
     return {url for url in urls if url}
 
 
-def has_external_link(item: dict[str, Any]) -> bool:
+def has_external_link(item: Mapping[str, Any]) -> bool:
     return bool(external_urls(item))
 
 
@@ -213,7 +232,7 @@ def normalize_path_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
-def title_values_for_item(item: dict[str, Any]) -> list[str]:
+def title_values_for_item(item: Mapping[str, Any]) -> list[str]:
     local_values = [
         str(value)
         for local_file in normalize_local_files(item.get("local_files"))
@@ -232,7 +251,7 @@ def title_values_for_item(item: dict[str, Any]) -> list[str]:
     ]
 
 
-def title_match_keys_for_item(item: dict[str, Any]) -> list[str]:
+def title_match_keys_for_item(item: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(key for key in (title_match_key(value) for value in title_values_for_item(item)) if key))
 
 
@@ -244,7 +263,7 @@ def title_similarity(left: str, right: str) -> float:
     return len(left_terms & right_terms) / max(len(left_terms), len(right_terms))
 
 
-def same_catalog_item(item: dict[str, Any], item_id: str, item_url: str, title: str, year: str, local_name: str) -> bool:
+def same_catalog_item(item: Mapping[str, Any], item_id: str, item_url: str, title: str, year: str, local_name: str) -> bool:
     if item_id and str(item.get("id") or "") == item_id:
         return True
     target_url = canonical_url(item_url)
@@ -259,7 +278,7 @@ def same_catalog_item(item: dict[str, Any], item_id: str, item_url: str, title: 
     return bool(item_local and target_local and item_local == target_local)
 
 
-def possible_duplicate_candidates(items: list[dict[str, Any]], item: dict[str, Any]) -> list[dict[str, Any]]:
+def possible_duplicate_candidates(items: list[Mapping[str, Any]], item: Mapping[str, Any]) -> list[dict[str, Any]]:
     item_titles = title_match_keys_for_item(item)
     item_year = str(item.get("year") or "")
     candidates: list[dict[str, Any]] = []
@@ -286,7 +305,7 @@ def possible_duplicate_candidates(items: list[dict[str, Any]], item: dict[str, A
     return candidates
 
 
-def annotate_duplicate_items(items: list[dict[str, Any]]) -> None:
+def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
     if not items:
         return
     parents = list(range(len(items)))
@@ -336,7 +355,7 @@ def metadata_source_record(source: str, url: str, inferred: bool, updated_at: st
     }
 
 
-def metadata_origin(item: dict[str, Any]) -> tuple[str, str]:
+def metadata_origin(item: Mapping[str, Any]) -> tuple[str, str]:
     source = str(item.get("source") or "").strip()
     url = str(item.get("url") or "").strip()
     source_urls = {
@@ -354,7 +373,7 @@ def metadata_origin(item: dict[str, Any]) -> tuple[str, str]:
     return "legacy", url
 
 
-def ensure_metadata_sources(item: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def ensure_metadata_sources(item: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     sources = normalize_metadata_sources(item.get("metadata_sources"))
     source, url = metadata_origin(item)
     for field in METADATA_FIELDS:
@@ -364,7 +383,7 @@ def ensure_metadata_sources(item: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return sources
 
 
-def merge_metadata_field(existing: dict[str, Any], incoming: dict[str, Any], field: str) -> None:
+def merge_metadata_field(existing: MutableMapping[str, Any], incoming: Mapping[str, Any], field: str) -> None:
     if field in normalize_locked_fields(existing.get("locked_fields")):
         return
     before = existing.get(field)
@@ -383,15 +402,15 @@ def merge_metadata_field(existing: dict[str, Any], incoming: dict[str, Any], fie
     existing["metadata_sources"] = sources
 
 
-def is_wikipedia_item(item: dict[str, Any]) -> bool:
+def is_wikipedia_item(item: Mapping[str, Any]) -> bool:
     return (
         str(item.get("source") or "") == "wikipedia"
-        or "wikipedia.org" in canonical_url(str(item.get("url") or ""))
-        or "wikipedia.org" in canonical_url(str(item.get("wikipedia_url") or ""))
+        or external_source_name(str(item.get("url") or "")) == "wikipedia"
+        or external_source_name(str(item.get("wikipedia_url") or "")) == "wikipedia"
     )
 
 
-def merge_into_existing(items: list[dict[str, Any]], incoming: dict[str, Any], target_id: str) -> bool:
+def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping[str, Any], target_id: str) -> bool:
     incoming = normalize_item(incoming)
     for existing in items:
         if str(existing.get("id") or "") != target_id:

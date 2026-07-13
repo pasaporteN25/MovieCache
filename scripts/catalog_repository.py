@@ -13,12 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator, TypeVar
 
-from catalog_schema import atomic_write_json, catalog_document, extract_catalog_items
+from catalog_models import CatalogItem
+from catalog_schema import CatalogSchemaError, atomic_write_json, catalog_document, extract_catalog_items
 
 
 T = TypeVar("T")
-CatalogNormalizer = Callable[[dict[str, Any]], dict[str, Any]]
-CatalogMutation = Callable[[list[dict[str, Any]]], tuple[bool, T]]
+CatalogNormalizer = Callable[[dict[str, Any]], CatalogItem]
+CatalogMutation = Callable[[list[CatalogItem]], tuple[bool, T]]
 
 
 class CatalogRepositoryError(RuntimeError):
@@ -52,11 +53,11 @@ class JsonCatalogRepository:
     def lock_path(self) -> Path:
         return self.path.with_name(f".{self.path.name}.lock")
 
-    def read(self) -> list[dict[str, Any]]:
+    def read(self) -> list[CatalogItem]:
         with self.locked():
             return self._read_unlocked()
 
-    def write(self, items: list[dict[str, Any]]) -> None:
+    def write(self, items: list[CatalogItem]) -> None:
         with self.locked():
             self._write_unlocked(items)
 
@@ -89,7 +90,7 @@ class JsonCatalogRepository:
                 self._local.depth = 0
                 self._release_file_lock(token)
 
-    def _read_unlocked(self) -> list[dict[str, Any]]:
+    def _read_unlocked(self) -> list[CatalogItem]:
         if not self.path.exists():
             return []
         try:
@@ -98,11 +99,19 @@ class JsonCatalogRepository:
             raise CatalogRepositoryError(f"Cannot read catalog: {self.path}") from error
         except json.JSONDecodeError as error:
             raise CatalogFormatError(f"Invalid catalog JSON: {self.path} ({error})") from error
-        return [self.normalizer(row) for row in extract_catalog_items(raw)]
+        try:
+            rows = extract_catalog_items(raw)
+            items = [self.normalizer(row) for row in rows]
+            catalog_document(items)
+            return items
+        except CatalogSchemaError as error:
+            raise CatalogFormatError(f"Invalid catalog schema: {self.path} ({error})") from error
 
-    def _write_unlocked(self, items: list[dict[str, Any]]) -> None:
+    def _write_unlocked(self, items: list[CatalogItem]) -> None:
         try:
             atomic_write_json(self.path, catalog_document(items))
+        except CatalogSchemaError as error:
+            raise CatalogFormatError(f"Cannot write invalid catalog: {self.path} ({error})") from error
         except OSError as error:
             raise CatalogRepositoryError(f"Cannot write catalog: {self.path}") from error
 

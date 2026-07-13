@@ -12,12 +12,22 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Deteccion de archivos nuevos, modificados y movidos mediante ruta relativa y huella parcial.
 - Proteccion ante discos desconectados y escaneos parciales antes de marcar archivos no disponibles.
 - Esquema v4 con identidad de biblioteca, ruta relativa, huella, ultimo avistamiento y disponibilidad por archivo.
+- Modelos canonicos para catalogo, archivos locales y procedencia de metadata.
+- Migraciones explicitas desde formatos legacy y esquemas v1, v2 y v3.
+- Token por sesion, validacion de origen/host y respuestas HTTP con estados reales en el visor.
+- Proteccion SSRF del cache de imagenes, incluida la validacion de redirecciones.
+- Matching conservador y auditable con motivo y evidencia por candidato.
+- Pruebas de regresion para seguridad HTTP, esquema, repositorio, modelos, capas y matching.
 
 ### Corregido
 
 - El visor vuelve a cargar catalogos tras completar el refactor que habia dejado normalizadores duplicados.
 - Las expresiones regulares JavaScript embebidas ya no producen `SyntaxWarning` en Python.
 - Los valores de texto `false` en metadata y archivos locales ya no se interpretan como verdaderos.
+- Los dominios externos se validan por hostname exacto o subdominio, sin aceptar nombres como `imdb.com.example.org`.
+- Los titulos iguales sin ano ya no se combinan automaticamente.
+- Los catalogos futuros o mal formados ya no se leen como listas vacias ni se reescriben como v4.
+- Los comandos batch ya no importan la interfaz web ni el importador monolitico.
 
 ## [0.1.0] - 2026-07-13
 

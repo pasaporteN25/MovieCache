@@ -15,18 +15,16 @@ import time
 from pathlib import Path
 from typing import Any
 
-from view_catalog import (
-    enrich_selected_result,
-    external_urls,
+from catalog_deduplication import deduplicate_items
+from catalog_domain import (
     has_external_link,
     merge_into_existing,
     normalize_item,
-    read_json_items,
-    search_sources,
-    title_match_key,
-    title_similarity,
-    write_json_items,
 )
+from catalog_external import enrich_external_result, search_external_sources
+from catalog_models import CatalogItem
+from catalog_matching import rank_candidates
+from catalog_repository import JsonCatalogRepository
 
 
 def main() -> int:
@@ -35,12 +33,12 @@ def main() -> int:
     parser.add_argument("--json", dest="json_path", type=Path, required=True, help="Output JSON path.")
     parser.add_argument("--limit", type=int, default=0, help="Maximum unlinked entries to search. 0 means all.")
     parser.add_argument("--delay", type=float, default=0.4, help="Delay between searches.")
-    parser.add_argument("--min-score", type=float, default=0.86, help="Minimum confidence score to auto-merge.")
+    parser.add_argument("--min-score", type=float, default=0.0, help="Minimum ranking score included in review reports.")
     parser.add_argument("--report", type=Path, help="Optional JSON report path.")
     parser.add_argument("--dry-run", action="store_true", help="Do not write output JSON.")
     args = parser.parse_args()
 
-    items = [normalize_item(item) for item in read_json_items(args.catalog)]
+    items = JsonCatalogRepository(args.catalog, normalize_item).read()
     report: dict[str, Any] = {
         "input_items": len(items),
         "initial_with_link": sum(1 for item in items if has_external_link(item)),
@@ -61,10 +59,10 @@ def main() -> int:
             continue
 
         searched += 1
-        results = search_sources(query, "all")
-        candidates = scored_candidates(item, results)
-        if candidates and candidates[0]["score"] >= args.min_score:
-            best = enrich_selected_result(candidates[0]["result"])
+        results, _ = search_external_sources(query, "all")
+        candidates = [candidate for candidate in rank_candidates(item, results) if candidate["score"] >= args.min_score]
+        if candidates and candidates[0]["decision"]["accepted"]:
+            best = enrich_external_result(candidates[0]["result"])
             merge_into_existing(items, best, str(item.get("id") or ""))
             report["matched"].append(
                 {
@@ -73,6 +71,8 @@ def main() -> int:
                     "score": candidates[0]["score"],
                     "source": best.get("source", ""),
                     "url": best.get("url", ""),
+                    "reason": candidates[0]["decision"]["reason"],
+                    "evidence": candidates[0]["decision"]["evidence"],
                 }
             )
         elif candidates:
@@ -90,14 +90,14 @@ def main() -> int:
         if args.delay:
             time.sleep(args.delay)
 
-    items, merged_labels = dedupe_external_items(items)
+    items, merged_labels = deduplicate_items(items)
     report["duplicates_merged"] = merged_labels
     report["output_items"] = len(items)
     report["final_with_link"] = sum(1 for item in items if has_external_link(item))
     report["final_without_link"] = report["output_items"] - report["final_with_link"]
 
     if not args.dry_run:
-        write_json_items(args.json_path, items)
+        JsonCatalogRepository(args.json_path, normalize_item).write(items)
     if args.report:
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -114,61 +114,9 @@ def main() -> int:
     return 0
 
 
-def search_query(item: dict[str, Any]) -> str:
+def search_query(item: CatalogItem) -> str:
     title = str(item.get("title") or item.get("local_name") or "").strip()
     year = str(item.get("year") or "").strip()
     return " ".join(part for part in [title, year] if part)
-
-
-def scored_candidates(item: dict[str, Any], results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    item_title = title_match_key(str(item.get("title") or item.get("local_name") or ""))
-    item_year = str(item.get("year") or "")
-    scored: list[dict[str, Any]] = []
-    for result in results:
-        if not external_urls(result):
-            continue
-        result_title = title_match_key(str(result.get("title") or ""))
-        if not result_title:
-            continue
-        score = title_similarity(item_title, result_title)
-        result_year = str(result.get("year") or "")
-        if item_year and result_year:
-            score += 0.18 if item_year == result_year else -0.35
-        if item_title == result_title:
-            score += 0.08
-        score = max(0.0, min(score, 1.0))
-        if score <= 0:
-            continue
-        scored.append({"score": round(score, 3), "result": result})
-    return sorted(scored, key=lambda entry: entry["score"], reverse=True)
-
-
-def dedupe_external_items(items: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
-    unique: list[dict[str, Any]] = []
-    merged: list[str] = []
-    for item in items:
-        target = find_duplicate(unique, item)
-        if target is None:
-            unique.append(item)
-            continue
-        merge_into_existing(unique, item, str(target.get("id") or ""))
-        merged.append(str(item.get("title") or item.get("local_name") or item.get("url") or item.get("id") or ""))
-    return unique, merged
-
-
-def find_duplicate(items: list[dict[str, Any]], candidate: dict[str, Any]) -> dict[str, Any] | None:
-    candidate_urls = external_urls(candidate)
-    candidate_title = title_match_key(str(candidate.get("title") or candidate.get("local_name") or ""))
-    candidate_year = str(candidate.get("year") or "")
-    for item in items:
-        if candidate_urls and candidate_urls & external_urls(item):
-            return item
-        item_title = title_match_key(str(item.get("title") or item.get("local_name") or ""))
-        item_year = str(item.get("year") or "")
-        if candidate_title and item_title == candidate_title and candidate_year and item_year and candidate_year == item_year:
-            return item
-    return None
-
-
 if __name__ == "__main__":
     raise SystemExit(main())
