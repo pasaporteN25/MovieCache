@@ -315,3 +315,4 @@ Cuando ya tengas un `catalog.json` estable, ese archivo puede ser la semilla par
 - una app Kotlin
 - una base SQLite
 - importacion desde la extension
+
