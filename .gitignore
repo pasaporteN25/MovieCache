@@ -16,4 +16,7 @@ __pycache__/
 
 # Alternate Git metadata/bundles used when .git is managed as read-only.
 /.repo-git/
+/.git.failed-init-backup/
+/scripts/.git.*backup/
 /*.bundle
+/.github_known_hosts

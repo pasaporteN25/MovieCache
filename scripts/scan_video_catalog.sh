@@ -113,7 +113,7 @@ emit_json() {
   now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   echo "Scanning: $ROOT" >&2
-  printf '{\n  "schema_version": 3,\n  "items": [\n'
+  printf '{\n  "schema_version": 4,\n  "items": [\n'
   while IFS= read -r -d '' file; do
     TOTAL_FILES=$((TOTAL_FILES + 1))
     if ! is_video_file "$file"; then
@@ -169,7 +169,7 @@ emit_json() {
     printf '    "page_image": "",\n'
     printf '    "wikipedia_extract": "",\n'
     printf '    "en_catalogo": true,\n'
-    printf '    "local_files": [{"path": "%s", "name": "%s", "size_bytes": 0, "modified_at": "", "part": ""}],\n' "$(json_escape "$local_path")" "$(json_escape "$local_name")"
+    printf '    "local_files": [{"path": "%s", "name": "%s", "size_bytes": 0, "modified_at": "", "part": "", "library_id": "", "relative_path": "%s", "fingerprint": "", "last_seen_at": "%s", "available": true}],\n' "$(json_escape "$local_path")" "$(json_escape "$local_name")" "$(json_escape "$local_path")" "$now"
     printf '    "local_name": "%s",\n' "$(json_escape "$local_name")"
     printf '    "local_path": "%s",\n' "$(json_escape "$local_path")"
     printf '    "tags": [],\n'

@@ -18,7 +18,6 @@ import hashlib
 import html
 import json
 import re
-import threading
 import time
 import unicodedata
 import webbrowser
@@ -31,24 +30,36 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
+import catalog_domain as domain
 from catalog_sources import EXTERNAL_SOURCES
+from catalog_domain import (
+    annotate_duplicate_items,
+    canonical_url,
+    external_urls,
+    has_external_link,
+    merge_lists,
+    normalize_bool,
+    normalize_date,
+    normalize_item,
+    normalize_kind,
+    normalize_rating,
+    normalize_tags,
+    source_url_field,
+    stable_id,
+    title_match_key,
+    title_match_keys_for_item,
+)
+from catalog_repository import CatalogRepositoryError, JsonCatalogRepository
+from catalog_service import CatalogService
 from catalog_schema import (
     METADATA_FIELDS,
     SCHEMA_VERSION,
-    atomic_write_json,
-    backup_json_file as create_json_backup,
-    catalog_document,
-    extract_catalog_items,
-    merge_local_files,
-    normalize_locked_fields,
     normalize_local_files,
-    normalize_metadata_sources,
 )
 from txt_to_catalog import fetch_metadata
 
 
-_CATALOG_LOCKS: dict[str, threading.RLock] = {}
-_CATALOG_LOCKS_GUARD = threading.Lock()
+_CATALOG_SERVICES: dict[str, CatalogService] = {}
 
 
 @dataclass
@@ -171,7 +182,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         expected_source=str(body.get("expected_source") or ""),
                     )
                     self.respond_json({"ok": added, "reason": reason, "item": item, **extra})
-                except ValueError as error:
+                except (ValueError, CatalogRepositoryError) as error:
                     self.respond_json({"ok": False, "reason": str(error)})
                 return
             if path == "/api/delete":
@@ -188,7 +199,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         confirmed=bool(body.get("confirmed")),
                     )
                     self.respond_json({"ok": deleted, "reason": reason})
-                except ValueError as error:
+                except (ValueError, CatalogRepositoryError) as error:
                     self.respond_json({"ok": False, "reason": str(error)})
                 return
             if path == "/api/status":
@@ -201,7 +212,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         watched_at=str(body.get("watched_at") or ""),
                     )
                     self.respond_json({"ok": updated, "reason": reason})
-                except ValueError as error:
+                except (ValueError, CatalogRepositoryError) as error:
                     self.respond_json({"ok": False, "reason": str(error)})
                 return
             if path == "/api/kind":
@@ -213,7 +224,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         kind=str(body.get("kind") or ""),
                     )
                     self.respond_json({"ok": updated, "reason": reason})
-                except ValueError as error:
+                except (ValueError, CatalogRepositoryError) as error:
                     self.respond_json({"ok": False, "reason": str(error)})
                 return
             if path == "/api/catalog":
@@ -225,7 +236,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         en_catalogo=body.get("en_catalogo"),
                     )
                     self.respond_json({"ok": updated, "reason": reason})
-                except ValueError as error:
+                except (ValueError, CatalogRepositoryError) as error:
                     self.respond_json({"ok": False, "reason": str(error)})
                 return
             if path == "/api/personal":
@@ -239,7 +250,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         review=str(body.get("review") or ""),
                     )
                     self.respond_json({"ok": updated, "reason": reason})
-                except ValueError as error:
+                except (ValueError, CatalogRepositoryError) as error:
                     self.respond_json({"ok": False, "reason": str(error)})
                 return
             if path == "/api/metadata":
@@ -252,7 +263,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         locked_fields=body.get("locked_fields"),
                     )
                     self.respond_json({"ok": updated, "reason": reason})
-                except ValueError as error:
+                except (ValueError, CatalogRepositoryError) as error:
                     self.respond_json({"ok": False, "reason": str(error)})
                 return
             self.send_error(404, "Not found")
@@ -350,7 +361,12 @@ def resolved_files(patterns: list[str]) -> list[str]:
 def load_items(patterns: list[str]) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for file in resolved_files(patterns):
-        for item in read_json_items(Path(file)):
+        try:
+            rows = read_json_items(Path(file))
+        except CatalogRepositoryError as error:
+            print(f"[catalog-viewer] catalog read error file={file} error={error}", flush=True)
+            continue
+        for item in rows:
             item["_source_file"] = str(file)
             items.append(item)
     annotate_duplicate_items(items)
@@ -358,79 +374,41 @@ def load_items(patterns: list[str]) -> list[dict[str, Any]]:
 
 
 def read_json_items(path: Path) -> list[dict[str, Any]]:
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    rows = extract_catalog_items(raw)
-    return [normalize_item(row) for row in rows if isinstance(row, dict)]
+    return catalog_service(path).list_items()
 
 
 def write_json_items(path: Path, items: list[dict[str, Any]]) -> None:
-    with catalog_lock(path):
-        atomic_write_json(path, catalog_document(items))
+    catalog_service(path).repository.write(items)
 
 
-def backup_json_file(path: Path) -> None:
-    create_json_backup(path)
-
-
-def catalog_lock(path: Path) -> threading.RLock:
+def catalog_service(path: Path) -> CatalogService:
     try:
         key = str(path.resolve())
     except OSError:
         key = str(path.absolute())
-    with _CATALOG_LOCKS_GUARD:
-        return _CATALOG_LOCKS.setdefault(key, threading.RLock())
+    if key not in _CATALOG_SERVICES:
+        _CATALOG_SERVICES[key] = CatalogService(JsonCatalogRepository(Path(key), domain.normalize_item))
+    return _CATALOG_SERVICES[key]
 
 
-def annotate_duplicate_items(items: list[dict[str, Any]]) -> None:
-    if not items:
-        return
-    parents = list(range(len(items)))
-    owners: dict[str, int] = {}
-
-    def root(index: int) -> int:
-        while parents[index] != index:
-            parents[index] = parents[parents[index]]
-            index = parents[index]
-        return index
-
-    def union(left: int, right: int) -> None:
-        left_root = root(left)
-        right_root = root(right)
-        if left_root != right_root:
-            parents[right_root] = left_root
-
-    for index, item in enumerate(items):
-        item.pop("_duplicate_count", None)
-        item.pop("_duplicate_ids", None)
-        item.pop("_duplicate_reason", None)
-        keys = [f"url:{url}" for url in sorted(external_urls(item))]
-        year = str(item.get("year") or "").strip()
-        if year:
-            keys.extend(f"title-year:{title}:{year}" for title in title_match_keys_for_item(item))
-        for key in keys:
-            if key in owners:
-                union(index, owners[key])
-            else:
-                owners[key] = index
-
-    groups: dict[int, list[int]] = {}
-    for index in range(len(items)):
-        groups.setdefault(root(index), []).append(index)
-    for indexes in groups.values():
-        if len(indexes) < 2:
-            continue
-        ids = [str(items[index].get("id") or "") for index in indexes]
-        for index in indexes:
-            item = items[index]
-            item["_duplicate_count"] = len(indexes) - 1
-            item["_duplicate_ids"] = [item_id for item_id in ids if item_id and item_id != str(item.get("id") or "")]
-            item["_duplicate_reason"] = "misma URL o título/año"
-
-
-KNOWN_LINK_HOSTS = ("wikipedia.org", "imdb.com", "filmaffinity.com")
+# Keep the HTTP layer on the shared domain and service implementations while the
+# remaining page/search code is moved out of this legacy module incrementally.
+annotate_duplicate_items = domain.annotate_duplicate_items
+canonical_url = domain.canonical_url
+external_urls = domain.external_urls
+has_external_link = domain.has_external_link
+merge_lists = domain.merge_lists
+metadata_source_record = domain.metadata_source_record
+normalize_bool = domain.normalize_bool
+normalize_date = domain.normalize_date
+normalize_item = domain.normalize_item
+normalize_kind = domain.normalize_kind
+normalize_rating = domain.normalize_rating
+normalize_tags = domain.normalize_tags
+source_url_field = domain.source_url_field
+stable_id = domain.stable_id
+title_match_key = domain.title_match_key
+title_match_keys_for_item = domain.title_match_keys_for_item
 
 
 def append_item(
@@ -440,31 +418,14 @@ def append_item(
     target_id: str = "",
     expected_source: str = "",
 ) -> tuple[bool, str, dict[str, Any]]:
-    with catalog_lock(path):
-        items = read_json_items(path)
-        item_urls = external_urls(item)
-        if action == "merge":
-            merged = merge_into_existing(items, item, target_id)
-            if not merged:
-                return False, "merge_target_not_found", {}
-            write_json_items(path, items)
-            print(
-                f"[catalog-viewer] merge ok path={path} target_id={target_id} "
-                f"incoming_source={item.get('source', '')} incoming_url={item.get('url', '')}",
-                flush=True,
-            )
-            return True, "merged", {}
-
-        if item_urls and any(item_urls & external_urls(existing) for existing in items):
-            return False, "duplicate", {}
-
-        candidates = possible_duplicate_candidates(items, item)
-        if action == "check" and candidates:
-            return False, "possible_duplicate", {"candidates": candidates[:5]}
-
-        items.insert(0, normalize_item(item))
-        write_json_items(path, items)
-        return True, "added", {}
+    added, reason, extra = catalog_service(path).append_item(item, action, target_id)
+    if added and reason == "merged":
+        print(
+            f"[catalog-viewer] merge ok path={path} target_id={target_id} "
+            f"incoming_source={item.get('source', '')} incoming_url={item.get('url', '')}",
+            flush=True,
+        )
+    return added, reason, extra
 
 
 def delete_item_anywhere(
@@ -482,7 +443,6 @@ def delete_item_anywhere(
         path = Path(file)
         if all(path.resolve() != existing.resolve() for existing in paths):
             paths.append(path)
-
     last_reason = "not_found"
     for path in paths:
         deleted, reason = delete_item(path, item_id, item_url, title, year, local_name, confirmed)
@@ -501,122 +461,23 @@ def delete_item(
     local_name: str,
     confirmed: bool,
 ) -> tuple[bool, str]:
-    if not confirmed:
-        raise ValueError("Deletion requires confirmation")
-    if not any([item_id, item_url, title, local_name]):
-        raise ValueError("Missing item reference")
-
-    with catalog_lock(path):
-        items = read_json_items(path)
-        for index, item in enumerate(items):
-            if same_catalog_item(item, item_id, item_url, title, year, local_name):
-                del items[index]
-                write_json_items(path, items)
-                return True, "deleted"
-        return False, "not_found"
-
-
-def same_catalog_item(item: dict[str, Any], item_id: str, item_url: str, title: str, year: str, local_name: str) -> bool:
-    if item_id and str(item.get("id") or "") == item_id:
-        return True
-    target_url = canonical_url(item_url)
-    if target_url and canonical_url(str(item.get("url") or "")) == target_url:
-        return True
-
-    item_titles = title_match_keys_for_item(item)
-    target_title = title_match_key(title or local_name)
-    item_year = str(item.get("year") or "")
-    if target_title and target_title in item_titles and (not year or not item_year or item_year == year):
-        return True
-
-    item_local = normalize_path_text(str(item.get("local_name") or item.get("local_path") or ""))
-    target_local = normalize_path_text(local_name)
-    return bool(item_local and target_local and item_local == target_local)
+    return catalog_service(path).delete_item(item_id, item_url, title, year, local_name, confirmed)
 
 
 def update_item_status(path: Path, item_id: str, status: str, watched_at: str = "") -> tuple[bool, str]:
-    if not item_id:
-        raise ValueError("Missing item id")
-    if status not in {"to_watch", "watched"}:
-        raise ValueError("Invalid status")
-
-    with catalog_lock(path):
-        items = read_json_items(path)
-        for item in items:
-            if str(item.get("id") or "") == item_id:
-                item["status"] = status
-                if status == "watched":
-                    item["watched_at"] = normalize_date(watched_at) or today_date()
-                write_json_items(path, items)
-                return True, "updated"
-        return False, "not_found"
+    return catalog_service(path).update_status(item_id, status, watched_at)
 
 
 def update_item_kind(path: Path, item_id: str, kind: str) -> tuple[bool, str]:
-    if not item_id:
-        raise ValueError("Missing item id")
-    kind = normalize_kind(kind)
-    if kind not in {"pelicula", "serie", "anime", "documental"}:
-        raise ValueError("Invalid kind")
-
-    with catalog_lock(path):
-        items = read_json_items(path)
-        for item in items:
-            if str(item.get("id") or "") == item_id:
-                item["kind"] = kind
-                item["locked_fields"] = normalize_locked_fields([*normalize_locked_fields(item.get("locked_fields")), "kind"])
-                sources = normalize_metadata_sources(item.get("metadata_sources"))
-                sources["kind"] = metadata_source_record("manual", "", inferred=False)
-                item["metadata_sources"] = sources
-                write_json_items(path, items)
-                return True, "updated"
-        return False, "not_found"
+    return catalog_service(path).update_kind(item_id, kind)
 
 
 def update_item_catalog_status(path: Path, item_id: str, en_catalogo: Any) -> tuple[bool, str]:
-    if not item_id:
-        raise ValueError("Missing item id")
-
-    with catalog_lock(path):
-        items = read_json_items(path)
-        for item in items:
-            if str(item.get("id") or "") == item_id:
-                item["en_catalogo"] = normalize_bool(en_catalogo)
-                write_json_items(path, items)
-                return True, "updated"
-        return False, "not_found"
+    return catalog_service(path).update_catalog_status(item_id, en_catalogo)
 
 
 def update_item_personal(path: Path, item_id: str, watched_at: str, rating: Any, review: str) -> tuple[bool, str]:
-    if not item_id:
-        raise ValueError("Missing item id")
-
-    with catalog_lock(path):
-        items = read_json_items(path)
-        for item in items:
-            if str(item.get("id") or "") == item_id:
-                item["watched_at"] = normalize_date(watched_at)
-                item["rating"] = normalize_rating(rating)
-                item["review"] = review.strip()
-                write_json_items(path, items)
-                return True, "updated"
-        return False, "not_found"
-
-
-EDITABLE_METADATA_FIELDS = {
-    "title",
-    "original_title",
-    "spanish_title",
-    "english_title",
-    "alternative_titles",
-    "kind",
-    "year",
-    "description",
-    "genres",
-    "directors",
-    "writers",
-    "cast",
-}
+    return catalog_service(path).update_personal(item_id, watched_at, rating, review)
 
 
 def update_item_metadata(
@@ -625,447 +486,7 @@ def update_item_metadata(
     values: dict[str, Any],
     locked_fields: Any,
 ) -> tuple[bool, str]:
-    if not item_id:
-        raise ValueError("Missing item id")
-    requested_fields = set(values) & EDITABLE_METADATA_FIELDS
-    if not requested_fields and locked_fields is None:
-        raise ValueError("Missing metadata values")
-
-    with catalog_lock(path):
-        items = read_json_items(path)
-        for item in items:
-            if str(item.get("id") or "") != item_id:
-                continue
-            sources = normalize_metadata_sources(item.get("metadata_sources"))
-            for field in requested_fields:
-                value = values.get(field)
-                if field in {"alternative_titles", "genres", "directors", "writers", "cast"}:
-                    normalized_value: Any = normalize_tags(value)
-                elif field == "kind":
-                    normalized_value = normalize_kind(value)
-                else:
-                    normalized_value = str(value or "").strip()
-                if field == "title" and not normalized_value:
-                    raise ValueError("Title cannot be empty")
-                if item.get(field) == normalized_value:
-                    continue
-                item[field] = normalized_value
-                sources[field] = metadata_source_record("manual", "", inferred=False)
-            if locked_fields is not None:
-                item["locked_fields"] = normalize_locked_fields(locked_fields)
-            item["metadata_sources"] = sources
-            write_json_items(path, items)
-            return True, "updated"
-        return False, "not_found"
-
-
-def possible_duplicate_candidates(items: list[dict[str, Any]], item: dict[str, Any]) -> list[dict[str, Any]]:
-    item_titles = title_match_keys_for_item(item)
-    item_year = str(item.get("year") or "")
-    if not item_titles:
-        return []
-
-    candidates: list[dict[str, Any]] = []
-    for existing in items:
-        existing_titles = title_match_keys_for_item(existing)
-        existing_year = str(existing.get("year") or "")
-        if not existing_titles:
-            continue
-        exact_title = bool(set(existing_titles) & set(item_titles))
-        similar_title = any(title_similarity(existing_title, item_title) >= 0.75 for existing_title in existing_titles for item_title in item_titles)
-        if not exact_title and not similar_title:
-            continue
-        if item_year and existing_year and item_year != existing_year:
-            continue
-        candidates.append(
-            {
-                "id": existing.get("id", ""),
-                "title": existing.get("title", ""),
-                "year": existing.get("year", ""),
-                "source": existing.get("source", ""),
-                "url": existing.get("url", ""),
-                "en_catalogo": existing.get("en_catalogo", False),
-                "local_name": existing.get("local_name", ""),
-            }
-        )
-    return candidates
-
-
-def title_values_for_item(item: dict[str, Any]) -> list[str]:
-    local_file_values = [
-        str(value)
-        for local_file in normalize_local_files(item.get("local_files"))
-        for value in (local_file.get("name", ""), local_file.get("path", ""))
-        if value
-    ]
-    return [
-        str(item.get("title") or ""),
-        str(item.get("original_title") or ""),
-        str(item.get("spanish_title") or ""),
-        str(item.get("english_title") or ""),
-        *normalize_tags(item.get("alternative_titles")),
-        str(item.get("wikipedia_title") or ""),
-        str(item.get("local_name") or ""),
-        *local_file_values,
-    ]
-
-
-def title_match_keys_for_item(item: dict[str, Any]) -> list[str]:
-    keys = [title_match_key(value) for value in title_values_for_item(item)]
-    return list(dict.fromkeys(key for key in keys if key))
-
-
-def title_similarity(left: str, right: str) -> float:
-    left_terms = set(left.split())
-    right_terms = set(right.split())
-    if not left_terms or not right_terms:
-        return 0.0
-    shared = len(left_terms & right_terms)
-    return shared / max(len(left_terms), len(right_terms))
-
-
-def metadata_source_record(source: str, url: str, inferred: bool, updated_at: str = "") -> dict[str, Any]:
-    return {
-        "source": source or "unknown",
-        "url": url,
-        "updated_at": updated_at or datetime.now(timezone.utc).isoformat(),
-        "inferred": inferred,
-    }
-
-
-def metadata_origin(item: dict[str, Any]) -> tuple[str, str]:
-    source = str(item.get("source") or "").strip()
-    url = str(item.get("url") or "").strip()
-    source_urls = {
-        "wikipedia": str(item.get("wikipedia_url") or ""),
-        "imdb": str(item.get("imdb_url") or ""),
-        "filmaffinity": str(item.get("filmaffinity_url") or ""),
-    }
-    if source in source_urls:
-        return source, source_urls[source] or url
-    if source:
-        return source, url
-    for known_source, known_url in source_urls.items():
-        if known_url:
-            return known_source, known_url
-    return "legacy", url
-
-
-def ensure_metadata_sources(item: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    sources = normalize_metadata_sources(item.get("metadata_sources"))
-    source, url = metadata_origin(item)
-    inferred_at = str(item.get("added_at") or "")
-    for field in METADATA_FIELDS:
-        value = item.get(field)
-        if field not in sources and value not in (None, "", [], {}):
-            sources[field] = metadata_source_record(source, url, inferred=True, updated_at=inferred_at)
-    return sources
-
-
-def merge_metadata_field(existing: dict[str, Any], incoming: dict[str, Any], field: str) -> None:
-    if field in normalize_locked_fields(existing.get("locked_fields")):
-        return
-    before = existing.get(field)
-    incoming_value = incoming.get(field)
-    if field in {"alternative_titles", "genres", "directors", "writers", "cast"}:
-        after: Any = merge_lists(normalize_tags(before), normalize_tags(incoming_value))
-    else:
-        after = before or incoming_value
-    if after == before:
-        return
-    existing[field] = after
-    incoming_sources = ensure_metadata_sources(incoming)
-    sources = ensure_metadata_sources(existing)
-    if field in incoming_sources:
-        sources[field] = dict(incoming_sources[field])
-    else:
-        source, url = metadata_origin(incoming)
-        sources[field] = metadata_source_record(source, url, inferred=False)
-    existing["metadata_sources"] = sources
-
-
-def merge_into_existing(items: list[dict[str, Any]], incoming: dict[str, Any], target_id: str) -> bool:
-    incoming = normalize_item(incoming)
-    for existing in items:
-        if str(existing.get("id") or "") != target_id:
-            continue
-        before_link = has_external_link(existing)
-        incoming_url = str(incoming.get("url") or "")
-        incoming_source_field = source_url_field(str(incoming.get("source") or ""), incoming_url)
-        existing["url"] = existing.get("url") or incoming.get("url", "")
-        existing["source"] = incoming.get("source") if existing.get("source") in {"", "local_files"} else existing.get("source")
-        for field in (
-            "title",
-            "original_title",
-            "spanish_title",
-            "english_title",
-            "alternative_titles",
-            "year",
-            "description",
-            "wikipedia_title",
-            "wikidata_id",
-            "genres",
-            "directors",
-            "writers",
-            "cast",
-            "page_image",
-            "wikipedia_extract",
-        ):
-            merge_metadata_field(existing, incoming, field)
-        existing["kind"] = normalize_kind(existing.get("kind") or incoming.get("kind"))
-        existing_status = normalize_status(existing.get("status"))
-        incoming_status = normalize_status(incoming.get("status"))
-        existing["status"] = "watched" if "watched" in {existing_status, incoming_status} else existing_status
-        existing["watched_at"] = existing.get("watched_at") or incoming.get("watched_at", "")
-        existing["rating"] = normalize_rating(existing.get("rating")) or normalize_rating(incoming.get("rating"))
-        if incoming_source_field and incoming_url:
-            existing[incoming_source_field] = existing.get(incoming_source_field) or incoming_url
-        existing["wikipedia_url"] = existing.get("wikipedia_url") or incoming.get("wikipedia_url", "")
-        if not existing.get("wikipedia_url") and is_wikipedia_item(incoming):
-            existing["wikipedia_url"] = incoming.get("url", "")
-        existing["imdb_url"] = existing.get("imdb_url") or incoming.get("imdb_url", "")
-        existing["filmaffinity_url"] = existing.get("filmaffinity_url") or incoming.get("filmaffinity_url", "")
-        if not existing.get("wikipedia_title") and is_wikipedia_item(incoming):
-            merge_metadata_field(existing, {**incoming, "wikipedia_title": incoming.get("title", "")}, "wikipedia_title")
-        existing["en_catalogo"] = bool(existing.get("en_catalogo") or incoming.get("en_catalogo"))
-        existing["local_files"] = merge_local_files(
-            normalize_local_files(existing.get("local_files"), existing.get("local_name", ""), existing.get("local_path", "")),
-            normalize_local_files(incoming.get("local_files"), incoming.get("local_name", ""), incoming.get("local_path", "")),
-        )
-        existing["local_name"] = existing.get("local_name") or incoming.get("local_name", "")
-        existing["local_path"] = existing.get("local_path") or incoming.get("local_path", "")
-        existing["tags"] = sorted(set(normalize_tags(existing.get("tags")) + normalize_tags(incoming.get("tags"))))
-        existing["notes"] = existing.get("notes") or incoming.get("notes", "")
-        existing["review"] = existing.get("review") or incoming.get("review", "")
-        existing["added_at"] = existing.get("added_at") or incoming.get("added_at", "")
-        existing["locked_fields"] = normalize_locked_fields(existing.get("locked_fields"))
-        existing["metadata_sources"] = ensure_metadata_sources(existing)
-        print(
-            "[catalog-viewer] merge target "
-            f"id={target_id} before_link={before_link} after_link={has_external_link(existing)} "
-            f"url={existing.get('url', '')} wiki_url={existing.get('wikipedia_url', '')} "
-            f"imdb_url={existing.get('imdb_url', '')} fa_url={existing.get('filmaffinity_url', '')}",
-            flush=True,
-        )
-        return True
-    return False
-
-
-def is_wikipedia_item(item: dict[str, Any]) -> bool:
-    return (
-        str(item.get("source") or "") == "wikipedia"
-        or "wikipedia.org" in canonical_url(str(item.get("url") or ""))
-        or "wikipedia.org" in canonical_url(str(item.get("wikipedia_url") or ""))
-    )
-
-
-def has_wikipedia_metadata(item: dict[str, Any]) -> bool:
-    return (
-        is_wikipedia_item(item)
-        or bool(item.get("wikipedia_title") or item.get("wikidata_id"))
-    )
-
-
-def normalize_item(row: dict[str, Any]) -> dict[str, Any]:
-    item = dict(row)
-    item["local_files"] = normalize_local_files(
-        item.get("local_files"),
-        str(item.get("local_name") or ""),
-        str(item.get("local_path") or ""),
-    )
-    if item["local_files"]:
-        first_local_file = item["local_files"][0]
-        item["local_name"] = item.get("local_name") or first_local_file.get("name", "")
-        item["local_path"] = item.get("local_path") or first_local_file.get("path", "")
-    item["added_at"] = item.get("added_at") or item.get("addedAt") or ""
-    item["tags"] = normalize_tags(item.get("tags"))
-    item["alternative_titles"] = normalize_tags(item.get("alternative_titles") or item.get("alternativeTitles"))
-    item["genres"] = normalize_tags(item.get("genres") or item.get("genre"))
-    item["directors"] = normalize_tags(item.get("directors") or item.get("director"))
-    item["writers"] = normalize_tags(item.get("writers") or item.get("writer") or item.get("screenwriters"))
-    item["cast"] = normalize_tags(item.get("cast") or item.get("actors") or item.get("actor"))
-    item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
-    item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
-    for key in [
-        "id",
-        "url",
-        "source",
-        "title",
-        "original_title",
-        "spanish_title",
-        "english_title",
-        "alternative_titles",
-        "kind",
-        "status",
-        "watched_at",
-        "year",
-        "description",
-        "wikipedia_url",
-        "imdb_url",
-        "filmaffinity_url",
-        "wikipedia_title",
-        "wikidata_id",
-        "genres",
-        "directors",
-        "writers",
-        "cast",
-        "page_image",
-        "wikipedia_extract",
-        "en_catalogo",
-        "local_name",
-        "local_path",
-        "notes",
-        "review",
-    ]:
-        if key == "en_catalogo":
-            item[key] = normalize_bool(item.get(key))
-        elif key in {"alternative_titles", "genres", "directors", "writers", "cast"}:
-            item[key] = normalize_tags(item.get(key))
-        elif key == "kind":
-            item[key] = normalize_kind(item.get(key))
-        elif key == "status":
-            item[key] = normalize_status(item.get(key))
-        elif key == "watched_at":
-            item[key] = normalize_date(item.get(key))
-        else:
-            item[key] = str(item.get(key) or "")
-    item["rating"] = normalize_rating(item.get("rating"))
-    if not item["id"]:
-        seed = item["url"] or item["local_path"] or item["local_name"] or f"{item['title']} {item['year']}".strip()
-        item["id"] = stable_id(seed) if seed else ""
-    item["metadata_sources"] = ensure_metadata_sources(item)
-    return item
-
-
-def normalize_status(value: Any) -> str:
-    text = str(value or "to_watch").strip().lower()
-    if not text or text in {"cataloged", "watching", "maybe"}:
-        return "to_watch"
-    return text if text in {"to_watch", "watched"} else "to_watch"
-
-
-def normalize_date(value: Any) -> str:
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    match = re.match(r"^(\d{4}-\d{2}-\d{2})", text)
-    return match.group(1) if match else ""
-
-
-def today_date() -> str:
-    return datetime.now().date().isoformat()
-
-
-def normalize_rating(value: Any) -> int:
-    try:
-        rating = int(float(str(value or 0).strip()))
-    except ValueError:
-        return 0
-    return max(0, min(10, rating))
-
-
-def normalize_kind(value: Any) -> str:
-    text = str(value or "pelicula").strip().lower()
-    mapping = {
-        "movie": "pelicula",
-        "film": "pelicula",
-        "película": "pelicula",
-        "pelicula": "pelicula",
-        "series": "serie",
-        "tvseries": "serie",
-        "tv series": "serie",
-        "episode": "serie",
-        "tv episode": "serie",
-        "serie": "serie",
-        "anime": "anime",
-        "documentary": "documental",
-        "documental": "documental",
-        "other": "pelicula",
-    }
-    return mapping.get(text, "pelicula")
-
-
-def normalize_tags(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [str(tag).strip() for tag in value if str(tag).strip()]
-    if isinstance(value, str):
-        return [tag.strip() for tag in value.split(",") if tag.strip()]
-    return []
-
-
-def merge_lists(primary: list[str], secondary: list[str]) -> list[str]:
-    seen: set[str] = set()
-    merged: list[str] = []
-    for value in primary + secondary:
-        key = value.strip().lower()
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        merged.append(value)
-    return merged
-
-
-def normalize_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    text = str(value or "").strip().lower()
-    return text in {"si", "sí", "yes", "true", "1"}
-
-
-def canonical_url(url: str) -> str:
-    parsed = urlparse(url.strip())
-    if not parsed.scheme or not parsed.netloc:
-        return ""
-    return f"{parsed.scheme.lower()}://{parsed.netloc.lower().removeprefix('www.')}{parsed.path.rstrip('/')}"
-
-
-def trusted_external_url(url: str) -> str:
-    canonical = canonical_url(url)
-    if not canonical:
-        return ""
-    host = urlparse(canonical).netloc
-    return canonical if any(known_host in host for known_host in KNOWN_LINK_HOSTS) else ""
-
-
-def source_url_field(source: str, url: str = "") -> str:
-    text = f"{source} {url}".lower()
-    if "wikipedia" in text:
-        return "wikipedia_url"
-    if "imdb" in text:
-        return "imdb_url"
-    if "filmaffinity" in text:
-        return "filmaffinity_url"
-    return ""
-
-
-def external_urls(item: dict[str, Any]) -> set[str]:
-    urls = {
-        trusted_external_url(str(item.get("url") or "")),
-        trusted_external_url(str(item.get("wikipedia_url") or "")),
-        trusted_external_url(str(item.get("imdb_url") or "")),
-        trusted_external_url(str(item.get("filmaffinity_url") or "")),
-    }
-    return {url for url in urls if url}
-
-
-def has_external_link(item: dict[str, Any]) -> bool:
-    return bool(external_urls(item))
-
-
-def title_match_key(value: str) -> str:
-    value = unicodedata.normalize("NFKD", html.unescape(value).lower())
-    value = "".join(character for character in value if not unicodedata.combining(character))
-    value = re.sub(r"\([^)]*\)", " ", value)
-    value = re.sub(r"\b(19\d{2}|20\d{2})\b", " ", value)
-    value = re.sub(r"[^a-z0-9]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
-
-
-def normalize_path_text(value: str) -> str:
-    value = html.unescape(value).lower()
-    value = re.sub(r"[\\/]+", " ", value)
-    value = re.sub(r"[^a-z0-9áéíóúñü]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
+    return catalog_service(path).update_metadata(item_id, values, locked_fields)
 
 
 def search_sources(query: str, source: str = "all") -> list[dict[str, Any]]:
@@ -1264,7 +685,7 @@ def source_from_url(url: str) -> str:
 
 def render_html(title: str) -> str:
     escaped_title = html_escape(title)
-    return f"""<!doctype html>
+    return rf"""<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8">

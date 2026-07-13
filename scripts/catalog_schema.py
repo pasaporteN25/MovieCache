@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 BACKUP_LIMIT = 10
 VALID_KINDS = ("pelicula", "serie", "anime", "documental")
 VALID_STATUSES = ("to_watch", "watched")
@@ -104,9 +104,11 @@ def normalize_local_files(value: Any, legacy_name: str = "", legacy_path: str = 
             continue
         path = str(row.get("path") or row.get("local_path") or "").strip()
         name = str(row.get("name") or row.get("local_name") or (Path(path).name if path else "")).strip()
+        library_id = str(row.get("library_id") or "").strip()
+        relative_path = str(row.get("relative_path") or path).strip().replace("\\", "/")
         if not path and not name:
             continue
-        key = (path or name).replace("\\", "/").casefold()
+        key = f"{library_id}:{relative_path or path or name}".casefold()
         if key in seen:
             continue
         seen.add(key)
@@ -117,6 +119,11 @@ def normalize_local_files(value: Any, legacy_name: str = "", legacy_path: str = 
                 "size_bytes": normalize_non_negative_int(row.get("size_bytes")),
                 "modified_at": str(row.get("modified_at") or "").strip(),
                 "part": str(row.get("part") or "").strip(),
+                "library_id": library_id,
+                "relative_path": relative_path,
+                "fingerprint": str(row.get("fingerprint") or "").strip(),
+                "last_seen_at": str(row.get("last_seen_at") or "").strip(),
+                "available": normalize_bool(row.get("available", True), default=True),
             }
         )
 
@@ -131,6 +138,11 @@ def normalize_local_files(value: Any, legacy_name: str = "", legacy_path: str = 
                 "size_bytes": 0,
                 "modified_at": "",
                 "part": "",
+                "library_id": "",
+                "relative_path": legacy_path.replace("\\", "/"),
+                "fingerprint": "",
+                "last_seen_at": "",
+                "available": True,
             }
         )
     return normalized
@@ -154,7 +166,7 @@ def normalize_metadata_sources(value: Any) -> dict[str, dict[str, Any]]:
             "source": source,
             "url": str(row.get("url") or "").strip(),
             "updated_at": str(row.get("updated_at") or "").strip(),
-            "inferred": bool(row.get("inferred", False)),
+            "inferred": normalize_bool(row.get("inferred", False)),
         }
     return normalized
 
@@ -218,3 +230,11 @@ def normalize_non_negative_int(value: Any) -> int:
         return max(0, int(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def normalize_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None or str(value).strip() == "":
+        return default
+    return str(value).strip().casefold() in {"1", "true", "yes", "si", "sí"}

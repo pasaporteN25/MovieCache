@@ -93,7 +93,7 @@ async function saveCurrent() {
 async function exportItems(format) {
   const { items = [] } = await chrome.storage.local.get("items");
   const normalizedItems = items.map(normalizeStoredItem);
-  const text = format === "json" ? JSON.stringify({ schema_version: 3, items: normalizedItems }, null, 2) : toCsv(normalizedItems);
+  const text = format === "json" ? JSON.stringify({ schema_version: 4, items: normalizedItems }, null, 2) : toCsv(normalizedItems);
   const type = format === "json" ? "application/json" : "text/csv";
   await downloadText(text, filename("movie-inbox", format), type);
 }

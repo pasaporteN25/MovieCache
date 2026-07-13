@@ -2,6 +2,23 @@
 
 Los cambios relevantes del proyecto se documentan en este archivo.
 
+## [Sin publicar]
+
+### Agregado
+
+- Capa compartida de dominio, servicio y repositorio JSON para separar la interfaz de la persistencia.
+- Bloqueo entre procesos y escrituras atomicas compartidas por el visor, migrador y scanner.
+- Scanner Python incremental para una biblioteca, con `dry-run`, estado persistente, reportes y modo `watch`.
+- Deteccion de archivos nuevos, modificados y movidos mediante ruta relativa y huella parcial.
+- Proteccion ante discos desconectados y escaneos parciales antes de marcar archivos no disponibles.
+- Esquema v4 con identidad de biblioteca, ruta relativa, huella, ultimo avistamiento y disponibilidad por archivo.
+
+### Corregido
+
+- El visor vuelve a cargar catalogos tras completar el refactor que habia dejado normalizadores duplicados.
+- Las expresiones regulares JavaScript embebidas ya no producen `SyntaxWarning` en Python.
+- Los valores de texto `false` en metadata y archivos locales ya no se interpretan como verdaderos.
+
 ## [0.1.0] - 2026-07-13
 
 ### Agregado

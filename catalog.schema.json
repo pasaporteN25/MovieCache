@@ -6,7 +6,7 @@
   "required": ["schema_version", "items"],
   "properties": {
     "schema_version": {
-      "const": 3
+      "const": 4
     },
     "items": {
       "type": "array",
@@ -19,13 +19,21 @@
   "$defs": {
     "localFile": {
       "type": "object",
-      "required": ["path", "name", "size_bytes", "modified_at", "part"],
+      "required": [
+        "path", "name", "size_bytes", "modified_at", "part", "library_id",
+        "relative_path", "fingerprint", "last_seen_at", "available"
+      ],
       "properties": {
         "path": {"type": "string"},
         "name": {"type": "string"},
         "size_bytes": {"type": "integer", "minimum": 0},
         "modified_at": {"type": "string"},
-        "part": {"type": "string"}
+        "part": {"type": "string"},
+        "library_id": {"type": "string"},
+        "relative_path": {"type": "string"},
+        "fingerprint": {"type": "string"},
+        "last_seen_at": {"type": "string"},
+        "available": {"type": "boolean"}
       },
       "additionalProperties": false
     },

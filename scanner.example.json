@@ -1,0 +1,17 @@
+{
+  "catalog": "scripts/catalogv4.json",
+  "state_dir": ".catalog-state",
+  "libraries": [
+    {
+      "id": "disco_principal",
+      "path": "D:/Peliculas",
+      "max_missing_ratio": 0.5,
+      "exclude_dirs": [
+        "$RECYCLE.BIN",
+        "System Volume Information",
+        ".catalog-cache",
+        ".catalog-state"
+      ]
+    }
+  ]
+}
