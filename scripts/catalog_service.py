@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from catalog_models import CatalogItem
 from catalog_domain import (
     external_urls,
     merge_into_existing,
@@ -22,6 +23,7 @@ from catalog_domain import (
 )
 from catalog_repository import JsonCatalogRepository
 from catalog_schema import normalize_local_files, normalize_locked_fields, normalize_metadata_sources
+from catalog_matching import decide_match
 
 
 EDITABLE_METADATA_FIELDS = {
@@ -45,7 +47,7 @@ class CatalogService:
     def __init__(self, repository: JsonCatalogRepository) -> None:
         self.repository = repository
 
-    def list_items(self) -> list[dict[str, Any]]:
+    def list_items(self) -> list[CatalogItem]:
         return self.repository.read()
 
     def append_item(
@@ -56,7 +58,7 @@ class CatalogService:
     ) -> tuple[bool, str, dict[str, Any]]:
         normalized = normalize_item(item)
 
-        def mutation(items: list[dict[str, Any]]) -> tuple[bool, tuple[bool, str, dict[str, Any]]]:
+        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str, dict[str, Any]]]:
             if action == "merge":
                 merged = merge_into_existing(items, normalized, target_id)
                 return merged, (merged, "merged" if merged else "merge_target_not_found", {})
@@ -85,7 +87,7 @@ class CatalogService:
         if not any([item_id, item_url, title, local_name]):
             raise ValueError("Missing item reference")
 
-        def mutation(items: list[dict[str, Any]]) -> tuple[bool, tuple[bool, str]]:
+        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str]]:
             for index, item in enumerate(items):
                 if same_catalog_item(item, item_id, item_url, title, year, local_name):
                     del items[index]
@@ -182,13 +184,14 @@ class CatalogService:
         if not library_id.strip():
             raise ValueError("Missing library id")
 
-        def mutation(items: list[dict[str, Any]]) -> tuple[bool, dict[str, Any]]:
+        def mutation(items: list[CatalogItem]) -> tuple[bool, dict[str, Any]]:
             report: dict[str, Any] = {
                 "discovered": len(scanned_files),
                 "unchanged": 0,
                 "updated": 0,
                 "moved": 0,
                 "matched": 0,
+                "match_details": [],
                 "created": 0,
                 "unavailable": 0,
                 "needs_review": [],
@@ -202,6 +205,7 @@ class CatalogService:
             for item in items:
                 local_files = normalize_local_files(item.get("local_files"), item.get("local_name", ""), item.get("local_path", ""))
                 item["local_files"] = local_files
+                local_files = item["local_files"]
                 for local_file in local_files:
                     relative = _relative_key(local_file.get("relative_path") or local_file.get("path"))
                     owner_library = str(local_file.get("library_id") or "").casefold()
@@ -259,6 +263,7 @@ class CatalogService:
                     "year": str(raw_file.get("year") or ""),
                     "local_name": str(scanned_file.get("name") or ""),
                     "local_path": str(scanned_file.get("path") or ""),
+                    "kind": str(raw_file.get("kind") or ""),
                 }
                 title_keys = set(title_match_keys_for_item(candidate))
                 exact_matches = [
@@ -267,14 +272,27 @@ class CatalogService:
                     if title_keys.intersection(title_match_keys_for_item(item))
                     and _years_compatible(candidate, item)
                 ]
-                if len(exact_matches) == 1:
-                    owner = exact_matches[0]
+                accepted_matches = [
+                    (item, decision)
+                    for item in exact_matches
+                    if (decision := decide_match(item, candidate)).accepted
+                ]
+                if len(accepted_matches) == 1:
+                    owner, decision = accepted_matches[0]
                     owner["local_files"] = normalize_local_files([*owner.get("local_files", []), scanned_file])
                     owner["local_name"] = owner.get("local_name") or scanned_file.get("name", "")
                     owner["local_path"] = owner.get("local_path") or scanned_file.get("path", "")
                     owner["en_catalogo"] = True
                     path_index[current_key] = (owner, owner["local_files"][-1])
                     report["matched"] += 1
+                    report["match_details"].append(
+                        {
+                            "relative_path": scanned_file.get("relative_path", ""),
+                            "item_id": owner.get("id", ""),
+                            "reason": decision.reason,
+                            "evidence": decision.evidence,
+                        }
+                    )
                     changed = True
                     continue
 
@@ -330,7 +348,7 @@ class CatalogService:
         return report
 
     def _update_item(self, item_id: str, update: Any) -> tuple[bool, str]:
-        def mutation(items: list[dict[str, Any]]) -> tuple[bool, tuple[bool, str]]:
+        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str]]:
             for item in items:
                 if str(item.get("id") or "") == item_id:
                     update(item)
@@ -366,7 +384,7 @@ def _new_local_item(
     candidate: dict[str, Any],
     scanned_at: str,
     kind: str,
-) -> dict[str, Any]:
+) -> CatalogItem:
     title = str(candidate.get("title") or local_file.get("name") or "Sin titulo")
     seed = f"{library_id}:{local_file.get('relative_path') or local_file.get('path')}"
     return normalize_item(

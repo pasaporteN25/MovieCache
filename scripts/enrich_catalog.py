@@ -14,18 +14,13 @@ import json
 import time
 from pathlib import Path
 
-from txt_to_catalog import (
-    CatalogItem,
-    clean_release_title,
-    dedupe_items,
-    fetch_metadata,
-    fetch_wikipedia_by_title,
-    infer_year,
-    normalize_list,
-    read_json_catalog,
-    write_csv,
-    write_json,
-)
+from catalog_deduplication import deduplicate_items
+from catalog_domain import external_source_name, normalize_item, normalize_tags as normalize_list
+from catalog_export import write_catalog_csv
+from catalog_metadata import fetch_metadata, fetch_wikipedia_by_title
+from catalog_models import CatalogItem
+from catalog_repository import JsonCatalogRepository
+from catalog_titles import clean_release_title, infer_year
 
 
 def main() -> int:
@@ -40,8 +35,7 @@ def main() -> int:
     parser.add_argument("--report", type=Path, help="Write a JSON report with changed and unmatched items.")
     args = parser.parse_args()
 
-    rows = read_json_catalog(args.catalog, status="to_watch")
-    items = rows.items
+    items = JsonCatalogRepository(args.catalog, normalize_item).read()
 
     report = {
         "input_items": len(items),
@@ -55,7 +49,7 @@ def main() -> int:
     interrupted = False
     try:
         for item in items:
-            if normalize_status(item):
+            if normalize_item_status(item):
                 report["status_normalized"] += 1
             if clean_item_title(item):
                 report["titles_cleaned"] += 1
@@ -81,7 +75,7 @@ def main() -> int:
         report["interrupted"] = True
         print("\nInterrupted. Saving partial output...", flush=True)
 
-    items, duplicate_labels = dedupe_items(items)
+    items, duplicate_labels = deduplicate_items(items)
     report["output_items"] = len(items)
     report["duplicates_merged"] = len(duplicate_labels)
     save_outputs(items, args, report)
@@ -98,7 +92,7 @@ def main() -> int:
     return 130 if interrupted else 0
 
 
-def normalize_status(item: CatalogItem) -> bool:
+def normalize_item_status(item: CatalogItem) -> bool:
     if item.status == "cataloged":
         item.status = "to_watch"
         return True
@@ -140,14 +134,15 @@ def link_wikipedia(item: CatalogItem) -> bool:
     metadata = fetch_metadata(source_url) if source_url else fetch_wikipedia_by_title(item.title, item.year)
     if not metadata:
         return False
-    if not (metadata.get("wikipedia_title") or metadata.get("wikidata_id") or "wikipedia.org" in metadata.get("url", "")):
+    metadata_url = str(metadata.get("url") or "")
+    if not (metadata.get("wikipedia_title") or metadata.get("wikidata_id") or external_source_name(metadata_url) == "wikipedia"):
         return False
 
-    item.url = item.url or metadata.get("url", "")
+    item.url = item.url or metadata_url
     if not item.source:
-        item.source = "wikipedia" if item.url and "wikipedia.org" in item.url else ""
+        item.source = external_source_name(item.url)
     item.wikipedia_url = item.wikipedia_url or metadata.get("wikipedia_url", "") or (
-        metadata.get("url", "") if "wikipedia.org" in metadata.get("url", "") else ""
+        metadata_url if external_source_name(metadata_url) == "wikipedia" else ""
     )
     item.original_title = item.original_title or metadata.get("original_title", "")
     item.spanish_title = item.spanish_title or metadata.get("spanish_title", "")
@@ -169,9 +164,9 @@ def link_wikipedia(item: CatalogItem) -> bool:
 
 
 def save_outputs(items: list[CatalogItem], args: argparse.Namespace, report: dict[str, object]) -> None:
-    write_json(args.json_path, items)
+    JsonCatalogRepository(args.json_path, normalize_item).write(items)
     if args.csv_path:
-        write_csv(args.csv_path, items)
+        write_catalog_csv(args.csv_path, items)
     if args.report:
         args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 

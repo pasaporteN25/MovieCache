@@ -18,6 +18,7 @@ import hashlib
 import html
 import json
 import re
+import secrets
 import time
 import unicodedata
 import webbrowser
@@ -28,38 +29,22 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
 
 import catalog_domain as domain
-from catalog_sources import EXTERNAL_SOURCES
-from catalog_domain import (
-    annotate_duplicate_items,
-    canonical_url,
-    external_urls,
-    has_external_link,
-    merge_lists,
-    normalize_bool,
-    normalize_date,
-    normalize_item,
-    normalize_kind,
-    normalize_rating,
-    normalize_tags,
-    source_url_field,
-    stable_id,
-    title_match_key,
-    title_match_keys_for_item,
-)
-from catalog_repository import CatalogRepositoryError, JsonCatalogRepository
+from catalog_http_security import UnsafeRemoteUrl, open_public_url, validate_public_http_url
+from catalog_models import CatalogItem
+from catalog_external import enrich_external_result, external_sources_snapshot, search_external_sources
+from catalog_repository import CatalogBusyError, CatalogFormatError, CatalogRepositoryError, JsonCatalogRepository
 from catalog_service import CatalogService
 from catalog_schema import (
     METADATA_FIELDS,
     SCHEMA_VERSION,
     normalize_local_files,
 )
-from txt_to_catalog import fetch_metadata
 
 
 _CATALOG_SERVICES: dict[str, CatalogService] = {}
+MAX_JSON_BODY_BYTES = 2 * 1024 * 1024
 
 
 @dataclass
@@ -70,6 +55,8 @@ class ViewerConfig:
     image_cache: bool
     image_cache_dir: str
     image_cache_max_bytes: int
+    port: int
+    api_token: str
 
 
 def main() -> int:
@@ -93,6 +80,8 @@ def main() -> int:
         image_cache=not args.no_image_cache,
         image_cache_dir=str(image_cache_dir),
         image_cache_max_bytes=max(1, int(args.image_cache_max_mb * 1024 * 1024)),
+        port=args.port,
+        api_token=secrets.token_urlsafe(32),
     )
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(config))
     url = f"http://127.0.0.1:{args.port}"
@@ -120,12 +109,20 @@ def main() -> int:
 def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
     class CatalogHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
+            if not self.authorize_host():
+                return
             path = urlparse(self.path).path
             if path == "/":
-                self.respond_html(render_html(config.title))
+                self.respond_html(render_html(config.title, config.api_token))
+                return
+            if path.startswith("/api/") and not self.authorize_token():
                 return
             if path == "/api/items":
-                items = load_items(config.patterns)
+                try:
+                    items = load_items(config.patterns)
+                except CatalogRepositoryError as error:
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
+                    return
                 with_link = sum(1 for item in items if has_external_link(item))
                 duplicate_items = sum(1 for item in items if int(item.get("_duplicate_count") or 0) > 0)
                 print(
@@ -139,7 +136,7 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                     "write_json": config.write_json,
                     "schema_version": SCHEMA_VERSION,
                     "duplicate_items": duplicate_items,
-                    "external": EXTERNAL_SOURCES.snapshot(),
+                    "external": external_sources_snapshot(),
                 }
                 self.respond_json(payload)
                 return
@@ -153,20 +150,24 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                     f"count={len(results)} result_sources={sorted(set(str(result.get('source') or '') for result in results))}",
                     flush=True,
                 )
-                payload = {"results": results, "external": EXTERNAL_SOURCES.snapshot()}
+                payload = {"results": results, "external": external_sources_snapshot()}
                 self.respond_json(payload)
                 return
             if path == "/api/source-health":
-                payload = {"external": EXTERNAL_SOURCES.snapshot()}
+                payload = {"external": external_sources_snapshot()}
                 self.respond_json(payload)
                 return
             if path == "/image-cache":
                 params = parse_qs(urlparse(self.path).query)
+                if not self.authorize_token(params.get("token", [""])[0]):
+                    return
                 self.respond_cached_image(params.get("url", [""])[0])
                 return
             self.send_error(404, "Not found")
 
         def do_POST(self) -> None:
+            if not self.authorize_host() or not self.authorize_post():
+                return
             path = urlparse(self.path).path
             if path == "/api/add":
                 try:
@@ -181,9 +182,9 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         target_id=str(body.get("target_id") or ""),
                         expected_source=str(body.get("expected_source") or ""),
                     )
-                    self.respond_json({"ok": added, "reason": reason, "item": item, **extra})
+                    self.respond_json({"ok": added, "reason": reason, "item": item, **extra}, operation_status(added, reason))
                 except (ValueError, CatalogRepositoryError) as error:
-                    self.respond_json({"ok": False, "reason": str(error)})
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
                 return
             if path == "/api/delete":
                 try:
@@ -198,9 +199,9 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         local_name=str(body.get("local_name") or ""),
                         confirmed=bool(body.get("confirmed")),
                     )
-                    self.respond_json({"ok": deleted, "reason": reason})
+                    self.respond_json({"ok": deleted, "reason": reason}, operation_status(deleted, reason))
                 except (ValueError, CatalogRepositoryError) as error:
-                    self.respond_json({"ok": False, "reason": str(error)})
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
                 return
             if path == "/api/status":
                 try:
@@ -211,9 +212,9 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         status=str(body.get("status") or ""),
                         watched_at=str(body.get("watched_at") or ""),
                     )
-                    self.respond_json({"ok": updated, "reason": reason})
+                    self.respond_json({"ok": updated, "reason": reason}, operation_status(updated, reason))
                 except (ValueError, CatalogRepositoryError) as error:
-                    self.respond_json({"ok": False, "reason": str(error)})
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
                 return
             if path == "/api/kind":
                 try:
@@ -223,9 +224,9 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         item_id=str(body.get("id") or ""),
                         kind=str(body.get("kind") or ""),
                     )
-                    self.respond_json({"ok": updated, "reason": reason})
+                    self.respond_json({"ok": updated, "reason": reason}, operation_status(updated, reason))
                 except (ValueError, CatalogRepositoryError) as error:
-                    self.respond_json({"ok": False, "reason": str(error)})
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
                 return
             if path == "/api/catalog":
                 try:
@@ -235,9 +236,9 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         item_id=str(body.get("id") or ""),
                         en_catalogo=body.get("en_catalogo"),
                     )
-                    self.respond_json({"ok": updated, "reason": reason})
+                    self.respond_json({"ok": updated, "reason": reason}, operation_status(updated, reason))
                 except (ValueError, CatalogRepositoryError) as error:
-                    self.respond_json({"ok": False, "reason": str(error)})
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
                 return
             if path == "/api/personal":
                 try:
@@ -249,9 +250,9 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         rating=body.get("rating"),
                         review=str(body.get("review") or ""),
                     )
-                    self.respond_json({"ok": updated, "reason": reason})
+                    self.respond_json({"ok": updated, "reason": reason}, operation_status(updated, reason))
                 except (ValueError, CatalogRepositoryError) as error:
-                    self.respond_json({"ok": False, "reason": str(error)})
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
                 return
             if path == "/api/metadata":
                 try:
@@ -262,17 +263,28 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
                         values=body.get("values") if isinstance(body.get("values"), dict) else {},
                         locked_fields=body.get("locked_fields"),
                     )
-                    self.respond_json({"ok": updated, "reason": reason})
+                    self.respond_json({"ok": updated, "reason": reason}, operation_status(updated, reason))
                 except (ValueError, CatalogRepositoryError) as error:
-                    self.respond_json({"ok": False, "reason": str(error)})
+                    self.respond_json({"ok": False, "reason": str(error)}, exception_status(error))
                 return
             self.send_error(404, "Not found")
+
+        def do_OPTIONS(self) -> None:
+            self.send_error(405, "CORS is not enabled")
 
         def log_message(self, format: str, *args: Any) -> None:
             return
 
         def read_json_body(self) -> dict[str, Any]:
-            length = int(self.headers.get("Content-Length", "0"))
+            content_type = self.headers.get_content_type()
+            if content_type != "application/json":
+                raise ValueError("Content-Type must be application/json")
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError as error:
+                raise ValueError("Invalid Content-Length") from error
+            if length <= 0 or length > MAX_JSON_BODY_BYTES:
+                raise ValueError("JSON body is empty or too large")
             raw = self.rfile.read(length).decode("utf-8")
             data = json.loads(raw or "{}")
             if not isinstance(data, dict):
@@ -282,40 +294,76 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
         def respond_html(self, body: str) -> None:
             self.respond(body.encode("utf-8"), "text/html; charset=utf-8")
 
-        def respond_json(self, payload: dict[str, Any]) -> None:
-            self.respond(json.dumps(payload, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+        def respond_json(self, payload: dict[str, Any], status: int = 200) -> None:
+            self.respond(json.dumps(payload, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8", status)
 
-        def respond(self, body: bytes, content_type: str) -> None:
-            self.send_response(200)
+        def respond(self, body: bytes, content_type: str, status: int = 200) -> None:
+            self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; img-src 'self' data: https:; style-src 'unsafe-inline'; "
+                "script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; "
+                "base-uri 'none'; form-action 'self'",
+            )
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
             self.end_headers()
             self.wfile.write(body)
+
+        def authorize_host(self) -> bool:
+            host = str(self.headers.get("Host") or "").strip().casefold()
+            port = int(self.server.server_address[1])
+            allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
+            if host not in allowed:
+                self.respond_json({"ok": False, "reason": "invalid_host"}, 403)
+                return False
+            return True
+
+        def authorize_token(self, query_token: str = "") -> bool:
+            supplied = query_token or str(self.headers.get("X-Movie-Inbox-Token") or "")
+            if not supplied or not secrets.compare_digest(supplied, config.api_token):
+                self.respond_json({"ok": False, "reason": "invalid_token"}, 403)
+                return False
+            return True
+
+        def authorize_post(self) -> bool:
+            if not self.authorize_token():
+                return False
+            origin = str(self.headers.get("Origin") or "").strip().casefold()
+            port = int(self.server.server_address[1])
+            allowed = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+            if origin not in allowed:
+                self.respond_json({"ok": False, "reason": "invalid_origin"}, 403)
+                return False
+            return True
 
         def respond_cached_image(self, image_url: str) -> None:
             if not image_url:
                 self.send_error(400, "Missing image URL")
                 return
-            parsed = urlparse(image_url)
-            if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            try:
+                validated_url = validate_public_http_url(image_url)
+            except UnsafeRemoteUrl:
                 self.send_error(400, "Invalid image URL")
                 return
             if not config.image_cache:
-                self.redirect(image_url)
+                self.redirect(validated_url)
                 return
             try:
-                body, content_type = cached_image(config, image_url)
-            except ValueError:
-                self.redirect(image_url)
-                return
-            except (HTTPError, URLError, TimeoutError, OSError):
-                self.redirect(image_url)
+                body, content_type = cached_image(config, validated_url)
+            except (ValueError, UnsafeRemoteUrl, HTTPError, URLError, TimeoutError, OSError):
+                self.send_error(502, "Image could not be fetched safely")
                 return
 
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(body)
 
@@ -323,9 +371,31 @@ def make_handler(config: ViewerConfig) -> type[BaseHTTPRequestHandler]:
             self.send_response(302)
             self.send_header("Location", location)
             self.send_header("Content-Length", "0")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
 
     return CatalogHandler
+
+
+def operation_status(ok: bool, reason: str) -> int:
+    if ok:
+        return 200
+    if reason in {"duplicate", "possible_duplicate", "merge_target_not_found"}:
+        return 409
+    if reason == "not_found":
+        return 404
+    return 400
+
+
+def exception_status(error: Exception) -> int:
+    if isinstance(error, CatalogBusyError):
+        return 503
+    if isinstance(error, CatalogFormatError):
+        return 422
+    if isinstance(error, CatalogRepositoryError):
+        return 500
+    return 400
 
 
 def first_json_file(patterns: list[str]) -> str:
@@ -365,19 +435,20 @@ def load_items(patterns: list[str]) -> list[dict[str, Any]]:
             rows = read_json_items(Path(file))
         except CatalogRepositoryError as error:
             print(f"[catalog-viewer] catalog read error file={file} error={error}", flush=True)
-            continue
+            raise
         for item in rows:
-            item["_source_file"] = str(file)
-            items.append(item)
+            row = item.to_dict()
+            row["_source_file"] = str(file)
+            items.append(row)
     annotate_duplicate_items(items)
     return sorted(items, key=lambda item: str(item.get("added_at") or item.get("addedAt") or ""), reverse=True)
 
 
-def read_json_items(path: Path) -> list[dict[str, Any]]:
+def read_json_items(path: Path) -> list[CatalogItem]:
     return catalog_service(path).list_items()
 
 
-def write_json_items(path: Path, items: list[dict[str, Any]]) -> None:
+def write_json_items(path: Path, items: list[CatalogItem]) -> None:
     catalog_service(path).repository.write(items)
 
 
@@ -491,7 +562,7 @@ def update_item_metadata(
 
 def search_sources(query: str, source: str = "all") -> list[dict[str, Any]]:
     started = time.monotonic()
-    results, external_state = EXTERNAL_SOURCES.search(query, source)
+    results, external_state = search_external_sources(query, source)
     cache_hit = external_state.get("cache", {}).get("last_request_hit")
     print(
         f"[catalog-viewer] external search completed query={query!r} source={source} "
@@ -502,45 +573,7 @@ def search_sources(query: str, source: str = "all") -> list[dict[str, Any]]:
 
 
 def enrich_selected_result(result: dict[str, Any]) -> dict[str, Any]:
-    enriched = dict(result)
-    source = str(enriched.get("source") or source_from_url(str(enriched.get("url") or "")))
-    if source not in {"wikipedia", "imdb", "filmaffinity"}:
-        return enriched
-    result_url = str(enriched.get("url") or "")
-    cache_key = canonical_url(result_url) or result_url
-    metadata, _ = EXTERNAL_SOURCES.selected_metadata(cache_key, lambda _: fetch_metadata(result_url))
-    if not metadata:
-        return enriched
-    for field in (
-        "title",
-        "original_title",
-        "spanish_title",
-        "english_title",
-        "year",
-        "description",
-        "wikipedia_title",
-        "wikidata_id",
-        "page_image",
-        "wikipedia_extract",
-    ):
-        if metadata.get(field):
-            enriched[field] = metadata[field]
-    for field in ("alternative_titles", "genres", "directors", "writers", "cast"):
-        values = normalize_tags(metadata.get(field))
-        if values:
-            enriched[field] = merge_lists(normalize_tags(enriched.get(field)), values)
-    for field in ("wikipedia_url", "imdb_url", "filmaffinity_url"):
-        if metadata.get(field):
-            enriched[field] = metadata[field]
-    metadata_url = str(metadata.get("url") or "")
-    if source == "wikipedia" and metadata_url:
-        enriched["url"] = metadata_url
-        enriched["wikipedia_url"] = metadata_url
-    elif source == "imdb":
-        enriched["imdb_url"] = result_url
-    elif source == "filmaffinity":
-        enriched["filmaffinity_url"] = result_url
-    return enriched
+    return dict(enrich_external_result(result))
 
 
 def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -619,9 +652,8 @@ IMAGE_CONTENT_EXTENSIONS = {
 
 
 def cached_image(config: ViewerConfig, image_url: str) -> tuple[bytes, str]:
+    image_url = validate_public_http_url(image_url)
     parsed = urlparse(image_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError("Invalid image URL")
 
     cache_dir = Path(config.image_cache_dir)
     key = hashlib.sha1(image_url.encode("utf-8")).hexdigest()
@@ -637,14 +669,15 @@ def cached_image(config: ViewerConfig, image_url: str) -> tuple[bytes, str]:
 
 
 def download_image(image_url: str, max_bytes: int) -> tuple[bytes, str]:
-    request = Request(
+    response = open_public_url(
         image_url,
         headers={
             "User-Agent": "MovieInboxViewer/0.1 (+local personal catalog)",
             "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         },
+        timeout=10,
     )
-    with urlopen(request, timeout=10) as response:
+    with response:
         content_type = response.headers.get_content_type()
         if not content_type.startswith("image/"):
             raise ValueError("URL did not return an image")
@@ -668,23 +701,16 @@ def image_content_type(suffix: str) -> str:
     return IMAGE_EXTENSIONS.get(suffix.lower(), "application/octet-stream")
 
 
-def stable_id(value: str) -> str:
-    return hashlib.sha1(value.encode("utf-8")).hexdigest()[:12]
-
-
 def source_from_url(url: str) -> str:
-    host = urlparse(url).netloc.lower()
-    if "wikipedia.org" in host:
-        return "wikipedia"
-    if "imdb.com" in host:
-        return "imdb"
-    if "filmaffinity.com" in host:
-        return "filmaffinity"
-    return host.removeprefix("www.")
+    source = domain.external_source_name(url)
+    if source:
+        return source
+    return (urlparse(url).hostname or "").lower().removeprefix("www.")
 
 
-def render_html(title: str) -> str:
+def render_html(title: str, api_token: str) -> str:
     escaped_title = html_escape(title)
+    encoded_api_token = json.dumps(api_token)
     return rf"""<!doctype html>
 <html lang="es">
   <head>
@@ -1491,6 +1517,7 @@ def render_html(title: str) -> str:
       </div>
     </dialog>
     <script>
+      const API_TOKEN = {encoded_api_token};
       let items = [];
       let sourceFiles = [];
       let manualResults = [];
@@ -1516,6 +1543,12 @@ def render_html(title: str) -> str:
       let externalHealth = {{ sources: {{}}, cache: {{}} }};
       const SEARCH_PAGE_SIZE = 6;
       const CATALOG_PAGE_SIZE = 36;
+
+      function apiFetch(url, options = {{}}) {{
+        const headers = new Headers(options.headers || {{}});
+        headers.set("X-Movie-Inbox-Token", API_TOKEN);
+        return fetch(url, {{ ...options, headers, credentials: "same-origin" }});
+      }}
       const fields = {{
         query: document.querySelector("#query"),
         catalogSource: document.querySelector("#catalogSource"),
@@ -1599,8 +1632,19 @@ def render_html(title: str) -> str:
       load();
 
       async function load() {{
-        const response = await fetch("/api/items");
+        try {{
+          await loadCatalog();
+        }} catch (error) {{
+          console.error("[catalog-viewer] catalog load failed", error);
+          fields.empty.textContent = `No se pudo cargar el catalogo: ${{error.message || error}}`;
+          fields.empty.hidden = false;
+        }}
+      }}
+
+      async function loadCatalog() {{
+        const response = await apiFetch("/api/items");
         const payload = await response.json();
+        if (!response.ok) throw new Error(payload.reason || `HTTP ${{response.status}}`);
         items = payload.items || [];
         sourceFiles = payload.sources || [];
         writeJsonPath = payload.write_json || "";
@@ -2053,7 +2097,7 @@ def render_html(title: str) -> str:
       }}
 
       function cachedImageSrc(url) {{
-        return `/image-cache?url=${{encodeURIComponent(url)}}`;
+        return `/image-cache?url=${{encodeURIComponent(url)}}&token=${{encodeURIComponent(API_TOKEN)}}`;
       }}
 
       async function searchManual(source = "all", statusPrefix = "") {{
@@ -2072,7 +2116,7 @@ def render_html(title: str) -> str:
         fields.searchButton.disabled = true;
         fields.searchButton.textContent = "Buscando...";
         try {{
-          const response = await fetch(`/api/search?q=${{encodeURIComponent(query)}}&source=${{encodeURIComponent(source)}}`, {{
+          const response = await apiFetch(`/api/search?q=${{encodeURIComponent(query)}}&source=${{encodeURIComponent(source)}}`, {{
             signal: controller.signal
           }});
           if (!response.ok) throw new Error(`HTTP ${{response.status}}`);
@@ -2352,7 +2396,7 @@ def render_html(title: str) -> str:
           await mergeSearchResult(index, selectedExistingIdForSearch);
           return;
         }}
-        const response = await fetch("/api/add", {{
+        const response = await apiFetch("/api/add", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify(manualResults[index])
@@ -2437,7 +2481,7 @@ def render_html(title: str) -> str:
 
       async function postAdd(result, action, targetId) {{
         const target = items.find((entry) => entry.id === targetId);
-        return fetch("/api/add", {{
+        return apiFetch("/api/add", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{
@@ -2570,7 +2614,7 @@ def render_html(title: str) -> str:
         const title = item?.title || item?.local_name || "Sin titulo";
         const confirmed = confirm(`Eliminar "${{title}}" del JSON? Esta accion modifica el catalogo.`);
         if (!confirmed) return;
-        const response = await fetch("/api/delete", {{
+        const response = await apiFetch("/api/delete", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{
@@ -2592,7 +2636,7 @@ def render_html(title: str) -> str:
         event.preventDefault();
         const nextStatus = currentStatus === "watched" ? "to_watch" : "watched";
         const item = items.find((entry) => entry.id === id);
-        const response = await fetch("/api/status", {{
+        const response = await apiFetch("/api/status", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{
@@ -2610,7 +2654,7 @@ def render_html(title: str) -> str:
       async function updateKind(event, id) {{
         const kind = event.target.value;
         const item = items.find((entry) => entry.id === id);
-        const response = await fetch("/api/kind", {{
+        const response = await apiFetch("/api/kind", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{ id, kind, source_file: item?._source_file || "" }})
@@ -2625,7 +2669,7 @@ def render_html(title: str) -> str:
         const item = items.find((entry) => entry.id === id);
         if (!item) return;
         const nextValue = !isInCatalog(item.en_catalogo);
-        const response = await fetch("/api/catalog", {{
+        const response = await apiFetch("/api/catalog", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{ id, en_catalogo: nextValue, source_file: item?._source_file || "" }})
@@ -2654,7 +2698,7 @@ def render_html(title: str) -> str:
         const status = panel?.querySelector("[data-personal-status]");
         if (status) status.textContent = "Guardando...";
         openPersonalId = id;
-        const response = await fetch("/api/personal", {{
+        const response = await apiFetch("/api/personal", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{ id, watched_at: watchedAt, rating, review, source_file: item?._source_file || "" }})
@@ -2684,7 +2728,7 @@ def render_html(title: str) -> str:
         }});
         const status = editor.querySelector("[data-metadata-status]");
         if (status) status.textContent = "Guardando...";
-        const response = await fetch("/api/metadata", {{
+        const response = await apiFetch("/api/metadata", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{
@@ -2800,7 +2844,8 @@ def render_html(title: str) -> str:
 
       function hasHost(url, host) {{
         try {{
-          return new URL(url).hostname.includes(host);
+          const hostname = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+          return hostname === host || hostname.endsWith(`.${{host}}`);
         }} catch {{
           return false;
         }}

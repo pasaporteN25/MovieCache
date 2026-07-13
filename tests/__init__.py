@@ -1,0 +1,1 @@
+"""Movie Inbox test suite."""

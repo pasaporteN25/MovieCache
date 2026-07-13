@@ -14,6 +14,10 @@ Incluye:
 - `scripts/scan_video_catalog.sh`: recorre una carpeta local de peliculas y genera JSON desde archivos de video.
 - `scripts/scan_library.py`: sincroniza incrementalmente una biblioteca de video con el catalogo principal.
 - `scripts/view_catalog.py`: servidor local con visor, CRUD, busqueda y detalle del catalogo.
+- `scripts/catalog_models.py`: modelos canonicos `CatalogItem`, `LocalFile` y `MetadataSource`.
+- `scripts/catalog_domain.py`: normalizacion y reglas compartidas de merge.
+- `scripts/catalog_service.py`: casos de uso del visor y del scanner.
+- `scripts/catalog_repository.py`: lectura, validacion, bloqueo y escritura atomica.
 - `scripts/catalog_sources.py`: adaptadores para Wikipedia, IMDb y FilmAffinity.
 - `catalog.schema.json`: contrato JSON versionado del catalogo.
 - `chrome-extension/`: extension de Chrome para guardar la pestana actual con datos minimos y exportar CSV/JSON.
@@ -83,7 +87,7 @@ Para detectar cambios periodicamente en el mismo proceso:
 py scripts/scan_library.py --config scanner.json --apply --watch --interval 300 --report scanner-report.json
 ```
 
-El scanner recorre subcarpetas y guarda estado liviano en `.catalog-state`. Usa tamano, fecha de modificacion y una huella parcial para evitar leer de nuevo archivos que no cambiaron. Un movimiento dentro del disco conserva la entrada; una coincidencia unica por titulo/ano se asocia al item existente; una coincidencia ambigua no se aplica y queda en `needs_review`.
+El scanner recorre subcarpetas y guarda estado liviano en `.catalog-state`. Usa tamano, fecha de modificacion y una huella parcial para evitar leer de nuevo archivos que no cambiaron. Un movimiento dentro del disco conserva la entrada; una coincidencia unica por titulo, ano y tipo se asocia al item existente; una coincidencia ambigua no se aplica y queda en `needs_review`.
 
 Si el disco no existe o no esta montado, el scanner aborta antes de modificar el catalogo. Tambien compara el recorrido con el ultimo estado y omite bajas cuando desaparece mas del porcentaje configurado en `max_missing_ratio` (50% por defecto), lo que cubre puntos de montaje que siguen existiendo pero aparecen vacios. Si hubo errores parciales de lectura, actualiza lo que pudo ver pero no marca archivos ausentes ni reemplaza el ultimo estado completo. El scanner solo administra `local_files` y la disponibilidad agregada `en_catalogo`: no modifica `status`, `watched_at`, `rating` ni `review`, y no consulta fuentes externas durante el recorrido.
 
@@ -139,7 +143,7 @@ El campo `kind` ya acepta `pelicula`, `serie`, `anime` y `documental`. Por ahora
 
 Cuando se puede resolver un `wikidata_id`, el enriquecimiento intenta completar datos de obra: `genres`, `directors`, `writers`, `cast` y `year`.
 
-Durante el merge, si dos entradas coinciden por URL normalizada o por titulo normalizado, se combinan en una sola. Si cualquiera de las dos tiene `en_catalogo: true`, el resultado final conserva `en_catalogo: true`.
+Durante el merge automatico solo se combinan entradas con una senal fuerte: URL externa compartida, mismo `wikidata_id`, o titulo exacto junto con ano exacto y tipo compatible. Los titulos iguales sin ano quedan pendientes de revision. Si cualquiera de las dos entradas tiene `en_catalogo: true`, el resultado final conserva `en_catalogo: true`.
 
 ## Sumar exports a un catalogo general
 
@@ -155,7 +159,7 @@ Tambien podes guardar el resumen de importacion:
 python scripts/txt_to_catalog.py movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv --log-json import-log.json
 ```
 
-La deduplicacion se hace por URL normalizada, incluyendo `url`, `wikipedia_url`, `imdb_url` y `filmaffinity_url`. Por ejemplo, ignora diferencias como `www.` o una barra final. En el script de matching externo tambien se combinan duplicados con mismo titulo exacto y mismo año.
+La deduplicacion se hace por URL normalizada, incluyendo `url`, `wikipedia_url`, `imdb_url` y `filmaffinity_url`. Por ejemplo, ignora diferencias como `www.` o una barra final. Tambien puede combinar mismo titulo exacto, mismo ano y tipo compatible. Cada match automatico del script externo registra en el reporte su motivo y evidencia.
 
 Si queres que los links nuevos de Wikipedia entren enriquecidos:
 
@@ -245,9 +249,11 @@ py scripts/match_external_links.py catalogv2.json --json catalogv3_links.json --
 
 El script busca en Wikipedia, IMDb y FilmAffinity para entradas sin link, combina automaticamente solo matches de alta confianza y deja en el reporte los casos dudosos para revisar en el visualizador.
 
+Un titulo exacto sin ano, con ano distinto o con tipo incompatible nunca se combina automaticamente. Esos candidatos aparecen en `needs_review` con score, motivo y evidencia para decidirlos desde el visor.
+
 ## Esquema versionado y migracion
 
-Las escrituras nuevas usan `schema_version: 4` y guardan las entradas dentro de `items`. Los catalogos anteriores que eran una lista se siguen leyendo. Cada obra puede tener varios archivos fisicos en `local_files`; `local_name` y `local_path` se mantienen por compatibilidad. La version 3 sumo procedencia y bloqueos de metadata. La version 4 agrega a cada archivo `library_id`, `relative_path`, `fingerprint`, `last_seen_at` y `available` para soportar sincronizacion incremental sin eliminar campos anteriores.
+Las escrituras nuevas usan `schema_version: 4` y guardan las entradas dentro de `items`. Los catalogos legacy y las versiones 1 a 3 pasan por migraciones explicitas antes de usarse. Una version futura, una raiz mal formada o una fila invalida se rechazan y nunca se interpretan como catalogo vacio ni se reescriben silenciosamente. Cada obra puede tener varios archivos fisicos en `local_files`; `local_name` y `local_path` se mantienen por compatibilidad. La version 3 sumo procedencia y bloqueos de metadata. La version 4 agrega a cada archivo `library_id`, `relative_path`, `fingerprint`, `last_seen_at` y `available` para soportar sincronizacion incremental sin eliminar campos anteriores.
 
 Para convertir un catalogo completo sin reemplazar el original:
 
@@ -256,6 +262,18 @@ py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalo
 ```
 
 Las escrituras del visor y del importador son atomicas: primero se completa un archivo temporal y luego se reemplaza el JSON. El visor bloquea cada catalogo durante operaciones de escritura concurrentes y conserva como maximo los 10 backups automaticos mas recientes.
+
+## Seguridad del visor local
+
+El visor genera un token aleatorio en cada inicio y lo exige en todas las operaciones de API. Tambien valida `Host` y `Origin`, acepta escrituras solo con `Content-Type: application/json`, limita el cuerpo de las peticiones y devuelve estados HTTP 4xx/5xx cuando corresponde. El proxy de imagenes solo acepta HTTP/HTTPS publico en puertos estandar, bloquea destinos privados, loopback, link-local o reservados y vuelve a validar cada redireccion.
+
+## Pruebas
+
+La suite usa `unittest` de la libreria standard y cubre migraciones, repositorio, modelos, matching conservador, limites entre capas y seguridad HTTP/SSRF:
+
+```powershell
+py -m unittest discover -s tests -v
+```
 
 ## Limpiar titulos y linkear con Wikipedia
 

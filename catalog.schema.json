@@ -41,7 +41,7 @@
       "type": "object",
       "required": ["source", "url", "updated_at", "inferred"],
       "properties": {
-        "source": {"type": "string"},
+        "source": {"type": "string", "minLength": 1},
         "url": {"type": "string"},
         "updated_at": {"type": "string"},
         "inferred": {"type": "boolean"}
@@ -89,6 +89,14 @@
         "review": {"type": "string"},
         "metadata_sources": {
           "type": "object",
+          "propertyNames": {
+            "enum": [
+              "title", "original_title", "spanish_title", "english_title",
+              "alternative_titles", "kind", "year", "description",
+              "wikipedia_title", "wikidata_id", "genres", "directors",
+              "writers", "cast", "page_image", "wikipedia_extract"
+            ]
+          },
           "additionalProperties": {"$ref": "#/$defs/metadataSource"}
         },
         "locked_fields": {
