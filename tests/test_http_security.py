@@ -8,10 +8,10 @@ from urllib.error import HTTPError
 from unittest.mock import patch
 
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
-sys.path.insert(0, str(SCRIPTS))
+SRC = Path(__file__).resolve().parents[1] / "src"
+sys.path.insert(0, str(SRC))
 
-from catalog_http_security import UnsafeRemoteUrl, open_public_url, validate_public_http_url
+from movie_inbox.web.security import UnsafeRemoteUrl, open_public_url, validate_public_http_url
 
 
 def resolver_for(address: str):
@@ -52,7 +52,7 @@ class HttpSecurityTests(unittest.TestCase):
             address = "127.0.0.1" if host == "127.0.0.1" else "8.8.8.8"
             return resolver_for(address)(host, port)
 
-        with patch("catalog_http_security.build_opener", return_value=RedirectingOpener()):
+        with patch("movie_inbox.web.security.build_opener", return_value=RedirectingOpener()):
             with self.assertRaises(UnsafeRemoteUrl):
                 open_public_url("https://images.example.com/a.jpg", headers={}, timeout=1, resolver=resolver)
 

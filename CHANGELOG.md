@@ -6,7 +6,18 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
-- Capa compartida de dominio, servicio y repositorio JSON para separar la interfaz de la persistencia.
+- Paquete instalable `movie-inbox` con subcomandos `import`, `scan`, `serve`, `migrate`, `enrich`, `match` y `db`.
+- Estructura `src/movie_inbox` con capas de dominio, aplicacion, infraestructura, clientes externos y web.
+- Clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity, con registro concurrente y cache compartido.
+- HTML, CSS y JavaScript del visor como assets estaticos empaquetados.
+- Handlers HTTP, ciclo de vida del servidor y proxy/cache de imagenes en modulos independientes.
+- Lanzadores compatibles en `scripts/` para conservar los comandos de v0.1.
+- Contrato de repositorio compartido para separar los casos de uso de la persistencia.
+- Repositorio SQLite transaccional seleccionable por extension, manteniendo JSON como importacion, exportacion y backup.
+- Tablas normalizadas para obras, aliases, IDs externos, archivos, tags y procedencia, con estructura reservada para temporadas y episodios.
+- Importacion JSON a SQLite con verificacion y backup previo al reemplazo, exportacion reversible e inspeccion de la base.
+- Checks reproducibles para PowerShell y Bash, y CI en GitHub Actions para Linux y Windows.
+- Documentacion del modelo de despliegue con codigo y datos persistentes separados.
 - Bloqueo entre procesos y escrituras atomicas compartidas por el visor, migrador y scanner.
 - Scanner Python incremental para una biblioteca, con `dry-run`, estado persistente, reportes y modo `watch`.
 - Deteccion de archivos nuevos, modificados y movidos mediante ruta relativa y huella parcial.
@@ -17,10 +28,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Token por sesion, validacion de origen/host y respuestas HTTP con estados reales en el visor.
 - Proteccion SSRF del cache de imagenes, incluida la validacion de redirecciones.
 - Matching conservador y auditable con motivo y evidencia por candidato.
-- Pruebas de regresion para seguridad HTTP, esquema, repositorio, modelos, capas y matching.
+- Pruebas de regresion para seguridad HTTP, esquema, repositorios JSON/SQLite, gateways externos, modelos, capas y matching.
 
 ### Corregido
 
+- Las consultas batch de metadata vuelven a continuar ante timeouts o respuestas invalidas, mientras el buscador conserva errores para el panel de salud.
+- La politica CSP del visor ya no necesita permitir JavaScript ni estilos inline.
 - El visor vuelve a cargar catalogos tras completar el refactor que habia dejado normalizadores duplicados.
 - Las expresiones regulares JavaScript embebidas ya no producen `SyntaxWarning` en Python.
 - Los valores de texto `false` en metadata y archivos locales ya no se interpretan como verdaderos.
