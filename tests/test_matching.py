@@ -5,11 +5,11 @@ import unittest
 from pathlib import Path
 
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
-sys.path.insert(0, str(SCRIPTS))
+SRC = Path(__file__).resolve().parents[1] / "src"
+sys.path.insert(0, str(SRC))
 
-from catalog_domain import external_source_name, trusted_external_url
-from catalog_matching import decide_match
+from movie_inbox.domain.catalog import external_source_name, trusted_external_url
+from movie_inbox.domain.matching import decide_match
 
 
 class MatchingTests(unittest.TestCase):

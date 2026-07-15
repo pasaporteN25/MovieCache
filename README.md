@@ -4,9 +4,11 @@ Pequena base para convertir una lista desordenada de links de peliculas/series e
 
 ## Estado del proyecto
 
-La version actual es **v0.1.0**. Movie Inbox funciona como un gestor local de catalogo basado en JSON: importa listas y archivos, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews desde una interfaz web.
+La version de desarrollo actual es **v0.2.0**. Movie Inbox funciona como un gestor local de catalogo con almacenamiento JSON o SQLite: importa listas y archivos, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews desde una interfaz web.
 
-El catalogo usa un esquema versionado y sigue siendo un archivo legible y portable. Los JSON personales, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
+El catalogo usa esquemas versionados. JSON sigue siendo el formato legible y portable de intercambio y backup; SQLite puede usarse como fuente de verdad transaccional. Los catalogos personales, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
+
+El codigo principal vive en el paquete instalable `src/movie_inbox`. Los archivos de `scripts/` son lanzadores compatibles con los comandos usados en v0.1.
 
 Incluye:
 
@@ -14,13 +16,67 @@ Incluye:
 - `scripts/scan_video_catalog.sh`: recorre una carpeta local de peliculas y genera JSON desde archivos de video.
 - `scripts/scan_library.py`: sincroniza incrementalmente una biblioteca de video con el catalogo principal.
 - `scripts/view_catalog.py`: servidor local con visor, CRUD, busqueda y detalle del catalogo.
-- `scripts/catalog_models.py`: modelos canonicos `CatalogItem`, `LocalFile` y `MetadataSource`.
-- `scripts/catalog_domain.py`: normalizacion y reglas compartidas de merge.
-- `scripts/catalog_service.py`: casos de uso del visor y del scanner.
-- `scripts/catalog_repository.py`: lectura, validacion, bloqueo y escritura atomica.
-- `scripts/catalog_sources.py`: adaptadores para Wikipedia, IMDb y FilmAffinity.
+- `src/movie_inbox/domain/`: modelos, normalizacion, matching y reglas de merge.
+- `src/movie_inbox/application/`: casos de uso compartidos por el visor, importadores y scanner.
+- `src/movie_inbox/infrastructure/`: esquemas, repositorios JSON/SQLite y exportacion.
+- `src/movie_inbox/external/`: clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity.
+- `src/movie_inbox/web/`: servidor, handlers, proxy seguro de imagenes y assets estaticos.
 - `catalog.schema.json`: contrato JSON versionado del catalogo.
 - `chrome-extension/`: extension de Chrome para guardar la pestana actual con datos minimos y exportar CSV/JSON.
+
+## Instalacion y comandos
+
+Para trabajar desde un checkout, instala el paquete en modo editable:
+
+```powershell
+py -m pip install -e .
+```
+
+Eso habilita un unico comando con subcomandos:
+
+```powershell
+movie-inbox import links.txt --json catalog.json --fetch
+movie-inbox scan --config scanner.json --dry-run
+movie-inbox serve catalog.json
+movie-inbox migrate catalog-viejo.json --json catalog-v4.json
+movie-inbox enrich catalog.json --json catalog-enriquecido.json
+movie-inbox match catalog.json --json catalog-con-links.json
+movie-inbox db import catalog.json --db data/movie-inbox.db
+movie-inbox db export data/movie-inbox.db --json backups/catalog.json
+```
+
+En Windows, si la carpeta `Scripts` de Python no esta en `PATH`, usa la forma equivalente:
+
+```powershell
+py -m movie_inbox serve catalog.json
+```
+
+El ejecutable suele quedar en `%LocalAppData%\Programs\Python\Python314\Scripts`. Agregar esa carpeta al `PATH` permite invocar directamente `movie-inbox` desde una terminal nueva.
+
+Los comandos `py scripts/txt_to_catalog.py ...`, `py scripts/scan_library.py ...` y `py scripts/view_catalog.py ...` siguen funcionando y llaman a la misma implementacion del paquete.
+
+## SQLite y backups JSON
+
+Para crear una base SQLite sin modificar el JSON original:
+
+```powershell
+py -m movie_inbox db import scripts/catalogv3_links.json --db data/movie-inbox.db
+```
+
+El import verifica los IDs despues de escribir. No reemplaza una base con datos salvo que se use `--replace`; en ese caso primero crea un backup JSON de la base anterior. El visor, scanner, enriquecedor y matcher seleccionan el repositorio por extension, por lo que la base se abre directamente:
+
+```powershell
+py -m movie_inbox serve data/movie-inbox.db
+py -m movie_inbox db info data/movie-inbox.db
+```
+
+Para generar un backup legible y versionado:
+
+```powershell
+py -m movie_inbox db export data/movie-inbox.db --json backups/catalog-2026-07-15.json
+```
+
+SQLite normaliza obras, aliases, IDs externos, archivos locales, tags y procedencia. Tambien reserva tablas para temporadas y episodios, pero esa funcionalidad todavia no forma parte del dominio ni de la interfaz. Los archivos `.db`, `.sqlite`, sus journals y `data/` se ignoran en Git.
 
 ## Uso del script
 
@@ -137,7 +193,7 @@ Para items locales sin URL, `--fetch` busca en Wikipedia usando el titulo limpio
 
 Los items que vengan de links, CSVs o JSONs de la extension entran con `en_catalogo: false` por defecto, salvo que el archivo ya traiga otro valor. Tambien se normalizan los campos personales nuevos: `watched_at`, `rating` y `review`, y los campos de titulos `original_title`, `spanish_title`, `english_title` y `alternative_titles`. Los JSONs viejos con `si`/`no` se siguen leyendo correctamente y se normalizan a booleanos.
 
-Antes de sobrescribir un JSON existente, los scripts crean un backup automatico junto al archivo con formato `nombre.YYYYMMDD-HHMMSS-microsegundos.bak.json`. Por ahora el JSON sigue siendo la fuente principal porque es facil de auditar y versionar; una base relacional queda como paso futuro si crecen mucho temporadas, capitulos, usuarios o relaciones complejas.
+Antes de sobrescribir un JSON existente, los scripts crean un backup automatico junto al archivo con formato `nombre.YYYYMMDD-HHMMSS-microsegundos.bak.json`. Para uso continuo en servidor se recomienda SQLite como fuente principal y una exportacion JSON periodica como backup portable.
 
 El campo `kind` ya acepta `pelicula`, `serie`, `anime` y `documental`. Por ahora `serie` identifica el tipo de entrada; temporadas y capitulos quedan para una etapa posterior del modelo.
 
@@ -191,7 +247,7 @@ python scripts/view_catalog.py exports/*.json --port 8765
 
 Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada.
 
-El visor tiene una consola de busqueda unica con fuentes combinables. `Catalogo` queda siempre activo para buscar en tu JSON local y `Externo` se puede marcar cuando tambien queres consultar Wikipedia, IMDb y FilmAffinity. La busqueda se ejecuta solo al tocar `Buscar` o presionar Enter; marcar/desmarcar una fuente no dispara consultas. Si abriste varios JSONs, por defecto escribe en el primer JSON resuelto; podes elegir otro archivo con `--write-json`:
+El visor tiene una consola de busqueda unica con fuentes combinables. `Catalogo` queda siempre activo para buscar en los datos locales y `Externo` se puede marcar cuando tambien queres consultar Wikipedia, IMDb y FilmAffinity. La busqueda se ejecuta solo al tocar `Buscar` o presionar Enter; marcar/desmarcar una fuente no dispara consultas. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
 
 Las consultas externas se ejecutan en paralelo mediante adaptadores independientes y se guardan durante 15 minutos en un cache de memoria. Un error en una fuente no cancela las otras. `External DBs` muestra estado, latencia, cantidad de resultados y errores por fuente, ademas de hits, misses y entradas del cache. Wikipedia devuelve primero datos livianos para mostrar resultados rapido y completa la metadata de la entrada elegida recien al agregarla o combinarla.
 
@@ -203,7 +259,7 @@ python scripts/view_catalog.py catalog_wiki_v5.json --write-json catalog_wiki_v5
 
 Las tarjetas del visor local ahora son una vista rapida para escanear: imagen, titulo, subtitulo con titulo original/ingles cuando difiere, badges de estado/link/catalogo, mini ficha y acciones basicas. Al hacer click en una tarjeta se abre un panel lateral con la ficha completa, titulos multilenguaje, links asociados, registro personal y acciones destructivas.
 
-El resumen muestra cuantas entradas tienen posibles duplicados por URL externa o por titulo y ano. `Ver duplicadas` filtra esas entradas, cada card lleva un badge y el detalle explica la coincidencia. Al agregar desde una fuente externa, el JSON editable se revisa primero por URL y por todos sus titulos conocidos antes de insertar.
+El resumen muestra cuantas entradas tienen posibles duplicados por URL externa o por titulo y ano. `Ver duplicadas` filtra esas entradas, cada card lleva un badge y el detalle explica la coincidencia. Al agregar desde una fuente externa, el catalogo editable se revisa primero por URL y por todos sus titulos conocidos antes de insertar.
 
 Los resultados de busqueda local y externa se muestran como cards compactas, de a 6, y suman `Cargar mas` cuando quedan mas coincidencias. La descripcion ocupa como maximo dos lineas y `Ver mas` abre el texto completo. Las cards externas priorizan `Agregar`, `Comparar` y `Detalle`; las locales priorizan `Detalle` y muestran `Combinar` cuando venis comparando contra un resultado externo. La grilla principal renderiza 36 entradas por tanda para evitar crear de golpe todas las cards e imagenes del catalogo.
 
@@ -215,7 +271,7 @@ Cuando el detector automatico no encuentra el duplicado, en un resultado externo
 
 Cada tarjeta tiene `Buscar link`. Ese boton usa automaticamente el titulo/año de esa entrada, busca en Wikipedia, IMDb y FilmAffinity, y deja lista la comparacion contra esa misma entrada.
 
-El panel lateral tiene accion `Eliminar`. Antes de borrar, el navegador pide confirmacion porque se modifica directamente el JSON elegido con `--write-json`.
+El panel lateral tiene accion `Eliminar`. Antes de borrar, el navegador pide confirmacion porque se modifica directamente el catalogo elegido.
 
 Cada tarjeta tambien permite cambiar rapidamente entre `to_watch` y `watched` con `Marcar vista` / `Marcar pendiente`. Al marcar una entrada como vista se guarda `watched_at` con la fecha local del dia.
 
@@ -233,13 +289,13 @@ El panel lateral permite editar el tipo con un selector: `pelicula`, `serie`, `a
 
 Al combinar un resultado externo se guarda el link especifico de la fuente (`wikipedia_url`, `imdb_url` o `filmaffinity_url`) sin perder el link principal que ya tuviera la entrada.
 
-El lateral queda separado en `Resumen`, `Filtros`, `Menu` y `Herramientas`. En `Menu`, `Bases de datos` muestra el JSON editable y los JSON cargados; `External DBs` muestra el estado de Wikipedia, IMDb y FilmAffinity. En herramientas incluye `Revisar sin link`, `Anterior` y `Siguiente` para recorrer de forma sistematica las entradas que todavia no tienen link asociado de Wikipedia, IMDb o FilmAffinity.
+El lateral queda separado en `Resumen`, `Filtros`, `Menu` y `Herramientas`. En `Menu`, `Bases de datos` muestra el catalogo editable y los archivos cargados; `External DBs` muestra el estado de Wikipedia, IMDb y FilmAffinity. En herramientas incluye `Revisar sin link`, `Anterior` y `Siguiente` para recorrer de forma sistematica las entradas que todavia no tienen link asociado de Wikipedia, IMDb o FilmAffinity.
 
 El resumen lateral muestra cuantas entradas estan vistas, cuantas quedan por ver, cuantas tienen algun link asociado y cuantas siguen sin link.
 
 El lateral tambien incluye `Randomizar` para mezclar solo la vista actual, respetando filtros y busquedas sin modificar el JSON. `Orden normal` vuelve al orden original.
 
-Las imagenes del visor se sirven con un cache local. La primera vez que una tarjeta necesita `page_image`, el servidor la descarga y la guarda en `.catalog-cache/images` junto al JSON editable; despues se sirve desde esa carpeta. Se puede desactivar con `--no-image-cache`, cambiar la carpeta con `--image-cache-dir` o limitar el tamano por imagen con `--image-cache-max-mb`.
+Las imagenes del visor se sirven con un cache local. La primera vez que una tarjeta necesita `page_image`, el servidor la descarga y la guarda en `.catalog-cache/images` junto al catalogo editable; despues se sirve desde esa carpeta. Se puede desactivar con `--no-image-cache`, cambiar la carpeta con `--image-cache-dir` o limitar el tamano por imagen con `--image-cache-max-mb`.
 
 Para intentar completar links automaticamente desde la terminal:
 
@@ -269,11 +325,25 @@ El visor genera un token aleatorio en cada inicio y lo exige en todas las operac
 
 ## Pruebas
 
-La suite usa `unittest` de la libreria standard y cubre migraciones, repositorio, modelos, matching conservador, limites entre capas y seguridad HTTP/SSRF:
+La suite usa `unittest` de la libreria standard y cubre migraciones, repositorios JSON/SQLite, modelos, matching conservador, limites entre capas y seguridad HTTP/SSRF:
 
 ```powershell
 py -m unittest discover -s tests -v
 ```
+
+Los checks completos, incluida la compilacion y `git diff --check`, se ejecutan localmente con:
+
+```powershell
+scripts\check.ps1
+```
+
+En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/workflows/tests.yml` corre la misma validacion en Linux/Python 3.11 y Windows/Python 3.14 en cada push a `master` y en cada pull request. CI valida una revision; no despliega ni accede al catalogo personal.
+
+## Despliegue en servidor
+
+El checkout contiene codigo, no datos. En un servidor, la base debe vivir fuera del repo, por ejemplo en `/var/lib/movie-inbox/movie-inbox.db`, y los backups en otra ruta persistente. Nginx apunta al proceso web que escucha en loopback; nunca apunta al directorio Git ni sirve la base directamente.
+
+El flujo propuesto y los requisitos antes de exponer el visor estan documentados en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). Por ahora el servidor HTTP sigue orientado a uso local: autenticacion publica, headers de proxy y operacion como servicio se analizaran antes de publicar el puerto mediante Nginx.
 
 ## Limpiar titulos y linkear con Wikipedia
 
@@ -307,7 +377,7 @@ Para corridas largas, el script guarda progreso cada 25 consultas por defecto y 
 py scripts/enrich_catalog.py catalog_clean.json --json catalog_wiki_v5.json --csv catalog_wiki_v5.csv --fetch-wikipedia --report wiki-report-v5.json --progress-every 25
 ```
 
-Por ahora el JSON consolidado sigue siendo la fuente de verdad. SQLite tiene sentido como siguiente paso cuando los titulos y links externos ya esten razonablemente limpios.
+El enriquecedor acepta tanto JSON como SQLite. Para pruebas largas sigue siendo prudente escribir a una salida distinta y revisar el reporte antes de reemplazar la fuente principal.
 
 ## Extension de Chrome
 
@@ -327,10 +397,10 @@ Nota: Chrome puede pedir confirmacion o guardar los archivos en la carpeta de de
 
 ## Siguiente paso natural
 
-Cuando ya tengas un `catalog.json` estable, ese archivo puede ser la semilla para:
+Cuando ya tengas un catalogo estable, JSON puede ser la semilla portable y SQLite la base de trabajo para:
 
 - una webapp local
 - una app Kotlin
-- una base SQLite
+- temporadas y episodios sobre el esquema relacional preparado
 - importacion desde la extension
 

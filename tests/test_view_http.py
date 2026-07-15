@@ -10,12 +10,13 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
-sys.path.insert(0, str(SCRIPTS))
+SRC = Path(__file__).resolve().parents[1] / "src"
+sys.path.insert(0, str(SRC))
 
-from catalog_domain import normalize_item
-from catalog_repository import JsonCatalogRepository
-from view_catalog import ViewerConfig, make_handler
+from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
+from movie_inbox.web.config import ViewerConfig
+from movie_inbox.web.handlers import make_handler
 
 
 class ViewerHttpTests(unittest.TestCase):
@@ -64,6 +65,22 @@ class ViewerHttpTests(unittest.TestCase):
     def test_api_requires_token(self) -> None:
         status, _ = self.request("GET", "/api/items")
         self.assertEqual(status, 403)
+
+    def test_frontend_assets_are_served_without_inline_code(self) -> None:
+        status, body = self.request("GET", "/")
+        self.assertEqual(status, 200)
+        self.assertIn(b'/static/style.css', body)
+        self.assertIn(b'/static/app.js', body)
+        self.assertNotIn(b'<style>', body)
+
+        status, css = self.request("GET", "/static/style.css")
+        self.assertEqual(status, 200)
+        self.assertIn(b'.search-console', css)
+
+        status, javascript = self.request("GET", "/static/app.js")
+        self.assertEqual(status, 200)
+        self.assertIn(b'const API_TOKEN', javascript)
+        self.assertNotIn(b'onclick=', javascript)
 
     def test_post_requires_same_origin_and_json(self) -> None:
         body = json.dumps({"id": "heat", "status": "watched"})

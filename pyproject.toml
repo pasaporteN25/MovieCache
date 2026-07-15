@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "movie-inbox"
+version = "0.2.0"
+description = "Personal movie catalog, scanner and local web viewer."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [{name = "Lucas"}]
+dependencies = []
+
+[project.scripts]
+movie-inbox = "movie_inbox.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"movie_inbox.web" = ["static/*.html", "static/*.css", "static/*.js"]

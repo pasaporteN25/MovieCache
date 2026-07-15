@@ -7,13 +7,13 @@ import unittest
 from pathlib import Path
 
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
-sys.path.insert(0, str(SCRIPTS))
+SRC = Path(__file__).resolve().parents[1] / "src"
+sys.path.insert(0, str(SRC))
 
-from catalog_domain import normalize_item
-from catalog_models import CatalogItem, LocalFile, MetadataSource
-from catalog_repository import CatalogFormatError, JsonCatalogRepository
-from catalog_schema import CatalogSchemaError, UnsupportedCatalogVersion, catalog_document, extract_catalog_items
+from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.models import CatalogItem, LocalFile, MetadataSource
+from movie_inbox.infrastructure.json_repository import CatalogFormatError, JsonCatalogRepository
+from movie_inbox.infrastructure.schema import CatalogSchemaError, UnsupportedCatalogVersion, catalog_document, extract_catalog_items
 
 
 class SchemaAndRepositoryTests(unittest.TestCase):

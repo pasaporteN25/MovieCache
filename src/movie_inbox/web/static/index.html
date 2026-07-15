@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="movie-inbox-token" content="__MOVIE_INBOX_TOKEN__">
+    <title>__MOVIE_INBOX_TITLE__</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>__MOVIE_INBOX_TITLE__</h1>
+          <div class="stats" id="stats">Cargando...</div>
+        </div>
+        <section class="search-console">
+          <div class="search-main">
+            <input id="query" type="search" placeholder="Buscar catalogo, Wikipedia, IMDb o FilmAffinity...">
+            <label class="source-toggle disabled"><input id="catalogSource" type="checkbox" checked disabled> Catalogo</label>
+            <label class="source-toggle"><input id="externalSource" type="checkbox"> Externo</label>
+            <button id="searchButton" class="search-action" type="button">Buscar</button>
+            <button id="clearManualSearch" type="button">Limpiar</button>
+          </div>
+          <div class="search-sections">
+            <section class="search-section" id="catalogMergeSection">
+              <div class="section-heading">
+                <strong>Catalogo local</strong>
+                <div class="status-line" id="catalogMergeStatus"></div>
+              </div>
+              <div class="search-results" id="catalogMergeResults"></div>
+            </section>
+            <section class="search-section" id="externalSearchSection">
+              <div class="section-heading">
+                <strong>Fuentes externas</strong>
+                <div class="status-line" id="manualSearchStatus"></div>
+              </div>
+              <div class="search-results" id="manualSearchResults"></div>
+            </section>
+          </div>
+        </section>
+      </header>
+      <section class="layout">
+        <aside>
+          <section class="side-section">
+            <h3>Resumen</h3>
+            <div class="metric"><span>Total</span><strong id="total">0</strong></div>
+            <div class="metric"><span>Visibles</span><strong id="visible">0</strong></div>
+            <div class="metric"><span>Vistas</span><strong id="watchedCount">0</strong></div>
+            <div class="metric"><span>Por ver</span><strong id="toWatchCount">0</strong></div>
+            <div class="metric"><span>Puntuadas</span><strong id="ratedCount">0</strong></div>
+            <div class="metric"><span>Con imagen</span><strong id="withImage">0</strong></div>
+            <div class="metric"><span>Con link</span><strong id="wikiLinks">0</strong></div>
+            <div class="metric"><span>Sin link</span><strong id="withoutWiki">0</strong></div>
+            <div class="metric"><span>IMDb</span><strong id="imdbLinks">0</strong></div>
+            <div class="metric"><span>FilmAffinity</span><strong id="faLinks">0</strong></div>
+            <div class="metric"><span>Duplicadas</span><strong id="duplicateCount">0</strong></div>
+            <div class="metric"><span>Catalogos</span><strong id="sourceFiles">0</strong></div>
+          </section>
+          <section class="side-section">
+            <h3>Filtros</h3>
+            <div class="filter-row">
+              <select id="status"></select>
+              <select id="kind"></select>
+              <select id="source"></select>
+            </div>
+          </section>
+          <section class="side-section">
+            <h3>Menu</h3>
+            <div class="menu-tabs">
+              <button id="databaseMenuCatalog" class="menu-tab active" type="button">Bases de datos</button>
+              <button id="databaseMenuExternal" class="menu-tab" type="button">External DBs</button>
+            </div>
+            <div id="databaseCatalogPanel" class="db-panel"></div>
+            <div id="databaseExternalPanel" class="db-panel" hidden></div>
+          </section>
+          <section class="side-section">
+            <h3>Herramientas</h3>
+            <button id="startWikiReview" type="button">Revisar sin link</button>
+            <button id="previousWikiReview" type="button">Anterior</button>
+            <button id="nextWikiReview" type="button">Siguiente</button>
+            <div class="status-line" id="wikiReviewStatus"></div>
+            <button id="randomizeView" type="button">Randomizar</button>
+            <button id="resetOrder" type="button">Orden normal</button>
+            <button id="showDuplicates" type="button">Ver duplicadas</button>
+            <button id="refresh">Actualizar</button>
+          </section>
+        </aside>
+        <div>
+          <section class="grid" id="grid"></section>
+          <button id="catalogLoadMore" class="catalog-more" type="button" hidden>Cargar mas</button>
+          <p class="empty" id="empty">No hay resultados para esos filtros.</p>
+        </div>
+      </section>
+    </main>
+    <div id="detailBackdrop" class="drawer-backdrop"></div>
+    <aside id="detailDrawer" class="detail-drawer" aria-hidden="true">
+      <div class="drawer-top">
+        <strong>Detalle</strong>
+        <button id="closeDetail" class="drawer-close" type="button">Cerrar</button>
+      </div>
+      <div id="detailBody" class="drawer-body"></div>
+    </aside>
+    <dialog id="descriptionDialog">
+      <div class="description-dialog-body">
+        <h2 id="descriptionDialogTitle"></h2>
+        <p id="descriptionDialogText"></p>
+        <div class="description-dialog-actions">
+          <button id="closeDescriptionDialog" type="button">Cerrar</button>
+        </div>
+      </div>
+    </dialog>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
