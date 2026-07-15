@@ -20,7 +20,7 @@ Incluye:
 - `src/movie_inbox/application/`: casos de uso compartidos por el visor, importadores y scanner.
 - `src/movie_inbox/infrastructure/`: esquemas, repositorios JSON/SQLite y exportacion.
 - `src/movie_inbox/external/`: clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity.
-- `src/movie_inbox/web/`: servidor, handlers, proxy seguro de imagenes y assets estaticos.
+- `src/movie_inbox/web/`: aplicacion FastAPI, servidor Uvicorn, proxy seguro de imagenes y assets estaticos.
 - `catalog.schema.json`: contrato JSON versionado del catalogo.
 - `chrome-extension/`: extension de Chrome para guardar la pestana actual con datos minimos y exportar CSV/JSON.
 
@@ -245,6 +245,8 @@ O una carpeta de exports:
 python scripts/view_catalog.py exports/*.json --port 8765
 ```
 
+El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibilidad, `--write-json` sigue disponible como alias de `--write-catalog`.
+
 Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada.
 
 El visor tiene una consola de busqueda unica con fuentes combinables. `Catalogo` queda siempre activo para buscar en los datos locales y `Externo` se puede marcar cuando tambien queres consultar Wikipedia, IMDb y FilmAffinity. La busqueda se ejecuta solo al tocar `Buscar` o presionar Enter; marcar/desmarcar una fuente no dispara consultas. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
@@ -319,9 +321,11 @@ py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalo
 
 Las escrituras del visor y del importador son atomicas: primero se completa un archivo temporal y luego se reemplaza el JSON. El visor bloquea cada catalogo durante operaciones de escritura concurrentes y conserva como maximo los 10 backups automaticos mas recientes.
 
-## Seguridad del visor local
+## Seguridad del visor web
 
-El visor genera un token aleatorio en cada inicio y lo exige en todas las operaciones de API. Tambien valida `Host` y `Origin`, acepta escrituras solo con `Content-Type: application/json`, limita el cuerpo de las peticiones y devuelve estados HTTP 4xx/5xx cuando corresponde. El proxy de imagenes solo acepta HTTP/HTTPS publico en puertos estandar, bloquea destinos privados, loopback, link-local o reservados y vuelve a validar cada redireccion.
+El visor genera un token aleatorio en cada inicio y lo exige en todas las operaciones de API. FastAPI valida hosts confiables y, para escrituras, un origen exacto; acepta solamente `Content-Type: application/json`, limita el cuerpo a 2 MB y devuelve estados HTTP 4xx/5xx. El proxy de imagenes solo acepta HTTP/HTTPS publico en puertos estandar, bloquea destinos privados, loopback, link-local o reservados y vuelve a validar cada redireccion. La documentacion OpenAPI publica esta deshabilitada y `/healthz` no expone datos.
+
+Detras de Nginx se indica el origen externo con `--public-origin` y se limita la confianza de headers reenviados con `--forwarded-allow-ips`. El token de sesion no reemplaza autenticacion: el acceso debe protegerse con una VPN o en el proxy HTTPS.
 
 ## Pruebas
 
@@ -343,7 +347,7 @@ En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/w
 
 El checkout contiene codigo, no datos. En un servidor, la base debe vivir fuera del repo, por ejemplo en `/var/lib/movie-inbox/movie-inbox.db`, y los backups en otra ruta persistente. Nginx apunta al proceso web que escucha en loopback; nunca apunta al directorio Git ni sirve la base directamente.
 
-El flujo propuesto y los requisitos antes de exponer el visor estan documentados en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). Por ahora el servidor HTTP sigue orientado a uso local: autenticacion publica, headers de proxy y operacion como servicio se analizaran antes de publicar el puerto mediante Nginx.
+El flujo completo, los flags de proxy y las plantillas de `systemd`/Nginx estan documentados en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). Uvicorn debe permanecer en loopback; Nginx o una VPN controlan el acceso externo.
 
 ## Limpiar titulos y linkear con Wikipedia
 

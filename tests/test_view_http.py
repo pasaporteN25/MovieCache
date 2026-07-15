@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-import http.client
 import json
 import sys
 import tempfile
-import threading
 import unittest
-from http.server import ThreadingHTTPServer
+from dataclasses import replace
 from pathlib import Path
 
 
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
+from fastapi.testclient import TestClient
+
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
+from movie_inbox.web.app import MAX_JSON_BODY_BYTES, create_app
 from movie_inbox.web.config import ViewerConfig
-from movie_inbox.web.handlers import make_handler
 
 
 class ViewerHttpTests(unittest.TestCase):
@@ -33,32 +33,24 @@ class ViewerHttpTests(unittest.TestCase):
             image_cache=False,
             image_cache_dir=str(Path(self.temporary.name) / "images"),
             image_cache_max_bytes=1024,
-            port=0,
+            port=8765,
             api_token="test-token",
         )
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.config))
-        self.port = int(self.server.server_address[1])
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.thread.start()
+        self.client_context = TestClient(create_app(self.config), base_url="http://127.0.0.1:8765")
+        self.client = self.client_context.__enter__()
 
     def tearDown(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=2)
+        self.client_context.__exit__(None, None, None)
         self.temporary.cleanup()
 
     def request(self, method: str, path: str, body: str = "", headers: dict[str, str] | None = None):
-        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=3)
-        connection.request(method, path, body=body, headers=headers or {})
-        response = connection.getresponse()
-        payload = response.read()
-        connection.close()
-        return response.status, payload
+        response = self.client.request(method, path, content=body, headers=headers or {})
+        return response.status_code, response.content
 
     def post_headers(self, content_type: str = "application/json") -> dict[str, str]:
         return {
             "X-Movie-Inbox-Token": self.config.api_token,
-            "Origin": f"http://127.0.0.1:{self.port}",
+            "Origin": "http://127.0.0.1:8765",
             "Content-Type": content_type,
         }
 
@@ -66,9 +58,28 @@ class ViewerHttpTests(unittest.TestCase):
         status, _ = self.request("GET", "/api/items")
         self.assertEqual(status, 403)
 
-    def test_frontend_assets_are_served_without_inline_code(self) -> None:
-        status, body = self.request("GET", "/")
+    def test_healthcheck_does_not_expose_catalog_data(self) -> None:
+        status, payload = self.request("GET", "/healthz")
         self.assertEqual(status, 200)
+        self.assertEqual(json.loads(payload), {"status": "ok"})
+
+    def test_image_cache_does_not_accept_session_tokens_in_urls(self) -> None:
+        status, _ = self.request(
+            "GET",
+            "/image-cache?url=https%3A%2F%2Fimages.example.com%2Fposter.jpg&token=test-token",
+        )
+        self.assertEqual(status, 403)
+
+    def test_untrusted_host_is_rejected(self) -> None:
+        status, _ = self.request("GET", "/", headers={"Host": "evil.example"})
+        self.assertEqual(status, 400)
+
+    def test_frontend_assets_are_served_without_inline_code(self) -> None:
+        response = self.client.get("/")
+        status, body = response.status_code, response.content
+        self.assertEqual(status, 200)
+        self.assertIn("HttpOnly", response.headers.get("set-cookie", ""))
+        self.assertIn("SameSite=strict", response.headers.get("set-cookie", ""))
         self.assertIn(b'/static/style.css', body)
         self.assertIn(b'/static/app.js', body)
         self.assertNotIn(b'<style>', body)
@@ -81,6 +92,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn(b'const API_TOKEN', javascript)
         self.assertNotIn(b'onclick=', javascript)
+        self.assertNotIn(b'&token=', javascript)
 
     def test_post_requires_same_origin_and_json(self) -> None:
         body = json.dumps({"id": "heat", "status": "watched"})
@@ -102,6 +114,26 @@ class ViewerHttpTests(unittest.TestCase):
         item = JsonCatalogRepository(self.catalog_path, normalize_item).read()[0]
         self.assertEqual(item.status, "watched")
         self.assertEqual(item.watched_at, "2026-07-13")
+
+    def test_public_origin_is_accepted_for_proxy_deployment(self) -> None:
+        proxy_config = replace(self.config, public_origin="https://movies.example.com")
+        headers = {
+            "X-Movie-Inbox-Token": proxy_config.api_token,
+            "Origin": "https://movies.example.com",
+            "Content-Type": "application/json",
+        }
+        body = json.dumps({"id": "heat", "status": "watched", "watched_at": "2026-07-15"})
+        with TestClient(create_app(proxy_config), base_url="https://movies.example.com") as client:
+            root = client.get("/")
+            response = client.post("/api/status", content=body, headers=headers)
+        self.assertIn("Secure", root.headers.get("set-cookie", ""))
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def test_json_body_limit_is_enforced(self) -> None:
+        body = json.dumps({"id": "heat", "review": "x" * MAX_JSON_BODY_BYTES})
+        status, payload = self.request("POST", "/api/personal", body, self.post_headers())
+        self.assertEqual(status, 400)
+        self.assertIn(b"too large", payload)
 
     def test_invalid_catalog_is_reported_instead_of_becoming_empty(self) -> None:
         self.catalog_path.write_text('{"schema_version": 5, "items": []}', encoding="utf-8")

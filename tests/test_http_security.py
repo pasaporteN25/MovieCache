@@ -11,7 +11,15 @@ from unittest.mock import patch
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from movie_inbox.web.security import UnsafeRemoteUrl, open_public_url, validate_public_http_url
+from movie_inbox.web.security import (
+    InvalidPublicOrigin,
+    UnsafeRemoteUrl,
+    normalize_public_origin,
+    open_public_url,
+    validate_public_http_url,
+    viewer_allowed_hosts,
+    viewer_allowed_origins,
+)
 
 
 def resolver_for(address: str):
@@ -24,6 +32,13 @@ def resolver_for(address: str):
 
 
 class HttpSecurityTests(unittest.TestCase):
+    def test_public_origin_is_normalized_for_proxy_validation(self) -> None:
+        self.assertEqual(normalize_public_origin("HTTPS://Movies.Example.com:443/"), "https://movies.example.com")
+        self.assertIn("movies.example.com", viewer_allowed_hosts("https://movies.example.com"))
+        self.assertIn("https://movies.example.com", viewer_allowed_origins(8765, "https://movies.example.com"))
+        with self.assertRaises(InvalidPublicOrigin):
+            normalize_public_origin("https://movies.example.com/path")
+
     def test_public_destination_is_allowed(self) -> None:
         self.assertEqual(
             validate_public_http_url("https://images.example.com/poster.jpg", resolver_for("8.8.8.8")),

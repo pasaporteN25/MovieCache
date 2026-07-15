@@ -621,7 +621,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function cachedImageSrc(url) {
-        return `/image-cache?url=${encodeURIComponent(url)}&token=${encodeURIComponent(API_TOKEN)}`;
+        return `/image-cache?url=${encodeURIComponent(url)}`;
       }
 
       async function searchManual(source = "all", statusPrefix = "") {

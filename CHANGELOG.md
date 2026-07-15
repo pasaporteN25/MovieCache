@@ -10,7 +10,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Estructura `src/movie_inbox` con capas de dominio, aplicacion, infraestructura, clientes externos y web.
 - Clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity, con registro concurrente y cache compartido.
 - HTML, CSS y JavaScript del visor como assets estaticos empaquetados.
-- Handlers HTTP, ciclo de vida del servidor y proxy/cache de imagenes en modulos independientes.
+- Aplicacion FastAPI y servidor Uvicorn con endpoints compatibles con el visor existente.
+- Healthcheck sin datos sensibles, validacion de origen publico y confianza restringida de headers de proxy.
+- Plantillas endurecidas de `systemd` y Nginx para ejecutar con SQLite fuera del checkout.
 - Lanzadores compatibles en `scripts/` para conservar los comandos de v0.1.
 - Contrato de repositorio compartido para separar los casos de uso de la persistencia.
 - Repositorio SQLite transaccional seleccionable por extension, manteniendo JSON como importacion, exportacion y backup.
@@ -26,6 +28,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Modelos canonicos para catalogo, archivos locales y procedencia de metadata.
 - Migraciones explicitas desde formatos legacy y esquemas v1, v2 y v3.
 - Token por sesion, validacion de origen/host y respuestas HTTP con estados reales en el visor.
+- Limite de cuerpo aplicado durante la lectura del stream y documentacion OpenAPI deshabilitada.
+- El token del cache de imagenes sale de la URL y pasa a una cookie `HttpOnly` con `SameSite=Strict`.
 - Proteccion SSRF del cache de imagenes, incluida la validacion de redirecciones.
 - Matching conservador y auditable con motivo y evidencia por candidato.
 - Pruebas de regresion para seguridad HTTP, esquema, repositorios JSON/SQLite, gateways externos, modelos, capas y matching.

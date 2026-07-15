@@ -1,0 +1,40 @@
+server {
+    listen 80;
+    server_name movies.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name movies.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/movies.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/movies.example.com/privkey.pem;
+
+    client_max_body_size 2m;
+
+    # Keep this or replace it with access through a private VPN.
+    auth_basic "Movie Inbox";
+    auth_basic_user_file /etc/nginx/.htpasswd-movie-inbox;
+
+    location = /image-cache {
+        access_log off;
+        proxy_pass http://127.0.0.1:8765;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 60s;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 60s;
+    }
+}

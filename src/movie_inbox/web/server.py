@@ -5,21 +5,30 @@ from __future__ import annotations
 import argparse
 import secrets
 import webbrowser
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+import uvicorn
+
+from movie_inbox.web.app import create_app
 from movie_inbox.web.catalog_api import first_catalog_file
 from movie_inbox.web.config import ViewerConfig
-from movie_inbox.web.handlers import make_handler
+from movie_inbox.web.security import InvalidPublicOrigin, normalize_public_origin
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="View JSON or SQLite movie catalogs in a local browser UI.")
     parser.add_argument("inputs", nargs="+", help="JSON/SQLite catalogs or glob patterns, for example catalog.json or movie-inbox.db.")
-    parser.add_argument("--port", type=int, default=8765, help="Local server port.")
+    parser.add_argument("--host", default="127.0.0.1", help="Bind address. Keep 127.0.0.1 when using Nginx.")
+    parser.add_argument("--port", type=int, default=8765, help="Application server port.")
+    parser.add_argument("--public-origin", default="", help="External origin, for example https://movies.example.com.")
+    parser.add_argument(
+        "--forwarded-allow-ips",
+        default="127.0.0.1",
+        help="Comma-separated proxy IPs trusted by Uvicorn for forwarded headers.",
+    )
     parser.add_argument("--title", default="Movie Inbox", help="Viewer title.")
     parser.add_argument(
-        "--write-json",
+        "--write-catalog", "--write-json",
         dest="write_catalog",
         help="Catalog file to update when adding items. Defaults to the first viewed catalog.",
     )
@@ -31,7 +40,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not 1 <= args.port <= 65535:
+        parser.error("--port must be between 1 and 65535")
+    try:
+        public_origin = normalize_public_origin(args.public_origin)
+    except InvalidPublicOrigin as error:
+        parser.error(str(error))
+    if args.host.casefold() not in {"127.0.0.1", "localhost", "::1"} and not public_origin:
+        parser.error("--public-origin is required when binding to a non-loopback host")
     write_catalog = args.write_catalog or first_catalog_file(args.inputs)
     image_cache_dir = args.image_cache_dir or (Path(write_catalog).resolve().parent / ".catalog-cache" / "images")
     config = ViewerConfig(
@@ -43,9 +61,11 @@ def main(argv: list[str] | None = None) -> int:
         image_cache_max_bytes=max(1, int(args.image_cache_max_mb * 1024 * 1024)),
         port=args.port,
         api_token=secrets.token_urlsafe(32),
+        host=args.host,
+        public_origin=public_origin,
+        forwarded_allow_ips=args.forwarded_allow_ips,
     )
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(config))
-    url = f"http://127.0.0.1:{args.port}"
+    url = public_origin or f"http://127.0.0.1:{args.port}"
     print(f"Viewing {', '.join(args.inputs)}")
     print(f"Writing changes to {write_catalog}")
     print(f"Image cache: {config.image_cache_dir}" if config.image_cache else "Image cache: disabled")
@@ -54,12 +74,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.no_open:
         webbrowser.open(url)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopped.")
-    finally:
-        server.server_close()
+    uvicorn.run(
+        create_app(config),
+        host=args.host,
+        port=args.port,
+        proxy_headers=True,
+        forwarded_allow_ips=args.forwarded_allow_ips,
+        workers=1,
+        access_log=False,
+    )
     return 0
 
 

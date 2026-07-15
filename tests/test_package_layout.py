@@ -10,7 +10,9 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from movie_inbox.cli.main import COMMANDS
 from movie_inbox.external.registry import ExternalSourceService
+from movie_inbox.web.app import create_app
 from movie_inbox.web.assets import render_html, static_asset
+from movie_inbox.web.config import ViewerConfig
 
 
 class PackageLayoutTests(unittest.TestCase):
@@ -28,6 +30,24 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIsNotNone(static_asset("style.css"))
         self.assertIsNotNone(static_asset("app.js"))
         self.assertIsNone(static_asset("../pyproject.toml"))
+
+    def test_fastapi_application_disables_public_api_documentation(self) -> None:
+        app = create_app(
+            ViewerConfig(
+                patterns=["catalog.json"],
+                title="Movie Inbox",
+                write_json="catalog.json",
+                image_cache=False,
+                image_cache_dir=".catalog-cache/images",
+                image_cache_max_bytes=1024,
+                port=8765,
+                api_token="test-token",
+            )
+        )
+        paths = {route.path for route in app.routes}
+        self.assertNotIn("/docs", paths)
+        self.assertNotIn("/openapi.json", paths)
+        self.assertIn("/healthz", paths)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ if (-not $python) {
 
 Push-Location $root
 try {
-    & $python.Source -m pip install -e .
+    & $python.Source -m pip install -e ".[test]"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $python.Source -m compileall -q src scripts tests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
