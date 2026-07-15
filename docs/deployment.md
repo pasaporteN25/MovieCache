@@ -12,7 +12,7 @@ GitHub Actions: compile + tests
 revision aprobada en el servidor
         |
         v
-systemd -> movie-inbox serve -> 127.0.0.1:8765
+systemd -> Uvicorn/FastAPI -> 127.0.0.1:8765
         |
         v
 Nginx -> HTTPS y autenticacion -> navegador
@@ -38,15 +38,74 @@ El primer despliegue puede ser manual y auditable:
 
 Una automatizacion posterior puede hacer esos pasos al publicar una version. No es necesario instalar un runner de CI en el servidor.
 
-## Limite actual
+Una preparacion minima del host seria:
 
-El servidor incluido escucha solamente en loopback y sus defensas actuales estan pensadas para uso local directo. Antes de exponerlo mediante Nginx deben resolverse en conjunto:
+```bash
+sudo useradd --system --home /var/lib/movie-inbox --shell /usr/sbin/nologin movie-inbox
+sudo install -d -o movie-inbox -g movie-inbox /var/lib/movie-inbox /var/backups/movie-inbox
+cd /opt/movie-inbox
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+```
 
-- autenticacion de usuarios o acceso privado mediante VPN;
-- origen publico permitido y validacion segura de headers del proxy;
-- persistencia o estrategia de renovacion del token de sesion;
-- TLS, limites de peticion, logs y reinicios del servicio;
-- permisos del usuario del proceso sobre base, cache y backups;
-- restauracion probada desde una exportacion JSON.
+El checkout puede pertenecer al usuario de despliegue y ser solamente legible para `movie-inbox`. La base y el cache si deben pertenecer al usuario del servicio.
 
-Hasta cerrar esa fase, Nginx no debe publicar el visor en Internet. Una opcion temporal segura es entrar al servidor por Tailscale/VPN y usar un tunel SSH hacia el puerto loopback.
+## Ejecutar la aplicacion
+
+El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public-origin` habilita ese origen exacto para validacion de `Host` y escrituras del navegador; no cambia la direccion de escucha:
+
+```bash
+/opt/movie-inbox/.venv/bin/movie-inbox serve \
+  /var/lib/movie-inbox/movie-inbox.db \
+  --host 127.0.0.1 \
+  --port 8765 \
+  --public-origin https://movies.example.com \
+  --forwarded-allow-ips 127.0.0.1 \
+  --image-cache-dir /var/lib/movie-inbox/image-cache \
+  --no-open
+```
+
+La app usa un solo worker. SQLite serializa escrituras y el cache de busquedas vive en memoria; agregar workers antes de medir carga sumaria contencion y estados duplicados sin aportar valor para un catalogo personal.
+
+`--forwarded-allow-ips` nunca debe configurarse con `*` si Uvicorn acepta conexiones que no provienen exclusivamente del proxy. Con Nginx local alcanza `127.0.0.1`.
+
+## systemd
+
+La plantilla [movie-inbox.service.example](../deploy/movie-inbox.service.example) ejecuta el servicio con un usuario sin privilegios, reinicio ante fallos y acceso de escritura limitado a `/var/lib/movie-inbox`.
+
+```bash
+sudo cp deploy/movie-inbox.service.example /etc/systemd/system/movie-inbox.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now movie-inbox
+curl http://127.0.0.1:8765/healthz
+sudo systemctl status movie-inbox
+```
+
+Antes de iniciarla hay que reemplazar dominio, rutas y usuario en la unidad. El healthcheck no devuelve rutas ni datos del catalogo.
+
+## Nginx y acceso
+
+La plantilla [nginx.movie-inbox.conf.example](../deploy/nginx.movie-inbox.conf.example) termina HTTPS, limita el cuerpo a 2 MB, preserva el `Host` publico y reenvia headers al proceso local. Copiala despues de reemplazar dominio y certificados:
+
+```bash
+sudo htpasswd -c /etc/nginx/.htpasswd-movie-inbox lucas
+sudo cp deploy/nginx.movie-inbox.conf.example /etc/nginx/sites-available/movie-inbox
+sudo ln -s /etc/nginx/sites-available/movie-inbox /etc/nginx/sites-enabled/movie-inbox
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+El token embebido por Movie Inbox protege operaciones contra otras paginas web, pero no autentica personas: cualquiera que pueda abrir la portada recibe su propio acceso a la API de esa sesion. Las imagenes usan una cookie `HttpOnly` y no colocan el token en la URL; Uvicorn no registra access logs y Nginx omite el log de esa ruta para no guardar URLs de imagenes del catalogo. La plantilla conserva `auth_basic`; para un servicio estrictamente personal es preferible limitar Nginx mediante Tailscale/VPN y no publicarlo en Internet.
+
+## Checklist de publicacion
+
+- Los checks pasan sobre el commit desplegado.
+- El proceso corre como usuario sin privilegios.
+- SQLite, cache y backups estan fuera de `/opt/movie-inbox`.
+- Nginx es el unico proceso publico y Uvicorn escucha en `127.0.0.1`.
+- `--public-origin` coincide exactamente con el origen HTTPS del navegador.
+- `--forwarded-allow-ips` contiene solamente la direccion del proxy.
+- Hay autenticacion en Nginx o acceso limitado por VPN.
+- La restauracion desde una exportacion JSON fue probada.
+
+La automatizacion de deploy sigue fuera del workflow de CI por ahora: primero conviene hacer un despliegue manual completo y verificar backup/restauracion.

@@ -1,0 +1,23 @@
+[Unit]
+Description=Movie Inbox catalog service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=movie-inbox
+Group=movie-inbox
+WorkingDirectory=/opt/movie-inbox
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/movie-inbox/.venv/bin/movie-inbox serve /var/lib/movie-inbox/movie-inbox.db --host 127.0.0.1 --port 8765 --public-origin https://movies.example.com --forwarded-allow-ips 127.0.0.1 --image-cache-dir /var/lib/movie-inbox/image-cache --no-open
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/movie-inbox
+
+[Install]
+WantedBy=multi-user.target

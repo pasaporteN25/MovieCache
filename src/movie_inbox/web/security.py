@@ -19,6 +19,56 @@ class UnsafeRemoteUrl(ValueError):
     pass
 
 
+class InvalidPublicOrigin(ValueError):
+    pass
+
+
+def normalize_public_origin(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = urlparse(raw)
+        scheme = parsed.scheme.casefold()
+        hostname_value = parsed.hostname or ""
+        port = parsed.port
+    except ValueError as error:
+        raise InvalidPublicOrigin("Malformed public origin") from error
+    if scheme not in {"http", "https"} or not hostname_value:
+        raise InvalidPublicOrigin("Public origin must use http:// or https://")
+    if parsed.username or parsed.password:
+        raise InvalidPublicOrigin("Public origin cannot contain credentials")
+    if parsed.path not in {"", "/"} or parsed.params or parsed.query or parsed.fragment:
+        raise InvalidPublicOrigin("Public origin cannot contain a path, query or fragment")
+    try:
+        hostname = hostname_value.encode("idna").decode("ascii").casefold().rstrip(".")
+    except UnicodeError as error:
+        raise InvalidPublicOrigin("Invalid public origin hostname") from error
+    authority = f"[{hostname}]" if ":" in hostname else hostname
+    default_port = 443 if scheme == "https" else 80
+    if port and port != default_port:
+        authority = f"{authority}:{port}"
+    return f"{scheme}://{authority}"
+
+
+def viewer_allowed_origins(port: int, public_origin: str = "") -> set[str]:
+    origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+    normalized = normalize_public_origin(public_origin)
+    if normalized:
+        origins.add(normalized)
+    return {origin.casefold() for origin in origins}
+
+
+def viewer_allowed_hosts(public_origin: str = "") -> list[str]:
+    hosts = {"127.0.0.1", "localhost"}
+    normalized = normalize_public_origin(public_origin)
+    if normalized:
+        hostname = urlparse(normalized).hostname
+        if hostname:
+            hosts.add(hostname.casefold())
+    return sorted(hosts)
+
+
 class NoRedirectHandler(HTTPRedirectHandler):
     def redirect_request(self, request, file_pointer, code, message, headers, new_url):  # type: ignore[no-untyped-def]
         return None
@@ -87,4 +137,3 @@ def open_public_url(
                 raise UnsafeRemoteUrl("Remote image redirected too many times") from error
             current_url = validate_public_http_url(urljoin(current_url, location), resolver)
     raise UnsafeRemoteUrl("Remote image redirect could not be resolved")
-

@@ -10,7 +10,7 @@ else
   PYTHON=python
 fi
 
-"$PYTHON" -m pip install -e .
+"$PYTHON" -m pip install -e ".[test]"
 "$PYTHON" -m compileall -q src scripts tests
 "$PYTHON" -m unittest discover -s tests -v
 git diff --check
