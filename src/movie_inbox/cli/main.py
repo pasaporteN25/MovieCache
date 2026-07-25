@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 
-from movie_inbox.cli import database, enrich_catalog, import_catalog, match_external_links, migrate, scan_library
+from movie_inbox.cli import cache, database, enrich_catalog, import_catalog, match_external_links, migrate, scan_library
 from movie_inbox.web import server
 
 
@@ -18,6 +18,7 @@ COMMANDS: dict[str, tuple[Command, str]] = {
     "enrich": (enrich_catalog.main, "Clean titles and fetch missing metadata."),
     "match": (match_external_links.main, "Attach trusted external links."),
     "db": (database.main, "Import, export and inspect SQLite catalogs."),
+    "cache": (cache.main, "Inspect, prune or clear the image cache."),
 }
 
 

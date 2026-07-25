@@ -21,6 +21,7 @@ from movie_inbox.domain.metadata import (
 )
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.normalization import normalize_bool, normalize_kind, normalize_rating, normalize_status
+from movie_inbox.domain.titles import infer_kind_from_text, looks_like_external_id
 
 
 KNOWN_LINK_HOSTS = {
@@ -74,6 +75,8 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         "wikipedia_title",
         "wikidata_id",
         "page_image",
+        "backdrop_image",
+        "tmdb_id",
         "wikipedia_extract",
         "local_name",
         "local_path",
@@ -84,7 +87,41 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         item[field] = str(item.get(field) or "")
     for field in LIST_FIELDS:
         item[field] = normalize_tags(item.get(field))
+
+    if looks_like_external_id(item["title"]):
+        replacement_title = next(
+            (
+                value
+                for value in [
+                    item["wikipedia_title"],
+                    item["spanish_title"],
+                    item["original_title"],
+                    item["english_title"],
+                    *item["alternative_titles"],
+                    item["local_name"],
+                ]
+                if value and not looks_like_external_id(value)
+            ),
+            "",
+        )
+        if replacement_title:
+            item["title"] = replacement_title
+    for field in ("original_title", "spanish_title", "english_title"):
+        if looks_like_external_id(item[field]):
+            item[field] = ""
+
     item["kind"] = normalize_kind(item.get("kind"))
+    inferred_kind = infer_kind_from_text(
+        item["title"],
+        item["description"],
+        item["wikipedia_extract"],
+    )
+    if (
+        item["kind"] == "pelicula"
+        and inferred_kind in {"serie", "anime", "documental"}
+        and "kind" not in item["locked_fields"]
+    ):
+        item["kind"] = inferred_kind
     item["status"] = normalize_status(item.get("status"))
     item["watched_at"] = normalize_date(item.get("watched_at"))
     item["rating"] = normalize_rating(item.get("rating"))
@@ -411,6 +448,7 @@ def is_wikipedia_item(item: Mapping[str, Any]) -> bool:
 
 
 def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping[str, Any], target_id: str) -> bool:
+    incoming_kind_explicit = bool(str(incoming.get("kind") or "").strip())
     incoming = normalize_item(incoming)
     for existing in items:
         if str(existing.get("id") or "") != target_id:
@@ -422,7 +460,22 @@ def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping
         for field in METADATA_FIELDS:
             if field != "kind":
                 merge_metadata_field(existing, incoming, field)
-        existing["kind"] = normalize_kind(existing.get("kind") or incoming.get("kind"))
+        existing_kind = normalize_kind(existing.get("kind"))
+        incoming_kind = normalize_kind(incoming.get("kind"))
+        if (
+            incoming_kind_explicit
+            and "kind" not in normalize_locked_fields(existing.get("locked_fields"))
+            and existing_kind == "pelicula"
+            and incoming_kind in {"serie", "anime", "documental"}
+        ):
+            existing["kind"] = incoming_kind
+            incoming_sources = ensure_metadata_sources(incoming)
+            sources = ensure_metadata_sources(existing)
+            if "kind" in incoming_sources:
+                sources["kind"] = dict(incoming_sources["kind"])
+            existing["metadata_sources"] = sources
+        else:
+            existing["kind"] = existing_kind
         statuses = {normalize_status(existing.get("status")), normalize_status(incoming.get("status"))}
         existing["status"] = "watched" if "watched" in statuses else "to_watch"
         existing["watched_at"] = existing.get("watched_at") or incoming.get("watched_at", "")

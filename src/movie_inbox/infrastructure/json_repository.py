@@ -11,17 +11,20 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from movie_inbox.application.repository import (
     CatalogBusyError,
     CatalogFormatError,
+    CatalogItemMutation,
     CatalogMutation,
     CatalogNormalizer,
     CatalogRepositoryError,
     T,
 )
+from movie_inbox.domain.metadata import normalize_local_files
 from movie_inbox.domain.models import CatalogItem
+from movie_inbox.domain.catalog import possible_duplicate_candidates
 from movie_inbox.infrastructure.schema import CatalogSchemaError, atomic_write_json, catalog_document, extract_catalog_items
 
 
@@ -48,6 +51,10 @@ class JsonCatalogRepository:
         with self.locked():
             return self._read_unlocked()
 
+    def get(self, item_id: str) -> CatalogItem | None:
+        with self.locked():
+            return next((item for item in self._read_unlocked() if item.id == item_id), None)
+
     def write(self, items: list[CatalogItem]) -> None:
         with self.locked():
             self._write_unlocked(items)
@@ -59,6 +66,53 @@ class JsonCatalogRepository:
             if changed:
                 self._write_unlocked(items)
             return result
+
+    def update_item(self, item_id: str, mutation: CatalogItemMutation) -> bool:
+        def update(items: list[CatalogItem]) -> tuple[bool, bool]:
+            item = next((row for row in items if row.id == item_id), None)
+            if item is None:
+                return False, False
+            mutation(item)
+            return True, True
+
+        return self.mutate(update)
+
+    def update_status(self, item_id: str, status: str, watched_at: str | None = None) -> bool:
+        def update(item: CatalogItem) -> None:
+            item["status"] = status
+            if watched_at is not None:
+                item["watched_at"] = watched_at
+
+        return self.update_item(item_id, update)
+
+    def update_metadata(self, item_id: str, mutation: CatalogItemMutation) -> bool:
+        return self.update_item(item_id, mutation)
+
+    def delete_by_id(self, item_id: str) -> bool:
+        def delete(items: list[CatalogItem]) -> tuple[bool, bool]:
+            for index, item in enumerate(items):
+                if item.id == item_id:
+                    del items[index]
+                    return True, True
+            return False, False
+
+        return self.mutate(delete)
+
+    def attach_local_file(self, item_id: str, local_file: dict[str, Any]) -> bool:
+        normalized = normalize_local_files([local_file])
+        if not normalized:
+            raise ValueError("Invalid local file")
+
+        def attach(item: CatalogItem) -> None:
+            item["local_files"] = normalize_local_files([*item.local_files, normalized[0]])
+            item["en_catalogo"] = True
+            item["local_name"] = item.local_name or normalized[0]["name"]
+            item["local_path"] = item.local_path or normalized[0]["path"]
+
+        return self.update_item(item_id, attach)
+
+    def find_candidates(self, candidate: CatalogItem) -> list[dict[str, Any]]:
+        return possible_duplicate_candidates(self.read(), candidate)
 
     @contextmanager
     def locked(self) -> Iterator[None]:

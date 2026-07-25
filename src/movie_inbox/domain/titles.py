@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import re
+import unicodedata
 
 
 def clean_whitespace(value: str) -> str:
@@ -45,3 +46,41 @@ def infer_year(*values: str) -> str:
             return match.group(1)
     return ""
 
+
+def looks_like_external_id(value: str) -> bool:
+    text = str(value or "").strip()
+    return bool(re.fullmatch(r"(tt|nm)\d{7,9}", text, flags=re.IGNORECASE)) or bool(
+        re.fullmatch(r"film\d+", text, flags=re.IGNORECASE)
+    )
+
+
+def infer_kind_from_text(*values: str) -> str:
+    marker_groups = {
+        "anime": ("anime",),
+        "documental": ("documentary", "documental"),
+        "serie": (
+            "television series",
+            "tv series",
+            "tv mini series",
+            "tv miniseries",
+            "miniseries",
+            "mini series",
+            "serie de television",
+            "serie de tv",
+            "serie televisiva",
+            "tv show",
+        ),
+        "pelicula": ("feature film", "television film", "tv movie", "film", "movie", "pelicula"),
+    }
+    for value in values:
+        text = unicodedata.normalize("NFKD", str(value or "").casefold())
+        text = "".join(character for character in text if not unicodedata.combining(character))
+        matches: list[tuple[int, int, str]] = []
+        for priority, (kind, markers) in enumerate(marker_groups.items()):
+            for marker in markers:
+                index = text.find(marker)
+                if index >= 0:
+                    matches.append((index, priority, kind))
+        if matches:
+            return min(matches)[2]
+    return ""

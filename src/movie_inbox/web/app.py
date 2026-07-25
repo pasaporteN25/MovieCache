@@ -7,7 +7,7 @@ import secrets
 from typing import Any
 from urllib.error import HTTPError, URLError
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -21,11 +21,13 @@ from movie_inbox.infrastructure.schema import SCHEMA_VERSION
 from movie_inbox.web.assets import render_html, static_asset
 from movie_inbox.web.catalog_api import (
     append_item,
+    background_enrich_catalog_item,
     delete_item_anywhere,
     enrich_selected_result,
     has_external_link,
     item_from_search_result,
     load_items,
+    needs_background_title_enrichment,
     resolved_files,
     search_sources,
     update_item_catalog_status,
@@ -173,15 +175,17 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return error_response("invalid_token", 403)
         if not url:
             return error_response("missing_image_url", 400)
-        try:
-            validated_url = validate_public_http_url(url)
-        except UnsafeRemoteUrl:
-            return error_response("invalid_image_url", 400)
         if not config.image_cache:
+            try:
+                validated_url = validate_public_http_url(url, allowed_hosts=config.image_allowed_hosts)
+            except UnsafeRemoteUrl:
+                return error_response("invalid_image_url", 400)
             return RedirectResponse(validated_url, status_code=302)
         try:
-            body, content_type = cached_image(config, validated_url)
-        except (ValueError, UnsafeRemoteUrl, HTTPError, URLError, TimeoutError, OSError):
+            body, content_type = cached_image(config, url)
+        except UnsafeRemoteUrl:
+            return error_response("invalid_image_url", 400)
+        except (ValueError, HTTPError, URLError, TimeoutError, OSError):
             return error_response("image_fetch_failed", 502)
         return Response(
             body,
@@ -192,20 +196,41 @@ def create_app(config: ViewerConfig) -> FastAPI:
         )
 
     @app.post("/api/add")
-    def add(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def add(
+        background_tasks: BackgroundTasks,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
         try:
             result = body.get("result") if isinstance(body.get("result"), dict) else body
             result = enrich_selected_result(result)
             item = item_from_search_result(result)
+            write_path = write_path_for(config, str(body.get("target_source_file") or ""))
+            target_id = str(body.get("target_id") or "")
             added, reason, extra = append_item(
-                write_path_for(config, str(body.get("target_source_file") or "")),
+                write_path,
                 item,
                 action=str(body.get("action") or "check"),
-                target_id=str(body.get("target_id") or ""),
+                target_id=target_id,
                 expected_source=str(body.get("expected_source") or ""),
             )
+            background_enrichment = "not_needed"
+            if added and reason in {"added", "merged"} and needs_background_title_enrichment(item):
+                effective_item_id = target_id if reason == "merged" else str(item.get("id") or "")
+                background_tasks.add_task(
+                    background_enrich_catalog_item,
+                    write_path,
+                    effective_item_id,
+                    item,
+                )
+                background_enrichment = "scheduled"
             return JSONResponse(
-                {"ok": added, "reason": reason, "item": item, **extra},
+                {
+                    "ok": added,
+                    "reason": reason,
+                    "item": item,
+                    "background_enrichment": background_enrichment,
+                    **extra,
+                },
                 status_code=operation_status(added, reason),
             )
         except (ValueError, CatalogRepositoryError) as error:

@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import html
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from html.parser import HTMLParser
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
-from movie_inbox.domain.catalog import external_source_name, source_url_field
-from movie_inbox.domain.titles import clean_title, clean_whitespace
+from movie_inbox.domain.catalog import external_source_name, normalize_tags, source_url_field
+from movie_inbox.domain.titles import clean_title, clean_whitespace, infer_kind_from_text, looks_like_external_id
 from movie_inbox.external.imdb import fetch_wikipedia_by_imdb_id, imdb_id_from_text
 from movie_inbox.external.wikipedia import (
     fetch_wikipedia_by_title,
@@ -90,6 +91,13 @@ def fetch_metadata(url: str) -> dict[str, Any]:
         "description": clean_whitespace(description),
         "og_type": parser.meta.get("og:type", ""),
     }
+    inferred_kind = infer_kind_from_text(
+        parser.meta.get("og:type", ""),
+        metadata["title"],
+        metadata["description"],
+    )
+    if inferred_kind:
+        metadata["kind"] = inferred_kind
     source = external_source_name(url)
     if source == "imdb":
         metadata["english_title"] = metadata["title"]
@@ -98,6 +106,46 @@ def fetch_metadata(url: str) -> dict[str, Any]:
     if link_field:
         metadata[link_field] = url
     return metadata
+
+
+def fetch_metadata_by_title(title: str, year: str = "") -> dict[str, Any]:
+    title = clean_title(title)
+    year = str(year or "").strip()
+    if not title or looks_like_external_id(title):
+        return {}
+
+    candidates: list[dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(fetch_wikipedia_by_wikidata_title, title, year),
+            executor.submit(fetch_wikipedia_by_title, title, year),
+        ]
+        for future in as_completed(futures):
+            try:
+                metadata = future.result()
+            except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+                metadata = {}
+            if metadata:
+                candidates.append(metadata)
+    if not candidates:
+        return {}
+    return max(candidates, key=lambda metadata: _metadata_quality(metadata, year))
+
+
+def _metadata_quality(metadata: dict[str, Any], expected_year: str) -> tuple[int, int]:
+    score = 0
+    if metadata.get("wikidata_id"):
+        score += 20
+    if metadata.get("wikipedia_url") or metadata.get("url"):
+        score += 10
+    if expected_year and str(metadata.get("year") or "") == expected_year:
+        score += 10
+    for field in ("original_title", "spanish_title", "english_title", "description", "page_image"):
+        if metadata.get(field):
+            score += 2
+    aliases = normalize_tags(metadata.get("alternative_titles"))
+    score += min(len(aliases), 10)
+    return score, len(aliases)
 
 
 def source_name(netloc: str) -> str:
@@ -123,14 +171,9 @@ def guess_title_from_url(url: str) -> str:
     return clean_title(unquote(slug).replace("_", " ").replace("-", " "))
 
 
-def looks_like_external_id(value: str) -> bool:
-    return bool(re.fullmatch(r"(tt|nm)\d+", value.strip(), flags=re.IGNORECASE)) or bool(
-        re.fullmatch(r"film\d+", value.strip(), flags=re.IGNORECASE)
-    )
-
-
 __all__ = [
     "fetch_metadata",
+    "fetch_metadata_by_title",
     "fetch_wikidata_metadata",
     "fetch_wikipedia_by_imdb_id",
     "fetch_wikipedia_by_title",

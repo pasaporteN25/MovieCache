@@ -8,7 +8,6 @@ import os
 import shutil
 import tempfile
 from collections.abc import Mapping
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +23,7 @@ from movie_inbox.domain.normalization import VALID_KINDS, VALID_STATUSES, normal
 
 
 SCHEMA_VERSION = 4
-BACKUP_LIMIT = 10
+BACKUP_LIMIT = 1
 CATALOG_FIELDS = [
     "id",
     "url",
@@ -50,6 +49,8 @@ CATALOG_FIELDS = [
     "writers",
     "cast",
     "page_image",
+    "backdrop_image",
+    "tmdb_id",
     "wikipedia_extract",
     "en_catalogo",
     "local_files",
@@ -337,18 +338,30 @@ def backup_json_file(path: Path, limit: int = BACKUP_LIMIT) -> Path | None:
     path = Path(path)
     if not path.exists() or path.suffix.lower() != ".json":
         return None
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-    backup_path = path.with_name(f"{path.stem}.{stamp}.bak{path.suffix}")
-    shutil.copy2(path, backup_path)
-    backups = sorted(
-        path.parent.glob(f"{path.stem}.*.bak{path.suffix}"),
-        key=lambda candidate: candidate.stat().st_mtime_ns,
-        reverse=True,
-    )
-    for old_backup in backups[max(1, limit) :]:
+
+    backup_path = path.with_name(f"{path.stem}.bak{path.suffix}")
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "wb",
+            delete=False,
+            dir=path.parent,
+            prefix=f".{backup_path.name}.",
+            suffix=".tmp",
+        ) as handle:
+            temporary_path = Path(handle.name)
+        shutil.copy2(path, temporary_path)
+        os.replace(temporary_path, backup_path)
+        temporary_path = None
+    finally:
+        if temporary_path and temporary_path.exists():
+            temporary_path.unlink()
+
+    for old_backup in path.parent.glob(f"{path.stem}.*.bak{path.suffix}"):
+        if old_backup == backup_path:
+            continue
         try:
             old_backup.unlink()
         except OSError:
             pass
     return backup_path
-

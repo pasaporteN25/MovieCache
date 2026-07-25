@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.infrastructure.external_catalog import (
     enrich_external_result,
+    external_metadata_by_title,
     search_external_sources,
 )
 from movie_inbox.domain import catalog as domain
@@ -128,6 +129,54 @@ def append_item(
     return added, reason, extra
 
 
+def needs_background_title_enrichment(item: dict[str, Any]) -> bool:
+    return not str(item.get("wikidata_id") or "").strip()
+
+
+def background_enrich_catalog_item(path: Path, item_id: str, seed: dict[str, Any]) -> None:
+    year = str(seed.get("year") or "").strip()
+    titles = normalize_tags(
+        [
+            str(seed.get("original_title") or ""),
+            str(seed.get("title") or ""),
+            str(seed.get("english_title") or ""),
+            str(seed.get("spanish_title") or ""),
+            *normalize_tags(seed.get("alternative_titles")),
+        ]
+    )[:3]
+    print(
+        f"[catalog-viewer] background enrichment start item_id={item_id} titles={titles!r} year={year}",
+        flush=True,
+    )
+    try:
+        metadata: dict[str, Any] = {}
+        for title in titles:
+            metadata = external_metadata_by_title(title, year)
+            if metadata:
+                break
+        if not metadata:
+            print(f"[catalog-viewer] background enrichment no_match item_id={item_id}", flush=True)
+            return
+        wikipedia_url = str(metadata.get("wikipedia_url") or metadata.get("url") or "")
+        incoming = {
+            **metadata,
+            "url": wikipedia_url,
+            "source": "wikipedia",
+            "wikipedia_url": wikipedia_url,
+        }
+        updated, reason = catalog_service(path).merge_external_metadata(item_id, incoming)
+        print(
+            f"[catalog-viewer] background enrichment {reason} item_id={item_id} "
+            f"aliases={len(normalize_tags(metadata.get('alternative_titles')))} "
+            f"wikidata={metadata.get('wikidata_id', '')}",
+            flush=True,
+        )
+        if not updated:
+            return
+    except (CatalogRepositoryError, ValueError, OSError) as error:
+        print(f"[catalog-viewer] background enrichment error item_id={item_id} error={error}", flush=True)
+
+
 def delete_item_anywhere(
     config: ViewerConfig,
     source_file: str,
@@ -242,6 +291,8 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "writers": normalize_tags(result.get("writers")),
         "cast": normalize_tags(result.get("cast")),
         "page_image": str(result.get("page_image") or ""),
+        "backdrop_image": str(result.get("backdrop_image") or ""),
+        "tmdb_id": str(result.get("tmdb_id") or ""),
         "wikipedia_extract": str(result.get("wikipedia_extract") or ""),
         "en_catalogo": False,
         "local_files": [],

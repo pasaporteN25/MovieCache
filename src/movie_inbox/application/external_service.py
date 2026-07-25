@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from movie_inbox.domain.catalog import canonical_url, external_source_name, merge_lists, normalize_tags
 from movie_inbox.domain.models import ExternalSearchResult
+from movie_inbox.domain.titles import looks_like_external_id
 
 
 class ExternalSourceGateway(Protocol):
@@ -36,6 +37,13 @@ class ExternalCatalogService:
 
     def enrich(self, result: ExternalSearchResult | dict[str, Any]) -> ExternalSearchResult:
         enriched: ExternalSearchResult = dict(result)
+        preserved_titles = [
+            *(
+                str(enriched.get(field) or "").strip()
+                for field in ("title", "original_title", "spanish_title", "english_title")
+            ),
+            *normalize_tags(enriched.get("alternative_titles")),
+        ]
         result_url = str(enriched.get("url") or "")
         detected_source = external_source_name(result_url)
         source = str(enriched.get("source") or detected_source)
@@ -46,11 +54,15 @@ class ExternalCatalogService:
         if not metadata:
             return enriched
         for field in (
-            "title", "original_title", "spanish_title", "english_title", "year",
-            "description", "wikipedia_title", "wikidata_id", "page_image", "wikipedia_extract",
+            "title", "original_title", "spanish_title", "english_title", "kind", "year",
+            "description", "wikipedia_title", "wikidata_id", "page_image", "backdrop_image", "tmdb_id",
+            "wikipedia_extract",
         ):
             if metadata.get(field):
-                enriched[field] = str(metadata[field])
+                value = str(metadata[field])
+                if field in {"title", "original_title", "spanish_title", "english_title"} and looks_like_external_id(value):
+                    continue
+                enriched[field] = value
         for field in ("alternative_titles", "genres", "directors", "writers", "cast"):
             values = normalize_tags(metadata.get(field))
             if values:
@@ -66,7 +78,26 @@ class ExternalCatalogService:
             enriched["imdb_url"] = result_url
         elif source == "filmaffinity":
             enriched["filmaffinity_url"] = result_url
+        enriched["alternative_titles"] = _alternative_titles(enriched, preserved_titles)
         return enriched
 
     def snapshot(self) -> dict[str, Any]:
         return self.gateway.snapshot()
+
+
+def _alternative_titles(result: dict[str, Any], preserved_titles: list[str]) -> list[str]:
+    primary = {
+        str(result.get(field) or "").strip().casefold()
+        for field in ("title", "original_title", "spanish_title", "english_title")
+        if str(result.get(field) or "").strip()
+    }
+    aliases: list[str] = []
+    seen: set[str] = set()
+    for value in [*normalize_tags(result.get("alternative_titles")), *preserved_titles]:
+        title = str(value or "").strip()
+        key = title.casefold()
+        if not title or key in primary or key in seen:
+            continue
+        seen.add(key)
+        aliases.append(title)
+    return aliases[:40]

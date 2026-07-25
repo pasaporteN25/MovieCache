@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-import sys
 import unittest
-from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
 
 from movie_inbox.cli.main import COMMANDS
 from movie_inbox.external.registry import ExternalSourceService
@@ -17,7 +11,7 @@ from movie_inbox.web.config import ViewerConfig
 
 class PackageLayoutTests(unittest.TestCase):
     def test_installed_command_surface_is_complete(self) -> None:
-        self.assertEqual(set(COMMANDS), {"import", "scan", "serve", "migrate", "enrich", "match", "db"})
+        self.assertEqual(set(COMMANDS), {"import", "scan", "serve", "migrate", "enrich", "match", "db", "cache"})
 
     def test_external_clients_are_registered_independently(self) -> None:
         service = ExternalSourceService()

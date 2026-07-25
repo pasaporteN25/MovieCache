@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import sys
 import tempfile
 import unittest
 from contextlib import closing, redirect_stdout
@@ -10,16 +9,13 @@ from io import StringIO
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.repository import CatalogFormatError, CatalogRepositoryError
-from movie_inbox.cli.database import export_json, import_json
+from movie_inbox.cli.database import export_json, import_json, verify_catalog_round_trip
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
-from movie_inbox.infrastructure.sqlite_repository import SqliteCatalogRepository
+from movie_inbox.infrastructure.sqlite_repository import SCHEMA_V1, SqliteCatalogRepository
 
 
 def sample_item(item_id: str = "heat-1995"):
@@ -42,6 +38,9 @@ def sample_item(item_id: str = "heat-1995"):
             "directors": ["Michael Mann"],
             "writers": ["Michael Mann"],
             "cast": ["Al Pacino", "Robert De Niro"],
+            "page_image": "https://images.example/poster.jpg",
+            "backdrop_image": "https://images.example/backdrop.jpg",
+            "tmdb_id": "949",
             "en_catalogo": True,
             "local_files": [
                 {
@@ -74,6 +73,22 @@ def sample_item(item_id: str = "heat-1995"):
 
 
 class SqliteRepositoryTests(unittest.TestCase):
+    def test_version_one_database_is_migrated_for_landscape_artwork(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.sqlite"
+            with closing(sqlite3.connect(path)) as connection:
+                connection.executescript(SCHEMA_V1)
+                connection.execute(
+                    "INSERT INTO schema_migrations(version, name, applied_at) VALUES (1, 'initial', '2026-07-01')"
+                )
+                connection.commit()
+
+            repository = SqliteCatalogRepository(path, normalize_item)
+            self.assertEqual(repository.database_version(), 2)
+            with closing(sqlite3.connect(path)) as connection:
+                columns = {row[1] for row in connection.execute("PRAGMA table_info(catalog_items)")}
+            self.assertTrue({"backdrop_image", "tmdb_id"} <= columns)
+
     def test_relational_round_trip_preserves_catalog_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "movie-inbox.db"
@@ -86,6 +101,8 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.genres, ["Crime", "Drama"])
             self.assertEqual(loaded.imdb_url, "https://www.imdb.com/title/tt0113277/")
             self.assertEqual(loaded.wikidata_id, "Q42198")
+            self.assertEqual(loaded.backdrop_image, "https://images.example/backdrop.jpg")
+            self.assertEqual(loaded.tmdb_id, "949")
             self.assertEqual(loaded.local_files[0].library_id, "movies-a")
             self.assertEqual(loaded.metadata_sources["title"].source, "imdb")
             self.assertEqual(loaded.extra["custom_field"], "preserved")
@@ -96,6 +113,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                     for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
                 }
             self.assertTrue({"catalog_items", "external_ids", "local_files", "seasons", "episodes"} <= tables)
+            self.assertEqual(repository.database_version(), 2)
 
     def test_catalog_service_mutates_sqlite_transactionally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -107,6 +125,103 @@ class SqliteRepositoryTests(unittest.TestCase):
             loaded = repository.read()[0]
             self.assertEqual(loaded.status, "watched")
             self.assertEqual(loaded.watched_at, "2026-07-15")
+
+    def test_status_update_does_not_rewrite_secondary_relations(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.sqlite"
+            repository = SqliteCatalogRepository(path, normalize_item)
+            repository.write([sample_item()])
+            with closing(sqlite3.connect(path)) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE relation_audit(event TEXT NOT NULL);
+                    CREATE TRIGGER audit_tag_delete AFTER DELETE ON tags
+                    BEGIN INSERT INTO relation_audit(event) VALUES ('tag_deleted'); END;
+                    CREATE TRIGGER audit_file_delete AFTER DELETE ON local_files
+                    BEGIN INSERT INTO relation_audit(event) VALUES ('file_deleted'); END;
+                    """
+                )
+                connection.commit()
+
+            updated, _ = CatalogService(repository).update_status("heat-1995", "watched", "2026-07-15")
+            self.assertTrue(updated)
+            with closing(sqlite3.connect(path)) as connection:
+                self.assertEqual(connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0)
+
+    def test_metadata_update_only_rewrites_changed_relations(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.sqlite"
+            repository = SqliteCatalogRepository(path, normalize_item)
+            repository.write([sample_item()])
+            with closing(sqlite3.connect(path)) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE relation_audit(event TEXT NOT NULL);
+                    CREATE TRIGGER audit_file_delete AFTER DELETE ON local_files
+                    BEGIN INSERT INTO relation_audit(event) VALUES ('file_deleted'); END;
+                    CREATE TRIGGER audit_tag_delete AFTER DELETE ON tags
+                    BEGIN INSERT INTO relation_audit(event) VALUES ('tag_deleted'); END;
+                    """
+                )
+                connection.commit()
+
+            updated, _ = CatalogService(repository).update_metadata(
+                "heat-1995",
+                {"genres": ["Crime", "Thriller"]},
+                None,
+            )
+            self.assertTrue(updated)
+            with closing(sqlite3.connect(path)) as connection:
+                self.assertEqual(connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0)
+            self.assertEqual(repository.get("heat-1995").genres, ["Crime", "Thriller"])
+
+    def test_batch_mutation_does_not_rewrite_unchanged_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.sqlite"
+            repository = SqliteCatalogRepository(path, normalize_item)
+            repository.write([sample_item()])
+            with closing(sqlite3.connect(path)) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE relation_audit(event TEXT NOT NULL);
+                    CREATE TRIGGER audit_file_delete AFTER DELETE ON local_files
+                    BEGIN INSERT INTO relation_audit(event) VALUES ('file_deleted'); END;
+                    CREATE TRIGGER audit_tag_delete AFTER DELETE ON tags
+                    BEGIN INSERT INTO relation_audit(event) VALUES ('tag_deleted'); END;
+                    """
+                )
+                connection.commit()
+
+            added, reason, _ = CatalogService(repository).append_item(
+                {"id": "arrival-2016", "title": "Arrival", "year": "2016", "kind": "pelicula"}
+            )
+            self.assertTrue(added)
+            self.assertEqual(reason, "added")
+            with closing(sqlite3.connect(path)) as connection:
+                self.assertEqual(connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0)
+            self.assertEqual([item.id for item in repository.read()], ["arrival-2016", "heat-1995"])
+
+    def test_attach_local_file_is_granular_and_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.sqlite"
+            repository = SqliteCatalogRepository(path, normalize_item)
+            item = sample_item()
+            item.local_files = []
+            item.local_name = ""
+            item.local_path = ""
+            repository.write([item])
+            local_file = {
+                "path": "D:/Movies/Heat.mkv",
+                "name": "Heat.mkv",
+                "library_id": "movies-a",
+                "relative_path": "Heat.mkv",
+            }
+            self.assertTrue(repository.attach_local_file("heat-1995", local_file))
+            self.assertTrue(repository.attach_local_file("heat-1995", local_file))
+            loaded = repository.get("heat-1995")
+            self.assertIsNotNone(loaded)
+            self.assertEqual(len(loaded.local_files), 1)
+            self.assertTrue(loaded.en_catalogo)
 
     def test_catalog_rewrite_preserves_series_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -150,6 +265,19 @@ class SqliteRepositoryTests(unittest.TestCase):
             payload = json.loads(exported.read_text(encoding="utf-8"))
             self.assertEqual(payload["schema_version"], 4)
             self.assertEqual(payload["items"][0]["id"], "heat-1995")
+
+    def test_round_trip_verification_compares_complete_documents(self) -> None:
+        expected = sample_item()
+        changed = sample_item()
+        changed.review = "A changed review must fail verification"
+        with self.assertRaisesRegex(RuntimeError, r"canonical catalog documents differ at \$\.items\[0\]\.review"):
+            verify_catalog_round_trip([expected], [changed], "test")
+
+    def test_normalizing_an_item_does_not_duplicate_its_legacy_local_file(self) -> None:
+        item = sample_item()
+        normalized_again = normalize_item(item.to_dict())
+        self.assertEqual(len(normalized_again.local_files), 1)
+        self.assertEqual(normalized_again.local_files[0].library_id, "movies-a")
 
     def test_import_refuses_to_replace_existing_database_without_flag(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

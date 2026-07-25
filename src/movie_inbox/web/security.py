@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.error import HTTPError
@@ -74,7 +74,34 @@ class NoRedirectHandler(HTTPRedirectHandler):
         return None
 
 
-def validate_public_http_url(url: str, resolver: Resolver = socket.getaddrinfo) -> str:
+def validate_public_http_url(
+    url: str,
+    resolver: Resolver = socket.getaddrinfo,
+    allowed_hosts: Collection[str] | None = None,
+) -> str:
+    validated_url = validate_http_url(url, allowed_hosts)
+    parsed = urlparse(validated_url)
+    hostname = (parsed.hostname or "").encode("idna").decode("ascii").casefold().rstrip(".")
+    port = parsed.port or (443 if parsed.scheme.casefold() == "https" else 80)
+    try:
+        addresses = resolver(hostname, port, type=socket.SOCK_STREAM)
+    except OSError as error:
+        raise UnsafeRemoteUrl("Remote hostname could not be resolved") from error
+    if not addresses:
+        raise UnsafeRemoteUrl("Remote hostname did not resolve")
+    for address in addresses:
+        sockaddr = address[4]
+        ip_text = str(sockaddr[0]).split("%", 1)[0]
+        try:
+            ip = ipaddress.ip_address(ip_text)
+        except ValueError as error:
+            raise UnsafeRemoteUrl("Remote hostname resolved to an invalid address") from error
+        if not ip.is_global:
+            raise UnsafeRemoteUrl("Private, loopback, link-local and reserved destinations are blocked")
+    return validated_url
+
+
+def validate_http_url(url: str, allowed_hosts: Collection[str] | None = None) -> str:
     try:
         parsed = urlparse(str(url or "").strip())
         scheme = parsed.scheme.lower()
@@ -93,24 +120,20 @@ def validate_public_http_url(url: str, resolver: Resolver = socket.getaddrinfo) 
         raise UnsafeRemoteUrl("Only standard HTTP(S) ports are allowed")
 
     try:
-        hostname = hostname_value.encode("idna").decode("ascii")
+        hostname = hostname_value.encode("idna").decode("ascii").casefold().rstrip(".")
     except UnicodeError as error:
         raise UnsafeRemoteUrl("Invalid remote hostname") from error
-    try:
-        addresses = resolver(hostname, port, type=socket.SOCK_STREAM)
-    except OSError as error:
-        raise UnsafeRemoteUrl("Remote hostname could not be resolved") from error
-    if not addresses:
-        raise UnsafeRemoteUrl("Remote hostname did not resolve")
-    for address in addresses:
-        sockaddr = address[4]
-        ip_text = str(sockaddr[0]).split("%", 1)[0]
+    if allowed_hosts is not None:
         try:
-            ip = ipaddress.ip_address(ip_text)
-        except ValueError as error:
-            raise UnsafeRemoteUrl("Remote hostname resolved to an invalid address") from error
-        if not ip.is_global:
-            raise UnsafeRemoteUrl("Private, loopback, link-local and reserved destinations are blocked")
+            normalized_allowed = {
+                str(host).strip().encode("idna").decode("ascii").casefold().rstrip(".")
+                for host in allowed_hosts
+                if str(host).strip()
+            }
+        except UnicodeError as error:
+            raise UnsafeRemoteUrl("Invalid image allowlist hostname") from error
+        if hostname not in normalized_allowed:
+            raise UnsafeRemoteUrl("Remote image host is not allowed")
     return parsed.geturl()
 
 
@@ -120,9 +143,10 @@ def open_public_url(
     headers: dict[str, str],
     timeout: float,
     resolver: Resolver = socket.getaddrinfo,
+    allowed_hosts: Collection[str] | None = None,
 ):
     opener = build_opener(NoRedirectHandler())
-    current_url = validate_public_http_url(url, resolver)
+    current_url = validate_public_http_url(url, resolver, allowed_hosts)
     for redirect_count in range(MAX_REDIRECTS + 1):
         request = Request(current_url, headers=headers)
         try:
@@ -135,5 +159,5 @@ def open_public_url(
             error.close()
             if not location or redirect_count >= MAX_REDIRECTS:
                 raise UnsafeRemoteUrl("Remote image redirected too many times") from error
-            current_url = validate_public_http_url(urljoin(current_url, location), resolver)
+            current_url = validate_public_http_url(urljoin(current_url, location), resolver, allowed_hosts)
     raise UnsafeRemoteUrl("Remote image redirect could not be resolved")

@@ -35,6 +35,9 @@ def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
 
     labels = fetch_wikidata_labels(all_ids)
     metadata = wikidata_title_metadata(entity)
+    kind = wikidata_kind(claims)
+    if kind:
+        metadata["kind"] = kind
     year = wikidata_claim_year(claims, "P577")
     if year:
         metadata["year"] = year
@@ -43,6 +46,19 @@ def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
         if values:
             metadata[field] = values
     return metadata
+
+
+def wikidata_kind(claims: dict[str, object]) -> str:
+    instance_ids = set(wikidata_claim_entity_ids(claims, "P31", 12))
+    if instance_ids & {"Q1107", "Q63952888"}:
+        return "anime"
+    if "Q93204" in instance_ids:
+        return "documental"
+    if instance_ids & {"Q5398426", "Q1259759", "Q15416"}:
+        return "serie"
+    if instance_ids & {"Q11424", "Q24862", "Q506240"}:
+        return "pelicula"
+    return ""
 
 
 def wikidata_title_metadata(entity: dict[str, object]) -> dict[str, object]:
