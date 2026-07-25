@@ -9,23 +9,115 @@
   </head>
   <body>
     <main>
-      <header>
-        <div>
+      <header class="app-header">
+        <div class="brand-lockup">
+          <span class="brand-kicker">Video club // night shift</span>
           <h1>__MOVIE_INBOX_TITLE__</h1>
-          <div class="stats" id="stats">Cargando...</div>
+          <div class="stats" id="stats" aria-live="polite">Cargando...</div>
         </div>
-        <section class="search-console">
+        <div class="header-actions">
+          <nav class="primary-nav" aria-label="Navegación principal">
+            <button id="homeButton" class="nav-action active" type="button" aria-current="page">Inicio</button>
+            <button id="catalogButton" class="nav-action" type="button">Colección</button>
+            <button id="randomButton" class="nav-action random-nav-action" type="button">Random</button>
+            <label class="random-scope-control">
+              <input id="randomCatalogOnly" type="checkbox" aria-label="Limitar Random a entradas en catálogo" checked>
+              <span id="randomScopeLabel">Catálogo</span>
+            </label>
+          </nav>
+          <details id="systemMenu" class="system-menu">
+            <summary aria-label="Abrir menú de sistema">Menú</summary>
+            <div class="system-menu-panel">
+              <span class="system-menu-kicker">Sistema</span>
+              <button id="adminButton" class="system-menu-action" type="button">Administrar</button>
+            </div>
+          </details>
+          <div class="format-mark" aria-hidden="true">
+            <span>REW</span><strong>PLAY</strong><span>FF</span>
+          </div>
+        </div>
+      </header>
+
+      <section id="homeView" class="app-view home-view">
+        <section id="spotlight" class="spotlight" aria-labelledby="spotlightTitle">
+          <div class="spotlight-bar">
+            <div>
+              <span class="eyebrow">Selección del videoclub</span>
+              <h2 id="spotlightTitle">Ahora en pantalla</h2>
+            </div>
+            <button id="spotlightToggle" class="spotlight-toggle" type="button" aria-pressed="false">Pausar</button>
+          </div>
+          <div id="spotlightStage" class="spotlight-stage" aria-live="off"></div>
+        </section>
+
+        <section class="home-shelf" aria-labelledby="homeShelfTitle">
+          <div class="home-shelf-heading">
+            <div>
+              <span class="eyebrow">Disponible esta noche</span>
+              <h2 id="homeShelfTitle">Selección del catálogo</h2>
+            </div>
+            <button id="homeCollectionButton" class="quiet-action home-collection-action" type="button">Ver colección</button>
+          </div>
+          <div class="grid home-grid" id="homeGrid"></div>
+          <p class="empty home-empty" id="homeEmpty" hidden>Tu selección aparecerá cuando haya obras disponibles en catálogo.</p>
+        </section>
+      </section>
+
+      <section id="collectionView" class="app-view collection-view" hidden>
+        <section class="search-console" aria-label="Buscar y filtrar la colección">
           <div class="search-main">
-            <input id="query" type="search" placeholder="Buscar catalogo, Wikipedia, IMDb o FilmAffinity...">
-            <label class="source-toggle disabled"><input id="catalogSource" type="checkbox" checked disabled> Catalogo</label>
-            <label class="source-toggle"><input id="externalSource" type="checkbox"> Externo</label>
+            <label class="search-field">
+              <span class="sr-only">Buscar películas</span>
+              <input id="query" type="search" placeholder="Buscar una película..." autocomplete="off">
+            </label>
             <button id="searchButton" class="search-action" type="button">Buscar</button>
-            <button id="clearManualSearch" type="button">Limpiar</button>
+            <button id="clearManualSearch" class="quiet-action" type="button" hidden>Salir</button>
+            <details class="utility-menu">
+              <summary>Filtros y orden</summary>
+              <div class="utility-panel collection-filter-panel">
+                <section class="utility-section">
+                  <div class="utility-section-heading">
+                    <h2>Filtrar estantería</h2>
+                    <button id="clearFilters" class="text-action" type="button">Limpiar</button>
+                  </div>
+                  <div class="filter-row">
+                    <select id="status" aria-label="Filtrar por estado"></select>
+                    <select id="kind" aria-label="Filtrar por tipo"></select>
+                    <select id="source" aria-label="Filtrar por fuente"></select>
+                    <select id="sort" aria-label="Ordenar colección">
+                      <option value="original">Orden original</option>
+                      <option value="title-asc">Título A-Z</option>
+                      <option value="year-desc">Año, más nuevas</option>
+                      <option value="year-asc">Año, más antiguas</option>
+                      <option value="rating-desc">Mejor puntuadas</option>
+                    </select>
+                  </div>
+                  <div class="collection-order-actions">
+                    <button id="randomizeView" type="button">Mezclar vista</button>
+                    <button id="resetOrder" class="quiet-action" type="button">Restablecer orden</button>
+                  </div>
+                </section>
+              </div>
+            </details>
+          </div>
+          <div class="search-options">
+            <input id="catalogSource" type="checkbox" checked disabled hidden>
+            <label class="source-toggle search-source-toggle"><input id="externalSource" type="checkbox"> Incluir fuentes externas</label>
+          </div>
+          <div id="activeFilters" class="active-filters" aria-live="polite" hidden></div>
+          <div id="searchContext" class="search-context" aria-live="polite" hidden>
+            <span id="searchContextText"></span>
+            <div class="search-context-actions">
+              <button id="cancelSearch" class="quiet-action" type="button" hidden>Cancelar búsqueda</button>
+              <button id="reviewPrevious" class="quiet-action review-step" type="button" hidden>Anterior</button>
+              <button id="reviewNext" class="quiet-action review-step" type="button" hidden>Siguiente</button>
+              <button id="backToCollection" class="quiet-action" type="button">Volver a la colección</button>
+            </div>
           </div>
           <div class="search-sections">
             <section class="search-section" id="catalogMergeSection">
               <div class="section-heading">
-                <strong>Catalogo local</strong>
+                <strong>Catálogo local</strong>
                 <div class="status-line" id="catalogMergeStatus"></div>
               </div>
               <div class="search-results" id="catalogMergeResults"></div>
@@ -39,68 +131,108 @@
             </section>
           </div>
         </section>
-      </header>
-      <section class="layout">
-        <aside>
-          <section class="side-section">
-            <h3>Resumen</h3>
+
+        <section id="catalogSection" class="catalog-heading" aria-labelledby="catalogTitle">
+          <div>
+            <span class="eyebrow">Archivo nocturno</span>
+            <h2 id="catalogTitle">La colección</h2>
+          </div>
+          <p>Disponibilidad, estado y puntuación visibles en cada caja.</p>
+        </section>
+
+        <section class="grid" id="grid"></section>
+        <button id="catalogLoadMore" class="catalog-more" type="button" hidden>Cargar más</button>
+        <p class="empty" id="empty">No hay obras que coincidan con la búsqueda y los filtros actuales.</p>
+      </section>
+
+      <section id="adminView" class="app-view admin-view" hidden>
+        <header class="admin-heading">
+          <div>
+            <span class="eyebrow">Control room</span>
+            <h2>Administrar Movie Inbox</h2>
+            <p>Estado del archivo, fuentes externas y herramientas de curación.</p>
+          </div>
+          <button id="refresh" class="search-action admin-refresh" type="button">Actualizar datos</button>
+        </header>
+
+        <nav class="admin-section-nav" aria-label="Secciones de administración">
+          <a href="#adminSummary">Resumen</a>
+          <a href="#adminDatabase">Base de datos</a>
+          <a href="#adminExternal">Fuentes externas</a>
+          <a href="#adminMatching">Matching y duplicados</a>
+        </nav>
+
+        <section id="adminSummary" class="admin-section" aria-labelledby="adminSummaryTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminSummaryTitle">Resumen</h3>
+              <p>Una lectura rápida del estado actual de la biblioteca.</p>
+            </div>
+          </div>
+          <div class="metric-grid admin-metric-grid">
             <div class="metric"><span>Total</span><strong id="total">0</strong></div>
             <div class="metric"><span>Visibles</span><strong id="visible">0</strong></div>
             <div class="metric"><span>Vistas</span><strong id="watchedCount">0</strong></div>
             <div class="metric"><span>Por ver</span><strong id="toWatchCount">0</strong></div>
             <div class="metric"><span>Puntuadas</span><strong id="ratedCount">0</strong></div>
-            <div class="metric"><span>Con imagen</span><strong id="withImage">0</strong></div>
+            <div class="metric"><span>Con portada</span><strong id="withImage">0</strong></div>
             <div class="metric"><span>Con link</span><strong id="wikiLinks">0</strong></div>
             <div class="metric"><span>Sin link</span><strong id="withoutWiki">0</strong></div>
             <div class="metric"><span>IMDb</span><strong id="imdbLinks">0</strong></div>
             <div class="metric"><span>FilmAffinity</span><strong id="faLinks">0</strong></div>
             <div class="metric"><span>Duplicadas</span><strong id="duplicateCount">0</strong></div>
-            <div class="metric"><span>Catalogos</span><strong id="sourceFiles">0</strong></div>
-          </section>
-          <section class="side-section">
-            <h3>Filtros</h3>
-            <div class="filter-row">
-              <select id="status"></select>
-              <select id="kind"></select>
-              <select id="source"></select>
+            <div class="metric"><span>Catálogos</span><strong id="sourceFiles">0</strong></div>
+          </div>
+        </section>
+
+        <section id="adminDatabase" class="admin-section" aria-labelledby="adminDatabaseTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminDatabaseTitle">Base de datos</h3>
+              <p>Origen editable y archivos que participan del catálogo actual.</p>
             </div>
-          </section>
-          <section class="side-section">
-            <h3>Menu</h3>
-            <div class="menu-tabs">
-              <button id="databaseMenuCatalog" class="menu-tab active" type="button">Bases de datos</button>
-              <button id="databaseMenuExternal" class="menu-tab" type="button">External DBs</button>
+          </div>
+          <div id="databaseCatalogPanel" class="db-panel admin-db-panel"></div>
+        </section>
+
+        <section id="adminExternal" class="admin-section" aria-labelledby="adminExternalTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminExternalTitle">Fuentes externas</h3>
+              <p>Salud y actividad reciente de Wikipedia, IMDb y FilmAffinity.</p>
             </div>
-            <div id="databaseCatalogPanel" class="db-panel"></div>
-            <div id="databaseExternalPanel" class="db-panel" hidden></div>
-          </section>
-          <section class="side-section">
-            <h3>Herramientas</h3>
-            <button id="startWikiReview" type="button">Revisar sin link</button>
-            <button id="previousWikiReview" type="button">Anterior</button>
-            <button id="nextWikiReview" type="button">Siguiente</button>
-            <div class="status-line" id="wikiReviewStatus"></div>
-            <button id="randomizeView" type="button">Randomizar</button>
-            <button id="resetOrder" type="button">Orden normal</button>
-            <button id="showDuplicates" type="button">Ver duplicadas</button>
-            <button id="refresh">Actualizar</button>
-          </section>
-        </aside>
-        <div>
-          <section class="grid" id="grid"></section>
-          <button id="catalogLoadMore" class="catalog-more" type="button" hidden>Cargar mas</button>
-          <p class="empty" id="empty">No hay resultados para esos filtros.</p>
-        </div>
+          </div>
+          <div id="databaseExternalPanel" class="db-panel admin-db-panel"></div>
+        </section>
+
+        <section id="adminMatching" class="admin-section" aria-labelledby="adminMatchingTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminMatchingTitle">Matching y duplicados</h3>
+              <p>Revisión manual de entradas sin links y posibles obras repetidas.</p>
+            </div>
+          </div>
+          <div class="tool-grid admin-tool-grid">
+            <button id="showDuplicates" type="button">Ver duplicadas en Colección</button>
+            <button id="startWikiReview" type="button">Revisar entradas sin link</button>
+            <button id="previousWikiReview" class="quiet-action" type="button">Anterior</button>
+            <button id="nextWikiReview" class="quiet-action" type="button">Siguiente</button>
+          </div>
+          <div class="status-line" id="wikiReviewStatus"></div>
+        </section>
       </section>
     </main>
-    <div id="detailBackdrop" class="drawer-backdrop"></div>
-    <aside id="detailDrawer" class="detail-drawer" aria-hidden="true">
-      <div class="drawer-top">
-        <strong>Detalle</strong>
-        <button id="closeDetail" class="drawer-close" type="button">Cerrar</button>
+
+    <dialog id="detailDrawer" class="detail-drawer" aria-labelledby="detailDrawerTitle">
+      <div class="movie-dialog-surface">
+        <div class="drawer-top">
+          <strong id="detailDrawerTitle">Ficha // lado B</strong>
+          <button id="closeDetail" class="drawer-close" type="button">Cerrar</button>
+        </div>
+        <div id="detailBody" class="drawer-body"></div>
       </div>
-      <div id="detailBody" class="drawer-body"></div>
-    </aside>
+    </dialog>
+
     <dialog id="descriptionDialog">
       <div class="description-dialog-body">
         <h2 id="descriptionDialogTitle"></h2>

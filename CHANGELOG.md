@@ -6,7 +6,7 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
-- Paquete instalable `movie-inbox` con subcomandos `import`, `scan`, `serve`, `migrate`, `enrich`, `match` y `db`.
+- Paquete instalable `movie-inbox` con subcomandos `import`, `scan`, `serve`, `migrate`, `enrich`, `match`, `db` y `cache`.
 - Estructura `src/movie_inbox` con capas de dominio, aplicacion, infraestructura, clientes externos y web.
 - Clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity, con registro concurrente y cache compartido.
 - HTML, CSS y JavaScript del visor como assets estaticos empaquetados.
@@ -31,8 +31,17 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Limite de cuerpo aplicado durante la lectura del stream y documentacion OpenAPI deshabilitada.
 - El token del cache de imagenes sale de la URL y pasa a una cookie `HttpOnly` con `SameSite=Strict`.
 - Proteccion SSRF del cache de imagenes, incluida la validacion de redirecciones.
+- Allowlist exacta para hosts de imagenes y proxy limitado a JPEG, PNG, WebP, GIF y AVIF; SVG remoto queda rechazado.
+- Cache de imagenes con limite total configurable, limpieza LRU, escrituras atomicas y comandos `info`, `prune` y `clear`.
+- Job de CI que construye e instala el wheel en un entorno limpio y prueba comando, assets y healthcheck.
 - Matching conservador y auditable con motivo y evidencia por candidato.
 - Pruebas de regresion para seguridad HTTP, esquema, repositorios JSON/SQLite, gateways externos, modelos, capas y matching.
+- Contratos durables de producto y diseno para preservar el posicionamiento, lenguaje visual y reglas de interaccion de Movie Inbox.
+- Navegacion del visor separada en `Inicio`, `Coleccion` y `Administrar`, con las tareas operativas fuera de la pantalla de descubrimiento.
+- Inicio con spotlight pausable y una seleccion breve de obras disponibles en el catalogo.
+- Coleccion con busqueda explicita, filtros combinables, orden, chips activos y carga incremental.
+- Administracion dedicada para resumen, base de datos, fuentes externas, matching y duplicados.
+- Cards de proporcion estable 2:3 con titulo, ano, disponibilidad, estado personal y puntuacion visible cuando existe.
 
 ### Corregido
 
@@ -44,7 +53,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Los dominios externos se validan por hostname exacto o subdominio, sin aceptar nombres como `imdb.com.example.org`.
 - Los titulos iguales sin ano ya no se combinan automaticamente.
 - Los catalogos futuros o mal formados ya no se leen como listas vacias ni se reescriben como v4.
+- SQLite sincroniza solamente items y relaciones modificadas; los cambios de estado usan un `UPDATE` directo.
+- Importacion y exportacion comparan documentos canonicos completos para detectar perdida de reviews, metadata, aliases o archivos.
+- La normalizacion legacy ya no duplica un archivo local que tambien tiene `library_id` y `relative_path`.
 - Los comandos batch ya no importan la interfaz web ni el importador monolitico.
+- Los titulos largos y los estados de las cards se adaptan sin cambiar el alto de la grilla ni depender de hover en dispositivos tactiles.
 
 ## [0.1.0] - 2026-07-13
 

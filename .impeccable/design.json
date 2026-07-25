@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-25T03:30:57.2277919-03:00",
+  "title": "Design System: Movie Inbox",
+  "extensions": {
+    "colorMeta": {
+      "playhead-pink": {
+        "role": "primary",
+        "displayName": "Playhead Pink",
+        "canonical": "oklch(68.2% 0.241 353.2)",
+        "tonalRamp": ["oklch(15% 0.241 353.2)", "oklch(27% 0.241 353.2)", "oklch(39% 0.241 353.2)", "oklch(51% 0.241 353.2)", "oklch(63% 0.241 353.2)", "oklch(75% 0.241 353.2)", "oklch(87% 0.241 353.2)", "oklch(95% 0.241 353.2)"]
+      },
+      "playhead-pink-deep": {
+        "role": "primary-hover",
+        "displayName": "Playhead Pink Deep",
+        "canonical": "oklch(59.9% 0.224 350.6)",
+        "tonalRamp": ["oklch(15% 0.224 350.6)", "oklch(27% 0.224 350.6)", "oklch(39% 0.224 350.6)", "oklch(51% 0.224 350.6)", "oklch(63% 0.224 350.6)", "oklch(75% 0.224 350.6)", "oklch(87% 0.224 350.6)", "oklch(95% 0.224 350.6)"]
+      },
+      "crt-cyan": {
+        "role": "focus-and-confirmation",
+        "displayName": "CRT Cyan",
+        "canonical": "oklch(80.6% 0.133 202.8)",
+        "tonalRamp": ["oklch(15% 0.133 202.8)", "oklch(27% 0.133 202.8)", "oklch(39% 0.133 202.8)", "oklch(51% 0.133 202.8)", "oklch(63% 0.133 202.8)", "oklch(75% 0.133 202.8)", "oklch(87% 0.133 202.8)", "oklch(95% 0.133 202.8)"]
+      },
+      "rental-sticker-gold": {
+        "role": "value-and-warning",
+        "displayName": "Rental Sticker Gold",
+        "canonical": "oklch(84.2% 0.141 76.6)",
+        "tonalRamp": ["oklch(15% 0.141 76.6)", "oklch(27% 0.141 76.6)", "oklch(39% 0.141 76.6)", "oklch(51% 0.141 76.6)", "oklch(63% 0.141 76.6)", "oklch(75% 0.141 76.6)", "oklch(87% 0.141 76.6)", "oklch(95% 0.141 76.6)"]
+      },
+      "tape-violet": {
+        "role": "structure",
+        "displayName": "Tape Violet",
+        "canonical": "oklch(59.6% 0.23 284.9)",
+        "tonalRamp": ["oklch(15% 0.23 284.9)", "oklch(27% 0.23 284.9)", "oklch(39% 0.23 284.9)", "oklch(51% 0.23 284.9)", "oklch(63% 0.23 284.9)", "oklch(75% 0.23 284.9)", "oklch(87% 0.23 284.9)", "oklch(95% 0.23 284.9)"]
+      },
+      "cassette-black": {
+        "role": "deep-background",
+        "displayName": "Cassette Black",
+        "canonical": "oklch(15.1% 0.03 275.6)",
+        "tonalRamp": ["oklch(15% 0.03 275.6)", "oklch(27% 0.03 275.6)", "oklch(39% 0.03 275.6)", "oklch(51% 0.03 275.6)", "oklch(63% 0.03 275.6)", "oklch(75% 0.03 275.6)", "oklch(87% 0.03 275.6)", "oklch(95% 0.03 275.6)"]
+      },
+      "night-shelf": {
+        "role": "surface",
+        "displayName": "Night Shelf",
+        "canonical": "oklch(20.4% 0.042 273.9)",
+        "tonalRamp": ["oklch(15% 0.042 273.9)", "oklch(27% 0.042 273.9)", "oklch(39% 0.042 273.9)", "oklch(51% 0.042 273.9)", "oklch(63% 0.042 273.9)", "oklch(75% 0.042 273.9)", "oklch(87% 0.042 273.9)", "oklch(95% 0.042 273.9)"]
+      },
+      "case-blue": {
+        "role": "raised-surface",
+        "displayName": "Case Blue",
+        "canonical": "oklch(24.2% 0.052 275.5)",
+        "tonalRamp": ["oklch(15% 0.052 275.5)", "oklch(27% 0.052 275.5)", "oklch(39% 0.052 275.5)", "oklch(51% 0.052 275.5)", "oklch(63% 0.052 275.5)", "oklch(75% 0.052 275.5)", "oklch(87% 0.052 275.5)", "oklch(95% 0.052 275.5)"]
+      },
+      "screen-white": {
+        "role": "text-primary",
+        "displayName": "Screen White",
+        "canonical": "oklch(96.9% 0.016 293.8)",
+        "tonalRamp": ["oklch(15% 0.016 293.8)", "oklch(27% 0.016 293.8)", "oklch(39% 0.016 293.8)", "oklch(51% 0.016 293.8)", "oklch(63% 0.016 293.8)", "oklch(75% 0.016 293.8)", "oklch(87% 0.016 293.8)", "oklch(95% 0.016 293.8)"]
+      },
+      "dusty-lavender": {
+        "role": "text-secondary",
+        "displayName": "Dusty Lavender",
+        "canonical": "oklch(74.5% 0.042 280.7)",
+        "tonalRamp": ["oklch(15% 0.042 280.7)", "oklch(27% 0.042 280.7)", "oklch(39% 0.042 280.7)", "oklch(51% 0.042 280.7)", "oklch(63% 0.042 280.7)", "oklch(75% 0.042 280.7)", "oklch(87% 0.042 280.7)", "oklch(95% 0.042 280.7)"]
+      },
+      "soft-signal-line": {
+        "role": "divider",
+        "displayName": "Soft Signal Line",
+        "canonical": "oklch(66.3% 0.188 285.3 / 0.34)",
+        "tonalRamp": ["oklch(15% 0.188 285.3 / 0.34)", "oklch(27% 0.188 285.3 / 0.34)", "oklch(39% 0.188 285.3 / 0.34)", "oklch(51% 0.188 285.3 / 0.34)", "oklch(63% 0.188 285.3 / 0.34)", "oklch(75% 0.188 285.3 / 0.34)", "oklch(87% 0.188 285.3 / 0.34)", "oklch(95% 0.188 285.3 / 0.34)"]
+      },
+      "projection-panel": {
+        "role": "translucent-surface",
+        "displayName": "Projection Panel",
+        "canonical": "oklch(20.4% 0.042 273.9 / 0.9)",
+        "tonalRamp": ["oklch(15% 0.042 273.9 / 0.9)", "oklch(27% 0.042 273.9 / 0.9)", "oklch(39% 0.042 273.9 / 0.9)", "oklch(51% 0.042 273.9 / 0.9)", "oklch(63% 0.042 273.9 / 0.9)", "oklch(75% 0.042 273.9 / 0.9)", "oklch(87% 0.042 273.9 / 0.9)", "oklch(95% 0.042 273.9 / 0.9)"]
+      },
+      "control-background": {
+        "role": "control-surface",
+        "displayName": "Control Background",
+        "canonical": "oklch(18.2% 0.043 273.2)",
+        "tonalRamp": ["oklch(15% 0.043 273.2)", "oklch(27% 0.043 273.2)", "oklch(39% 0.043 273.2)", "oklch(51% 0.043 273.2)", "oklch(63% 0.043 273.2)", "oklch(75% 0.043 273.2)", "oklch(87% 0.043 273.2)", "oklch(95% 0.043 273.2)"]
+      },
+      "control-border": {
+        "role": "control-border",
+        "displayName": "Control Border",
+        "canonical": "oklch(43.1% 0.073 276)",
+        "tonalRamp": ["oklch(15% 0.073 276)", "oklch(27% 0.073 276)", "oklch(39% 0.073 276)", "oklch(51% 0.073 276)", "oklch(63% 0.073 276)", "oklch(75% 0.073 276)", "oklch(87% 0.073 276)", "oklch(95% 0.073 276)"]
+      },
+      "quiet-control": {
+        "role": "secondary-control",
+        "displayName": "Quiet Control",
+        "canonical": "oklch(28.4% 0.055 275.1)",
+        "tonalRamp": ["oklch(15% 0.055 275.1)", "oklch(27% 0.055 275.1)", "oklch(39% 0.055 275.1)", "oklch(51% 0.055 275.1)", "oklch(63% 0.055 275.1)", "oklch(75% 0.055 275.1)", "oklch(87% 0.055 275.1)", "oklch(95% 0.055 275.1)"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Marca y encabezados principales de alto impacto."
+      },
+      "feature": {
+        "displayName": "Feature",
+        "purpose": "Titulos cinematograficos dentro del spotlight."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Titulos de obra con escalado por longitud."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Lectura operativa, controles y contenido."
+      },
+      "label": {
+        "displayName": "Signal Label",
+        "purpose": "Metadata, estados, kickers y microcopy tecnico."
+      }
+    },
+    "shadows": [
+      {
+        "name": "header-signal",
+        "value": "0 12px 36px rgba(0,0,0,.34), 0 1px 22px rgba(255,62,165,.12)",
+        "purpose": "Separar la cabecera con una senal ambiental leve."
+      },
+      {
+        "name": "spotlight-lift",
+        "value": "0 20px 44px rgba(0,0,0,.32)",
+        "purpose": "Sostener la marquesina cinematografica."
+      },
+      {
+        "name": "dvd-case",
+        "value": "0 14px 28px rgba(0,0,0,.4), -2px 0 13px rgba(120,92,255,.12)",
+        "purpose": "Comunicar carcasa, lomo y presencia material."
+      },
+      {
+        "name": "utility-overlay",
+        "value": "0 18px 44px rgba(0,0,0,.52), 0 0 24px rgba(120,92,255,.12)",
+        "purpose": "Separar menus flotantes de la coleccion."
+      },
+      {
+        "name": "detail-dossier",
+        "value": "0 28px 90px rgba(0,0,0,.72), 0 0 34px rgba(34,216,229,.16)",
+        "purpose": "Elevar la ficha sobre el catalogo."
+      }
+    ],
+    "motion": [
+      {
+        "name": "spotlight-in",
+        "value": "520ms ease",
+        "purpose": "Entrada breve por opacidad y escala para una nueva seleccion."
+      },
+      {
+        "name": "dvd-flip",
+        "value": "420ms cubic-bezier(0.22, 0.72, 0.18, 1)",
+        "purpose": "Giro material entre portada y lado B."
+      },
+      {
+        "name": "case-shadow",
+        "value": "180ms ease",
+        "purpose": "Respuesta tactil corta sobre la caja."
+      },
+      {
+        "name": "dialog-in",
+        "value": "220ms ease",
+        "purpose": "Apertura de ficha mediante opacidad, traslacion y escala."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "Desactivar entradas, flips y transformaciones cuando el usuario lo solicita."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "utility-compact",
+        "value": "1100px"
+      },
+      {
+        "name": "console-stack",
+        "value": "860px"
+      },
+      {
+        "name": "mobile",
+        "value": "640px"
+      },
+      {
+        "name": "mobile-compact",
+        "value": "440px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Accion principal unica dentro de un contexto operativo.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">BUSCAR</button>",
+      "css": ".ds-btn-primary { background: linear-gradient(135deg, var(--red, #ff3ea5), #b62cff); border: 1px solid rgba(255,121,191,.65); border-radius: 3px; color: #fff; cursor: pointer; font: 700 16px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 14px; transition: filter 180ms ease, background 180ms ease; } .ds-btn-primary:hover { filter: brightness(.96); } .ds-btn-primary:active { background: var(--red-dark, #d92a91); } .ds-btn-primary:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Salida, limpieza o accion secundaria sin competir con la principal.",
+      "html": "<button class=\"ds-btn-quiet\" type=\"button\">SALIR</button>",
+      "css": ".ds-btn-quiet { background: var(--quiet-control, #222745); border: 1px solid var(--control-border, #454c78); border-radius: 3px; color: var(--ink, #f5f3ff); cursor: pointer; font: 700 16px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 14px; transition: filter 180ms ease; } .ds-btn-quiet:hover { filter: brightness(.96); } .ds-btn-quiet:active { filter: brightness(.88); } .ds-btn-quiet:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Campo profundo y sobrio para iniciar la busqueda principal.",
+      "html": "<label class=\"ds-search\"><span>BUSCAR PELICULAS</span><input type=\"search\" placeholder=\"Buscar una pelicula...\"></label>",
+      "css": ".ds-search { color: var(--muted, #a7aac7); display: grid; font: 800 10px/1.2 \"Courier New\", monospace; gap: 6px; letter-spacing: .12em; text-transform: uppercase; } .ds-search input { background: var(--control-background, #0c1025); border: 1px solid var(--control-border, #454c78); border-radius: 3px; color: var(--ink, #f5f3ff); font: 400 16px/1.5 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 10px; } .ds-search input::placeholder { color: var(--muted, #a7aac7); } .ds-search input:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Primary Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "Navegacion rectangular compacta con una excepcion dorada para Random.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Principal\"><button class=\"ds-nav-active\" type=\"button\">INICIO</button><button type=\"button\">COLECCION</button><button class=\"ds-nav-random\" type=\"button\">RANDOM</button></nav>",
+      "css": ".ds-nav { background: rgba(8,10,24,.74); border: 1px solid rgba(120,92,255,.46); display: flex; gap: 3px; padding: 3px; } .ds-nav button { background: transparent; border: 0; border-radius: 0; color: var(--muted, #a7aac7); cursor: pointer; font: 700 14px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 32px; padding: 6px 10px; } .ds-nav .ds-nav-active { background: rgba(34,216,229,.12); color: var(--teal, #22d8e5); } .ds-nav .ds-nav-random { color: var(--gold, #ffbe55); } .ds-nav button:hover { background: rgba(120,92,255,.12); } .ds-nav button:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Estado compacto; la variante cyan confirma y la dorada advierte o puntua.",
+      "html": "<div class=\"ds-chip-row\"><span class=\"ds-chip ds-chip-good\">EN CATALOGO</span><span class=\"ds-chip ds-chip-warning\">8 / 10</span></div>",
+      "css": ".ds-chip-row { display: flex; flex-wrap: wrap; gap: 6px; } .ds-chip { border: 1px solid rgba(139,124,255,.34); border-radius: 999px; color: #d6d4e8; font: 700 11px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; padding: 3px 7px; } .ds-chip-good { background: rgba(34,216,229,.1); border-color: rgba(34,216,229,.52); color: #9bf8ff; } .ds-chip-warning { background: rgba(255,190,85,.11); border-color: rgba(255,190,85,.52); color: var(--gold, #ffbe55); }"
+    },
+    {
+      "name": "DVD Case",
+      "kind": "card",
+      "refersTo": "dvd-case",
+      "description": "Componente firma para explorar una obra como objeto fisico.",
+      "html": "<article class=\"ds-dvd\"><button class=\"ds-dvd-open\" type=\"button\" aria-label=\"Abrir Blade Runner\"></button><span class=\"ds-dvd-spine\"></span><span class=\"ds-dvd-sticker\">EN CATALOGO</span><div class=\"ds-dvd-cover\"><small>MOVIE INBOX</small><strong>BLADE RUNNER</strong><span>1982 · PELICULA</span></div></article>",
+      "css": ".ds-dvd { aspect-ratio: 2/3; background: linear-gradient(90deg,#030511 0 8px,#25294c 8px 12px,var(--case,#080a18) 12px 100%); border: 1px solid #343a68; border-radius: 4px 10px 10px 4px; box-shadow: 0 14px 28px rgba(0,0,0,.4),-2px 0 13px rgba(120,92,255,.12); color: #fff; max-width: 220px; overflow: hidden; padding: 7px 7px 7px 13px; position: relative; transition: box-shadow 180ms ease, transform 180ms ease; } .ds-dvd:hover { box-shadow: 0 18px 38px rgba(0,0,0,.5),0 0 25px rgba(34,216,229,.18); transform: translateY(-4px); } .ds-dvd-open { background: transparent; border: 0; border-radius: inherit; cursor: pointer; inset: 0; position: absolute; z-index: 4; } .ds-dvd-open:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: -6px; } .ds-dvd-spine { background: linear-gradient(90deg,#03040e,#262b52 55%,#090b1c); border-right: 1px solid rgba(34,216,229,.28); bottom: 8px; left: 4px; position: absolute; top: 8px; width: 6px; } .ds-dvd-sticker { background: var(--gold,#ffbe55); border: 1px solid #39240a; color: #24170b; font: 900 8px/1.2 \"Courier New\",monospace; padding: 4px 6px; position: absolute; right: 10px; top: 10px; transform: rotate(3deg); } .ds-dvd-cover { align-content: end; background: linear-gradient(155deg,var(--red,#ff3ea5),#76256f 50%,#0a0c1d); display: grid; gap: 5px; height: 100%; padding: 18px 14px; text-align: center; } .ds-dvd-cover small,.ds-dvd-cover span { font: 800 8px/1.2 \"Courier New\",monospace; letter-spacing: .12em; text-transform: uppercase; } .ds-dvd-cover strong { font: italic 900 30px/.92 \"Arial Narrow\",\"Trebuchet MS\",sans-serif; overflow-wrap: anywhere; text-shadow: 2px 3px 0 rgba(0,0,0,.28); } @media (prefers-reduced-motion: reduce) { .ds-dvd { transition: none; } .ds-dvd:hover { transform: none; } }"
+    },
+    {
+      "name": "Spotlight CTA",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Accion cinematografica dentro de una seleccion destacada.",
+      "html": "<button class=\"ds-spotlight-cta\" type=\"button\">VER FICHA</button>",
+      "css": ".ds-spotlight-cta { background: var(--red,#ff3ea5); border: 1px solid rgba(255,255,255,.52); border-radius: 3px; color: #fff; cursor: pointer; font: 800 12px/1.2 \"Space Grotesk\",\"Trebuchet MS\",sans-serif; min-height: 36px; padding: 7px 13px; text-transform: uppercase; } .ds-spotlight-cta:hover,.ds-spotlight-cta:active { background: var(--red-dark,#d92a91); } .ds-spotlight-cta:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Detail State",
+      "kind": "card",
+      "refersTo": "status-chip",
+      "description": "Resumen accionable de disponibilidad, visualizacion o puntuacion dentro de la ficha.",
+      "html": "<button class=\"ds-detail-state ds-detail-state-active\" type=\"button\"><span>MI CATALOGO</span><strong>Disponible</strong><small>Cambiar disponibilidad</small></button>",
+      "css": ".ds-detail-state { align-content: start; background: rgba(25,29,56,.72); border: 1px solid rgba(120,92,255,.4); border-radius: 0; color: var(--ink,#f5f3ff); cursor: pointer; display: grid; gap: 2px; min-height: 74px; padding: 10px; text-align: left; } .ds-detail-state span { color: var(--muted,#a7aac7); font: 800 10px/1.2 \"Courier New\",monospace; letter-spacing: .1em; text-transform: uppercase; } .ds-detail-state strong { font: 700 15px/1.3 \"Space Grotesk\",\"Trebuchet MS\",sans-serif; } .ds-detail-state small { color: var(--muted,#a7aac7); font-size: 10px; } .ds-detail-state-active { background: rgba(34,216,229,.1); border-color: rgba(34,216,229,.68); } .ds-detail-state:hover { filter: brightness(1.08); } .ds-detail-state:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El videoclub después de medianoche",
+    "overview": "Movie Inbox es nocturna, cinéfila, táctil y técnica. La interfaz debe sentirse como un archivo personal abierto después de la última función: precisa para mantener una biblioteca grande, pero atravesada por el placer material de explorar cajas, portadas, fichas y recuerdos.\n\nLa experiencia combina controles técnicos sobrios con portadas táctiles y expresivas. Las superficies operativas permanecen planas, legibles y previsibles; la profundidad y el movimiento se reservan para objetos del videoclub y momentos de descubrimiento. Movie Inbox no debe parecer un dashboard SaaS genérico, una copia de Netflix ni una interfaz minimalista pálida y excesivamente redondeada.",
+    "keyCharacteristics": [
+      "Nocturna y de alto contraste, sin caer en una paleta de un solo color.",
+      "Operativa en controles y navegación; cinematográfica en portadas, spotlight y ficha.",
+      "Inspirada en cajas de video, etiquetas de alquiler, señal CRT y archivo físico.",
+      "Densa pero organizada, con complejidad revelada sólo cuando la tarea la necesita.",
+      "Personal antes que algorítmica: la biblioteca propia conserva la autoridad visual."
+    ],
+    "rules": [
+      {
+        "name": "The Signal Hierarchy Rule",
+        "body": "Playhead Pink llama a actuar, CRT Cyan confirma y orienta, Rental Sticker Gold destaca valor o excepción y Tape Violet estructura; no intercambiar sus roles por decoración.",
+        "section": "colors"
+      },
+      {
+        "name": "The Condensed Display Rule",
+        "body": "La tipografía condensada, itálica y en mayúsculas pertenece a marca, títulos de obra y momentos cinematográficos; nunca usarla para párrafos, formularios largos o instrucciones.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tactile Object Rule",
+        "body": "Las sombras y transformaciones pertenecen a objetos materiales, overlays y cambios de estado; las secciones operativas normales no deben flotar como cards decorativas.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do usar Playhead Pink, CRT Cyan, Tape Violet y Rental Sticker Gold con roles semánticos estables.",
+      "Do mantener controles técnicos, portadas táctiles y jerarquía personal en cada nueva superficie.",
+      "Do preservar la proporción 2:3, el lomo y la materialidad de las cajas cuando se represente una obra.",
+      "Do revelar metadata, fuentes y mantenimiento mediante divulgación progresiva.",
+      "Do verificar títulos largos, dos columnas móviles, foco visible y reducción de movimiento."
+    ],
+    "donts": [
+      "Don't convertir Movie Inbox en un dashboard SaaS genérico de cards redondeadas.",
+      "Don't copiar la composición, navegación o lenguaje visual de Netflix.",
+      "Don't reemplazar el mundo nocturno por minimalismo pálido, neutro o excesivamente aireado.",
+      "Don't usar sombras, gradientes o neón sin una función de jerarquía, material o estado.",
+      "Don't ocultar disponibilidad, intención de ver y memoria personal detrás de metadata externa."
+    ]
+  }
+}
