@@ -1,15 +1,10 @@
 from __future__ import annotations
 
 import socket
-import sys
 import unittest
-from pathlib import Path
 from urllib.error import HTTPError
 from unittest.mock import patch
 
-
-SRC = Path(__file__).resolve().parents[1] / "src"
-sys.path.insert(0, str(SRC))
 
 from movie_inbox.web.security import (
     InvalidPublicOrigin,
@@ -45,6 +40,25 @@ class HttpSecurityTests(unittest.TestCase):
             "https://images.example.com/poster.jpg",
         )
 
+    def test_image_allowlist_rejects_arbitrary_hosts_before_dns_lookup(self) -> None:
+        def unexpected_resolver(*_: object, **__: object):
+            raise AssertionError("resolver must not be called for a disallowed host")
+
+        with self.assertRaisesRegex(UnsafeRemoteUrl, "host is not allowed"):
+            validate_public_http_url(
+                "https://attacker.example/poster.jpg",
+                unexpected_resolver,
+                {"upload.wikimedia.org"},
+            )
+        self.assertEqual(
+            validate_public_http_url(
+                "https://upload.wikimedia.org/poster.jpg",
+                resolver_for("8.8.8.8"),
+                {"upload.wikimedia.org"},
+            ),
+            "https://upload.wikimedia.org/poster.jpg",
+        )
+
     def test_private_and_nonstandard_destinations_are_blocked(self) -> None:
         for address in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "::1"):
             with self.subTest(address=address), self.assertRaises(UnsafeRemoteUrl):
@@ -70,6 +84,27 @@ class HttpSecurityTests(unittest.TestCase):
         with patch("movie_inbox.web.security.build_opener", return_value=RedirectingOpener()):
             with self.assertRaises(UnsafeRemoteUrl):
                 open_public_url("https://images.example.com/a.jpg", headers={}, timeout=1, resolver=resolver)
+
+    def test_redirect_cannot_leave_the_image_allowlist(self) -> None:
+        class RedirectingOpener:
+            def open(self, request, timeout=0):
+                raise HTTPError(
+                    request.full_url,
+                    302,
+                    "Found",
+                    {"Location": "https://attacker.example/private.jpg"},
+                    None,
+                )
+
+        with patch("movie_inbox.web.security.build_opener", return_value=RedirectingOpener()):
+            with self.assertRaisesRegex(UnsafeRemoteUrl, "host is not allowed"):
+                open_public_url(
+                    "https://images.example.com/a.jpg",
+                    headers={},
+                    timeout=1,
+                    resolver=resolver_for("8.8.8.8"),
+                    allowed_hosts={"images.example.com"},
+                )
 
 
 if __name__ == "__main__":

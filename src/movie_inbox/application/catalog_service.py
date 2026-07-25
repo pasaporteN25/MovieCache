@@ -39,6 +39,8 @@ EDITABLE_METADATA_FIELDS = {
     "directors",
     "writers",
     "cast",
+    "backdrop_image",
+    "tmdb_id",
 }
 LIST_METADATA_FIELDS = {"alternative_titles", "genres", "directors", "writers", "cast"}
 
@@ -87,6 +89,9 @@ class CatalogService:
         if not any([item_id, item_url, title, local_name]):
             raise ValueError("Missing item reference")
 
+        if item_id and self.repository.delete_by_id(item_id):
+            return True, "deleted"
+
         def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str]]:
             for index, item in enumerate(items):
                 if same_catalog_item(item, item_id, item_url, title, year, local_name):
@@ -102,12 +107,9 @@ class CatalogService:
         if status not in {"to_watch", "watched"}:
             raise ValueError("Invalid status")
 
-        def update(item: dict[str, Any]) -> None:
-            item["status"] = status
-            if status == "watched":
-                item["watched_at"] = normalize_date(watched_at) or today_date()
-
-        return self._update_item(item_id, update)
+        effective_watched_at = (normalize_date(watched_at) or today_date()) if status == "watched" else None
+        updated = self.repository.update_status(item_id, status, effective_watched_at)
+        return updated, "updated" if updated else "not_found"
 
     def update_kind(self, item_id: str, kind: str) -> tuple[bool, str]:
         if not item_id:
@@ -170,6 +172,16 @@ class CatalogService:
             if locked_fields is not None:
                 item["locked_fields"] = normalize_locked_fields(locked_fields)
             item["metadata_sources"] = sources
+
+        return self._update_item(item_id, update)
+
+    def merge_external_metadata(self, item_id: str, incoming: dict[str, Any]) -> tuple[bool, str]:
+        if not item_id:
+            raise ValueError("Missing item id")
+
+        def update(item: CatalogItem) -> None:
+            if not merge_into_existing([item], incoming, item_id):
+                raise ValueError("External metadata merge failed")
 
         return self._update_item(item_id, update)
 
@@ -348,14 +360,8 @@ class CatalogService:
         return report
 
     def _update_item(self, item_id: str, update: Any) -> tuple[bool, str]:
-        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str]]:
-            for item in items:
-                if str(item.get("id") or "") == item_id:
-                    update(item)
-                    return True, (True, "updated")
-            return False, (False, "not_found")
-
-        return self.repository.mutate(mutation)
+        updated = self.repository.update_metadata(item_id, update)
+        return updated, "updated" if updated else "not_found"
 
 
 def _normalize_list(value: Any) -> list[str]:
@@ -413,6 +419,8 @@ def _new_local_item(
             "writers": [],
             "cast": [],
             "page_image": "",
+            "backdrop_image": "",
+            "tmdb_id": "",
             "wikipedia_extract": "",
             "en_catalogo": True,
             "local_files": [local_file],

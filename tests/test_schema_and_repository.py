@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-
-SRC = Path(__file__).resolve().parents[1] / "src"
-sys.path.insert(0, str(SRC))
-
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.models import CatalogItem, LocalFile, MetadataSource
 from movie_inbox.infrastructure.json_repository import CatalogFormatError, JsonCatalogRepository
-from movie_inbox.infrastructure.schema import CatalogSchemaError, UnsupportedCatalogVersion, catalog_document, extract_catalog_items
+from movie_inbox.infrastructure.schema import (
+    CatalogSchemaError,
+    UnsupportedCatalogVersion,
+    atomic_write_json,
+    catalog_document,
+    extract_catalog_items,
+)
 
 
 class SchemaAndRepositoryTests(unittest.TestCase):
@@ -70,6 +71,49 @@ class SchemaAndRepositoryTests(unittest.TestCase):
             path.write_text('{"schema_version": 5, "items": []}', encoding="utf-8")
             with self.assertRaises(CatalogFormatError):
                 repository.read()
+
+    def test_normalization_repairs_identifier_titles_and_detects_series(self) -> None:
+        item = normalize_item(
+            {
+                "id": "the-fly",
+                "title": "tt0091064",
+                "english_title": "tt0091064",
+                "alternative_titles": ["The Fly"],
+                "kind": "pelicula",
+                "description": "1986 science fiction film",
+            }
+        )
+        series = normalize_item(
+            {
+                "id": "tantei",
+                "title": "Tantei Monogatari",
+                "kind": "pelicula",
+                "description": "1979-1980 Japanese TV series",
+            }
+        )
+
+        self.assertEqual(item.title, "The Fly")
+        self.assertEqual(item.english_title, "")
+        self.assertEqual(item.kind, "pelicula")
+        self.assertEqual(series.kind, "serie")
+
+    def test_atomic_json_writes_keep_one_replaceable_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.json"
+            path.write_text('{"revision": 1}', encoding="utf-8")
+            stale = path.with_name("catalog.20260723-120000-000000.bak.json")
+            stale.write_text('{"revision": 0}', encoding="utf-8")
+
+            atomic_write_json(path, {"revision": 2})
+
+            backup = path.with_name("catalog.bak.json")
+            self.assertEqual(json.loads(backup.read_text(encoding="utf-8")), {"revision": 1})
+            self.assertFalse(stale.exists())
+
+            atomic_write_json(path, {"revision": 3})
+
+            self.assertEqual(json.loads(backup.read_text(encoding="utf-8")), {"revision": 2})
+            self.assertEqual(list(path.parent.glob("catalog*.bak.json")), [backup])
 
 
 if __name__ == "__main__":

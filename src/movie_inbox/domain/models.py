@@ -125,6 +125,8 @@ class CatalogItem(ModelMapping):
     writers: list[str] = field(default_factory=list)
     cast: list[str] = field(default_factory=list)
     page_image: str = ""
+    backdrop_image: str = ""
+    tmdb_id: str = ""
     wikipedia_extract: str = ""
     en_catalogo: bool = False
     local_files: list[LocalFile] = field(default_factory=list)
@@ -178,6 +180,8 @@ class ExternalSearchResult(TypedDict, total=False):
     writers: list[str]
     cast: list[str]
     page_image: str
+    backdrop_image: str
+    tmdb_id: str
     wikipedia_extract: str
 
 
@@ -189,4 +193,3 @@ def model_value(value: Any) -> Any:
     if isinstance(value, list):
         return [model_value(row) for row in value]
     return value
-

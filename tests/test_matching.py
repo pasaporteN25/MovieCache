@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-import sys
 import unittest
-from pathlib import Path
-
-
-SRC = Path(__file__).resolve().parents[1] / "src"
-sys.path.insert(0, str(SRC))
 
 from movie_inbox.domain.catalog import external_source_name, trusted_external_url
 from movie_inbox.domain.matching import decide_match

@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
+from movie_inbox.infrastructure.schema import catalog_document
 from movie_inbox.infrastructure.sqlite_repository import DATABASE_SCHEMA_VERSION, SqliteCatalogRepository
 
 
@@ -60,14 +64,14 @@ def import_json(source_path: Path, database_path: Path, replace: bool = False) -
 
     destination.write(items)
     persisted = destination.read()
-    if [item.id for item in persisted] != [item.id for item in items]:
-        raise RuntimeError("SQLite verification failed after import")
+    verify_catalog_round_trip(items, persisted, "SQLite import")
 
     print("Database import summary")
     print(f"- Input: {source_path}")
     print(f"- Database: {database_path}")
     print(f"- Database schema: {destination.database_version()}")
     print(f"- Items: {len(persisted)}")
+    print("- Verification: complete canonical document")
     if backup_path:
         print(f"- Previous database backup: {backup_path}")
     return 0
@@ -87,14 +91,50 @@ def export_json(database_path: Path, json_path: Path) -> int:
     items = database.read()
     destination.write(items)
     exported = destination.read()
-    if [item.id for item in exported] != [item.id for item in items]:
-        raise RuntimeError("JSON verification failed after export")
+    verify_catalog_round_trip(items, exported, "JSON export")
 
     print("Database export summary")
     print(f"- Database: {database_path}")
     print(f"- JSON: {json_path}")
     print(f"- Items: {len(exported)}")
+    print("- Verification: complete canonical document")
     return 0
+
+
+def verify_catalog_round_trip(
+    expected: list[CatalogItem],
+    persisted: list[CatalogItem],
+    operation: str,
+) -> None:
+    expected_document = catalog_document(expected)
+    persisted_document = catalog_document(persisted)
+    if persisted_document != expected_document:
+        difference = first_document_difference(expected_document, persisted_document)
+        raise RuntimeError(
+            f"{operation} verification failed: canonical catalog documents differ at {difference}"
+        )
+
+
+def first_document_difference(expected: Any, persisted: Any, path: str = "$") -> str:
+    if isinstance(expected, Mapping) and isinstance(persisted, Mapping):
+        expected_keys = set(expected)
+        persisted_keys = set(persisted)
+        if expected_keys != persisted_keys:
+            missing = sorted(expected_keys - persisted_keys)
+            unexpected = sorted(persisted_keys - expected_keys)
+            return f"{path} (missing={missing!r}, unexpected={unexpected!r})"
+        for key in expected:
+            if expected[key] != persisted[key]:
+                return first_document_difference(expected[key], persisted[key], f"{path}.{key}")
+        return path
+    if isinstance(expected, list) and isinstance(persisted, list):
+        if len(expected) != len(persisted):
+            return f"{path}.length (expected={len(expected)!r}, persisted={len(persisted)!r})"
+        for index, (expected_row, persisted_row) in enumerate(zip(expected, persisted)):
+            if expected_row != persisted_row:
+                return first_document_difference(expected_row, persisted_row, f"{path}[{index}]")
+        return path
+    return f"{path} (expected={expected!r}, persisted={persisted!r})"
 
 
 def show_info(database_path: Path) -> int:

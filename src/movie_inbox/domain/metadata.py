@@ -26,6 +26,8 @@ METADATA_FIELDS = (
     "writers",
     "cast",
     "page_image",
+    "backdrop_image",
+    "tmdb_id",
     "wikipedia_extract",
 )
 
@@ -73,8 +75,16 @@ def normalize_local_files(value: Any, legacy_name: str = "", legacy_path: str = 
 
     legacy_path = str(legacy_path or "").strip()
     legacy_name = str(legacy_name or (Path(legacy_path).name if legacy_path else "")).strip()
-    legacy_key = (legacy_path or legacy_name).replace("\\", "/").casefold()
-    if legacy_key and legacy_key not in seen:
+    if legacy_path:
+        legacy_key = legacy_path.replace("\\", "/").casefold()
+        legacy_exists = any(
+            str(row.get("path") or "").replace("\\", "/").casefold() == legacy_key
+            for row in normalized
+        )
+    else:
+        legacy_key = legacy_name.casefold()
+        legacy_exists = any(str(row.get("name") or "").casefold() == legacy_key for row in normalized)
+    if legacy_key and not legacy_exists:
         normalized.append(
             {
                 "path": legacy_path,

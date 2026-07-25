@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-import sys
 import unittest
-from pathlib import Path
 from typing import Any, Callable
-
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
 
 from movie_inbox.application.external_service import ExternalCatalogService
 
@@ -79,6 +73,52 @@ class ExternalCatalogServiceTests(unittest.TestCase):
         }
         self.assertEqual(service.enrich(original), original)
         self.assertEqual(gateway.loader_calls, 0)
+
+    def test_enrich_preserves_replaced_search_title_as_an_alias(self) -> None:
+        gateway = FakeGateway()
+        service = ExternalCatalogService(
+            gateway,
+            lambda _: {
+                "title": "La Belle Personne",
+                "original_title": "La Belle Personne",
+                "spanish_title": "La bella persona",
+                "alternative_titles": ["A Bela Junie"],
+            },
+        )
+
+        result = service.enrich(
+            {
+                "title": "The Beautiful Person",
+                "source": "imdb",
+                "url": "https://www.imdb.com/title/tt1263778/",
+            }
+        )
+
+        self.assertEqual(result["title"], "La Belle Personne")
+        self.assertEqual(result["alternative_titles"], ["A Bela Junie", "The Beautiful Person"])
+
+    def test_enrich_does_not_replace_a_title_with_an_imdb_identifier(self) -> None:
+        gateway = FakeGateway()
+        service = ExternalCatalogService(
+            gateway,
+            lambda _: {
+                "title": "tt0091064",
+                "english_title": "tt0091064",
+                "description": "David Cronenberg film",
+            },
+        )
+
+        result = service.enrich(
+            {
+                "title": "The Fly",
+                "english_title": "The Fly",
+                "source": "imdb",
+                "url": "https://www.imdb.com/title/tt0091064/",
+            }
+        )
+
+        self.assertEqual(result["title"], "The Fly")
+        self.assertEqual(result["english_title"], "The Fly")
 
 
 if __name__ == "__main__":

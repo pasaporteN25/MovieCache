@@ -8,7 +8,7 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 
 from movie_inbox.domain.catalog import external_source_name
-from movie_inbox.domain.titles import clean_release_title, clean_title, clean_whitespace, infer_year
+from movie_inbox.domain.titles import clean_release_title, clean_title, clean_whitespace, infer_kind_from_text, infer_year
 from movie_inbox.external.common import fetch_json, fetch_json_safe, interleave_batches, result_index
 from movie_inbox.external.wikidata import (
     fetch_wikidata_article_url,
@@ -47,6 +47,7 @@ class WikipediaAdapter:
             if not title:
                 continue
             extract = str(row.get("extract") or "")
+            kind = infer_kind_from_text(title, extract) or "pelicula"
             thumbnail = row.get("thumbnail") if isinstance(row.get("thumbnail"), dict) else {}
             pageprops = row.get("pageprops") if isinstance(row.get("pageprops"), dict) else {}
             page_url = f"https://{language}.wikipedia.org/wiki/{quote(title.replace(' ', '_'), safe='')}"
@@ -58,6 +59,7 @@ class WikipediaAdapter:
                     "spanish_title": title if language == "es" else "",
                     "english_title": title if language == "en" else "",
                     "alternative_titles": [],
+                    "kind": kind,
                     "year": infer_year(extract),
                     "url": page_url,
                     "description": extract[:360],
@@ -109,6 +111,7 @@ def fetch_wikipedia_metadata(url: str) -> dict[str, Any]:
         "wikipedia_extract": extract,
         "og_type": raw.get("type", ""),
     }
+    metadata["kind"] = infer_kind_from_text(title, description, extract) or "pelicula"
     metadata.update(fetch_wikidata_metadata(wikidata_id))
     if not (metadata["wikidata_id"] or metadata["wikipedia_extract"] or metadata["description"]):
         return fetch_wikipedia_metadata_action_api(language, page_title) or metadata
@@ -151,6 +154,7 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
         "wikipedia_extract": extract,
         "og_type": "",
     }
+    metadata["kind"] = infer_kind_from_text(title, description, extract) or "pelicula"
     metadata.update(fetch_wikidata_metadata(wikidata_id))
     return metadata
 

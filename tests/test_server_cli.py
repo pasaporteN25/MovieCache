@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -8,9 +7,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
 
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository

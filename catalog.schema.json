@@ -79,6 +79,8 @@
         "writers": {"type": "array", "items": {"type": "string"}},
         "cast": {"type": "array", "items": {"type": "string"}},
         "page_image": {"type": "string"},
+        "backdrop_image": {"type": "string"},
+        "tmdb_id": {"type": "string"},
         "wikipedia_extract": {"type": "string"},
         "en_catalogo": {"type": "boolean"},
         "local_files": {"type": "array", "items": {"$ref": "#/$defs/localFile"}},
@@ -94,7 +96,7 @@
               "title", "original_title", "spanish_title", "english_title",
               "alternative_titles", "kind", "year", "description",
               "wikipedia_title", "wikidata_id", "genres", "directors",
-              "writers", "cast", "page_image", "wikipedia_extract"
+              "writers", "cast", "page_image", "backdrop_image", "tmdb_id", "wikipedia_extract"
             ]
           },
           "additionalProperties": {"$ref": "#/$defs/metadataSource"}
@@ -106,7 +108,7 @@
               "title", "original_title", "spanish_title", "english_title",
               "alternative_titles", "kind", "year", "description",
               "wikipedia_title", "wikidata_id", "genres", "directors",
-              "writers", "cast", "page_image", "wikipedia_extract"
+              "writers", "cast", "page_image", "backdrop_image", "tmdb_id", "wikipedia_extract"
             ]
           },
           "uniqueItems": true

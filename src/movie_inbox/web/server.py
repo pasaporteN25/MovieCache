@@ -11,7 +11,7 @@ import uvicorn
 
 from movie_inbox.web.app import create_app
 from movie_inbox.web.catalog_api import first_catalog_file
-from movie_inbox.web.config import ViewerConfig
+from movie_inbox.web.config import DEFAULT_IMAGE_ALLOWED_HOSTS, ViewerConfig
 from movie_inbox.web.security import InvalidPublicOrigin, normalize_public_origin
 
 
@@ -35,6 +35,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-image-cache", action="store_true", help="Use remote image URLs directly instead of local image cache.")
     parser.add_argument("--image-cache-dir", type=Path, help="Directory for cached images. Defaults to .catalog-cache/images next to the writable catalog.")
     parser.add_argument("--image-cache-max-mb", type=float, default=5.0, help="Maximum size per cached image.")
+    parser.add_argument(
+        "--image-cache-total-mb",
+        type=float,
+        default=512.0,
+        help="Maximum total image cache size. Least-recently-used files are removed first.",
+    )
+    parser.add_argument(
+        "--image-host",
+        action="append",
+        default=[],
+        help="Additional exact image hostname allowed by the proxy. Can be repeated.",
+    )
     parser.add_argument("--no-open", action="store_true", help="Do not open the browser automatically.")
     return parser
 
@@ -44,6 +56,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
+    if args.image_cache_max_mb <= 0:
+        parser.error("--image-cache-max-mb must be greater than zero")
+    if args.image_cache_total_mb < args.image_cache_max_mb:
+        parser.error("--image-cache-total-mb must be at least --image-cache-max-mb")
     try:
         public_origin = normalize_public_origin(args.public_origin)
     except InvalidPublicOrigin as error:
@@ -64,11 +80,16 @@ def main(argv: list[str] | None = None) -> int:
         host=args.host,
         public_origin=public_origin,
         forwarded_allow_ips=args.forwarded_allow_ips,
+        image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),
+        image_allowed_hosts=tuple(dict.fromkeys([*DEFAULT_IMAGE_ALLOWED_HOSTS, *args.image_host])),
     )
     url = public_origin or f"http://127.0.0.1:{args.port}"
     print(f"Viewing {', '.join(args.inputs)}")
     print(f"Writing changes to {write_catalog}")
-    print(f"Image cache: {config.image_cache_dir}" if config.image_cache else "Image cache: disabled")
+    print(
+        f"Image cache: {config.image_cache_dir} (max {args.image_cache_total_mb:g} MB)"
+        if config.image_cache else "Image cache: disabled"
+    )
     print(f"Open {url}")
     print("Press Ctrl+C to stop.")
 

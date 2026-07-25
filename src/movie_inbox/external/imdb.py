@@ -36,6 +36,7 @@ class ImdbAdapter:
                     "spanish_title": "",
                     "english_title": title,
                     "alternative_titles": [],
+                    "kind": "serie" if row.get("qid") in {"tvSeries", "tvMiniSeries"} else "pelicula",
                     "year": str(row.get("y") or ""),
                     "url": f"https://www.imdb.com/title/{imdb_id}/",
                     "description": str(row.get("s") or ""),
