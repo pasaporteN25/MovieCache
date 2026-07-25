@@ -3,6 +3,8 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+/build/
+/dist/
 *.bak.json
 *.log
 *.db
@@ -31,3 +33,8 @@ __pycache__/
 /scripts/.git.*backup/
 /*.bundle
 /.github_known_hosts
+
+# Local Codex skills and generated design review reports.
+/.agents/skills/impeccable/
+/.impeccable/critique/
+/scripts/.commit-pending.ps1

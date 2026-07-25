@@ -62,10 +62,13 @@ El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public
   --public-origin https://movies.example.com \
   --forwarded-allow-ips 127.0.0.1 \
   --image-cache-dir /var/lib/movie-inbox/image-cache \
+  --image-cache-total-mb 512 \
   --no-open
 ```
 
 La app usa un solo worker. SQLite serializa escrituras y el cache de busquedas vive en memoria; agregar workers antes de medir carga sumaria contencion y estados duplicados sin aportar valor para un catalogo personal.
+
+El proxy de imagenes acepta solamente los hosts conocidos de Wikimedia, IMDb y FilmAffinity. Si una fuente confiable nueva usa otro dominio, se agrega con `--image-host host.example`; no se recomienda permitir dominios aportados por usuarios. El cache se puede inspeccionar y mantener sin detener el servicio con `movie-inbox cache info|prune|clear --dir /var/lib/movie-inbox/image-cache`.
 
 `--forwarded-allow-ips` nunca debe configurarse con `*` si Uvicorn acepta conexiones que no provienen exclusivamente del proxy. Con Nginx local alcanza `127.0.0.1`.
 
@@ -102,6 +105,7 @@ El token embebido por Movie Inbox protege operaciones contra otras paginas web, 
 - Los checks pasan sobre el commit desplegado.
 - El proceso corre como usuario sin privilegios.
 - SQLite, cache y backups estan fuera de `/opt/movie-inbox`.
+- El cache tiene un limite total y la allowlist contiene solamente proveedores de imagenes confiables.
 - Nginx es el unico proceso publico y Uvicorn escucha en `127.0.0.1`.
 - `--public-origin` coincide exactamente con el origen HTTPS del navegador.
 - `--forwarded-allow-ips` contiene solamente la direccion del proxy.

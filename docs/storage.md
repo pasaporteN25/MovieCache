@@ -9,7 +9,7 @@ Movie Inbox mantiene un modelo canonico independiente del formato de persistenci
 - Los datos personales no se guardan en Git.
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 
-## Esquema SQLite v1
+## Esquema SQLite v2
 
 La tabla `schema_migrations` gobierna la version de la base. Una version superior se rechaza; una base con tablas sin historial tampoco se interpreta como un catalogo vacio.
 
@@ -23,6 +23,8 @@ El esquema separa:
 - `metadata_provenance`, `locked_fields` y `tags`: curacion personal.
 - `seasons` y `episodes`: estructura reservada para una futura fase de series.
 
+La migracion v2 suma `backdrop_image` y `tmdb_id`: permite guardar arte horizontal para el reel y una identidad estable para futuros proveedores de imagenes, sin obligar a configurar una API externa para usar el catalogo.
+
 Temporadas y episodios todavia no se importan desde JSON ni aparecen en el CRUD. Las actualizaciones de una obra preservan esas filas para que el esquema pueda evolucionar sin perderlas.
 
 ## Migracion reversible
@@ -33,6 +35,6 @@ py -m movie_inbox db info data/movie-inbox.db
 py -m movie_inbox db export data/movie-inbox.db --json backups/catalog.json
 ```
 
-`db import` no reemplaza una base no vacia sin `--replace`. Antes de un reemplazo crea una exportacion `pre-import-*.bak.json`. Tanto import como export vuelven a leer el destino y verifican el orden de IDs.
+`db import` no reemplaza una base no vacia sin `--replace`. Antes de un reemplazo crea una exportacion `pre-import-*.bak.json`. Tanto import como export vuelven a leer el destino y comparan el documento canonico completo, incluidos aliases, reviews, metadata, procedencia y archivos locales.
 
 No se migra automaticamente ningun catalogo del usuario. El comando siempre recibe origen y destino explicitos.
