@@ -23,6 +23,7 @@ Incluye:
 - `src/movie_inbox/web/`: aplicacion FastAPI, servidor Uvicorn, proxy seguro de imagenes y assets estaticos.
 - `catalog.schema.json`: contrato JSON versionado del catalogo.
 - `chrome-extension/`: extension de Chrome para guardar la pestana actual con datos minimos y exportar CSV/JSON.
+- `PRODUCT.md` y `DESIGN.md`: contratos de producto, terminologia y lenguaje visual del visor.
 
 ## Instalacion y comandos
 
@@ -43,6 +44,7 @@ movie-inbox enrich catalog.json --json catalog-enriquecido.json
 movie-inbox match catalog.json --json catalog-con-links.json
 movie-inbox db import catalog.json --db data/movie-inbox.db
 movie-inbox db export data/movie-inbox.db --json backups/catalog.json
+movie-inbox cache info --dir .catalog-cache/images
 ```
 
 En Windows, si la carpeta `Scripts` de Python no esta en `PATH`, usa la forma equivalente:
@@ -63,7 +65,7 @@ Para crear una base SQLite sin modificar el JSON original:
 py -m movie_inbox db import scripts/catalogv3_links.json --db data/movie-inbox.db
 ```
 
-El import verifica los IDs despues de escribir. No reemplaza una base con datos salvo que se use `--replace`; en ese caso primero crea un backup JSON de la base anterior. El visor, scanner, enriquecedor y matcher seleccionan el repositorio por extension, por lo que la base se abre directamente:
+El import compara el documento canonico completo despues de escribir: titulos, aliases, reviews, metadata, links y archivos locales, no solamente los IDs. No reemplaza una base con datos salvo que se use `--replace`; en ese caso primero crea un backup JSON de la base anterior. El visor, scanner, enriquecedor y matcher seleccionan el repositorio por extension, por lo que la base se abre directamente:
 
 ```powershell
 py -m movie_inbox serve data/movie-inbox.db
@@ -76,7 +78,7 @@ Para generar un backup legible y versionado:
 py -m movie_inbox db export data/movie-inbox.db --json backups/catalog-2026-07-15.json
 ```
 
-SQLite normaliza obras, aliases, IDs externos, archivos locales, tags y procedencia. Tambien reserva tablas para temporadas y episodios, pero esa funcionalidad todavia no forma parte del dominio ni de la interfaz. Los archivos `.db`, `.sqlite`, sus journals y `data/` se ignoran en Git.
+SQLite normaliza obras, aliases, IDs externos, archivos locales, tags y procedencia. Las actualizaciones frecuentes son granulares: estado y fecha se actualizan directamente, mientras que metadata y relaciones reconstruyen solamente la parte modificada del item. Las operaciones batch conservan una transaccion unica pero sincronizan diferencias en vez de reescribir todas las relaciones. Tambien reserva tablas para temporadas y episodios, aunque esa funcionalidad todavia no forma parte del dominio ni de la interfaz. Los archivos `.db`, `.sqlite`, sus journals y `data/` se ignoran en Git.
 
 ## Uso del script
 
@@ -193,7 +195,7 @@ Para items locales sin URL, `--fetch` busca en Wikipedia usando el titulo limpio
 
 Los items que vengan de links, CSVs o JSONs de la extension entran con `en_catalogo: false` por defecto, salvo que el archivo ya traiga otro valor. Tambien se normalizan los campos personales nuevos: `watched_at`, `rating` y `review`, y los campos de titulos `original_title`, `spanish_title`, `english_title` y `alternative_titles`. Los JSONs viejos con `si`/`no` se siguen leyendo correctamente y se normalizan a booleanos.
 
-Antes de sobrescribir un JSON existente, los scripts crean un backup automatico junto al archivo con formato `nombre.YYYYMMDD-HHMMSS-microsegundos.bak.json`. Para uso continuo en servidor se recomienda SQLite como fuente principal y una exportacion JSON periodica como backup portable.
+Antes de sobrescribir un JSON existente, los scripts actualizan un unico backup automatico junto al archivo con formato `nombre.bak.json`. La siguiente escritura tambien elimina los backups historicos con timestamp creados por versiones anteriores. Para uso continuo en servidor se recomienda SQLite como fuente principal y una exportacion JSON periodica como backup portable.
 
 El campo `kind` ya acepta `pelicula`, `serie`, `anime` y `documental`. Por ahora `serie` identifica el tipo de entrada; temporadas y capitulos quedan para una etapa posterior del modelo.
 
@@ -249,6 +251,8 @@ El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibi
 
 Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada.
 
+La interfaz se divide en tres espacios. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Administrar`, dentro del menu de sistema, agrupa resumen, base de datos, salud de fuentes externas, matching y duplicados.
+
 El visor tiene una consola de busqueda unica con fuentes combinables. `Catalogo` queda siempre activo para buscar en los datos locales y `Externo` se puede marcar cuando tambien queres consultar Wikipedia, IMDb y FilmAffinity. La busqueda se ejecuta solo al tocar `Buscar` o presionar Enter; marcar/desmarcar una fuente no dispara consultas. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
 
 Las consultas externas se ejecutan en paralelo mediante adaptadores independientes y se guardan durante 15 minutos en un cache de memoria. Un error en una fuente no cancela las otras. `External DBs` muestra estado, latencia, cantidad de resultados y errores por fuente, ademas de hits, misses y entradas del cache. Wikipedia devuelve primero datos livianos para mostrar resultados rapido y completa la metadata de la entrada elegida recien al agregarla o combinarla.
@@ -259,7 +263,7 @@ Los resultados elegidos de IMDb tambien intentan resolverse mediante su ID en Wi
 python scripts/view_catalog.py catalog_wiki_v5.json --write-json catalog_wiki_v5.json
 ```
 
-Las tarjetas del visor local ahora son una vista rapida para escanear: imagen, titulo, subtitulo con titulo original/ingles cuando difiere, badges de estado/link/catalogo, mini ficha y acciones basicas. Al hacer click en una tarjeta se abre un panel lateral con la ficha completa, titulos multilenguaje, links asociados, registro personal y acciones destructivas.
+Las tarjetas del visor mantienen una proporcion 2:3 estable para poder escanear la coleccion sin saltos de altura. El frente muestra portada, titulo, ano, disponibilidad, estado personal y puntuacion cuando existe. En desktop el reverso tecnico aparece con hover o foco; hacer click o tap en cualquier punto abre la ficha completa. En movil la interaccion no depende del giro ni del hover.
 
 El resumen muestra cuantas entradas tienen posibles duplicados por URL externa o por titulo y ano. `Ver duplicadas` filtra esas entradas, cada card lleva un badge y el detalle explica la coincidencia. Al agregar desde una fuente externa, el catalogo editable se revisa primero por URL y por todos sus titulos conocidos antes de insertar.
 
@@ -291,13 +295,19 @@ El panel lateral permite editar el tipo con un selector: `pelicula`, `serie`, `a
 
 Al combinar un resultado externo se guarda el link especifico de la fuente (`wikipedia_url`, `imdb_url` o `filmaffinity_url`) sin perder el link principal que ya tuviera la entrada.
 
-El lateral queda separado en `Resumen`, `Filtros`, `Menu` y `Herramientas`. En `Menu`, `Bases de datos` muestra el catalogo editable y los archivos cargados; `External DBs` muestra el estado de Wikipedia, IMDb y FilmAffinity. En herramientas incluye `Revisar sin link`, `Anterior` y `Siguiente` para recorrer de forma sistematica las entradas que todavia no tienen link asociado de Wikipedia, IMDb o FilmAffinity.
+La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por ver, cuantas tienen links o portada y cuantas necesitan revision. Tambien expone el catalogo editable, los archivos cargados y el estado de Wikipedia, IMDb y FilmAffinity. Sus herramientas permiten recorrer sistematicamente entradas sin link y revisar duplicados.
 
-El resumen lateral muestra cuantas entradas estan vistas, cuantas quedan por ver, cuantas tienen algun link asociado y cuantas siguen sin link.
+`Random` abre una ficha al azar sin modificar el JSON. Su casilla permite limitar la eleccion a obras disponibles en catalogo. Dentro de `Coleccion`, `Mezclar vista` cambia solamente el orden visual de los resultados actuales y `Restablecer orden` recupera el orden elegido.
 
-El lateral tambien incluye `Randomizar` para mezclar solo la vista actual, respetando filtros y busquedas sin modificar el JSON. `Orden normal` vuelve al orden original.
+Las imagenes del visor se sirven con un cache local. La primera vez que una tarjeta necesita `page_image`, el servidor la descarga y la guarda de forma atomica en `.catalog-cache/images` junto al catalogo editable; despues se sirve desde esa carpeta. El limite predeterminado es 5 MB por imagen y 512 MB en total. Cuando se alcanza el limite global se eliminan primero los archivos menos usados recientemente.
 
-Las imagenes del visor se sirven con un cache local. La primera vez que una tarjeta necesita `page_image`, el servidor la descarga y la guarda en `.catalog-cache/images` junto al catalogo editable; despues se sirve desde esa carpeta. Se puede desactivar con `--no-image-cache`, cambiar la carpeta con `--image-cache-dir` o limitar el tamano por imagen con `--image-cache-max-mb`.
+```powershell
+movie-inbox cache info --dir .catalog-cache/images
+movie-inbox cache prune --dir .catalog-cache/images --max-total-mb 512
+movie-inbox cache clear --dir .catalog-cache/images
+```
+
+Se puede desactivar con `--no-image-cache`, cambiar la carpeta con `--image-cache-dir`, limitar cada imagen con `--image-cache-max-mb` o el total con `--image-cache-total-mb`. El proxy acepta JPEG, PNG, WebP, GIF y AVIF provenientes de los hosts conocidos de Wikimedia, IMDb y FilmAffinity. Un proveedor adicional debe habilitarse de forma explicita repitiendo `--image-host nombre.example`.
 
 Para intentar completar links automaticamente desde la terminal:
 
@@ -319,11 +329,11 @@ Para convertir un catalogo completo sin reemplazar el original:
 py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalogv4.json
 ```
 
-Las escrituras del visor y del importador son atomicas: primero se completa un archivo temporal y luego se reemplaza el JSON. El visor bloquea cada catalogo durante operaciones de escritura concurrentes y conserva como maximo los 10 backups automaticos mas recientes.
+Las escrituras del visor y del importador son atomicas: primero se completa un archivo temporal y luego se reemplaza el JSON. El visor bloquea cada catalogo durante operaciones de escritura concurrentes y conserva un unico backup automatico reemplazable.
 
 ## Seguridad del visor web
 
-El visor genera un token aleatorio en cada inicio y lo exige en todas las operaciones de API. FastAPI valida hosts confiables y, para escrituras, un origen exacto; acepta solamente `Content-Type: application/json`, limita el cuerpo a 2 MB y devuelve estados HTTP 4xx/5xx. El proxy de imagenes solo acepta HTTP/HTTPS publico en puertos estandar, bloquea destinos privados, loopback, link-local o reservados y vuelve a validar cada redireccion. La documentacion OpenAPI publica esta deshabilitada y `/healthz` no expone datos.
+El visor genera un token aleatorio en cada inicio y lo exige en todas las operaciones de API. FastAPI valida hosts confiables y, para escrituras, un origen exacto; acepta solamente `Content-Type: application/json`, limita el cuerpo a 2 MB y devuelve estados HTTP 4xx/5xx. El proxy de imagenes limita los destinos a una allowlist exacta, valida sus IPs publicas y vuelve a aplicar ambas reglas en cada redireccion. SVG remoto no se acepta. La documentacion OpenAPI publica esta deshabilitada y `/healthz` no expone datos.
 
 Detras de Nginx se indica el origen externo con `--public-origin` y se limita la confianza de headers reenviados con `--forwarded-allow-ips`. El token de sesion no reemplaza autenticacion: el acceso debe protegerse con una VPN o en el proxy HTTPS.
 
@@ -341,7 +351,13 @@ Los checks completos, incluida la compilacion y `git diff --check`, se ejecutan 
 scripts\check.ps1
 ```
 
-En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/workflows/tests.yml` corre la misma validacion en Linux/Python 3.11 y Windows/Python 3.14 en cada push a `master` y en cada pull request. CI valida una revision; no despliega ni accede al catalogo personal.
+Si Windows bloquea la ejecucion de scripts, se puede habilitar solamente para esa corrida:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\check.ps1"
+```
+
+En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/workflows/tests.yml` corre la misma validacion en Linux/Python 3.11 y Windows/Python 3.14 en cada push a `master` y en cada pull request. Un job adicional construye el wheel, lo instala en un entorno limpio, ejecuta `movie-inbox --help`, carga HTML/CSS/JS desde el paquete y consulta `/healthz` sobre una instancia real. CI valida una revision; no despliega ni accede al catalogo personal.
 
 ## Despliegue en servidor
 

@@ -11,19 +11,31 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let randomOrder = [];
       let openPersonalId = "";
       let selectedDetailId = "";
+      let detailReturnFocus = null;
+      let detailReturnCardId = "";
       let activeQuery = "";
       let writeJsonPath = "";
-      let databasePanel = "catalog";
+      let currentView = "home";
       let manualVisibleCount = 6;
       let catalogMergeVisibleCount = 6;
       let externalSourcesLastUsed = [];
       let externalSourcesAttempted = [];
       let externalSearchController = null;
+      let externalSearchTimedOut = false;
       let duplicatesOnly = false;
       let catalogVisibleCount = 36;
       let externalHealth = { sources: {}, cache: {} };
+      let spotlightItems = [];
+      let spotlightIndex = 0;
+      let spotlightTimer = null;
+      let spotlightPaused = false;
+      let spotlightDetailPaused = false;
+      let spotlightViewPaused = false;
+      let routeRestored = false;
       const SEARCH_PAGE_SIZE = 6;
       const CATALOG_PAGE_SIZE = 36;
+      const SEARCH_TIMEOUT_MS = 10000;
+      const SPOTLIGHT_INTERVAL_MS = 8000;
 
       function apiFetch(url, options = {}) {
         const headers = new Headers(options.headers || {});
@@ -35,9 +47,35 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogSource: document.querySelector("#catalogSource"),
         externalSource: document.querySelector("#externalSource"),
         searchButton: document.querySelector("#searchButton"),
+        homeButton: document.querySelector("#homeButton"),
+        catalogButton: document.querySelector("#catalogButton"),
+        adminButton: document.querySelector("#adminButton"),
+        systemMenu: document.querySelector("#systemMenu"),
+        randomButton: document.querySelector("#randomButton"),
+        randomCatalogOnly: document.querySelector("#randomCatalogOnly"),
+        randomScopeLabel: document.querySelector("#randomScopeLabel"),
+        homeView: document.querySelector("#homeView"),
+        collectionView: document.querySelector("#collectionView"),
+        adminView: document.querySelector("#adminView"),
+        homeCollectionButton: document.querySelector("#homeCollectionButton"),
+        homeGrid: document.querySelector("#homeGrid"),
+        homeEmpty: document.querySelector("#homeEmpty"),
+        catalogSection: document.querySelector("#catalogSection"),
+        spotlight: document.querySelector("#spotlight"),
+        spotlightStage: document.querySelector("#spotlightStage"),
+        spotlightToggle: document.querySelector("#spotlightToggle"),
+        searchContext: document.querySelector("#searchContext"),
+        searchContextText: document.querySelector("#searchContextText"),
+        cancelSearch: document.querySelector("#cancelSearch"),
+        reviewPrevious: document.querySelector("#reviewPrevious"),
+        reviewNext: document.querySelector("#reviewNext"),
+        backToCollection: document.querySelector("#backToCollection"),
         status: document.querySelector("#status"),
         kind: document.querySelector("#kind"),
         source: document.querySelector("#source"),
+        sort: document.querySelector("#sort"),
+        activeFilters: document.querySelector("#activeFilters"),
+        clearFilters: document.querySelector("#clearFilters"),
         grid: document.querySelector("#grid"),
         stats: document.querySelector("#stats"),
         total: document.querySelector("#total"),
@@ -66,11 +104,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogMergeSection: document.querySelector("#catalogMergeSection"),
         catalogMergeStatus: document.querySelector("#catalogMergeStatus"),
         catalogMergeResults: document.querySelector("#catalogMergeResults"),
-        databaseMenuCatalog: document.querySelector("#databaseMenuCatalog"),
-        databaseMenuExternal: document.querySelector("#databaseMenuExternal"),
         databaseCatalogPanel: document.querySelector("#databaseCatalogPanel"),
         databaseExternalPanel: document.querySelector("#databaseExternalPanel"),
-        detailBackdrop: document.querySelector("#detailBackdrop"),
         detailDrawer: document.querySelector("#detailDrawer"),
         detailBody: document.querySelector("#detailBody"),
         closeDetail: document.querySelector("#closeDetail"),
@@ -83,32 +118,50 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       };
 
       document.querySelector("#refresh").addEventListener("click", load);
-      fields.searchButton.addEventListener("click", runSearch);
+      fields.searchButton.addEventListener("click", () => runSearch());
+      fields.homeButton.addEventListener("click", goHome);
+      fields.catalogButton.addEventListener("click", goToCollection);
+      fields.adminButton.addEventListener("click", goToAdmin);
+      fields.homeCollectionButton.addEventListener("click", goToCollection);
+      fields.randomButton.addEventListener("click", openRandomDetail);
+      fields.randomCatalogOnly.addEventListener("change", syncRandomControl);
+      fields.spotlightToggle.addEventListener("click", toggleSpotlight);
+      fields.cancelSearch.addEventListener("click", cancelExternalSearch);
+      fields.reviewPrevious.addEventListener("click", previousWikiReview);
+      fields.reviewNext.addEventListener("click", nextWikiReview);
+      fields.backToCollection.addEventListener("click", () => {
+        clearManualSearch({ focus: false });
+        goToCollection();
+      });
       fields.externalSource.addEventListener("change", renderDatabaseMenu);
-      fields.clearManualSearch.addEventListener("click", clearManualSearch);
+      fields.clearFilters.addEventListener("click", clearFilters);
+      fields.clearManualSearch.addEventListener("click", () => clearManualSearch());
       fields.startWikiReview.addEventListener("click", startWikiReview);
       fields.previousWikiReview.addEventListener("click", previousWikiReview);
       fields.nextWikiReview.addEventListener("click", nextWikiReview);
       fields.randomizeView.addEventListener("click", randomizeView);
       fields.resetOrder.addEventListener("click", resetViewOrder);
       fields.showDuplicates.addEventListener("click", toggleDuplicatesOnly);
-      fields.databaseMenuCatalog.addEventListener("click", () => setDatabasePanel("catalog"));
-      fields.databaseMenuExternal.addEventListener("click", () => setDatabasePanel("external"));
       fields.closeDetail.addEventListener("click", closeDetail);
-      fields.detailBackdrop.addEventListener("click", closeDetail);
+      fields.detailDrawer.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeDetail();
+      });
+      fields.detailDrawer.addEventListener("click", (event) => {
+        if (event.target === fields.detailDrawer) closeDetail();
+      });
       fields.catalogLoadMore.addEventListener("click", showMoreCatalogItems);
       fields.closeDescriptionDialog.addEventListener("click", () => fields.descriptionDialog.close());
       fields.query.addEventListener("keydown", (event) => {
         if (event.key === "Enter") runSearch();
         if (event.key === "Escape") clearManualSearch();
       });
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && selectedDetailId) closeDetail();
-      });
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("popstate", restoreRoute);
+      document.addEventListener("error", handlePosterError, true);
       document.addEventListener("click", handleDelegatedClick);
-      document.addEventListener("change", handleDelegatedChange);
       document.addEventListener("toggle", handleDelegatedToggle, true);
-      [fields.status, fields.kind, fields.source].forEach((field) => field.addEventListener("input", () => {
+      [fields.status, fields.kind, fields.source, fields.sort].forEach((field) => field.addEventListener("input", () => {
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         render();
@@ -125,6 +178,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const actions = {
           "open-detail": () => openDetail(id),
           "toggle-watched": () => toggleWatched(event, id, target.dataset.status || "to_watch"),
+          "focus-personal": focusPersonalEditor,
           "find-link": () => findLinkForCatalog(event, id),
           "save-personal": () => savePersonal(event, id),
           "toggle-catalog": () => toggleCatalog(event, id),
@@ -137,14 +191,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "prepare-merge": () => prepareManualMerge(index),
           "show-description": () => openSearchDescription(target.dataset.collection || "", target.dataset.key || ""),
           "force-add": () => forceAddSearchResult(index),
+          "clear-filter": () => clearFilter(target.dataset.filter || ""),
           "run-search": runSearch
         };
         actions[target.dataset.click]?.();
-      }
-
-      function handleDelegatedChange(event) {
-        const target = event.target.closest("[data-change]");
-        if (target?.dataset.change === "update-kind") updateKind(event, target.dataset.id || "");
       }
 
       function handleDelegatedToggle(event) {
@@ -175,24 +225,234 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         setupSelect(fields.status, "Estado", items.map((item) => item.status));
         setupSelect(fields.kind, "Tipo", items.map((item) => item.kind));
         setupSelect(fields.source, "Fuente", items.map((item) => item.source));
+        seedSpotlight();
         render();
+        renderSpotlight();
+        startSpotlight();
         renderDatabaseMenu();
+        if (!routeRestored) {
+          routeRestored = true;
+          restoreRoute();
+        }
+      }
+
+      function goHome() {
+        closeDetail({ restoreFocus: false, updateHistory: false });
+        seedSpotlight();
+        renderSpotlight();
+        render();
+        showView("home", { updateHistory: false });
+        syncRoute({ view: "home", movie: "" }, "push");
+      }
+
+      function goToCollection(options = {}) {
+        showView("catalog", options);
+      }
+
+      function goToAdmin(options = {}) {
+        showView("admin", options);
+      }
+
+      function showView(view, { updateHistory = true, scroll = true } = {}) {
+        currentView = ["home", "catalog", "admin"].includes(view) ? view : "home";
+        fields.homeView.hidden = currentView !== "home";
+        fields.collectionView.hidden = currentView !== "catalog";
+        fields.adminView.hidden = currentView !== "admin";
+        spotlightViewPaused = currentView !== "home";
+        if (spotlightViewPaused) stopSpotlight();
+        else startSpotlight();
+        setActiveNavigation(currentView);
+        if (fields.systemMenu.open) fields.systemMenu.open = false;
+        if (updateHistory) syncRoute({ view: currentView }, "push");
+        if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function setActiveNavigation(view) {
+        const buttons = {
+          home: fields.homeButton,
+          catalog: fields.catalogButton,
+          admin: fields.adminButton
+        };
+        for (const [name, button] of Object.entries(buttons)) {
+          const active = name === view;
+          button.classList.toggle("active", active);
+          if (active) button.setAttribute("aria-current", "page");
+          else button.removeAttribute("aria-current");
+        }
+        fields.systemMenu.classList.toggle("active", view === "admin");
+      }
+
+      function openRandomDetail() {
+        const candidates = randomCandidates();
+        if (!candidates.length) return;
+        const pool = candidates.length > 1 && selectedDetailId
+          ? candidates.filter((item) => item.id !== selectedDetailId)
+          : candidates;
+        const item = pool[Math.floor(Math.random() * pool.length)];
+        if (item) openDetail(item.id);
+      }
+
+      function randomCandidates() {
+        const filtered = currentView === "catalog" ? filteredItems() : [];
+        const candidates = filtered.length ? filtered : items;
+        return fields.randomCatalogOnly.checked
+          ? candidates.filter((item) => isInCatalog(item.en_catalogo))
+          : candidates;
+      }
+
+      function syncRandomControl() {
+        const count = randomCandidates().length;
+        const catalogOnly = fields.randomCatalogOnly.checked;
+        fields.randomScopeLabel.textContent = catalogOnly ? "Catálogo" : "Todo";
+        fields.randomButton.disabled = count === 0;
+        fields.randomButton.title = count
+          ? `Abrir una ficha al azar entre ${count} ${catalogOnly ? "entradas en catálogo" : "entradas"}`
+          : catalogOnly ? "No hay entradas en catálogo con los filtros actuales" : "No hay entradas disponibles";
+      }
+
+      function syncRoute(values = {}, method = "replace") {
+        const url = new URL(window.location.href);
+        for (const [key, value] of Object.entries(values)) {
+          if (value) url.searchParams.set(key, value);
+          else url.searchParams.delete(key);
+        }
+        history[method === "push" ? "pushState" : "replaceState"]({}, "", url);
+      }
+
+      function restoreRoute() {
+        if (!items.length) return;
+        const params = new URLSearchParams(window.location.search);
+        const query = params.get("q") || "";
+        const movieId = params.get("movie") || "";
+        const requestedView = ["home", "catalog", "admin"].includes(params.get("view"))
+          ? params.get("view")
+          : query ? "catalog" : "home";
+        if (query.length >= 2 && query !== activeQuery) {
+          fields.query.value = query;
+          runSearch({ updateHistory: false });
+        } else if (!query && activeQuery) {
+          clearManualSearch({ focus: false, updateHistory: false });
+        }
+        if (movieId && items.some((item) => item.id === movieId) && movieId !== selectedDetailId) {
+          openDetail(movieId, { updateHistory: false });
+        } else if (!movieId && selectedDetailId) {
+          closeDetail({ restoreFocus: false, updateHistory: false });
+        }
+        showView(requestedView, { updateHistory: false, scroll: false });
+      }
+
+      function seedSpotlight() {
+        const catalogItems = items.filter((item) => isInCatalog(item.en_catalogo));
+        const candidates = catalogItems.filter((item) => item.backdrop_image || item.page_image);
+        spotlightItems = shuffle(candidates.length ? candidates : catalogItems).slice(0, 8);
+        spotlightIndex = 0;
+      }
+
+      function renderSpotlight() {
+        const item = spotlightItems[spotlightIndex];
+        if (!item) {
+          fields.spotlight.hidden = false;
+          fields.spotlightStage.innerHTML = `<div class="spotlight-empty">
+            <strong>Tu pantalla está lista</strong>
+            <span>Marcá una película como “en catálogo” para sumarla al carrusel.</span>
+          </div>`;
+          syncSpotlightControl();
+          return;
+        }
+        fields.spotlight.hidden = false;
+        const title = displayTitle(item) || "Sin título";
+        const realBackdrop = String(item.backdrop_image || "").trim();
+        const poster = String(item.page_image || "").trim();
+        const imageUrl = realBackdrop || poster;
+        const image = imageUrl
+          ? `<img class="spotlight-image ${realBackdrop ? "is-backdrop" : "is-poster-fallback"}" data-spotlight-image src="${escapeAttr(cachedImageSrc(imageUrl))}" alt="" decoding="async">`
+          : "";
+        const cover = !realBackdrop && poster
+          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(poster))}" alt="" decoding="async">`
+          : "";
+        fields.spotlightStage.innerHTML = `<article class="spotlight-slide poster-${posterVariant(item.id || title)}">
+          ${image}${cover}
+          <div class="spotlight-copy">
+            <span>${escapeHtml([item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Archivo nocturno")}</span>
+            <strong>${escapeHtml(title)}</strong>
+            <button class="spotlight-cta" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Ver ficha</button>
+          </div>
+          <div class="spotlight-counter" aria-hidden="true">${String(spotlightIndex + 1).padStart(2, "0")} / ${String(spotlightItems.length).padStart(2, "0")}</div>
+        </article>`;
+      }
+
+      function advanceSpotlight() {
+        if (spotlightPaused || spotlightDetailPaused || spotlightItems.length < 2) return;
+        spotlightIndex = (spotlightIndex + 1) % spotlightItems.length;
+        renderSpotlight();
+      }
+
+      function startSpotlight() {
+        stopSpotlight();
+        if (
+          spotlightItems.length > 1
+          && !spotlightPaused
+          && !spotlightDetailPaused
+          && !spotlightViewPaused
+          && !document.hidden
+          && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+          spotlightTimer = window.setInterval(advanceSpotlight, SPOTLIGHT_INTERVAL_MS);
+        }
+      }
+
+      function stopSpotlight() {
+        window.clearInterval(spotlightTimer);
+        spotlightTimer = null;
+      }
+
+      function syncSpotlightControl() {
+        const hasItems = spotlightItems.length > 0;
+        fields.spotlightToggle.disabled = spotlightDetailPaused || !hasItems;
+        fields.spotlightToggle.textContent = !hasItems
+          ? "Sin títulos"
+          : spotlightDetailPaused
+          ? "Ficha abierta"
+          : spotlightPaused ? "Reanudar" : "Pausar";
+        fields.spotlightToggle.setAttribute("aria-pressed", String(spotlightPaused));
+      }
+
+      function toggleSpotlight() {
+        spotlightPaused = !spotlightPaused;
+        syncSpotlightControl();
+        if (spotlightPaused) stopSpotlight();
+        else startSpotlight();
+      }
+
+      function handleVisibilityChange() {
+        if (document.hidden) stopSpotlight();
+        else startSpotlight();
       }
 
       function setupSelect(select, label, values) {
         const selected = select.value;
         const unique = [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
-        select.innerHTML = `<option value="">${label}</option>` + unique.map((value) => `<option value="${escapeAttr(value)}">${escapeHtml(value)}</option>`).join("");
+        select.innerHTML = `<option value="">${label}</option>` + unique.map((value) => (
+          `<option value="${escapeAttr(value)}">${escapeHtml(filterValueLabel(label, value))}</option>`
+        )).join("");
         select.value = unique.includes(selected) ? selected : "";
       }
 
-      function setDatabasePanel(panel) {
-        databasePanel = panel;
-        fields.databaseMenuCatalog.classList.toggle("active", panel === "catalog");
-        fields.databaseMenuExternal.classList.toggle("active", panel === "external");
-        fields.databaseCatalogPanel.hidden = panel !== "catalog";
-        fields.databaseExternalPanel.hidden = panel !== "external";
-        renderDatabaseMenu();
+      function filterValueLabel(label, value) {
+        const normalized = String(value || "").toLowerCase();
+        const labels = {
+          watched: "Vista",
+          to_watch: "Por ver",
+          pelicula: "Película",
+          serie: "Serie",
+          anime: "Anime",
+          documental: "Documental",
+          local_files: "Archivos locales",
+          wikipedia: "Wikipedia",
+          imdb: "IMDb",
+          filmaffinity: "FilmAffinity"
+        };
+        return labels[normalized] || String(value || label);
       }
 
       function renderDatabaseMenu() {
@@ -217,10 +477,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             ${externalCacheItem()}
           </div>
         `;
-        fields.databaseMenuCatalog.classList.toggle("active", databasePanel === "catalog");
-        fields.databaseMenuExternal.classList.toggle("active", databasePanel === "external");
-        fields.databaseCatalogPanel.hidden = databasePanel !== "catalog";
-        fields.databaseExternalPanel.hidden = databasePanel !== "external";
       }
 
       function externalDatabaseItem(label, source) {
@@ -242,7 +498,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return `<div class="db-item"><strong>Cache</strong><span>${entries} entradas | ${Number(cache.hits || 0)} hits | ${Number(cache.misses || 0)} misses</span></div>`;
       }
 
-      async function runSearch() {
+      async function runSearch({ updateHistory = true } = {}) {
         const requestedQuery = fields.query.value.trim();
         activeQuery = requestedQuery.length >= 2 ? requestedQuery : "";
         selectedManualIndex = null;
@@ -261,19 +517,33 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.catalogMergeResults.innerHTML = "";
         fields.externalSearchSection.classList.remove("active");
         fields.catalogMergeSection.classList.remove("active");
+        setSearchState(requestedQuery ? "searching" : "idle", requestedQuery ? `Buscando “${requestedQuery}”…` : "");
         render();
         renderDatabaseMenu();
         if (requestedQuery.length < 2) {
           if (requestedQuery) {
             fields.catalogMergeSection.classList.add("active");
             fields.catalogMergeStatus.textContent = "Escribi al menos 2 caracteres.";
+            setSearchState("error", "La búsqueda necesita al menos 2 caracteres.");
           }
           return;
         }
+        if (updateHistory) syncRoute({ q: activeQuery, view: "catalog" }, "push");
+        showView("catalog", { updateHistory: false, scroll: false });
         searchCatalogForMerge(activeQuery);
         if (fields.externalSource.checked) {
           await searchManual("all");
+        } else {
+          setSearchState("results", `Resultados para “${activeQuery}”`);
         }
+      }
+
+      function setSearchState(state, message = "") {
+        fields.searchContext.hidden = state === "idle";
+        fields.searchContext.dataset.state = state;
+        fields.searchContextText.textContent = message;
+        fields.cancelSearch.hidden = state !== "searching";
+        fields.clearManualSearch.hidden = state === "idle";
       }
 
       function filteredItems() {
@@ -309,6 +579,82 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         });
       }
 
+      function sortItems(list) {
+        const mode = fields.sort.value || "original";
+        if (mode === "original") return list;
+        const sorted = [...list];
+        if (mode === "title-asc") {
+          return sorted.sort((left, right) => displayTitle(left).localeCompare(displayTitle(right), "es", { sensitivity: "base" }));
+        }
+        if (mode === "year-desc") {
+          return sorted.sort((left, right) => numericYear(right.year) - numericYear(left.year));
+        }
+        if (mode === "year-asc") {
+          return sorted.sort((left, right) => {
+            const leftYear = numericYear(left.year) || Number.MAX_SAFE_INTEGER;
+            const rightYear = numericYear(right.year) || Number.MAX_SAFE_INTEGER;
+            return leftYear - rightYear;
+          });
+        }
+        if (mode === "rating-desc") {
+          return sorted.sort((left, right) => normalizeRating(right.rating) - normalizeRating(left.rating));
+        }
+        return sorted;
+      }
+
+      function numericYear(value) {
+        const year = Number.parseInt(value || 0, 10);
+        return Number.isNaN(year) ? 0 : year;
+      }
+
+      function clearFilters() {
+        fields.status.value = "";
+        fields.kind.value = "";
+        fields.source.value = "";
+        fields.sort.value = "original";
+        duplicatesOnly = false;
+        randomOrder = [];
+        catalogVisibleCount = CATALOG_PAGE_SIZE;
+        render();
+      }
+
+      function clearFilter(filter) {
+        if (filter === "query") {
+          clearManualSearch({ focus: false });
+          return;
+        }
+        if (filter === "status" || filter === "kind" || filter === "source") {
+          fields[filter].value = "";
+        } else if (filter === "sort") {
+          fields.sort.value = "original";
+        } else if (filter === "duplicates") {
+          duplicatesOnly = false;
+        } else if (filter === "random") {
+          randomOrder = [];
+        }
+        catalogVisibleCount = CATALOG_PAGE_SIZE;
+        render();
+      }
+
+      function renderActiveFilters() {
+        const filters = [];
+        if (activeQuery) filters.push(["query", `Búsqueda: ${activeQuery}`]);
+        if (fields.status.value) filters.push(["status", filterValueLabel("Estado", fields.status.value)]);
+        if (fields.kind.value) filters.push(["kind", filterValueLabel("Tipo", fields.kind.value)]);
+        if (fields.source.value) filters.push(["source", filterValueLabel("Fuente", fields.source.value)]);
+        if (fields.sort.value && fields.sort.value !== "original") {
+          filters.push(["sort", fields.sort.selectedOptions[0]?.textContent || "Orden personalizado"]);
+        }
+        if (duplicatesOnly) filters.push(["duplicates", "Sólo duplicadas"]);
+        if (randomOrder.length) filters.push(["random", "Vista mezclada"]);
+        fields.activeFilters.hidden = filters.length === 0;
+        fields.activeFilters.innerHTML = filters.length
+          ? `<span>Activos</span>${filters.map(([filter, label]) => (
+              `<button type="button" data-click="clear-filter" data-filter="${escapeAttr(filter)}">${escapeHtml(label)} <span aria-hidden="true">×</span></button>`
+            )).join("")}`
+          : "";
+      }
+
       function applyRandomOrder(list) {
         if (!randomOrder.length) return list;
         const byId = new Map(list.map((item) => [item.id, item]));
@@ -318,11 +664,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function render() {
-        const baseFiltered = filteredItems();
+        const baseFiltered = sortItems(filteredItems());
         const filtered = applyRandomOrder(baseFiltered);
         const shown = filtered.slice(0, catalogVisibleCount);
+        const watchedVisible = filtered.filter((item) => item.status === "watched").length;
+        const cataloguedVisible = filtered.filter((item) => isInCatalog(item.en_catalogo)).length;
 
-        fields.stats.textContent = `${shown.length} mostradas de ${filtered.length} visibles (${items.length} items)${randomOrder.length ? " | orden aleatorio" : ""}${duplicatesOnly ? " | solo duplicadas" : ""}`;
+        fields.stats.textContent = `${filtered.length} en estantería · ${watchedVisible} vistas · ${cataloguedVisible} en catálogo${randomOrder.length ? " · mezcladas" : ""}${duplicatesOnly ? " · duplicadas" : ""}`;
         fields.total.textContent = items.length;
         fields.visible.textContent = filtered.length;
         fields.watchedCount.textContent = items.filter((item) => item.status === "watched").length;
@@ -337,10 +685,22 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.showDuplicates.textContent = duplicatesOnly ? "Ver todo" : "Ver duplicadas";
         fields.sourceFiles.textContent = sourceFiles.length;
         fields.empty.style.display = filtered.length ? "none" : "block";
+        fields.empty.textContent = activeQuery
+          ? `No encontramos obras para “${activeQuery}” con los filtros actuales.`
+          : "No hay obras que coincidan con los filtros actuales.";
         fields.grid.innerHTML = shown.map(card).join("");
         fields.catalogLoadMore.hidden = shown.length >= filtered.length;
-        fields.catalogLoadMore.textContent = `Cargar mas (${filtered.length - shown.length})`;
+        fields.catalogLoadMore.textContent = `Cargar más (${filtered.length - shown.length})`;
+        renderHomeShelf();
+        renderActiveFilters();
+        syncRandomControl();
         renderDetail();
+      }
+
+      function renderHomeShelf() {
+        const selection = spotlightItems.slice(0, 6);
+        fields.homeGrid.innerHTML = selection.map(card).join("");
+        fields.homeEmpty.hidden = selection.length > 0;
       }
 
       function showMoreCatalogItems() {
@@ -357,6 +717,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function resetViewOrder() {
         randomOrder = [];
+        fields.sort.value = "original";
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         render();
       }
@@ -366,6 +727,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         render();
+        goToCollection();
       }
 
       function shuffle(values) {
@@ -378,50 +740,102 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function card(item) {
-        const summary = item.wikipedia_extract || item.description || item.notes || item.review || "";
         const shownTitle = displayTitle(item);
-        const subtitle = titleSubtitle(item);
-        const image = item.page_image
-          ? `<img class="image" src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="" loading="lazy" decoding="async">`
-          : `<div class="image-placeholder">${escapeHtml((shownTitle || "Sin imagen").slice(0, 18))}</div>`;
-        const tags = Array.isArray(item.tags) ? item.tags : [];
+        const title = shownTitle || "Sin título";
+        const titleClass = titleSizeClass(title);
         const rating = normalizeRating(item.rating);
-        const personal = rating ? `${rating}/10` : item.status === "watched" ? "vista" : "sin puntaje";
-        return `<article class="card" data-click="open-detail" data-id="${escapeAttr(item.id)}">
-          ${image}
-          <div class="body">
-            <div class="title">
-              <h2>${escapeHtml(shownTitle || "Sin titulo")}</h2>
+        const watched = item.status === "watched";
+        const catalogued = isInCatalog(item.en_catalogo);
+        const duplicate = Number(item._duplicate_count || 0) > 0
+          ? `<span class="dvd-sticker">Duplicada +${escapeHtml(item._duplicate_count)}</span>`
+          : "";
+        const accessibleStatus = `${watched ? "vista" : "pendiente"}, ${catalogued ? "en catálogo" : "fuera de catálogo"}, ${rating} puntos`;
+        const backMeta = [item.year, firstListValue(item.directors)].filter(Boolean).join(" · ") || "Ficha sin completar";
+        return `<article class="card dvd-card" data-click="open-detail" data-id="${escapeAttr(item.id)}">
+          <div class="dvd-flipper" aria-hidden="true">
+            <div class="dvd-face dvd-front">
+              <div class="dvd-case">
+                <span class="dvd-spine"></span>
+                <div class="dvd-cover">
+                  ${posterArtwork(item, title)}
+                  <span class="dvd-gloss"></span>
+                  ${duplicate}
+                  <div class="dvd-title-block">
+                    <div class="dvd-title-meta">
+                      <span>${escapeHtml(item.year || "Año desconocido")}</span>
+                      ${rating ? `<strong>${rating}/10</strong>` : ""}
+                    </div>
+                    <h2 class="${titleClass}">${escapeHtml(title)}</h2>
+                    <div class="dvd-front-statuses">
+                      <span class="dvd-front-status ${catalogued ? "catalogued" : "muted"}">${catalogued ? "Catálogo" : "No catálogo"}</span>
+                      <span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
-            <div class="card-badges">
-              <span class="pill ${item.status === "watched" ? "good" : ""}">${escapeHtml(item.status || "sin estado")}</span>
-              <span class="pill ${hasExternalLink(item) ? "good" : "muted"}">${hasExternalLink(item) ? "con link" : "sin link"}</span>
-              <span class="pill ${isInCatalog(item.en_catalogo) ? "good" : "muted"}">${isInCatalog(item.en_catalogo) ? "catalogo: si" : "catalogo: no"}</span>
-              ${Number(item._duplicate_count || 0) > 0 ? `<span class="pill warning">duplicada +${item._duplicate_count}</span>` : ""}
-            </div>
-            <div class="meta">
-              ${meta(item.year)}${meta(item.kind)}${meta(item.source)}${meta(rating ? `puntaje: ${rating}/10` : "")}${meta(item.watched_at ? `vista: ${item.watched_at}` : "")}${meta(tags.join(", "))}
-              ${meta(localFileCountLabel(item))}
-            </div>
-            ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : ""}
-            <div class="card-facts">
-              ${cardFact("Año", item.year)}
-              ${cardFact("Director", firstListValue(item.directors))}
-              ${cardFact("Genero", listText(item.genres, 2))}
-              ${cardFact("Personal", personal)}
-            </div>
-            <div class="links">
-              <a href="#" data-click="open-detail" data-id="${escapeAttr(item.id)}">Detalle</a>
-              <a href="#" data-click="toggle-watched" data-id="${escapeAttr(item.id)}" data-status="${escapeAttr(item.status || "to_watch")}">${item.status === "watched" ? "Marcar pendiente" : "Marcar vista"}</a>
-              <a href="#" data-click="find-link" data-id="${escapeAttr(item.id)}">Buscar link</a>
+            <div class="dvd-face dvd-back">
+              <div class="dvd-case dvd-back-case">
+                <span class="dvd-spine"></span>
+                <div class="dvd-back-cover">
+                  <div class="dvd-back-header">
+                    <span>Archivo nocturno</span>
+                    <h2 class="${titleClass}">${escapeHtml(title)}</h2>
+                  </div>
+                  <p class="dvd-back-summary">${escapeHtml(dvdBackSummary(item))}</p>
+                  <p class="dvd-back-meta">${escapeHtml(backMeta)}</p>
+                  <div class="dvd-back-statuses">
+                    <span class="${watched ? "active" : ""}">${watched ? "✓ Vista" : "Pendiente"}</span>
+                    <span class="${catalogued ? "active" : ""}">${catalogued ? "En catálogo" : "Fuera"}</span>
+                    <strong>${rating ? `${rating} pts` : "0 pts · Sin puntuar"}</strong>
+                  </div>
+                  <span class="dvd-back-hint">Click para abrir la ficha →</span>
+                  <div class="dvd-barcode"><span></span><small>${escapeHtml(String(item.id || "movie-inbox").slice(0, 18))}</small></div>
+                </div>
+              </div>
             </div>
           </div>
+          ${openCardButton(item, title, accessibleStatus)}
         </article>`;
       }
 
-      function cardFact(label, value) {
-        return `<div class="card-fact"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value || "-")}</span></div>`;
+      function openCardButton(item, title, accessibleStatus) {
+        return `<button class="dvd-open-surface" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}" aria-haspopup="dialog" aria-label="Abrir ficha de ${escapeAttr(title)}: ${escapeAttr(accessibleStatus)}"></button>`;
+      }
+
+      function dvdBackSummary(item) {
+        const summary = String(item.wikipedia_extract || item.description || item.notes || "Sin sinopsis disponible.").trim();
+        return summary.length > 190 ? `${summary.slice(0, 187).trimEnd()}…` : summary;
+      }
+
+      function posterArtwork(item, title) {
+        const variant = posterVariant(item.id || title);
+        const placeholder = `<div class="dvd-placeholder poster-${variant}"${item.page_image ? " hidden" : ""}>
+          <span>Movie Inbox presenta</span>
+          <strong>${escapeHtml(title)}</strong>
+          <small>Edición videoclub</small>
+        </div>`;
+        if (!item.page_image) return placeholder;
+        return `<img class="dvd-cover-image" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">${placeholder}`;
+      }
+
+      function posterVariant(seed) {
+        const value = [...String(seed || "")].reduce((total, character) => total + character.codePointAt(0), 0);
+        return (value % 4) + 1;
+      }
+
+      function handlePosterError(event) {
+        const spotlightImage = event.target.closest?.("[data-spotlight-image]");
+        if (spotlightImage) {
+          spotlightImage.hidden = true;
+          spotlightImage.closest(".spotlight-slide")?.classList.add("is-image-missing");
+          return;
+        }
+        const image = event.target.closest?.("[data-poster-image]");
+        if (!image) return;
+        image.hidden = true;
+        const fallback = image.nextElementSibling;
+        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder")) fallback.hidden = false;
       }
 
       function personalPanel(item, forceOpen = false) {
@@ -431,7 +845,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         )).join("");
         const open = forceOpen || openPersonalId === item.id ? " open" : "";
         const watched = item.watched_at ? `Vista: ${item.watched_at}` : "Sin fecha de vista";
-        const summary = [rating ? `${rating}/10` : "Sin puntaje", watched].join(" | ");
+        const summary = [rating ? `${rating}/10` : "0/10 · Sin puntuar", watched].join(" | ");
         return `<details class="personal-panel"${open} data-toggle="track-personal" data-id="${escapeAttr(item.id)}">
           <summary>${escapeHtml(summary)}</summary>
           <div class="personal-grid">
@@ -471,30 +885,57 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           const text = listText(values, limit);
           return text ? `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(text)}</dd>` : "";
         }).filter(Boolean);
-        const localText = localFilesText(item);
-        if (localText) rows.push(`<dt>Archivos</dt><dd>${escapeHtml(localText)}</dd>`);
-        if (Number(item._duplicate_count || 0) > 0) {
-          const duplicateText = `${item._duplicate_count} coincidencia(s): ${item._duplicate_reason || "misma obra"}`;
-          rows.push(`<dt>Duplicados</dt><dd>${escapeHtml(duplicateText)}</dd>`);
-        }
         const content = rows.join("");
         return content ? `<dl class="facts">${content}</dl>` : "";
       }
 
-      function openDetail(id) {
-        selectedDetailId = id;
-        renderDetail();
-        fields.detailBackdrop.classList.add("open");
-        fields.detailDrawer.classList.add("open");
-        fields.detailDrawer.setAttribute("aria-hidden", "false");
+      function availabilityPanel(item) {
+        const localText = localFilesText(item);
+        const duplicates = Number(item._duplicate_count || 0);
+        return `<dl class="availability-list">
+          <div><dt>En catálogo</dt><dd>${isInCatalog(item.en_catalogo) ? "Sí" : "No"}</dd></div>
+          <div><dt>Archivos</dt><dd>${escapeHtml(localText || "Sin archivo asociado")}</dd></div>
+          <div><dt>Fuente</dt><dd>${escapeHtml(item.source || "Sin fuente")}</dd></div>
+          ${duplicates ? `<div><dt>Duplicados</dt><dd>${escapeHtml(`${duplicates} coincidencia(s): ${item._duplicate_reason || "misma obra"}`)}</dd></div>` : ""}
+        </dl>`;
       }
 
-      function closeDetail() {
+      function openDetail(id, { updateHistory = true } = {}) {
+        if (!id) return;
+        const activeElement = document.activeElement;
+        detailReturnFocus = activeElement?.matches?.("[data-click='open-detail']")
+          ? activeElement
+          : activeElement?.closest?.(".dvd-card") ? activeElement : null;
+        detailReturnCardId = id;
+        selectedDetailId = id;
+        spotlightDetailPaused = true;
+        stopSpotlight();
+        syncSpotlightControl();
+        renderDetail();
+        if (!fields.detailDrawer.open) fields.detailDrawer.showModal();
+        document.body.classList.add("drawer-open");
+        if (updateHistory) syncRoute({ movie: id }, "push");
+        requestAnimationFrame(() => fields.closeDetail.focus());
+      }
+
+      function closeDetail({ restoreFocus = true, updateHistory = true } = {}) {
+        if (!selectedDetailId && !fields.detailDrawer.open) return;
         selectedDetailId = "";
-        fields.detailBackdrop.classList.remove("open");
-        fields.detailDrawer.classList.remove("open");
-        fields.detailDrawer.setAttribute("aria-hidden", "true");
+        if (fields.detailDrawer.open) fields.detailDrawer.close();
         fields.detailBody.innerHTML = "";
+        document.body.classList.remove("drawer-open");
+        spotlightDetailPaused = false;
+        syncSpotlightControl();
+        startSpotlight();
+        if (updateHistory) syncRoute({ movie: "" }, "replace");
+        const currentCard = [...document.querySelectorAll(".dvd-card")]
+          .find((card) => card.dataset.id === detailReturnCardId);
+        const returnTarget = detailReturnFocus?.isConnected
+          ? detailReturnFocus
+          : currentCard?.querySelector(".dvd-open-surface");
+        if (restoreFocus) returnTarget?.focus();
+        detailReturnFocus = null;
+        detailReturnCardId = "";
       }
 
       function renderDetail() {
@@ -506,53 +947,80 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         const rating = normalizeRating(item.rating);
         const shownTitle = displayTitle(item);
+        const title = shownTitle || "Sin título";
         const subtitle = titleSubtitle(item);
-        const image = item.page_image
-          ? `<img class="drawer-poster" src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="" decoding="async">`
-          : `<div class="drawer-poster"></div>`;
-        const summary = item.wikipedia_extract || item.description || item.notes || item.review || "";
+        const summary = item.wikipedia_extract || item.description || item.notes || "";
+        const watched = item.status === "watched";
+        const catalogued = isInCatalog(item.en_catalogo);
         fields.detailBody.innerHTML = `
           <section class="drawer-hero">
-            ${image}
-            <div>
-              <h2>${escapeHtml(shownTitle || "Sin titulo")}</h2>
-              <div class="meta">
-                ${meta(item.year)}${meta(item.source)}${meta(item.status)}${meta(rating ? `puntaje: ${rating}/10` : "")}${meta(item.watched_at ? `vista: ${item.watched_at}` : "")}${meta(isInCatalog(item.en_catalogo) ? "catalogo: si" : "catalogo: no")}${meta(Number(item._duplicate_count || 0) > 0 ? `duplicada +${item._duplicate_count}` : "")}
-              </div>
+            ${drawerPoster(item, title)}
+            <div class="drawer-intro">
+              <span class="drawer-kicker">Ficha del videoclub</span>
+              <h2>${escapeHtml(title)}</h2>
               ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
-              <div class="drawer-control">
-                <span>Tipo</span>
-                ${kindSelect(item)}
-              </div>
-              ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : ""}
+              <div class="drawer-byline">${[item.year, firstListValue(item.directors), listText(item.genres, 2)].filter(Boolean).map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</div>
             </div>
           </section>
-          <section class="drawer-section">
-            <h3>Ficha</h3>
-            ${factsPanel(item) || `<span class="status-line">Sin ficha enriquecida.</span>`}
+          <section class="drawer-quick-actions" aria-label="Estado personal">
+            <button class="drawer-state ${watched ? "active" : ""}" type="button" data-click="toggle-watched" data-id="${escapeAttr(item.id)}" data-status="${escapeAttr(item.status || "to_watch")}" aria-pressed="${watched}">
+              <span>Estado</span><strong>${watched ? "Vista" : "Pendiente"}</strong><small>${item.watched_at ? escapeHtml(item.watched_at) : "Sin fecha"}</small>
+            </button>
+            <button class="drawer-state ${catalogued ? "active" : ""}" type="button" data-click="toggle-catalog" data-id="${escapeAttr(item.id)}" aria-pressed="${catalogued}">
+              <span>Mi catálogo</span><strong>${catalogued ? "Incluida" : "No incluida"}</strong><small>Cambiar estado</small>
+            </button>
+            <button class="drawer-state rating-state ${rating ? "active" : ""}" type="button" data-click="focus-personal" data-id="${escapeAttr(item.id)}">
+              <span>Rating</span><strong>${rating} pts</strong><small>${rating ? "Editar puntaje" : "Sin puntuar"}</small>
+            </button>
           </section>
-          <section class="drawer-section">
-            <h3>Metadata</h3>
-            ${metadataEditor(item)}
+          <section class="drawer-synopsis">
+            <h3>Sinopsis</h3>
+            <p>${escapeHtml(summary || "Todavía no hay una sinopsis disponible para esta película.")}</p>
           </section>
-          <section class="drawer-section">
+          <section class="drawer-section drawer-personal-section">
             <h3>Mi registro</h3>
             ${personalPanel(item, true)}
           </section>
-          <section class="drawer-section">
-            <h3>Links</h3>
-            <div class="links">${detailLinks(item)}</div>
-          </section>
-          <section class="drawer-section">
-            <h3>Acciones</h3>
-            <div class="links">
-              <a href="#" data-click="toggle-watched" data-id="${escapeAttr(item.id)}" data-status="${escapeAttr(item.status || "to_watch")}">${item.status === "watched" ? "Marcar pendiente" : "Marcar vista"}</a>
-              <a href="#" data-click="toggle-catalog" data-id="${escapeAttr(item.id)}">${isInCatalog(item.en_catalogo) ? "Quitar catalogo" : "Marcar catalogo"}</a>
-              <a href="#" data-click="find-link" data-id="${escapeAttr(item.id)}">Buscar link</a>
-              <a href="#" data-click="delete-item" data-id="${escapeAttr(item.id)}">Eliminar</a>
+          <details class="drawer-accordion">
+            <summary><span>Ficha técnica</span><small>Dirección, reparto y títulos</small></summary>
+            <div class="drawer-accordion-body">${factsPanel(item) || `<span class="status-line">Sin ficha enriquecida.</span>`}</div>
+          </details>
+          <details class="drawer-accordion">
+            <summary><span>Disponibilidad y fuentes</span><small>Archivos, catálogos y enlaces</small></summary>
+            <div class="drawer-accordion-body">
+              ${availabilityPanel(item)}
+              <div class="links">${detailLinks(item)}</div>
+              <button class="drawer-secondary-action" type="button" data-click="find-link" data-id="${escapeAttr(item.id)}">Buscar o completar enlaces</button>
             </div>
-          </section>
+          </details>
+          <details class="drawer-accordion drawer-editor">
+            <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>
+            <div class="drawer-accordion-body">${metadataEditor(item)}</div>
+          </details>
+          <details class="drawer-accordion danger-zone">
+            <summary><span>Mantenimiento</span><small>Acciones sensibles</small></summary>
+            <div class="drawer-accordion-body">
+              <p>Eliminar quita esta entrada del catálogo editable. No borra archivos de video.</p>
+              <button class="danger" type="button" data-click="delete-item" data-id="${escapeAttr(item.id)}">Eliminar del catálogo</button>
+            </div>
+          </details>
         `;
+      }
+
+      function drawerPoster(item, title) {
+        const placeholder = `<div class="drawer-poster drawer-poster-placeholder poster-${posterVariant(item.id || title)}"${item.page_image ? " hidden" : ""}><span>Movie Inbox</span><strong>${escapeHtml(title)}</strong></div>`;
+        const image = item.page_image
+          ? `<img class="drawer-poster" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" decoding="async">`
+          : "";
+        return `<div class="drawer-poster-frame">${image}${placeholder}</div>`;
+      }
+
+      function focusPersonalEditor() {
+        const rating = fields.detailBody.querySelector("[data-personal-rating]");
+        if (!rating) return;
+        rating.closest("details").open = true;
+        rating.scrollIntoView({ block: "center" });
+        rating.focus();
       }
 
       function detailLinks(item) {
@@ -579,7 +1047,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ["Generos", "genres", "text"],
           ["Directores", "directors", "text"],
           ["Guionistas", "writers", "text"],
-          ["Reparto", "cast", "text"]
+          ["Reparto", "cast", "text"],
+          ["TMDB ID", "tmdb_id", "text"],
+          ["Imagen landscape", "backdrop_image", "text"]
         ];
         return `<div class="metadata-editor">
           ${rows.map(([label, field, control]) => metadataEditorRow(item, label, field, control)).join("")}
@@ -612,14 +1082,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         </div>`;
       }
 
-      function kindSelect(item) {
-        const value = normalizeKind(item.kind);
-        const options = ["pelicula", "serie", "anime", "documental"];
-        return `<select class="kind-select" data-change="update-kind" data-id="${escapeAttr(item.id)}">
-          ${options.map((option) => `<option value="${option}" ${option === value ? "selected" : ""}>${option}</option>`).join("")}
-        </select>`;
-      }
-
       function cachedImageSrc(url) {
         return `/image-cache?url=${encodeURIComponent(url)}`;
       }
@@ -630,6 +1092,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (externalSearchController) externalSearchController.abort();
         const controller = new AbortController();
         externalSearchController = controller;
+        externalSearchTimedOut = false;
+        const timeoutId = window.setTimeout(() => {
+          if (externalSearchController === controller) {
+            externalSearchTimedOut = true;
+            controller.abort();
+          }
+        }, SEARCH_TIMEOUT_MS);
         manualSearchSource = source;
         manualResults = [];
         selectedManualIndex = null;
@@ -658,26 +1127,44 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           fields.manualSearchStatus.textContent = manualResults.length
             ? `${manualResults.length} resultados${source === "wikipedia" ? " de Wikipedia" : ""}`
             : "Sin resultados";
+          setSearchState("results", `Resultados para “${query}”`);
           renderManualResults();
           renderDatabaseMenu();
-          renderDatabaseMenu();
         } catch (error) {
-          if (error.name !== "AbortError") {
+          if (error.name === "AbortError" && externalSearchTimedOut) {
+            fields.manualSearchStatus.textContent = "La búsqueda externa tardó demasiado. Podés reintentar.";
+            setSearchState("error", `La búsqueda de “${query}” superó los 10 segundos.`);
+          } else if (error.name !== "AbortError") {
             fields.manualSearchStatus.textContent = "No se pudo completar la búsqueda externa.";
+            setSearchState("error", `No pudimos completar la búsqueda de “${query}”.`);
             console.error("[catalog-viewer] external search failed", error);
           }
         } finally {
+          window.clearTimeout(timeoutId);
           if (externalSearchController === controller) {
             externalSearchController = null;
+            externalSearchTimedOut = false;
             fields.searchButton.disabled = false;
             fields.searchButton.textContent = "Buscar";
           }
         }
       }
 
-      function clearManualSearch() {
+      function cancelExternalSearch() {
+        if (!externalSearchController) return;
+        externalSearchTimedOut = false;
+        externalSearchController.abort();
+        externalSearchController = null;
+        fields.searchButton.disabled = false;
+        fields.searchButton.textContent = "Buscar";
+        fields.manualSearchStatus.textContent = "Búsqueda externa cancelada.";
+        setSearchState("results", `Resultados locales para “${activeQuery}”`);
+      }
+
+      function clearManualSearch({ focus = true, updateHistory = true } = {}) {
         if (externalSearchController) externalSearchController.abort();
         externalSearchController = null;
+        externalSearchTimedOut = false;
         fields.searchButton.disabled = false;
         fields.searchButton.textContent = "Buscar";
         manualResults = [];
@@ -699,9 +1186,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.catalogMergeResults.innerHTML = "";
         fields.externalSearchSection.classList.remove("active");
         fields.catalogMergeSection.classList.remove("active");
+        fields.reviewPrevious.hidden = true;
+        fields.reviewNext.hidden = true;
+        setSearchState("idle");
+        if (updateHistory) syncRoute({ q: "" }, "replace");
         render();
         renderDatabaseMenu();
-        fields.query.focus();
+        if (focus) fields.query.focus();
       }
 
       function prepareManualMerge(index) {
@@ -770,6 +1261,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         wikiReviewIndex = 0;
         if (!wikiReviewQueue.length) {
           fields.wikiReviewStatus.textContent = "No quedan entradas sin link.";
+          fields.reviewPrevious.hidden = true;
+          fields.reviewNext.hidden = true;
           return;
         }
         await reviewCurrentWikiItem();
@@ -793,6 +1286,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const item = wikiReviewQueue[wikiReviewIndex];
         if (!item) return;
         fields.wikiReviewStatus.textContent = `${wikiReviewIndex + 1}/${wikiReviewQueue.length}: ${item.title || item.local_name || "Sin titulo"}`;
+        fields.reviewPrevious.hidden = false;
+        fields.reviewNext.hidden = false;
+        fields.reviewPrevious.disabled = wikiReviewIndex === 0;
+        fields.reviewNext.disabled = wikiReviewIndex >= wikiReviewQueue.length - 1;
         await findLinkForItem(item);
       }
 
@@ -805,7 +1302,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return `<article class="search-result ${comparison ? "comparison-result" : "compact-result"}">
           ${resultMedia(shownTitle || item.local_name, item.page_image)}
           <div class="result-body">
-            <h3>${escapeHtml(shownTitle || "Sin titulo")}</h3>
+            <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
             <div class="meta">
               ${meta(item.year)}${meta(item.kind)}${meta(item.source)}${meta(firstListValue(item.genres))}${meta(firstListValue(item.directors))}
@@ -834,7 +1331,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return `<article class="search-result compact-result">
           ${resultMedia(shownTitle, result.page_image)}
           <div class="result-body">
-            <h3>${escapeHtml(shownTitle || "Sin titulo")}</h3>
+            <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
             <div class="meta">
               ${meta(result.source)}${meta(result.year)}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(result.url ? new URL(result.url).hostname.replace(/^www\\./, "") : "")}${meta(similarity)}
@@ -934,6 +1431,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         button.textContent = payload.ok ? "Agregado" : payload.reason === "duplicate" ? "Ya existe" : "Error";
         await load();
+        if (payload.background_enrichment === "scheduled") {
+          window.setTimeout(() => load(), 12000);
+        }
       }
 
       function showDuplicateChoice(index, candidates) {
@@ -1175,19 +1675,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         await load();
       }
 
-      async function updateKind(event, id) {
-        const kind = event.target.value;
-        const item = items.find((entry) => entry.id === id);
-        const response = await apiFetch("/api/kind", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, kind, source_file: item?._source_file || "" })
-        });
-        const payload = await response.json();
-        if (!payload.ok) alert(payload.reason || "No se pudo cambiar el tipo");
-        await load();
-      }
-
       async function toggleCatalog(event, id) {
         event.preventDefault();
         const item = items.find((entry) => entry.id === id);
@@ -1279,6 +1766,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       async function findLinkForItem(item) {
+        showView("catalog", { updateHistory: true, scroll: false });
         selectedExistingIdForSearch = item.id;
         selectedManualIndex = null;
         fields.query.value = [item.title || item.local_name, item.year].filter(Boolean).join(" ");
@@ -1299,7 +1787,33 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function displayTitle(item) {
-        return item.spanish_title || item.title || item.original_title || item.english_title || item.local_name || "";
+        const candidates = [
+          item.spanish_title,
+          item.title,
+          item.original_title,
+          item.english_title,
+          item.wikipedia_title,
+          ...asList(item.alternative_titles),
+          item.local_name
+        ].filter(Boolean);
+        return candidates.find((value) => !isExternalIdTitle(value)) || candidates[0] || "";
+      }
+
+      function isExternalIdTitle(value) {
+        const text = String(value || "").trim();
+        return /^(tt|nm)\d{7,9}$/i.test(text) || /^film\d+$/i.test(text);
+      }
+
+      function titleSizeClass(value) {
+        const text = String(value || "").trim();
+        const length = [...text].length;
+        const longestWord = Math.max(0, ...text.split(/\s+/).map((word) => [...word].length));
+        if (longestWord > 18) return "title-ultra";
+        if (longestWord > 12 || length > 72) return "title-xxlong";
+        if (longestWord > 8 || length > 52) return "title-xlong";
+        if (length > 34) return "title-long";
+        if (length > 22) return "title-medium";
+        return "title-short";
       }
 
       function titleSubtitle(item) {
