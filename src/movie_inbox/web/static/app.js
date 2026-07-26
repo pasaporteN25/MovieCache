@@ -9,10 +9,17 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let wikiReviewQueue = [];
       let wikiReviewIndex = 0;
       let randomOrder = [];
-      let openPersonalId = "";
       let selectedDetailId = "";
       let detailReturnFocus = null;
       let detailReturnCardId = "";
+      let detailNavigationIds = [];
+      let detailNavigationMode = "catalog";
+      let detailNavigationLabel = "Colección";
+      let detailPersonalEditing = false;
+      let detailDirtyScopes = new Set();
+      let detailFeedbackState = { message: "", tone: "" };
+      let detailFeedbackTimer = null;
+      let pendingDetailTransition = null;
       let activeQuery = "";
       let writeJsonPath = "";
       let currentView = "home";
@@ -109,6 +116,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         detailDrawer: document.querySelector("#detailDrawer"),
         detailBody: document.querySelector("#detailBody"),
         closeDetail: document.querySelector("#closeDetail"),
+        detailNavigation: document.querySelector("#detailNavigation"),
+        detailFeedback: document.querySelector("#detailFeedback"),
+        unsavedDetailDialog: document.querySelector("#unsavedDetailDialog"),
+        keepEditingDetail: document.querySelector("#keepEditingDetail"),
+        discardDetailChanges: document.querySelector("#discardDetailChanges"),
+        saveDetailChanges: document.querySelector("#saveDetailChanges"),
         catalogLoadMore: document.querySelector("#catalogLoadMore"),
         descriptionDialog: document.querySelector("#descriptionDialog"),
         descriptionDialogTitle: document.querySelector("#descriptionDialogTitle"),
@@ -150,6 +163,18 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.detailDrawer.addEventListener("click", (event) => {
         if (event.target === fields.detailDrawer) closeDetail();
       });
+      fields.detailBody.addEventListener("input", handleDetailFormMutation);
+      fields.detailBody.addEventListener("change", handleDetailFormMutation);
+      fields.keepEditingDetail.addEventListener("click", keepEditingDetail);
+      fields.discardDetailChanges.addEventListener("click", discardDetailChanges);
+      fields.saveDetailChanges.addEventListener("click", saveDetailChanges);
+      fields.unsavedDetailDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        keepEditingDetail();
+      });
+      fields.unsavedDetailDialog.addEventListener("click", (event) => {
+        if (event.target === fields.unsavedDetailDialog) keepEditingDetail();
+      });
       fields.catalogLoadMore.addEventListener("click", showMoreCatalogItems);
       fields.closeDescriptionDialog.addEventListener("click", () => fields.descriptionDialog.close());
       fields.query.addEventListener("keydown", (event) => {
@@ -157,10 +182,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (event.key === "Escape") clearManualSearch();
       });
       document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("beforeunload", handleBeforeUnload);
       window.addEventListener("popstate", restoreRoute);
       document.addEventListener("error", handlePosterError, true);
       document.addEventListener("click", handleDelegatedClick);
-      document.addEventListener("toggle", handleDelegatedToggle, true);
       [fields.status, fields.kind, fields.source, fields.sort].forEach((field) => field.addEventListener("input", () => {
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
@@ -176,14 +201,19 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const id = target.dataset.id || "";
         const index = Number(target.dataset.index);
         const actions = {
-          "open-detail": () => openDetail(id),
-          "toggle-watched": () => toggleWatched(event, id, target.dataset.status || "to_watch"),
-          "focus-personal": focusPersonalEditor,
-          "find-link": () => findLinkForCatalog(event, id),
+          "open-detail": () => openDetailFromTrigger(target, id),
+          "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
+          "focus-personal": editPersonalRecord,
+          "edit-personal": editPersonalRecord,
+          "cancel-personal": cancelPersonalEdit,
+          "find-link": () => runDetailAwareAction(target, () => findLinkForCatalog(event, id)),
           "save-personal": () => savePersonal(event, id),
-          "toggle-catalog": () => toggleCatalog(event, id),
-          "delete-item": () => deleteCatalogItem(event, id),
+          "toggle-catalog": () => runDetailAwareAction(target, () => toggleCatalog(event, id)),
+          "delete-item": () => requestDetailTransition(() => deleteCatalogItem(event, id)),
           "save-metadata": () => saveMetadata(event, id),
+          "detail-previous": () => navigateDetail(-1),
+          "detail-next": () => navigateDetail(1),
+          "detail-random": openAnotherRandomDetail,
           "show-more-manual": showMoreManualResults,
           "show-more-catalog": showMoreCatalogResults,
           "merge-result": () => mergeSearchResult(index, id),
@@ -197,9 +227,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         actions[target.dataset.click]?.();
       }
 
-      function handleDelegatedToggle(event) {
-        const target = event.target;
-        if (target?.dataset?.toggle === "track-personal") trackPersonalPanel(event, target.dataset.id || "");
+      function runDetailAwareAction(target, action) {
+        if (target.closest("#detailDrawer") && hasUnsavedDetailChanges()) {
+          requestDetailTransition(action);
+          return;
+        }
+        action();
       }
 
       async function load() {
@@ -289,7 +322,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ? candidates.filter((item) => item.id !== selectedDetailId)
           : candidates;
         const item = pool[Math.floor(Math.random() * pool.length)];
-        if (item) openDetail(item.id);
+        if (item) {
+          openDetail(item.id, {
+            context: {
+              mode: "random",
+              label: fields.randomCatalogOnly.checked ? "Random · Catálogo" : "Random · Todo",
+              ids: candidates.map((candidate) => candidate.id)
+            }
+          });
+        }
       }
 
       function randomCandidates() {
@@ -308,6 +349,36 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.randomButton.title = count
           ? `Abrir una ficha al azar entre ${count} ${catalogOnly ? "entradas en catálogo" : "entradas"}`
           : catalogOnly ? "No hay entradas en catálogo con los filtros actuales" : "No hay entradas disponibles";
+      }
+
+      function catalogDetailItems() {
+        return applyRandomOrder(sortItems(filteredItems()));
+      }
+
+      function detailContextForTrigger(target) {
+        if (target.closest("#homeGrid, #spotlightStage")) {
+          return {
+            mode: "home",
+            label: "Inicio",
+            ids: spotlightItems.map((item) => item.id)
+          };
+        }
+        if (target.closest("#catalogMergeResults")) {
+          return {
+            mode: "search",
+            label: "Resultados locales",
+            ids: catalogMergeResults.map((item) => item.id)
+          };
+        }
+        return {
+          mode: "catalog",
+          label: activeQuery ? `Colección · ${activeQuery}` : "Colección",
+          ids: catalogDetailItems().map((item) => item.id)
+        };
+      }
+
+      function openDetailFromTrigger(target, id) {
+        openDetail(id, { context: detailContextForTrigger(target) });
       }
 
       function syncRoute(values = {}, method = "replace") {
@@ -838,37 +909,69 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder")) fallback.hidden = false;
       }
 
-      function personalPanel(item, forceOpen = false) {
+      function personalRecordPanel(item) {
+        if (detailPersonalEditing) return personalRecordEditor(item);
+        const rating = normalizeRating(item.rating);
+        const review = String(item.review || "").trim();
+        return `<div class="personal-record-read">
+          <div class="record-heading">
+            <div>
+              <span class="drawer-kicker">Memoria personal</span>
+              <h3>Mi registro</h3>
+            </div>
+            <button class="quiet-action record-edit-action" type="button" data-click="edit-personal" data-id="${escapeAttr(item.id)}">Editar registro</button>
+          </div>
+          <dl class="personal-read-grid">
+            <div>
+              <dt>Fecha vista</dt>
+              <dd>${escapeHtml(item.watched_at || "Sin fecha")}</dd>
+            </div>
+            <div>
+              <dt>Puntuación</dt>
+              <dd>${rating ? `${rating}/10` : "Sin puntuar"}</dd>
+            </div>
+          </dl>
+          <div class="personal-review-read">
+            <span>Review</span>
+            <p>${escapeHtml(review || "Sin review")}</p>
+          </div>
+        </div>`;
+      }
+
+      function personalRecordEditor(item) {
         const rating = normalizeRating(item.rating);
         const ratingOptions = Array.from({ length: 11 }, (_, value) => (
           `<option value="${value}" ${value === rating ? "selected" : ""}>${value}</option>`
         )).join("");
-        const open = forceOpen || openPersonalId === item.id ? " open" : "";
-        const watched = item.watched_at ? `Vista: ${item.watched_at}` : "Sin fecha de vista";
-        const summary = [rating ? `${rating}/10` : "0/10 · Sin puntuar", watched].join(" | ");
-        return `<details class="personal-panel"${open} data-toggle="track-personal" data-id="${escapeAttr(item.id)}">
-          <summary>${escapeHtml(summary)}</summary>
+        return `<div class="personal-record-editor" data-detail-form="personal" data-id="${escapeAttr(item.id)}">
+          <div class="record-heading">
+            <div>
+              <span class="drawer-kicker">Edición</span>
+              <h3>Mi registro</h3>
+            </div>
+            <span class="status-line" data-personal-status></span>
+          </div>
           <div class="personal-grid">
             <label>
               Fecha vista
-              <input data-personal-watched-at type="date" value="${escapeAttr(item.watched_at || "")}">
+              <input name="watched_at" data-personal-watched-at type="date" value="${escapeAttr(item.watched_at || "")}">
             </label>
             <label>
               Puntaje
-              <select data-personal-rating>
+              <select name="rating" data-personal-rating>
                 ${ratingOptions}
               </select>
             </label>
             <label class="review-field">
               Review
-              <textarea data-personal-review rows="4">${escapeHtml(item.review || "")}</textarea>
+              <textarea name="review" data-personal-review rows="6">${escapeHtml(item.review || "")}</textarea>
             </label>
             <div class="personal-actions">
-              <button type="button" data-click="save-personal" data-id="${escapeAttr(item.id)}">Guardar</button>
-              <span class="status-line" data-personal-status></span>
+              <button type="button" data-click="save-personal" data-detail-save data-id="${escapeAttr(item.id)}">Guardar cambios</button>
+              <button class="quiet-action" type="button" data-click="cancel-personal" data-id="${escapeAttr(item.id)}">Cancelar</button>
             </div>
           </div>
-        </details>`;
+        </div>`;
       }
 
       function factsPanel(item) {
@@ -900,30 +1003,47 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         </dl>`;
       }
 
-      function openDetail(id, { updateHistory = true } = {}) {
+      function openDetail(id, { updateHistory = true, context = null, skipGuard = false } = {}) {
         if (!id) return;
+        if (!skipGuard && selectedDetailId && selectedDetailId !== id && hasUnsavedDetailChanges()) {
+          requestDetailTransition(() => openDetail(id, { updateHistory, context, skipGuard: true }));
+          return;
+        }
         const activeElement = document.activeElement;
         detailReturnFocus = activeElement?.matches?.("[data-click='open-detail']")
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
+        setDetailContext(context, id);
         selectedDetailId = id;
+        detailPersonalEditing = false;
+        detailDirtyScopes.clear();
         spotlightDetailPaused = true;
         stopSpotlight();
         syncSpotlightControl();
-        renderDetail();
+        clearDetailFeedback();
+        renderDetail({ force: true });
         if (!fields.detailDrawer.open) fields.detailDrawer.showModal();
         document.body.classList.add("drawer-open");
         if (updateHistory) syncRoute({ movie: id }, "push");
         requestAnimationFrame(() => fields.closeDetail.focus());
       }
 
-      function closeDetail({ restoreFocus = true, updateHistory = true } = {}) {
+      function closeDetail({ restoreFocus = true, updateHistory = true, skipGuard = false } = {}) {
         if (!selectedDetailId && !fields.detailDrawer.open) return;
+        if (!skipGuard && hasUnsavedDetailChanges()) {
+          requestDetailTransition(() => closeDetail({ restoreFocus, updateHistory, skipGuard: true }));
+          return;
+        }
         selectedDetailId = "";
         if (fields.detailDrawer.open) fields.detailDrawer.close();
         fields.detailBody.innerHTML = "";
+        fields.detailNavigation.innerHTML = "";
         document.body.classList.remove("drawer-open");
+        detailPersonalEditing = false;
+        detailDirtyScopes.clear();
+        pendingDetailTransition = null;
+        clearDetailFeedback();
         spotlightDetailPaused = false;
         syncSpotlightControl();
         startSpotlight();
@@ -938,11 +1058,85 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         detailReturnCardId = "";
       }
 
-      function renderDetail() {
+      function setDetailContext(context, selectedId) {
+        if (context) {
+          detailNavigationMode = context.mode || "catalog";
+          detailNavigationLabel = context.label || "Colección";
+          detailNavigationIds = uniqueExistingIds(context.ids || []);
+        } else if (!detailNavigationIds.includes(selectedId)) {
+          detailNavigationMode = "catalog";
+          detailNavigationLabel = activeQuery ? `Colección · ${activeQuery}` : "Colección";
+          detailNavigationIds = uniqueExistingIds(catalogDetailItems().map((item) => item.id));
+        }
+        if (!detailNavigationIds.includes(selectedId)) detailNavigationIds.unshift(selectedId);
+      }
+
+      function uniqueExistingIds(values) {
+        const valid = new Set(items.map((item) => item.id));
+        return [...new Set(values)].filter((id) => valid.has(id));
+      }
+
+      function renderDetailNavigation() {
+        if (!selectedDetailId) {
+          fields.detailNavigation.innerHTML = "";
+          return;
+        }
+        if (detailNavigationMode === "random") {
+          fields.detailNavigation.innerHTML = `
+            <span class="drawer-navigation-label">${escapeHtml(detailNavigationLabel)}</span>
+            <button class="drawer-navigation-random" type="button" data-click="detail-random">Otro al azar</button>
+          `;
+          return;
+        }
+        const index = detailNavigationIds.indexOf(selectedDetailId);
+        const total = detailNavigationIds.length;
+        fields.detailNavigation.innerHTML = `
+          <button type="button" data-click="detail-previous" aria-label="Abrir ficha anterior" ${index <= 0 ? "disabled" : ""}>← <span>Anterior</span></button>
+          <span class="drawer-navigation-counter">${escapeHtml(detailNavigationLabel)} · ${Math.max(index + 1, 1)} / ${Math.max(total, 1)}</span>
+          <button type="button" data-click="detail-next" aria-label="Abrir ficha siguiente" ${index < 0 || index >= total - 1 ? "disabled" : ""}><span>Siguiente</span> →</button>
+        `;
+      }
+
+      function navigateDetail(offset) {
+        const index = detailNavigationIds.indexOf(selectedDetailId);
+        const nextId = detailNavigationIds[index + offset];
+        if (!nextId) return;
+        requestDetailTransition(() => showDetailFromQueue(nextId));
+      }
+
+      function showDetailFromQueue(id) {
+        detailPersonalEditing = false;
+        detailDirtyScopes.clear();
+        selectedDetailId = id;
+        detailReturnCardId = id;
+        clearDetailFeedback();
+        renderDetail({ force: true });
+        syncRoute({ movie: id }, "replace");
+        fields.detailBody.scrollTop = 0;
+        requestAnimationFrame(() => fields.closeDetail.focus());
+      }
+
+      function openAnotherRandomDetail() {
+        const candidates = randomCandidates().filter((item) => item.id !== selectedDetailId);
+        if (!candidates.length) return;
+        const item = candidates[Math.floor(Math.random() * candidates.length)];
+        requestDetailTransition(() => {
+          detailNavigationIds = randomCandidates().map((candidate) => candidate.id);
+          detailNavigationLabel = fields.randomCatalogOnly.checked ? "Random · Catálogo" : "Random · Todo";
+          showDetailFromQueue(item.id);
+        });
+      }
+
+      function renderDetail({ force = false } = {}) {
         if (!selectedDetailId) return;
+        if (!force && hasUnsavedDetailChanges()) {
+          renderDetailNavigation();
+          syncDetailFeedback();
+          return;
+        }
         const item = items.find((entry) => entry.id === selectedDetailId);
         if (!item) {
-          closeDetail();
+          closeDetail({ skipGuard: true });
           return;
         }
         const rating = normalizeRating(item.rating);
@@ -952,6 +1146,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const summary = item.wikipedia_extract || item.description || item.notes || "";
         const watched = item.status === "watched";
         const catalogued = isInCatalog(item.en_catalogo);
+        const metadataSection = detailPersonalEditing ? "" : `
+          <details class="drawer-accordion drawer-editor">
+            <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>
+            <div class="drawer-accordion-body">${metadataEditor(item)}</div>
+          </details>
+        `;
+        renderDetailNavigation();
         fields.detailBody.innerHTML = `
           <section class="drawer-hero">
             ${drawerPoster(item, title)}
@@ -969,8 +1170,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <button class="drawer-state ${catalogued ? "active" : ""}" type="button" data-click="toggle-catalog" data-id="${escapeAttr(item.id)}" aria-pressed="${catalogued}">
               <span>Mi catálogo</span><strong>${catalogued ? "Incluida" : "No incluida"}</strong><small>Cambiar estado</small>
             </button>
-            <button class="drawer-state rating-state ${rating ? "active" : ""}" type="button" data-click="focus-personal" data-id="${escapeAttr(item.id)}">
-              <span>Rating</span><strong>${rating} pts</strong><small>${rating ? "Editar puntaje" : "Sin puntuar"}</small>
+            <button class="drawer-state rating-state ${rating ? "active" : ""}" type="button" data-click="edit-personal" data-id="${escapeAttr(item.id)}">
+              <span>Puntuación</span><strong>${rating ? `${rating}/10` : "Sin puntuar"}</strong><small>Editar registro</small>
             </button>
           </section>
           <section class="drawer-synopsis">
@@ -978,8 +1179,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <p>${escapeHtml(summary || "Todavía no hay una sinopsis disponible para esta película.")}</p>
           </section>
           <section class="drawer-section drawer-personal-section">
-            <h3>Mi registro</h3>
-            ${personalPanel(item, true)}
+            ${personalRecordPanel(item)}
           </section>
           <details class="drawer-accordion">
             <summary><span>Ficha técnica</span><small>Dirección, reparto y títulos</small></summary>
@@ -993,10 +1193,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <button class="drawer-secondary-action" type="button" data-click="find-link" data-id="${escapeAttr(item.id)}">Buscar o completar enlaces</button>
             </div>
           </details>
-          <details class="drawer-accordion drawer-editor">
-            <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>
-            <div class="drawer-accordion-body">${metadataEditor(item)}</div>
-          </details>
+          ${metadataSection}
           <details class="drawer-accordion danger-zone">
             <summary><span>Mantenimiento</span><small>Acciones sensibles</small></summary>
             <div class="drawer-accordion-body">
@@ -1005,6 +1202,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             </div>
           </details>
         `;
+        primeDetailForms();
+        syncDetailFeedback();
       }
 
       function drawerPoster(item, title) {
@@ -1015,12 +1214,23 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return `<div class="drawer-poster-frame">${image}${placeholder}</div>`;
       }
 
-      function focusPersonalEditor() {
-        const rating = fields.detailBody.querySelector("[data-personal-rating]");
-        if (!rating) return;
-        rating.closest("details").open = true;
-        rating.scrollIntoView({ block: "center" });
-        rating.focus();
+      function editPersonalRecord() {
+        if (!selectedDetailId || detailPersonalEditing) return;
+        if (detailDirtyScopes.has("metadata")) {
+          requestDetailTransition(editPersonalRecord);
+          return;
+        }
+        detailPersonalEditing = true;
+        renderDetail({ force: true });
+        const editor = fields.detailBody.querySelector("[data-detail-form='personal']");
+        editor?.scrollIntoView({ block: "center" });
+        requestAnimationFrame(() => editor?.querySelector("[data-personal-watched-at]")?.focus());
+      }
+
+      function cancelPersonalEdit() {
+        detailDirtyScopes.delete("personal");
+        detailPersonalEditing = false;
+        renderDetail({ force: true });
       }
 
       function detailLinks(item) {
@@ -1051,10 +1261,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ["TMDB ID", "tmdb_id", "text"],
           ["Imagen landscape", "backdrop_image", "text"]
         ];
-        return `<div class="metadata-editor">
+        return `<div class="metadata-editor" data-detail-form="metadata" data-id="${escapeAttr(item.id)}">
           ${rows.map(([label, field, control]) => metadataEditorRow(item, label, field, control)).join("")}
           <div class="metadata-actions">
-            <button type="button" data-click="save-metadata" data-id="${escapeAttr(item.id)}">Guardar metadata</button>
+            <button type="button" data-click="save-metadata" data-detail-save data-id="${escapeAttr(item.id)}">Guardar metadata</button>
             <span class="status-line" data-metadata-status></span>
           </div>
         </div>`;
@@ -1080,6 +1290,130 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <label class="lock-control"><input data-lock-field="${field}" type="checkbox" ${locked ? "checked" : ""}> Bloquear</label>
           </div>
         </div>`;
+      }
+
+      function primeDetailForms() {
+        fields.detailBody.querySelectorAll("[data-detail-form]").forEach((form) => {
+          form.dataset.initial = serializeDetailForm(form);
+        });
+      }
+
+      function serializeDetailForm(form) {
+        const values = [...form.querySelectorAll("input, select, textarea")].map((control, index) => {
+          const key = control.dataset.metadataField
+            || control.dataset.lockField
+            || control.name
+            || String(index);
+          const value = control.type === "checkbox" ? control.checked : control.value;
+          return [key, value];
+        });
+        return JSON.stringify(values);
+      }
+
+      function handleDetailFormMutation(event) {
+        const form = event.target.closest("[data-detail-form]");
+        if (!form) return;
+        const scope = form.dataset.detailForm;
+        if (serializeDetailForm(form) === form.dataset.initial) detailDirtyScopes.delete(scope);
+        else detailDirtyScopes.add(scope);
+        syncDetailFeedback();
+      }
+
+      function hasUnsavedDetailChanges() {
+        return detailDirtyScopes.size > 0;
+      }
+
+      function handleBeforeUnload(event) {
+        if (!hasUnsavedDetailChanges()) return;
+        event.preventDefault();
+        event.returnValue = "";
+      }
+
+      function setDetailFeedback(message, tone = "", timeout = 2400) {
+        if (detailFeedbackTimer) window.clearTimeout(detailFeedbackTimer);
+        detailFeedbackState = { message, tone };
+        syncDetailFeedback();
+        if (timeout > 0) {
+          detailFeedbackTimer = window.setTimeout(() => {
+            detailFeedbackState = { message: "", tone: "" };
+            detailFeedbackTimer = null;
+            syncDetailFeedback();
+          }, timeout);
+        }
+      }
+
+      function clearDetailFeedback() {
+        if (detailFeedbackTimer) window.clearTimeout(detailFeedbackTimer);
+        detailFeedbackTimer = null;
+        detailFeedbackState = { message: "", tone: "" };
+        syncDetailFeedback();
+      }
+
+      function syncDetailFeedback() {
+        if (!fields.detailFeedback) return;
+        const dirty = hasUnsavedDetailChanges();
+        fields.detailFeedback.textContent = dirty
+          ? `Cambios sin guardar · ${detailDirtyScopes.size}`
+          : detailFeedbackState.message;
+        fields.detailFeedback.dataset.tone = dirty ? "dirty" : detailFeedbackState.tone;
+        fields.detailDrawer.classList.toggle("has-dirty-detail", dirty);
+      }
+
+      function requestDetailTransition(action) {
+        if (!hasUnsavedDetailChanges()) {
+          action();
+          return;
+        }
+        pendingDetailTransition = action;
+        if (!fields.unsavedDetailDialog.open) fields.unsavedDetailDialog.showModal();
+        requestAnimationFrame(() => fields.saveDetailChanges.focus());
+      }
+
+      function keepEditingDetail() {
+        pendingDetailTransition = null;
+        if (fields.unsavedDetailDialog.open) fields.unsavedDetailDialog.close();
+        if (selectedDetailId) syncRoute({ movie: selectedDetailId }, "replace");
+        requestAnimationFrame(() => fields.detailBody.querySelector("[data-detail-form] input, [data-detail-form] select, [data-detail-form] textarea")?.focus());
+      }
+
+      function discardDetailChanges() {
+        const transition = pendingDetailTransition;
+        pendingDetailTransition = null;
+        detailDirtyScopes.clear();
+        detailPersonalEditing = false;
+        if (fields.unsavedDetailDialog.open) fields.unsavedDetailDialog.close();
+        syncDetailFeedback();
+        transition?.();
+      }
+
+      async function saveDetailChanges() {
+        fields.saveDetailChanges.disabled = true;
+        fields.keepEditingDetail.disabled = true;
+        fields.discardDetailChanges.disabled = true;
+        setDetailFeedback("Guardando cambios…", "working", 0);
+        const saved = await saveDirtyDetailForms();
+        fields.saveDetailChanges.disabled = false;
+        fields.keepEditingDetail.disabled = false;
+        fields.discardDetailChanges.disabled = false;
+        if (!saved) return;
+        const transition = pendingDetailTransition;
+        pendingDetailTransition = null;
+        if (fields.unsavedDetailDialog.open) fields.unsavedDetailDialog.close();
+        detailPersonalEditing = false;
+        setDetailFeedback("Cambios guardados", "success");
+        await loadCatalog();
+        transition?.();
+      }
+
+      async function saveDirtyDetailForms() {
+        const personal = fields.detailBody.querySelector("[data-detail-form='personal']");
+        const metadata = fields.detailBody.querySelector("[data-detail-form='metadata']");
+        if (detailDirtyScopes.has("personal") && !await persistPersonalForm(personal, selectedDetailId)) return false;
+        detailDirtyScopes.delete("personal");
+        if (detailDirtyScopes.has("metadata") && !await persistMetadataForm(metadata, selectedDetailId)) return false;
+        detailDirtyScopes.delete("metadata");
+        syncDetailFeedback();
+        return true;
       }
 
       function cachedImageSrc(url) {
@@ -1660,19 +1994,28 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         event.preventDefault();
         const nextStatus = currentStatus === "watched" ? "to_watch" : "watched";
         const item = items.find((entry) => entry.id === id);
-        const response = await apiFetch("/api/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id,
-            status: nextStatus,
-            watched_at: nextStatus === "watched" ? todayLocalDate() : item?.watched_at || "",
-            source_file: item?._source_file || ""
-          })
-        });
-        const payload = await response.json();
-        if (!payload.ok) alert(payload.reason || "No se pudo cambiar el estado");
-        await load();
+        const detailAction = selectedDetailId === id;
+        if (detailAction) setDetailFeedback("Guardando estado…", "working", 0);
+        try {
+          const response = await apiFetch("/api/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id,
+              status: nextStatus,
+              watched_at: nextStatus === "watched" ? todayLocalDate() : item?.watched_at || "",
+              source_file: item?._source_file || ""
+            })
+          });
+          const payload = await response.json();
+          if (!payload.ok) throw new Error(payload.reason || "No se pudo cambiar el estado");
+          if (detailAction) setDetailFeedback(nextStatus === "watched" ? "Marcada como vista" : "Marcada como pendiente", "success");
+          await load();
+        } catch (error) {
+          console.error("[catalog-viewer] status update failed", error);
+          if (detailAction) setDetailFeedback("No se pudo guardar el estado", "error", 0);
+          else alert(error.message || "No se pudo cambiar el estado");
+        }
       }
 
       async function toggleCatalog(event, id) {
@@ -1680,54 +2023,84 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const item = items.find((entry) => entry.id === id);
         if (!item) return;
         const nextValue = !isInCatalog(item.en_catalogo);
-        const response = await apiFetch("/api/catalog", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, en_catalogo: nextValue, source_file: item?._source_file || "" })
-        });
-        const payload = await response.json();
-        if (!payload.ok) alert(payload.reason || "No se pudo cambiar el estado de catalogo");
-        await load();
-      }
-
-      function trackPersonalPanel(event, id) {
-        if (event.target.open) {
-          openPersonalId = id;
-        } else if (openPersonalId === id) {
-          openPersonalId = "";
+        const detailAction = selectedDetailId === id;
+        if (detailAction) setDetailFeedback("Guardando disponibilidad…", "working", 0);
+        try {
+          const response = await apiFetch("/api/catalog", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, en_catalogo: nextValue, source_file: item?._source_file || "" })
+          });
+          const payload = await response.json();
+          if (!payload.ok) throw new Error(payload.reason || "No se pudo cambiar el estado de catalogo");
+          if (detailAction) setDetailFeedback(nextValue ? "Disponible en catálogo" : "Fuera de catálogo", "success");
+          await load();
+        } catch (error) {
+          console.error("[catalog-viewer] catalog update failed", error);
+          if (detailAction) setDetailFeedback("No se pudo guardar la disponibilidad", "error", 0);
+          else alert(error.message || "No se pudo cambiar el estado de catalogo");
         }
       }
 
       async function savePersonal(event, id) {
         event.preventDefault();
-        const item = items.find((entry) => entry.id === id);
-        if (!item) return;
-        const panel = event.target.closest(".personal-panel");
-        const watchedAt = panel?.querySelector("[data-personal-watched-at]")?.value || "";
-        const rating = normalizeRating(panel?.querySelector("[data-personal-rating]")?.value);
-        const review = panel?.querySelector("[data-personal-review]")?.value || "";
-        const status = panel?.querySelector("[data-personal-status]");
-        if (status) status.textContent = "Guardando...";
-        openPersonalId = id;
-        const response = await apiFetch("/api/personal", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, watched_at: watchedAt, rating, review, source_file: item?._source_file || "" })
-        });
-        const payload = await response.json();
-        if (!payload.ok) {
-          if (status) status.textContent = "";
-          alert(payload.reason || "No se pudo guardar el registro personal");
-          return;
-        }
+        const form = event.target.closest("[data-detail-form='personal']");
+        if (!form) return;
+        event.target.disabled = true;
+        setDetailFeedback("Guardando registro…", "working", 0);
+        const saved = await persistPersonalForm(form, id);
+        event.target.disabled = false;
+        if (!saved) return;
+        detailDirtyScopes.delete("personal");
+        detailPersonalEditing = false;
+        setDetailFeedback("Registro guardado", "success");
         await load();
+      }
+
+      async function persistPersonalForm(form, id) {
+        const item = items.find((entry) => entry.id === id);
+        if (!item || !form) return false;
+        const watchedAt = form.querySelector("[data-personal-watched-at]")?.value || "";
+        const rating = normalizeRating(form.querySelector("[data-personal-rating]")?.value);
+        const review = form.querySelector("[data-personal-review]")?.value || "";
+        const status = form.querySelector("[data-personal-status]");
+        if (status) status.textContent = "Guardando…";
+        try {
+          const response = await apiFetch("/api/personal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, watched_at: watchedAt, rating, review, source_file: item?._source_file || "" })
+          });
+          const payload = await response.json();
+          if (!payload.ok) throw new Error(payload.reason || "No se pudo guardar");
+          if (status) status.textContent = "Guardado";
+          form.dataset.initial = serializeDetailForm(form);
+          return true;
+        } catch (error) {
+          console.error("[catalog-viewer] personal record update failed", error);
+          if (status) status.textContent = "No se pudo guardar. Revisá los datos e intentá otra vez.";
+          setDetailFeedback("Error al guardar el registro", "error", 0);
+          return false;
+        }
       }
 
       async function saveMetadata(event, id) {
         event.preventDefault();
+        const editor = event.target.closest("[data-detail-form='metadata']");
+        if (!editor) return;
+        event.target.disabled = true;
+        setDetailFeedback("Guardando metadata…", "working", 0);
+        const saved = await persistMetadataForm(editor, id);
+        event.target.disabled = false;
+        if (!saved) return;
+        detailDirtyScopes.delete("metadata");
+        setDetailFeedback("Metadata guardada", "success");
+        await load();
+      }
+
+      async function persistMetadataForm(editor, id) {
         const item = items.find((entry) => entry.id === id);
-        const editor = event.target.closest(".metadata-editor");
-        if (!item || !editor) return;
+        if (!item || !editor) return false;
         const values = {};
         editor.querySelectorAll("[data-metadata-field]").forEach((control) => {
           values[control.dataset.metadataField] = control.value;
@@ -1739,29 +2112,35 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         });
         const status = editor.querySelector("[data-metadata-status]");
         if (status) status.textContent = "Guardando...";
-        const response = await apiFetch("/api/metadata", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id,
-            values,
-            locked_fields: [...locked],
-            source_file: item._source_file || ""
-          })
-        });
-        const payload = await response.json();
-        if (!payload.ok) {
-          if (status) status.textContent = "";
-          alert(payload.reason || "No se pudo guardar la metadata");
-          return;
+        try {
+          const response = await apiFetch("/api/metadata", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id,
+              values,
+              locked_fields: [...locked],
+              source_file: item._source_file || ""
+            })
+          });
+          const payload = await response.json();
+          if (!payload.ok) throw new Error(payload.reason || "No se pudo guardar");
+          if (status) status.textContent = "Guardada";
+          editor.dataset.initial = serializeDetailForm(editor);
+          return true;
+        } catch (error) {
+          console.error("[catalog-viewer] metadata update failed", error);
+          if (status) status.textContent = "No se pudo guardar. Revisá los campos e intentá otra vez.";
+          setDetailFeedback("Error al guardar la metadata", "error", 0);
+          return false;
         }
-        await load();
       }
 
       async function findLinkForCatalog(event, id) {
         event.preventDefault();
         const item = items.find((entry) => entry.id === id);
         if (!item) return;
+        if (fields.detailDrawer.open) closeDetail({ restoreFocus: false, updateHistory: false, skipGuard: true });
         await findLinkForItem(item);
       }
 

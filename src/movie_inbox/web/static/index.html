@@ -226,10 +226,29 @@
     <dialog id="detailDrawer" class="detail-drawer" aria-labelledby="detailDrawerTitle">
       <div class="movie-dialog-surface">
         <div class="drawer-top">
-          <strong id="detailDrawerTitle">Ficha // lado B</strong>
-          <button id="closeDetail" class="drawer-close" type="button">Cerrar</button>
+          <div class="drawer-top-identity">
+            <strong id="detailDrawerTitle">Ficha // lado B</strong>
+            <span id="detailFeedback" class="drawer-feedback" aria-live="polite"></span>
+          </div>
+          <div class="drawer-top-actions">
+            <div id="detailNavigation" class="drawer-navigation" aria-label="Navegar fichas"></div>
+            <button id="closeDetail" class="drawer-close" type="button">Cerrar</button>
+          </div>
         </div>
         <div id="detailBody" class="drawer-body"></div>
+      </div>
+    </dialog>
+
+    <dialog id="unsavedDetailDialog" class="unsaved-dialog" aria-labelledby="unsavedDetailTitle">
+      <div class="unsaved-dialog-body">
+        <span class="drawer-kicker">Borrador abierto</span>
+        <h2 id="unsavedDetailTitle">Hay cambios sin guardar</h2>
+        <p>Podés guardarlos antes de continuar, descartarlos o volver a la ficha.</p>
+        <div class="unsaved-dialog-actions">
+          <button id="keepEditingDetail" class="quiet-action" type="button">Volver a editar</button>
+          <button id="discardDetailChanges" class="quiet-action" type="button">Descartar</button>
+          <button id="saveDetailChanges" type="button">Guardar cambios</button>
+        </div>
       </div>
     </dialog>
 
