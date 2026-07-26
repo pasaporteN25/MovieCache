@@ -42,6 +42,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Coleccion con busqueda explicita, filtros combinables, orden, chips activos y carga incremental.
 - Administracion dedicada para resumen, base de datos, fuentes externas, matching y duplicados.
 - Cards de proporcion estable 2:3 con titulo, ano, disponibilidad, estado personal y puntuacion visible cuando existe.
+- Ficha tipo dossier con registro personal en modo lectura, edicion explicita y acciones inmediatas para estado y disponibilidad.
+- Navegacion contextual entre fichas, variante `Otro al azar` y confirmacion para guardar o descartar borradores antes de salir.
 
 ### Corregido
 
