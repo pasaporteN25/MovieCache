@@ -253,7 +253,7 @@ Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve p
 
 La interfaz se divide en tres espacios. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Administrar`, dentro del menu de sistema, agrupa resumen, base de datos, salud de fuentes externas, matching y duplicados.
 
-El visor tiene una consola de busqueda unica con fuentes combinables. `Catalogo` queda siempre activo para buscar en los datos locales y `Externo` se puede marcar cuando tambien queres consultar Wikipedia, IMDb y FilmAffinity. La busqueda se ejecuta solo al tocar `Buscar` o presionar Enter; marcar/desmarcar una fuente no dispara consultas. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
+El visor tiene una consola de busqueda unica. Cada consulta filtra directamente `La coleccion`, sin repetir las mismas obras en una segunda lista local. `Buscar tambien en fuentes externas` agrega resultados de Wikipedia, IMDb y FilmAffinity solamente despues de tocar `Buscar` o presionar Enter. La consulta, los filtros y el orden quedan representados en la URL para que Atras y Adelante restauren la estanteria correcta. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
 
 Las consultas externas se ejecutan en paralelo mediante adaptadores independientes y se guardan durante 15 minutos en un cache de memoria. Un error en una fuente no cancela las otras. `External DBs` muestra estado, latencia, cantidad de resultados y errores por fuente, ademas de hits, misses y entradas del cache. Wikipedia devuelve primero datos livianos para mostrar resultados rapido y completa la metadata de la entrada elegida recien al agregarla o combinarla.
 
@@ -265,9 +265,11 @@ python scripts/view_catalog.py catalog_wiki_v5.json --write-json catalog_wiki_v5
 
 Las tarjetas del visor mantienen una proporcion 2:3 estable para poder escanear la coleccion sin saltos de altura. El frente muestra portada, titulo, ano, disponibilidad, estado personal y puntuacion cuando existe. En desktop el reverso tecnico aparece con hover o foco; hacer click o tap en cualquier punto abre la ficha completa. En movil la interaccion no depende del giro ni del hover.
 
+En movil, la navegacion principal pasa a una barra inferior con accesos tactiles a `Inicio`, `Coleccion`, `Bandeja` y `Random`; la cabecera conserva la marca y concentra las opciones secundarias en `Menu`. La coleccion usa una estanteria de dos columnas, controles compactos y margenes compatibles con las areas seguras del dispositivo.
+
 El resumen muestra cuantas entradas tienen posibles duplicados por URL externa o por titulo y ano. `Ver duplicadas` filtra esas entradas, cada card lleva un badge y el detalle explica la coincidencia. Al agregar desde una fuente externa, el catalogo editable se revisa primero por URL y por todos sus titulos conocidos antes de insertar.
 
-Los resultados de busqueda local y externa se muestran como cards compactas, de a 6, y suman `Cargar mas` cuando quedan mas coincidencias. La descripcion ocupa como maximo dos lineas y `Ver mas` abre el texto completo. Las cards externas priorizan `Agregar`, `Comparar` y `Detalle`; las locales priorizan `Detalle` y muestran `Combinar` cuando venis comparando contra un resultado externo. La grilla principal renderiza 36 entradas por tanda para evitar crear de golpe todas las cards e imagenes del catalogo.
+La busqueda local conserva las cards principales de la estanteria y renderiza 36 entradas por tanda. Los resultados externos se muestran como cards compactas, de a 6, con `Cargar mas` cuando quedan coincidencias. Su descripcion ocupa como maximo dos lineas y `Ver mas` abre el texto completo. Las cards externas priorizan `Agregar`, `Comparar` y `Detalle`; las cards locales auxiliares aparecen unicamente despues de elegir `Comparar` o `Buscar link`.
 
 Los items agregados manualmente entran con `status: to_watch` y `en_catalogo: false`.
 
@@ -427,4 +429,3 @@ Cuando ya tengas un catalogo estable, JSON puede ser la semilla portable y SQLit
 - una app Kotlin
 - temporadas y episodios sobre el esquema relacional preparado
 - importacion desde la extension
-

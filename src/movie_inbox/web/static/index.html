@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="movie-inbox-token" content="__MOVIE_INBOX_TOKEN__">
     <title>__MOVIE_INBOX_TITLE__</title>
     <link rel="stylesheet" href="/static/style.css">
@@ -32,6 +32,10 @@
             <summary aria-label="Abrir menú de sistema">Menú</summary>
             <div class="system-menu-panel">
               <span class="system-menu-kicker">Sistema</span>
+              <label class="system-menu-toggle mobile-random-scope">
+                <input id="mobileRandomCatalogOnly" type="checkbox" checked>
+                <span>Random solo en catálogo</span>
+              </label>
               <button id="adminButton" class="system-menu-action" type="button">Administrar</button>
             </div>
           </details>
@@ -127,9 +131,15 @@
               <input id="query" type="search" placeholder="Buscar una película..." autocomplete="off">
             </label>
             <button id="searchButton" class="search-action" type="button">Buscar</button>
-            <button id="clearManualSearch" class="quiet-action" type="button" hidden>Salir</button>
+            <button id="clearManualSearch" class="quiet-action compact-clear-action" type="button" aria-label="Limpiar búsqueda" hidden>
+              <span class="desktop-control-label">Limpiar</span>
+              <span class="mobile-control-label" aria-hidden="true">×</span>
+            </button>
             <details class="utility-menu">
-              <summary>Filtros y orden</summary>
+              <summary>
+                <span class="desktop-control-label">Filtros y orden</span>
+                <span class="mobile-control-label">Filtros</span>
+              </summary>
               <div class="utility-panel collection-filter-panel">
                 <section class="utility-section">
                   <div class="utility-section-heading">
@@ -156,31 +166,42 @@
               </div>
             </details>
           </div>
-          <div class="search-options">
-            <input id="catalogSource" type="checkbox" checked disabled hidden>
-            <label class="source-toggle search-source-toggle"><input id="externalSource" type="checkbox"> Incluir fuentes externas</label>
+          <div class="search-secondary">
+            <div class="search-options">
+              <label class="source-toggle search-source-toggle">
+                <input id="externalSource" type="checkbox">
+                <span class="desktop-control-label">Buscar también en fuentes externas</span>
+                <span class="mobile-control-label">Fuentes externas</span>
+              </label>
+            </div>
+            <div id="activeFilters" class="active-filters" aria-live="polite" hidden></div>
           </div>
-          <div id="activeFilters" class="active-filters" aria-live="polite" hidden></div>
           <div id="searchContext" class="search-context" aria-live="polite" hidden>
             <span id="searchContextText"></span>
             <div class="search-context-actions">
               <button id="cancelSearch" class="quiet-action" type="button" hidden>Cancelar búsqueda</button>
               <button id="reviewPrevious" class="quiet-action review-step" type="button" hidden>Anterior</button>
               <button id="reviewNext" class="quiet-action review-step" type="button" hidden>Siguiente</button>
-              <button id="backToCollection" class="quiet-action" type="button">Volver a la colección</button>
+              <button id="backToCollection" class="quiet-action" type="button" hidden>Terminar comparación</button>
             </div>
           </div>
           <div class="search-sections">
-            <section class="search-section" id="catalogMergeSection">
+            <section class="search-section comparison-section" id="catalogMergeSection" aria-labelledby="catalogMergeTitle">
               <div class="section-heading">
-                <strong>Catálogo local</strong>
+                <div>
+                  <span class="section-kicker">Comparación</span>
+                  <strong id="catalogMergeTitle">Entrada de la colección</strong>
+                </div>
                 <div class="status-line" id="catalogMergeStatus"></div>
               </div>
               <div class="search-results" id="catalogMergeResults"></div>
             </section>
-            <section class="search-section" id="externalSearchSection">
+            <section class="search-section external-results-section" id="externalSearchSection" aria-labelledby="externalSearchTitle">
               <div class="section-heading">
-                <strong>Fuentes externas</strong>
+                <div>
+                  <span class="section-kicker">Búsqueda ampliada</span>
+                  <strong id="externalSearchTitle">Resultados externos</strong>
+                </div>
                 <div class="status-line" id="manualSearchStatus"></div>
               </div>
               <div class="search-results" id="manualSearchResults"></div>
@@ -193,7 +214,7 @@
             <span class="eyebrow">Archivo nocturno</span>
             <h2 id="catalogTitle">La colección</h2>
           </div>
-          <p>Disponibilidad, estado y puntuación visibles en cada caja.</p>
+          <p id="catalogSummary">Disponibilidad, estado y puntuación visibles en cada caja.</p>
         </section>
 
         <section class="grid" id="grid"></section>
@@ -227,7 +248,7 @@
           </div>
           <div class="metric-grid admin-metric-grid">
             <div class="metric"><span>Total</span><strong id="total">0</strong></div>
-            <div class="metric"><span>Visibles</span><strong id="visible">0</strong></div>
+            <div class="metric"><span>En catálogo</span><strong id="catalogCount">0</strong></div>
             <div class="metric"><span>Vistas</span><strong id="watchedCount">0</strong></div>
             <div class="metric"><span>Por ver</span><strong id="toWatchCount">0</strong></div>
             <div class="metric"><span>Puntuadas</span><strong id="ratedCount">0</strong></div>

@@ -42,6 +42,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Coleccion con busqueda explicita, filtros combinables, orden, chips activos y carga incremental.
 - Administracion dedicada para resumen, base de datos, fuentes externas, matching y duplicados.
 - Cards de proporcion estable 2:3 con titulo, ano, disponibilidad, estado personal y puntuacion visible cuando existe.
+- Navegacion movil inferior para `Inicio`, `Coleccion`, `Bandeja` y `Random`, con cabecera compacta, areas seguras y controles tactiles.
+- Coleccion movil en dos columnas con busqueda y filtros compactos, titulos adaptativos y feedback de pulsacion sin depender de hover.
 - Ficha tipo dossier con registro personal en modo lectura, edicion explicita y acciones inmediatas para estado y disponibilidad.
 - Navegacion contextual entre fichas, variante `Otro al azar` y confirmacion para guardar o descartar borradores antes de salir.
 - Bandeja principal con contador de pendientes y colas dedicadas para posibles duplicados, entradas sin link y casos pospuestos.
@@ -67,6 +69,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - La normalizacion legacy ya no duplica un archivo local que tambien tiene `library_id` y `relative_path`.
 - Los comandos batch ya no importan la interfaz web ni el importador monolitico.
 - Los titulos largos y los estados de las cards se adaptan sin cambiar el alto de la grilla ni depender de hover en dispositivos tactiles.
+- La busqueda local filtra una sola estanteria y reserva las cards auxiliares para fuentes externas o comparaciones explicitas.
+- Consultas, filtros, orden y duplicados se restauran desde la URL sin alterar las estadisticas globales de otras vistas.
 - `Ver coleccion` y la navegacion principal abren la estanteria sin una busqueda anterior; Atrás y Adelante restauran cada consulta desde la URL.
 
 ## [0.1.0] - 2026-07-13

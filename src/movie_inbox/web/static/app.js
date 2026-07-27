@@ -35,6 +35,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let mergeSubmitting = false;
       let mergeRequestSequence = 0;
       let activeQuery = "";
+      let collectionSearchMode = "browse";
       let writeJsonPath = "";
       let currentView = "home";
       let manualVisibleCount = 6;
@@ -57,6 +58,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       const CATALOG_PAGE_SIZE = 36;
       const SEARCH_TIMEOUT_MS = 10000;
       const SPOTLIGHT_INTERVAL_MS = 8000;
+      const COLLECTION_ROUTE_KEYS = ["q", "status", "kind", "source", "sort", "duplicates", "external"];
 
       function apiFetch(url, options = {}) {
         const headers = new Headers(options.headers || {});
@@ -65,7 +67,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
       const fields = {
         query: document.querySelector("#query"),
-        catalogSource: document.querySelector("#catalogSource"),
         externalSource: document.querySelector("#externalSource"),
         searchButton: document.querySelector("#searchButton"),
         homeButton: document.querySelector("#homeButton"),
@@ -74,8 +75,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         inboxBadge: document.querySelector("#inboxBadge"),
         adminButton: document.querySelector("#adminButton"),
         systemMenu: document.querySelector("#systemMenu"),
+        collectionUtilityMenu: document.querySelector(".collection-view .utility-menu"),
         randomButton: document.querySelector("#randomButton"),
         randomCatalogOnly: document.querySelector("#randomCatalogOnly"),
+        mobileRandomCatalogOnly: document.querySelector("#mobileRandomCatalogOnly"),
         randomScopeLabel: document.querySelector("#randomScopeLabel"),
         homeView: document.querySelector("#homeView"),
         inboxView: document.querySelector("#inboxView"),
@@ -113,10 +116,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         sort: document.querySelector("#sort"),
         activeFilters: document.querySelector("#activeFilters"),
         clearFilters: document.querySelector("#clearFilters"),
+        catalogSummary: document.querySelector("#catalogSummary"),
         grid: document.querySelector("#grid"),
         stats: document.querySelector("#stats"),
         total: document.querySelector("#total"),
-        visible: document.querySelector("#visible"),
+        catalogCount: document.querySelector("#catalogCount"),
         watchedCount: document.querySelector("#watchedCount"),
         toWatchCount: document.querySelector("#toWatchCount"),
         ratedCount: document.querySelector("#ratedCount"),
@@ -139,6 +143,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         manualSearchResults: document.querySelector("#manualSearchResults"),
         externalSearchSection: document.querySelector("#externalSearchSection"),
         catalogMergeSection: document.querySelector("#catalogMergeSection"),
+        catalogMergeTitle: document.querySelector("#catalogMergeTitle"),
         catalogMergeStatus: document.querySelector("#catalogMergeStatus"),
         catalogMergeResults: document.querySelector("#catalogMergeResults"),
         databaseCatalogPanel: document.querySelector("#databaseCatalogPanel"),
@@ -191,7 +196,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.persistCurationHistory.addEventListener("change", changeCurationHistoryMode);
       fields.clearCurationHistory.addEventListener("click", clearCurationHistory);
       fields.randomButton.addEventListener("click", openRandomDetail);
-      fields.randomCatalogOnly.addEventListener("change", syncRandomControl);
+      fields.randomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.randomCatalogOnly));
+      fields.mobileRandomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.mobileRandomCatalogOnly));
       fields.spotlightToggle.addEventListener("click", toggleSpotlight);
       fields.cancelSearch.addEventListener("click", cancelExternalSearch);
       fields.reviewPrevious.addEventListener("click", previousWikiReview);
@@ -256,6 +262,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         render();
+        syncCollectionRoute("push");
       }));
       load();
 
@@ -343,12 +350,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function goHome() {
         closeDetail({ restoreFocus: false, updateHistory: false });
-        clearManualSearch({ focus: false, updateHistory: false });
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
         seedSpotlight();
         renderSpotlight();
         render();
         showView("home", { updateHistory: false });
-        syncRoute({ view: "home", movie: "", q: "" }, "push");
+        syncRoute(routeValuesForView("home"), "push");
       }
 
       function goToCollection(options = {}) {
@@ -356,9 +363,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function goToCollectionRoot() {
-        clearManualSearch({ focus: false, updateHistory: false });
+        resetCollectionFilters();
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
         showView("catalog", { updateHistory: false });
-        syncRoute({ view: "catalog", movie: "", q: "" }, "push");
+        syncRoute(routeValuesForView("catalog"), "push");
       }
 
       async function goToInbox(filter = "") {
@@ -382,7 +390,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         else startSpotlight();
         setActiveNavigation(currentView);
         if (fields.systemMenu.open) fields.systemMenu.open = false;
-        if (updateHistory) syncRoute({ view: currentView }, "push");
+        if (updateHistory) syncRoute(routeValuesForView(currentView), "push");
+        renderHeaderStats();
         if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
@@ -1368,11 +1377,19 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function syncRandomControl() {
         const count = randomCandidates().length;
         const catalogOnly = fields.randomCatalogOnly.checked;
+        fields.mobileRandomCatalogOnly.checked = catalogOnly;
         fields.randomScopeLabel.textContent = catalogOnly ? "Catálogo" : "Todo";
         fields.randomButton.disabled = count === 0;
         fields.randomButton.title = count
           ? `Abrir una ficha al azar entre ${count} ${catalogOnly ? "entradas en catálogo" : "entradas"}`
           : catalogOnly ? "No hay entradas en catálogo con los filtros actuales" : "No hay entradas disponibles";
+      }
+
+      function changeRandomScope(source) {
+        const catalogOnly = Boolean(source.checked);
+        fields.randomCatalogOnly.checked = catalogOnly;
+        fields.mobileRandomCatalogOnly.checked = catalogOnly;
+        syncRandomControl();
       }
 
       function catalogDetailItems() {
@@ -1414,6 +1431,45 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         history[method === "push" ? "pushState" : "replaceState"]({}, "", url);
       }
 
+      function collectionRouteValues() {
+        return {
+          q: activeQuery,
+          status: fields.status.value,
+          kind: fields.kind.value,
+          source: fields.source.value,
+          sort: fields.sort.value && fields.sort.value !== "original" ? fields.sort.value : "",
+          duplicates: duplicatesOnly ? "1" : "",
+          external: activeQuery && fields.externalSource.checked ? "1" : ""
+        };
+      }
+
+      function routeValuesForView(view) {
+        const values = { view, movie: "" };
+        for (const key of COLLECTION_ROUTE_KEYS) values[key] = "";
+        if (view === "catalog") Object.assign(values, collectionRouteValues());
+        return values;
+      }
+
+      function syncCollectionRoute(method = "replace") {
+        syncRoute(routeValuesForView("catalog"), method);
+      }
+
+      function selectRouteValue(select, value, fallback = "") {
+        const available = [...select.options].some((option) => option.value === value);
+        select.value = available ? value : fallback;
+      }
+
+      function applyCollectionRoute(params) {
+        selectRouteValue(fields.status, params.get("status") || "");
+        selectRouteValue(fields.kind, params.get("kind") || "");
+        selectRouteValue(fields.source, params.get("source") || "");
+        selectRouteValue(fields.sort, params.get("sort") || "original", "original");
+        duplicatesOnly = params.get("duplicates") === "1";
+        fields.externalSource.checked = params.get("external") === "1";
+        randomOrder = [];
+        catalogVisibleCount = CATALOG_PAGE_SIZE;
+      }
+
       function restoreRoute() {
         if (!items.length) return;
         const params = new URLSearchParams(window.location.search);
@@ -1423,11 +1479,32 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ? params.get("view")
           : rawQuery ? "catalog" : "home";
         const query = requestedView === "catalog" ? rawQuery : "";
+        if (requestedView === "catalog") {
+          selectedManualIndex = null;
+          selectedExistingIdForSearch = null;
+          catalogMergeResults = [];
+          fields.catalogMergeResults.innerHTML = "";
+          fields.catalogMergeSection.classList.remove("active");
+          fields.reviewPrevious.hidden = true;
+          fields.reviewNext.hidden = true;
+          setCollectionSearchMode("browse");
+          applyCollectionRoute(params);
+          if (!fields.externalSource.checked) {
+            manualResults = [];
+            fields.manualSearchResults.innerHTML = "";
+            fields.externalSearchSection.classList.remove("active");
+          } else if (manualResults.length) {
+            renderManualResults();
+          }
+        }
         if (query.length >= 2 && query !== activeQuery) {
           fields.query.value = query;
           runSearch({ updateHistory: false });
         } else if (!query && activeQuery) {
-          clearManualSearch({ focus: false, updateHistory: false });
+          clearManualSearch({ focus: false, updateHistory: false, resetExternal: requestedView !== "catalog" });
+        } else {
+          render();
+          setSearchState(query.length >= 2 ? "results" : "idle", query.length >= 2 ? collectionSearchMessage() : "");
         }
         if (movieId && items.some((item) => item.id === movieId) && movieId !== selectedDetailId) {
           openDetail(movieId, { updateHistory: false });
@@ -1597,6 +1674,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       async function runSearch({ updateHistory = true } = {}) {
         const requestedQuery = fields.query.value.trim();
+        fields.collectionUtilityMenu.open = false;
+        if (!requestedQuery) {
+          clearManualSearch({ focus: false, updateHistory });
+          return;
+        }
         activeQuery = requestedQuery.length >= 2 ? requestedQuery : "";
         selectedManualIndex = null;
         selectedExistingIdForSearch = null;
@@ -1614,33 +1696,57 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.catalogMergeResults.innerHTML = "";
         fields.externalSearchSection.classList.remove("active");
         fields.catalogMergeSection.classList.remove("active");
-        setSearchState(requestedQuery ? "searching" : "idle", requestedQuery ? `Buscando “${requestedQuery}”…` : "");
+        fields.reviewPrevious.hidden = true;
+        fields.reviewNext.hidden = true;
+        setCollectionSearchMode("browse");
         render();
         renderDatabaseMenu();
         if (requestedQuery.length < 2) {
-          if (requestedQuery) {
-            fields.catalogMergeSection.classList.add("active");
-            fields.catalogMergeStatus.textContent = "Escribi al menos 2 caracteres.";
-            setSearchState("error", "La búsqueda necesita al menos 2 caracteres.");
-          }
+          setSearchState("error", "La búsqueda necesita al menos 2 caracteres.");
+          if (updateHistory) syncCollectionRoute("push");
           return;
         }
-        if (updateHistory) syncRoute({ q: activeQuery, view: "catalog" }, "push");
+        if (updateHistory) syncCollectionRoute("push");
         showView("catalog", { updateHistory: false, scroll: false });
-        searchCatalogForMerge(activeQuery);
         if (fields.externalSource.checked) {
           await searchManual("all");
         } else {
-          setSearchState("results", `Resultados para “${activeQuery}”`);
+          setSearchState("results", collectionSearchMessage());
         }
       }
 
       function setSearchState(state, message = "") {
-        fields.searchContext.hidden = state === "idle";
+        const comparisonMode = collectionSearchMode !== "browse";
+        fields.searchContext.hidden = state !== "searching" && state !== "error" && !comparisonMode;
         fields.searchContext.dataset.state = state;
         fields.searchContextText.textContent = message;
         fields.cancelSearch.hidden = state !== "searching";
-        fields.clearManualSearch.hidden = state === "idle";
+        fields.clearManualSearch.hidden = state === "idle" && !comparisonMode;
+        fields.backToCollection.hidden = !comparisonMode;
+      }
+
+      function setCollectionSearchMode(mode = "browse") {
+        collectionSearchMode = ["browse", "compare", "link"].includes(mode) ? mode : "browse";
+        const comparisonMode = collectionSearchMode !== "browse";
+        fields.collectionView.classList.toggle("is-compare-mode", comparisonMode);
+        fields.collectionView.dataset.searchMode = collectionSearchMode;
+        fields.backToCollection.hidden = !comparisonMode;
+        if (!comparisonMode) fields.catalogMergeTitle.textContent = "Entrada de la colección";
+      }
+
+      function collectionSearchMessage() {
+        const count = filteredItems().length;
+        const noun = count === 1 ? "título" : "títulos";
+        return `${count} ${noun} en tu colección para “${activeQuery}”.`;
+      }
+
+      function comparisonSearchMessage() {
+        if (collectionSearchMode === "link") {
+          const selected = items.find((item) => item.id === selectedExistingIdForSearch);
+          return `Buscando una referencia para “${displayTitle(selected || {}) || activeQuery}”.`;
+        }
+        const incoming = manualResults[selectedManualIndex] || {};
+        return `Elegí la entrada local que corresponde a “${displayTitle(incoming) || activeQuery}”.`;
       }
 
       function filteredItems() {
@@ -1704,7 +1810,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return Number.isNaN(year) ? 0 : year;
       }
 
-      function clearFilters() {
+      function resetCollectionFilters() {
         fields.status.value = "";
         fields.kind.value = "";
         fields.source.value = "";
@@ -1712,7 +1818,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         duplicatesOnly = false;
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
+      }
+
+      function clearFilters() {
+        resetCollectionFilters();
         render();
+        syncCollectionRoute("push");
       }
 
       function clearFilter(filter) {
@@ -1731,6 +1842,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         render();
+        syncCollectionRoute("push");
       }
 
       function renderActiveFilters() {
@@ -1764,12 +1876,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const baseFiltered = sortItems(filteredItems());
         const filtered = applyRandomOrder(baseFiltered);
         const shown = filtered.slice(0, catalogVisibleCount);
-        const watchedVisible = filtered.filter((item) => item.status === "watched").length;
-        const cataloguedVisible = filtered.filter((item) => isInCatalog(item.en_catalogo)).length;
 
-        fields.stats.textContent = `${filtered.length} en estantería · ${watchedVisible} vistas · ${cataloguedVisible} en catálogo${randomOrder.length ? " · mezcladas" : ""}${duplicatesOnly ? " · duplicadas" : ""}`;
+        renderHeaderStats();
         fields.total.textContent = items.length;
-        fields.visible.textContent = filtered.length;
+        fields.catalogCount.textContent = items.filter((item) => isInCatalog(item.en_catalogo)).length;
         fields.watchedCount.textContent = items.filter((item) => item.status === "watched").length;
         fields.toWatchCount.textContent = items.filter((item) => item.status === "to_watch").length;
         fields.ratedCount.textContent = items.filter((item) => normalizeRating(item.rating) > 0).length;
@@ -1781,6 +1891,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.duplicateCount.textContent = items.filter((item) => Number(item._duplicate_count || 0) > 0).length;
         fields.showDuplicates.textContent = duplicatesOnly ? "Ver todo" : "Ver duplicadas";
         fields.sourceFiles.textContent = sourceFiles.length;
+        fields.catalogSummary.textContent = catalogSummaryText(filtered);
         fields.empty.style.display = filtered.length ? "none" : "block";
         fields.empty.textContent = activeQuery
           ? `No encontramos obras para “${activeQuery}” con los filtros actuales.`
@@ -1792,6 +1903,22 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         renderActiveFilters();
         syncRandomControl();
         renderDetail();
+      }
+
+      function renderHeaderStats() {
+        const watched = items.filter((item) => item.status === "watched").length;
+        const catalogued = items.filter((item) => isInCatalog(item.en_catalogo)).length;
+        fields.stats.textContent = `${items.length} obras · ${watched} vistas · ${catalogued} en catálogo`;
+      }
+
+      function catalogSummaryText(filtered) {
+        const count = filtered.length;
+        const noun = count === 1 ? "título" : "títulos";
+        if (activeQuery) return `${count} ${noun} para “${activeQuery}”`;
+        const hasFilters = fields.status.value || fields.kind.value || fields.source.value || duplicatesOnly;
+        if (hasFilters) return `${count} ${noun} con los filtros actuales`;
+        if (randomOrder.length) return `${count} ${noun} en orden aleatorio`;
+        return `${count} ${noun} en la estantería`;
       }
 
       function renderHomeShelf() {
@@ -1824,6 +1951,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         render();
+        syncCollectionRoute("push");
         goToCollection();
       }
 
@@ -2470,6 +2598,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.manualSearchResults.innerHTML = "";
         fields.searchButton.disabled = true;
         fields.searchButton.textContent = "Buscando...";
+        setSearchState(
+          "searching",
+          collectionSearchMode === "browse"
+            ? `${collectionSearchMessage()} Consultando fuentes externas…`
+            : comparisonSearchMessage()
+        );
         try {
           const response = await apiFetch(`/api/search?q=${encodeURIComponent(query)}&source=${encodeURIComponent(source)}`, {
             signal: controller.signal
@@ -2489,16 +2623,19 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           fields.manualSearchStatus.textContent = manualResults.length
             ? `${manualResults.length} resultados${source === "wikipedia" ? " de Wikipedia" : ""}`
             : "Sin resultados";
-          setSearchState("results", `Resultados para “${query}”`);
+          setSearchState(
+            "results",
+            collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
+          );
           renderManualResults();
           renderDatabaseMenu();
         } catch (error) {
           if (error.name === "AbortError" && externalSearchTimedOut) {
             fields.manualSearchStatus.textContent = "La búsqueda externa tardó demasiado. Podés reintentar.";
-            setSearchState("error", `La búsqueda de “${query}” superó los 10 segundos.`);
+            setSearchState("error", `La consulta externa para “${query}” superó los 10 segundos.`);
           } else if (error.name !== "AbortError") {
             fields.manualSearchStatus.textContent = "No se pudo completar la búsqueda externa.";
-            setSearchState("error", `No pudimos completar la búsqueda de “${query}”.`);
+            setSearchState("error", `La colección sigue disponible, pero falló la consulta externa para “${query}”.`);
             console.error("[catalog-viewer] external search failed", error);
           }
         } finally {
@@ -2520,11 +2657,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.searchButton.disabled = false;
         fields.searchButton.textContent = "Buscar";
         fields.manualSearchStatus.textContent = "Búsqueda externa cancelada.";
-        setSearchState("results", `Resultados locales para “${activeQuery}”`);
+        setSearchState(
+          "results",
+          collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
+        );
       }
 
-      function clearManualSearch({ focus = true, updateHistory = true } = {}) {
+      function clearManualSearch({ focus = true, updateHistory = true, resetExternal = false } = {}) {
         const hadSearch = Boolean(activeQuery || fields.query.value.trim());
+        fields.collectionUtilityMenu.open = false;
         if (externalSearchController) externalSearchController.abort();
         externalSearchController = null;
         externalSearchTimedOut = false;
@@ -2536,12 +2677,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         selectedExistingIdForSearch = null;
         manualSearchSource = "all";
         activeQuery = "";
+        setCollectionSearchMode("browse");
         manualVisibleCount = SEARCH_PAGE_SIZE;
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         externalSourcesLastUsed = [];
         externalSourcesAttempted = [];
-        fields.externalSource.checked = false;
+        if (resetExternal) fields.externalSource.checked = false;
         fields.query.value = "";
         fields.manualSearchStatus.textContent = "";
         fields.manualSearchResults.innerHTML = "";
@@ -2549,10 +2691,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.catalogMergeResults.innerHTML = "";
         fields.externalSearchSection.classList.remove("active");
         fields.catalogMergeSection.classList.remove("active");
+        fields.catalogMergeTitle.textContent = "Entrada de la colección";
         fields.reviewPrevious.hidden = true;
         fields.reviewNext.hidden = true;
         setSearchState("idle");
-        if (updateHistory && hadSearch) syncRoute({ q: "", view: "catalog", movie: "" }, "push");
+        if (updateHistory && hadSearch) syncCollectionRoute("push");
         render();
         renderDatabaseMenu();
         if (focus) fields.query.focus();
@@ -2561,24 +2704,33 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function prepareManualMerge(index) {
         selectedManualIndex = index;
         if (selectedExistingIdForSearch) {
+          setCollectionSearchMode("link");
           const item = items.find((entry) => entry.id === selectedExistingIdForSearch);
           catalogMergeResults = item ? [item] : [];
           catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
           fields.catalogMergeSection.classList.add("active");
+          fields.catalogMergeTitle.textContent = "Entrada seleccionada";
           fields.catalogMergeStatus.textContent = item ? "Entrada seleccionada para comparar." : "No se encontró la entrada seleccionada.";
           renderCatalogMergeResults();
+          setSearchState("results", comparisonSearchMessage());
+          fields.searchContext.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
         const result = manualResults[index] || {};
+        setCollectionSearchMode("compare");
         fields.query.value = [result.title, result.year].filter(Boolean).join(" ");
         activeQuery = fields.query.value.trim();
         render();
+        syncCollectionRoute("push");
         searchCatalogForMerge();
+        setSearchState("results", comparisonSearchMessage());
+        fields.searchContext.scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
       function searchCatalogForMerge(queryValue = "") {
         const query = (queryValue || fields.query.value).trim().toLowerCase();
         if (!query) return;
+        setCollectionSearchMode("compare");
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
         catalogMergeResults = items
           .map((item) => ({ item, score: catalogMatchScore(item, query) }))
@@ -2587,6 +2739,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           .slice(0, 60)
           .map((entry) => entry.item);
         fields.catalogMergeSection.classList.add("active");
+        fields.catalogMergeTitle.textContent = selectedManualIndex === null
+          ? "Coincidencias de la colección"
+          : "Elegí una entrada local";
         fields.catalogMergeStatus.textContent = selectedManualIndex === null
           ? `${catalogMergeResults.length} coincidencias locales.`
           : `${catalogMergeResults.length} entradas encontradas para comparar.`;
@@ -3099,16 +3254,19 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       async function findLinkForItem(item) {
-        showView("catalog", { updateHistory: true, scroll: false });
+        showView("catalog", { updateHistory: false, scroll: false });
         selectedExistingIdForSearch = item.id;
         selectedManualIndex = null;
+        setCollectionSearchMode("link");
         fields.query.value = [item.title || item.local_name, item.year].filter(Boolean).join(" ");
         activeQuery = fields.query.value.trim();
         fields.externalSource.checked = true;
         render();
+        syncCollectionRoute("push");
         catalogMergeResults = [item];
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
         fields.catalogMergeSection.classList.add("active");
+        fields.catalogMergeTitle.textContent = "Entrada seleccionada";
         fields.catalogMergeStatus.textContent = "Elegí un resultado externo y tocá Comparar para revisar diferencias.";
         renderCatalogMergeResults();
         await searchManual("all", "Buscando coincidencias en Wikipedia, IMDb y FilmAffinity...");
