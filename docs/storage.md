@@ -41,3 +41,11 @@ py -m movie_inbox db export data/movie-inbox.db --json backups/catalog.json
 `db import` no reemplaza una base no vacia sin `--replace`. Antes de un reemplazo crea una exportacion `pre-import-*.bak.json`. Tanto import como export vuelven a leer el destino y comparan el documento canonico completo, incluidos aliases, reviews, metadata, procedencia y archivos locales.
 
 No se migra automaticamente ningun catalogo del usuario. El comando siempre recibe origen y destino explicitos.
+
+## Historial de curaduria
+
+El historial reversible es estado operativo y no forma parte del documento canonico. En modo persistente se guarda junto al catalogo principal como `.<nombre>.curation-history.json`; tanto un catalogo JSON como uno SQLite usan el mismo contrato lateral. El archivo contiene solamente las ultimas 50 operaciones y se reemplaza de forma atomica, sin generar backups rotativos.
+
+Cada operacion conserva los estados anterior y posterior de las entradas afectadas. `Deshacer` compara primero el estado posterior esperado con el catalogo actual: si hubo una edicion posterior, devuelve un conflicto y no escribe. Al restaurar un merge recupera ambas entradas, sus IDs, posiciones y decisiones de curaduria.
+
+El modo `Solo esta sesion` mantiene esos snapshots en memoria y no crea el sidecar. Cerrar la sesion del navegador o reiniciar el servidor elimina esa capacidad de recuperacion. `Limpiar historial` borra el registro del modo activo, pero nunca modifica las obras.

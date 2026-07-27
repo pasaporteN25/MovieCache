@@ -273,7 +273,7 @@ Los items agregados manualmente entran con `status: to_watch` y `en_catalogo: fa
 
 Antes de agregar, el visor revisa si ya existe una entrada con titulo normalizado y año compatible. Si encuentra una posible coincidencia, muestra opciones para combinar, agregar igual o cancelar. Al combinar, conserva datos locales como `en_catalogo`, `local_name` y `local_path`, y suma el link/metadata del resultado elegido.
 
-Cuando el detector automatico no encuentra el duplicado, en un resultado externo podes usar `Comparar`: el visor busca la entrada existente, muestra diferencias campo por campo y permite usar `Combinar`.
+Cuando el detector automatico no encuentra el duplicado, en un resultado externo podes usar `Comparar`: el visor busca la entrada existente y abre la misma mesa de comparacion usada por la Bandeja. Cada diferencia permite conservar A, usar B o combinar listas; archivos locales y disponibilidad se preservan, mientras que conflictos de estado, fecha, puntaje, review o notas exigen una eleccion explicita.
 
 Cada tarjeta tiene `Buscar link`. Ese boton usa automaticamente el titulo/año de esa entrada, busca en Wikipedia, IMDb y FilmAffinity, y deja lista la comparacion contra esa misma entrada.
 
@@ -295,7 +295,9 @@ El panel lateral permite editar el tipo con un selector: `pelicula`, `serie`, `a
 
 Al combinar un resultado externo se guarda el link especifico de la fuente (`wikipedia_url`, `imdb_url` o `filmaffinity_url`) sin perder el link principal que ya tuviera la entrada.
 
-La navegacion principal incluye una `Bandeja` para curar el catalogo sin mezclar ese trabajo con la exploracion. Reune pendientes, posibles duplicados y entradas sin referencia externa; tambien conserva una cola separada de casos pospuestos. Las decisiones `Posponer`, `No son duplicados` y `No requiere referencia` se guardan en JSON o SQLite y sobreviven reinicios. Un caso puede volver a pendientes desde la misma Bandeja.
+La navegacion principal incluye una `Bandeja` para curar el catalogo sin mezclar ese trabajo con la exploracion. Reune pendientes, posibles duplicados y entradas sin referencia externa; tambien conserva una cola separada de casos pospuestos. Las decisiones `Posponer`, `No son duplicados`, `No requiere referencia` y los merges revisados quedan en `Actividad`, desde donde pueden deshacerse.
+
+El historial conserva hasta 50 operaciones y puede funcionar como `Persistente` o `Solo esta sesion`. El modo persistente usa un unico archivo lateral `.<catalogo>.curation-history.json`, separado del esquema portable y de las exportaciones. `Limpiar historial` elimina esos snapshots con confirmacion y no modifica el catalogo. Si una obra fue editada despues de una operacion, Deshacer se bloquea para no sobrescribir el cambio posterior.
 
 La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por ver y cuantas tienen links o portada. Tambien expone el catalogo editable, los archivos cargados y el estado de Wikipedia, IMDb y FilmAffinity. Los accesos de depuracion abren directamente la cola correspondiente de la Bandeja.
 

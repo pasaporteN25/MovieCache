@@ -102,6 +102,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="inboxView"', body)
         self.assertIn(b'id="curationQueue"', body)
         self.assertIn(b'id="curationDetail"', body)
+        self.assertIn(b'id="curationHistoryCount"', body)
+        self.assertIn(b'id="persistCurationHistory"', body)
+        self.assertIn(b'id="mergeComparatorDialog"', body)
+        self.assertIn(b'id="mergeComparatorFields"', body)
         self.assertIn(b'id="collectionView"', body)
         self.assertIn(b'id="adminView"', body)
         self.assertIn(b'id="adminButton"', body)
@@ -122,6 +126,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'.curation-workbench', css)
         self.assertIn(b'.curation-queue-item', css)
         self.assertIn(b'.curation-pair', css)
+        self.assertIn(b'.merge-comparator-dialog', css)
+        self.assertIn(b'.merge-field-options', css)
+        self.assertIn(b'.history-operation-mark', css)
         self.assertIn(b'.admin-section-nav', css)
         self.assertIn(b'.system-menu-panel', css)
         self.assertIn(b'.active-filters', css)
@@ -162,6 +169,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'function loadCurationQueue(', javascript)
         self.assertIn(b'function renderCuration()', javascript)
         self.assertIn(b'function postCurationDecision(', javascript)
+        self.assertIn(b'function openInternalMergeComparator(', javascript)
+        self.assertIn(b'function submitReviewedMerge()', javascript)
+        self.assertIn(b'function undoCurationOperation(', javascript)
+        self.assertIn(b'function changeCurationHistoryMode()', javascript)
         self.assertIn(b'function renderActiveFilters()', javascript)
         self.assertIn(b'function sortItems(list)', javascript)
         self.assertIn(b'const catalogItems = items.filter((item) => isInCatalog(item.en_catalogo))', javascript)
@@ -250,6 +261,88 @@ class ViewerHttpTests(unittest.TestCase):
             headers={"X-Movie-Inbox-Token": self.config.api_token},
         )
         self.assertEqual(json.loads(raw_payload)["counts"]["duplicates"], 0)
+
+    def test_reviewed_duplicate_merge_is_recorded_and_undo_restores_both_items(self) -> None:
+        repository = JsonCatalogRepository(self.catalog_path, normalize_item)
+        repository.write([
+            normalize_item({
+                "id": "heat-a",
+                "title": "Heat",
+                "year": "1995",
+                "status": "watched",
+                "rating": 8,
+                "en_catalogo": True,
+                "local_files": [{"path": "D:/Heat.mkv", "name": "Heat.mkv"}],
+            }),
+            normalize_item({
+                "id": "heat-b",
+                "title": "Heat",
+                "spanish_title": "Fuego contra fuego",
+                "year": "1995",
+                "status": "to_watch",
+                "imdb_url": "https://www.imdb.com/title/tt0113277/",
+                "url": "https://www.imdb.com/title/tt0113277/",
+                "source": "imdb",
+            }),
+        ])
+        reference = lambda item_id: {"id": item_id, "source_file": str(self.catalog_path)}
+        compare_body = json.dumps({
+            "left": reference("heat-a"),
+            "right": reference("heat-b"),
+            "survivor_side": "left",
+        })
+        status, raw_payload = self.request(
+            "POST",
+            "/api/curation/compare",
+            compare_body,
+            self.post_headers(),
+        )
+        self.assertEqual(status, 200, raw_payload)
+        comparison = json.loads(raw_payload)
+        status_field = next(field for field in comparison["fields"] if field["key"] == "status")
+        self.assertTrue(status_field["required"])
+
+        merge_body = json.dumps({
+            "left": reference("heat-a"),
+            "right": reference("heat-b"),
+            "survivor_side": "left",
+            "review_id": comparison["review_id"],
+            "choices": {"status": "left"},
+            "history_mode": "persistent",
+        })
+        status, raw_payload = self.request(
+            "POST",
+            "/api/curation/merge",
+            merge_body,
+            self.post_headers(),
+        )
+        self.assertEqual(status, 200, raw_payload)
+        merged_payload = json.loads(raw_payload)
+        self.assertEqual([item.id for item in repository.read()], ["heat-a"])
+        self.assertEqual(repository.get("heat-a").spanish_title, "Fuego contra fuego")
+
+        status, raw_payload = self.request(
+            "GET",
+            "/api/curation/history?mode=persistent",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(status, 200, raw_payload)
+        history = json.loads(raw_payload)
+        self.assertEqual(history["count"], 1)
+        self.assertTrue(history["operations"][0]["can_undo"])
+
+        undo_body = json.dumps({
+            "operation_id": merged_payload["operation"]["id"],
+            "history_mode": "persistent",
+        })
+        status, raw_payload = self.request(
+            "POST",
+            "/api/curation/undo",
+            undo_body,
+            self.post_headers(),
+        )
+        self.assertEqual(status, 200, raw_payload)
+        self.assertEqual([item.id for item in repository.read()], ["heat-a", "heat-b"])
 
     @patch("movie_inbox.web.catalog_api.external_metadata_by_title")
     def test_background_enrichment_updates_the_existing_item(self, title_lookup) -> None:
