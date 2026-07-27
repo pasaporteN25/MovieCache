@@ -1,0 +1,24 @@
+# Keep repository text deterministic across Windows, Linux, and CI.
+* text=auto eol=lf
+
+# PowerShell runs with LF on Windows and Linux; legacy command scripts use CRLF.
+*.ps1 text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets must never be line-ending normalized.
+*.bundle binary
+*.db binary
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.otf binary
+*.pdf binary
+*.png binary
+*.sqlite binary
+*.ttf binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.zip binary
