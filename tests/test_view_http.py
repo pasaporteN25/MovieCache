@@ -97,6 +97,11 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="saveDetailChanges"', body)
         self.assertIn(b'id="spotlightStage"', body)
         self.assertIn(b'id="homeButton"', body)
+        self.assertIn(b'id="inboxButton"', body)
+        self.assertIn(b'id="inboxBadge"', body)
+        self.assertIn(b'id="inboxView"', body)
+        self.assertIn(b'id="curationQueue"', body)
+        self.assertIn(b'id="curationDetail"', body)
         self.assertIn(b'id="collectionView"', body)
         self.assertIn(b'id="adminView"', body)
         self.assertIn(b'id="adminButton"', body)
@@ -114,6 +119,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'.dvd-case', css)
         self.assertIn(b'.dvd-front-statuses', css)
         self.assertIn(b'.home-grid', css)
+        self.assertIn(b'.curation-workbench', css)
+        self.assertIn(b'.curation-queue-item', css)
+        self.assertIn(b'.curation-pair', css)
         self.assertIn(b'.admin-section-nav', css)
         self.assertIn(b'.system-menu-panel', css)
         self.assertIn(b'.active-filters', css)
@@ -148,7 +156,12 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'function navigateDetail(offset)', javascript)
         self.assertIn(b'function openAnotherRandomDetail()', javascript)
         self.assertIn(b'function showView(view', javascript)
+        self.assertIn(b'function goToCollectionRoot()', javascript)
+        self.assertIn(b'const query = requestedView === "catalog" ? rawQuery : "";', javascript)
         self.assertIn(b'function renderHomeShelf()', javascript)
+        self.assertIn(b'function loadCurationQueue(', javascript)
+        self.assertIn(b'function renderCuration()', javascript)
+        self.assertIn(b'function postCurationDecision(', javascript)
         self.assertIn(b'function renderActiveFilters()', javascript)
         self.assertIn(b'function sortItems(list)', javascript)
         self.assertIn(b'const catalogItems = items.filter((item) => isInCatalog(item.en_catalogo))', javascript)
@@ -176,6 +189,67 @@ class ViewerHttpTests(unittest.TestCase):
         item = JsonCatalogRepository(self.catalog_path, normalize_item).read()[0]
         self.assertEqual(item.status, "watched")
         self.assertEqual(item.watched_at, "2026-07-13")
+
+    def test_link_curation_decision_is_persisted_and_reactivatable(self) -> None:
+        status, raw_payload = self.request(
+            "GET",
+            "/api/curation",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        payload = json.loads(raw_payload)
+        self.assertEqual(status, 200, raw_payload)
+        self.assertEqual(payload["counts"]["missing_link"], 1)
+
+        body = json.dumps({
+            "id": "heat",
+            "source_file": str(self.catalog_path),
+            "status": "deferred",
+        })
+        status, raw_payload = self.request("POST", "/api/curation/link", body, self.post_headers())
+        self.assertEqual(status, 200, raw_payload)
+
+        status, raw_payload = self.request(
+            "GET",
+            "/api/curation",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        payload = json.loads(raw_payload)
+        self.assertEqual(payload["counts"]["missing_link"], 0)
+        self.assertEqual(payload["counts"]["deferred"], 1)
+        item = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
+        self.assertEqual(item.link_curation_status, "deferred")
+
+    def test_duplicate_pair_can_be_dismissed_from_the_queue(self) -> None:
+        repository = JsonCatalogRepository(self.catalog_path, normalize_item)
+        repository.write([
+            normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
+            normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+        ])
+        status, raw_payload = self.request(
+            "GET",
+            "/api/curation",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        payload = json.loads(raw_payload)
+        duplicate = next(case for case in payload["cases"] if case["type"] == "duplicate")
+        self.assertEqual(status, 200, raw_payload)
+        self.assertEqual(payload["counts"]["duplicates"], 1)
+
+        body = json.dumps({
+            "id": duplicate["primary"]["id"],
+            "source_file": duplicate["primary"]["source_file"],
+            "other_reference": duplicate["secondary"]["ref"],
+            "status": "not_duplicate",
+        })
+        status, raw_payload = self.request("POST", "/api/curation/duplicate", body, self.post_headers())
+        self.assertEqual(status, 200, raw_payload)
+
+        status, raw_payload = self.request(
+            "GET",
+            "/api/curation",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(json.loads(raw_payload)["counts"]["duplicates"], 0)
 
     @patch("movie_inbox.web.catalog_api.external_metadata_by_title")
     def test_background_enrichment_updates_the_existing_item(self, title_lookup) -> None:
@@ -243,7 +317,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b"too large", payload)
 
     def test_invalid_catalog_is_reported_instead_of_becoming_empty(self) -> None:
-        self.catalog_path.write_text('{"schema_version": 5, "items": []}', encoding="utf-8")
+        self.catalog_path.write_text('{"schema_version": 6, "items": []}', encoding="utf-8")
         status, payload = self.request(
             "GET",
             "/api/items",

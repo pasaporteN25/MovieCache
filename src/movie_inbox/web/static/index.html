@@ -19,6 +19,9 @@
           <nav class="primary-nav" aria-label="Navegación principal">
             <button id="homeButton" class="nav-action active" type="button" aria-current="page">Inicio</button>
             <button id="catalogButton" class="nav-action" type="button">Colección</button>
+            <button id="inboxButton" class="nav-action inbox-nav-action" type="button">
+              Bandeja <span id="inboxBadge" class="nav-count" hidden>0</span>
+            </button>
             <button id="randomButton" class="nav-action random-nav-action" type="button">Random</button>
             <label class="random-scope-control">
               <input id="randomCatalogOnly" type="checkbox" aria-label="Limitar Random a entradas en catálogo" checked>
@@ -60,6 +63,49 @@
           </div>
           <div class="grid home-grid" id="homeGrid"></div>
           <p class="empty home-empty" id="homeEmpty" hidden>Tu selección aparecerá cuando haya obras disponibles en catálogo.</p>
+        </section>
+      </section>
+
+      <section id="inboxView" class="app-view curation-view" hidden>
+        <header class="curation-heading">
+          <div>
+            <span class="eyebrow">Mesa de ingresos</span>
+            <h2>Bandeja de curaduría</h2>
+            <p>Decisiones pendientes sobre referencias externas y posibles obras repetidas.</p>
+          </div>
+          <button id="refreshCuration" class="quiet-action" type="button">Actualizar bandeja</button>
+        </header>
+
+        <nav class="curation-tabs" aria-label="Filtrar casos de curaduría">
+          <button class="curation-tab active" type="button" data-curation-filter="pending" aria-pressed="true">
+            Pendientes <span id="curationPendingCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="duplicate" aria-pressed="false">
+            Duplicados <span id="curationDuplicateCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="missing_link" aria-pressed="false">
+            Sin link <span id="curationMissingCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="deferred" aria-pressed="false">
+            Pospuestas <span id="curationDeferredCount">0</span>
+          </button>
+        </nav>
+
+        <div id="curationFeedback" class="curation-feedback" aria-live="polite"></div>
+        <section class="curation-workbench" aria-label="Casos de curaduría">
+          <div class="curation-queue-panel">
+            <div class="curation-panel-heading">
+              <strong id="curationQueueTitle">Decisiones pendientes</strong>
+              <span id="curationQueueMeta">0 casos</span>
+            </div>
+            <div id="curationQueue" class="curation-queue" aria-label="Casos disponibles"></div>
+          </div>
+          <div id="curationDetail" class="curation-detail" aria-live="polite">
+            <div class="curation-empty">
+              <strong>Seleccioná un caso</strong>
+              <p>La evidencia y las acciones disponibles aparecerán en esta mesa.</p>
+            </div>
+          </div>
         </section>
       </section>
 
@@ -213,10 +259,10 @@
             </div>
           </div>
           <div class="tool-grid admin-tool-grid">
-            <button id="showDuplicates" type="button">Ver duplicadas en Colección</button>
-            <button id="startWikiReview" type="button">Revisar entradas sin link</button>
-            <button id="previousWikiReview" class="quiet-action" type="button">Anterior</button>
-            <button id="nextWikiReview" class="quiet-action" type="button">Siguiente</button>
+            <button id="showDuplicates" type="button">Abrir duplicados en Bandeja</button>
+            <button id="startWikiReview" type="button">Abrir entradas sin link</button>
+            <button id="previousWikiReview" class="quiet-action" type="button" hidden>Anterior</button>
+            <button id="nextWikiReview" class="quiet-action" type="button" hidden>Siguiente</button>
           </div>
           <div class="status-line" id="wikiReviewStatus"></div>
         </section>

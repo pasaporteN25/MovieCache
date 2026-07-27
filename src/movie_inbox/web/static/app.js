@@ -20,6 +20,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let detailFeedbackState = { message: "", tone: "" };
       let detailFeedbackTimer = null;
       let pendingDetailTransition = null;
+      let curationCases = [];
+      let curationCounts = { pending: 0, duplicates: 0, missing_link: 0, deferred: 0 };
+      let curationFilter = "pending";
+      let selectedCurationCaseId = "";
+      let curationLoading = false;
       let activeQuery = "";
       let writeJsonPath = "";
       let currentView = "home";
@@ -56,17 +61,30 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         searchButton: document.querySelector("#searchButton"),
         homeButton: document.querySelector("#homeButton"),
         catalogButton: document.querySelector("#catalogButton"),
+        inboxButton: document.querySelector("#inboxButton"),
+        inboxBadge: document.querySelector("#inboxBadge"),
         adminButton: document.querySelector("#adminButton"),
         systemMenu: document.querySelector("#systemMenu"),
         randomButton: document.querySelector("#randomButton"),
         randomCatalogOnly: document.querySelector("#randomCatalogOnly"),
         randomScopeLabel: document.querySelector("#randomScopeLabel"),
         homeView: document.querySelector("#homeView"),
+        inboxView: document.querySelector("#inboxView"),
         collectionView: document.querySelector("#collectionView"),
         adminView: document.querySelector("#adminView"),
         homeCollectionButton: document.querySelector("#homeCollectionButton"),
         homeGrid: document.querySelector("#homeGrid"),
         homeEmpty: document.querySelector("#homeEmpty"),
+        refreshCuration: document.querySelector("#refreshCuration"),
+        curationPendingCount: document.querySelector("#curationPendingCount"),
+        curationDuplicateCount: document.querySelector("#curationDuplicateCount"),
+        curationMissingCount: document.querySelector("#curationMissingCount"),
+        curationDeferredCount: document.querySelector("#curationDeferredCount"),
+        curationFeedback: document.querySelector("#curationFeedback"),
+        curationQueueTitle: document.querySelector("#curationQueueTitle"),
+        curationQueueMeta: document.querySelector("#curationQueueMeta"),
+        curationQueue: document.querySelector("#curationQueue"),
+        curationDetail: document.querySelector("#curationDetail"),
         catalogSection: document.querySelector("#catalogSection"),
         spotlight: document.querySelector("#spotlight"),
         spotlightStage: document.querySelector("#spotlightStage"),
@@ -133,9 +151,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       document.querySelector("#refresh").addEventListener("click", load);
       fields.searchButton.addEventListener("click", () => runSearch());
       fields.homeButton.addEventListener("click", goHome);
-      fields.catalogButton.addEventListener("click", goToCollection);
+      fields.catalogButton.addEventListener("click", goToCollectionRoot);
+      fields.inboxButton.addEventListener("click", () => goToInbox());
       fields.adminButton.addEventListener("click", goToAdmin);
-      fields.homeCollectionButton.addEventListener("click", goToCollection);
+      fields.homeCollectionButton.addEventListener("click", goToCollectionRoot);
+      fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
+      fields.inboxView.addEventListener("click", handleCurationClick);
       fields.randomButton.addEventListener("click", openRandomDetail);
       fields.randomCatalogOnly.addEventListener("change", syncRandomControl);
       fields.spotlightToggle.addEventListener("click", toggleSpotlight);
@@ -143,18 +164,17 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.reviewPrevious.addEventListener("click", previousWikiReview);
       fields.reviewNext.addEventListener("click", nextWikiReview);
       fields.backToCollection.addEventListener("click", () => {
-        clearManualSearch({ focus: false });
-        goToCollection();
+        goToCollectionRoot();
       });
       fields.externalSource.addEventListener("change", renderDatabaseMenu);
       fields.clearFilters.addEventListener("click", clearFilters);
       fields.clearManualSearch.addEventListener("click", () => clearManualSearch());
-      fields.startWikiReview.addEventListener("click", startWikiReview);
+      fields.startWikiReview.addEventListener("click", () => goToInbox("missing_link"));
       fields.previousWikiReview.addEventListener("click", previousWikiReview);
       fields.nextWikiReview.addEventListener("click", nextWikiReview);
       fields.randomizeView.addEventListener("click", randomizeView);
       fields.resetOrder.addEventListener("click", resetViewOrder);
-      fields.showDuplicates.addEventListener("click", toggleDuplicatesOnly);
+      fields.showDuplicates.addEventListener("click", () => goToInbox("duplicate"));
       fields.closeDetail.addEventListener("click", closeDetail);
       fields.detailDrawer.addEventListener("cancel", (event) => {
         event.preventDefault();
@@ -253,6 +273,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         sourceFiles = payload.sources || [];
         writeJsonPath = payload.write_json || "";
         externalHealth = payload.external || externalHealth;
+        curationCounts = {
+          ...curationCounts,
+          ...(payload.curation?.counts || {})
+        };
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         setupSelect(fields.status, "Estado", items.map((item) => item.status));
@@ -263,6 +287,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         renderSpotlight();
         startSpotlight();
         renderDatabaseMenu();
+        syncCurationCounts();
+        if (currentView === "inbox") await loadCurationQueue();
         if (!routeRestored) {
           routeRestored = true;
           restoreRoute();
@@ -271,15 +297,28 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function goHome() {
         closeDetail({ restoreFocus: false, updateHistory: false });
+        clearManualSearch({ focus: false, updateHistory: false });
         seedSpotlight();
         renderSpotlight();
         render();
         showView("home", { updateHistory: false });
-        syncRoute({ view: "home", movie: "" }, "push");
+        syncRoute({ view: "home", movie: "", q: "" }, "push");
       }
 
       function goToCollection(options = {}) {
         showView("catalog", options);
+      }
+
+      function goToCollectionRoot() {
+        clearManualSearch({ focus: false, updateHistory: false });
+        showView("catalog", { updateHistory: false });
+        syncRoute({ view: "catalog", movie: "", q: "" }, "push");
+      }
+
+      async function goToInbox(filter = "") {
+        if (filter) curationFilter = filter;
+        showView("inbox");
+        await loadCurationQueue();
       }
 
       function goToAdmin(options = {}) {
@@ -287,9 +326,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function showView(view, { updateHistory = true, scroll = true } = {}) {
-        currentView = ["home", "catalog", "admin"].includes(view) ? view : "home";
+        currentView = ["home", "catalog", "inbox", "admin"].includes(view) ? view : "home";
         fields.homeView.hidden = currentView !== "home";
         fields.collectionView.hidden = currentView !== "catalog";
+        fields.inboxView.hidden = currentView !== "inbox";
         fields.adminView.hidden = currentView !== "admin";
         spotlightViewPaused = currentView !== "home";
         if (spotlightViewPaused) stopSpotlight();
@@ -304,6 +344,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const buttons = {
           home: fields.homeButton,
           catalog: fields.catalogButton,
+          inbox: fields.inboxButton,
           admin: fields.adminButton
         };
         for (const [name, button] of Object.entries(buttons)) {
@@ -313,6 +354,314 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           else button.removeAttribute("aria-current");
         }
         fields.systemMenu.classList.toggle("active", view === "admin");
+      }
+
+      async function loadCurationQueue({ announce = false } = {}) {
+        if (curationLoading) return;
+        curationLoading = true;
+        fields.refreshCuration.disabled = true;
+        if (announce) setCurationFeedback("Actualizando bandeja…", "working");
+        try {
+          const response = await apiFetch("/api/curation");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          curationCases = payload.cases || [];
+          curationCounts = {
+            pending: 0,
+            duplicates: 0,
+            missing_link: 0,
+            deferred: 0,
+            ...(payload.counts || {})
+          };
+          const visible = visibleCurationCases();
+          if (!visible.some((entry) => entry.id === selectedCurationCaseId)) {
+            selectedCurationCaseId = visible[0]?.id || "";
+          }
+          syncCurationCounts();
+          renderCuration();
+          if (announce) setCurationFeedback("Bandeja actualizada", "success");
+        } catch (error) {
+          console.error("[catalog-viewer] curation load failed", error);
+          setCurationFeedback("No se pudo cargar la bandeja. Reintentá desde Actualizar bandeja.", "error");
+          fields.curationQueue.innerHTML = "";
+          fields.curationDetail.innerHTML = curationEmptyState("Bandeja no disponible", "La colección permanece intacta.");
+        } finally {
+          curationLoading = false;
+          fields.refreshCuration.disabled = false;
+        }
+      }
+
+      function syncCurationCounts() {
+        fields.curationPendingCount.textContent = curationCounts.pending || 0;
+        fields.curationDuplicateCount.textContent = curationCounts.duplicates || 0;
+        fields.curationMissingCount.textContent = curationCounts.missing_link || 0;
+        fields.curationDeferredCount.textContent = curationCounts.deferred || 0;
+        fields.inboxBadge.textContent = curationCounts.pending || 0;
+        fields.inboxBadge.hidden = !(curationCounts.pending > 0);
+        fields.inboxButton.setAttribute(
+          "aria-label",
+          curationCounts.pending
+            ? `Bandeja, ${curationCounts.pending} ${
+                curationCounts.pending === 1 ? "decisión pendiente" : "decisiones pendientes"
+              }`
+            : "Bandeja, sin decisiones pendientes"
+        );
+      }
+
+      function handleCurationClick(event) {
+        const filter = event.target.closest("[data-curation-filter]");
+        if (filter) {
+          curationFilter = filter.dataset.curationFilter || "pending";
+          selectedCurationCaseId = "";
+          renderCuration();
+          return;
+        }
+        const queueItem = event.target.closest("[data-curation-case]");
+        if (queueItem) {
+          selectedCurationCaseId = queueItem.dataset.curationCase || "";
+          renderCuration();
+          return;
+        }
+        const action = event.target.closest("[data-curation-action]");
+        if (!action) return;
+        const selected = curationCases.find((entry) => entry.id === selectedCurationCaseId);
+        if (!selected) return;
+        const actionName = action.dataset.curationAction;
+        if (actionName === "open-primary") {
+          openCurationItem(selected.primary);
+          return;
+        }
+        if (actionName === "open-secondary" && selected.secondary) {
+          openCurationItem(selected.secondary);
+          return;
+        }
+        if (actionName === "find-link") {
+          findLinkFromCuration(selected.primary);
+          return;
+        }
+        if (actionName === "link-deferred") updateLinkCuration(selected, "deferred");
+        if (actionName === "link-not-required") updateLinkCuration(selected, "not_required");
+        if (actionName === "link-pending") updateLinkCuration(selected, "pending");
+        if (actionName === "duplicate-deferred") updateDuplicateCuration(selected, "deferred");
+        if (actionName === "duplicate-not-duplicate") updateDuplicateCuration(selected, "not_duplicate");
+        if (actionName === "duplicate-pending") updateDuplicateCuration(selected, "pending");
+      }
+
+      function visibleCurationCases() {
+        if (curationFilter === "deferred") {
+          return curationCases.filter((entry) => entry.status === "deferred");
+        }
+        const pending = curationCases.filter((entry) => entry.status === "pending");
+        if (curationFilter === "duplicate") return pending.filter((entry) => entry.type === "duplicate");
+        if (curationFilter === "missing_link") return pending.filter((entry) => entry.type === "missing_link");
+        return pending;
+      }
+
+      function renderCuration() {
+        const visible = visibleCurationCases();
+        if (!visible.some((entry) => entry.id === selectedCurationCaseId)) {
+          selectedCurationCaseId = visible[0]?.id || "";
+        }
+        fields.inboxView.querySelectorAll("[data-curation-filter]").forEach((button) => {
+          const active = button.dataset.curationFilter === curationFilter;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        const labels = {
+          pending: "Decisiones pendientes",
+          duplicate: "Posibles duplicados",
+          missing_link: "Entradas sin link",
+          deferred: "Decisiones pospuestas"
+        };
+        fields.curationQueueTitle.textContent = labels[curationFilter] || labels.pending;
+        fields.curationQueueMeta.textContent = `${visible.length} ${visible.length === 1 ? "caso" : "casos"}`;
+        fields.curationQueue.innerHTML = visible.length
+          ? visible.map(curationQueueItem).join("")
+          : curationEmptyState(
+              curationFilter === "deferred" ? "No hay decisiones pospuestas" : "No quedan casos en esta cola",
+              curationFilter === "pending" ? "La bandeja está al día." : "Probá otro filtro."
+            );
+        const selected = visible.find((entry) => entry.id === selectedCurationCaseId);
+        fields.curationDetail.innerHTML = selected
+          ? curationCaseDetail(selected)
+          : curationEmptyState("Sin caso seleccionado", "La evidencia aparecerá cuando haya una decisión disponible.");
+      }
+
+      function curationQueueItem(entry) {
+        const item = entry.primary;
+        const selected = entry.id === selectedCurationCaseId;
+        const type = entry.type === "duplicate" ? "Duplicado" : "Sin link";
+        return `<button class="curation-queue-item ${selected ? "selected" : ""}" type="button"
+          data-curation-case="${escapeAttr(entry.id)}" aria-pressed="${selected}">
+          ${curationThumb(item)}
+          <span class="curation-queue-copy">
+            <span class="curation-queue-type">${escapeHtml(type)}${entry.status === "deferred" ? " · Pospuesta" : ""}</span>
+            <strong>${escapeHtml(item.title || "Sin título")}</strong>
+            <small>${escapeHtml([item.year, item.kind].filter(Boolean).join(" · ") || "Sin año")}</small>
+          </span>
+          <span class="curation-queue-arrow" aria-hidden="true">→</span>
+        </button>`;
+      }
+
+      function curationCaseDetail(entry) {
+        return entry.type === "duplicate"
+          ? duplicateCurationDetail(entry)
+          : missingLinkCurationDetail(entry);
+      }
+
+      function duplicateCurationDetail(entry) {
+        const deferred = entry.status === "deferred";
+        return `
+          <header class="curation-case-heading">
+            <div>
+              <span class="curation-case-kicker">${deferred ? "Decisión pospuesta" : "Revisión necesaria"}</span>
+              <h3>¿Son la misma obra?</h3>
+            </div>
+            <span class="pill warning">Posible duplicado</span>
+          </header>
+          ${curationEvidence(entry.evidence)}
+          <div class="curation-pair">
+            ${curationRecord(entry.primary, "Entrada A", "open-primary")}
+            <div class="curation-pair-mark" aria-hidden="true">↔</div>
+            ${curationRecord(entry.secondary, "Entrada B", "open-secondary")}
+          </div>
+          <footer class="curation-actions">
+            ${deferred
+              ? `<button class="action-primary" type="button" data-curation-action="duplicate-pending">Volver a pendientes</button>`
+              : `<button class="action-primary" type="button" data-curation-action="duplicate-not-duplicate">No son duplicados</button>
+                 <button class="quiet-action" type="button" data-curation-action="duplicate-deferred">Posponer</button>`}
+          </footer>
+        `;
+      }
+
+      function missingLinkCurationDetail(entry) {
+        const deferred = entry.status === "deferred";
+        return `
+          <header class="curation-case-heading">
+            <div>
+              <span class="curation-case-kicker">${deferred ? "Decisión pospuesta" : "Referencia pendiente"}</span>
+              <h3>${escapeHtml(entry.primary.title || "Sin título")}</h3>
+            </div>
+            <span class="pill muted">Sin link</span>
+          </header>
+          ${curationEvidence(entry.evidence)}
+          <div class="curation-single-record">${curationRecord(entry.primary, "Entrada actual", "open-primary")}</div>
+          <footer class="curation-actions">
+            ${deferred
+              ? `<button class="action-primary" type="button" data-curation-action="link-pending">Volver a pendientes</button>`
+              : `<button class="action-primary" type="button" data-curation-action="find-link">Buscar referencia</button>
+                 <button class="quiet-action" type="button" data-curation-action="link-not-required">No requiere referencia</button>
+                 <button class="quiet-action" type="button" data-curation-action="link-deferred">Posponer</button>`}
+          </footer>
+        `;
+      }
+
+      function curationRecord(item, label, action) {
+        if (!item) return "";
+        return `<article class="curation-record">
+          <span class="curation-record-label">${escapeHtml(label)}</span>
+          <div class="curation-record-main">
+            ${curationThumb(item, true)}
+            <div>
+              <h4>${escapeHtml(item.title || "Sin título")}</h4>
+              <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(item.source)}</div>
+              <div class="card-badges">
+                <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "en catálogo" : "fuera de catálogo"}</span>
+                <span class="pill ${item.status === "watched" ? "good" : "muted"}">${item.status === "watched" ? "vista" : "pendiente"}</span>
+              </div>
+            </div>
+          </div>
+          <button class="text-action curation-open-record" type="button" data-curation-action="${action}">Abrir ficha</button>
+        </article>`;
+      }
+
+      function curationThumb(item, large = false) {
+        const className = large ? "curation-thumb large" : "curation-thumb";
+        const title = item?.title || "Sin imagen";
+        const fallback = `<span class="${className} curation-thumb-placeholder">${escapeHtml(title.slice(0, 18))}</span>`;
+        if (!item?.page_image) return fallback;
+        return `<span class="curation-thumb-frame ${large ? "large" : ""}">
+          <img class="${className}" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="" loading="lazy" decoding="async">
+          ${fallback.replace('class="', 'hidden class="')}
+        </span>`;
+      }
+
+      function curationEvidence(evidence) {
+        return `<div class="curation-evidence">
+          <strong>Evidencia</strong>
+          <ul>${asList(evidence).map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>
+        </div>`;
+      }
+
+      function curationEmptyState(title, copy) {
+        return `<div class="curation-empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(copy)}</p></div>`;
+      }
+
+      function openCurationItem(summary) {
+        if (!summary?.id) return;
+        const contextIds = [...new Set(
+          visibleCurationCases()
+            .flatMap((entry) => [entry.primary?.id, entry.secondary?.id])
+            .filter(Boolean)
+        )];
+        openDetail(summary.id, {
+          context: { mode: "curation", label: "Bandeja", ids: contextIds }
+        });
+      }
+
+      async function findLinkFromCuration(summary) {
+        const item = items.find((entry) => (
+          entry.id === summary.id
+          && (!summary.source_file || entry._source_file === summary.source_file)
+        ));
+        if (!item) {
+          setCurationFeedback("La entrada ya no está disponible en el catálogo.", "error");
+          return;
+        }
+        await findLinkForItem(item);
+      }
+
+      async function updateLinkCuration(entry, status) {
+        await postCurationDecision("/api/curation/link", {
+          id: entry.primary.id,
+          source_file: entry.primary.source_file,
+          status
+        });
+      }
+
+      async function updateDuplicateCuration(entry, status) {
+        await postCurationDecision("/api/curation/duplicate", {
+          id: entry.primary.id,
+          source_file: entry.primary.source_file,
+          other_reference: entry.secondary.ref,
+          status
+        });
+      }
+
+      async function postCurationDecision(path, body) {
+        fields.curationDetail.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+        setCurationFeedback("Guardando decisión…", "working");
+        try {
+          const response = await apiFetch(path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          selectedCurationCaseId = "";
+          await loadCatalog();
+          setCurationFeedback("Decisión guardada", "success");
+        } catch (error) {
+          console.error("[catalog-viewer] curation update failed", error);
+          setCurationFeedback("No se pudo guardar la decisión. Reintentá sin salir de la Bandeja.", "error");
+          renderCuration();
+        }
+      }
+
+      function setCurationFeedback(message, tone = "") {
+        fields.curationFeedback.textContent = message;
+        fields.curationFeedback.dataset.tone = tone;
       }
 
       function openRandomDetail() {
@@ -393,11 +742,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function restoreRoute() {
         if (!items.length) return;
         const params = new URLSearchParams(window.location.search);
-        const query = params.get("q") || "";
+        const rawQuery = params.get("q") || "";
         const movieId = params.get("movie") || "";
-        const requestedView = ["home", "catalog", "admin"].includes(params.get("view"))
+        const requestedView = ["home", "catalog", "inbox", "admin"].includes(params.get("view"))
           ? params.get("view")
-          : query ? "catalog" : "home";
+          : rawQuery ? "catalog" : "home";
+        const query = requestedView === "catalog" ? rawQuery : "";
         if (query.length >= 2 && query !== activeQuery) {
           fields.query.value = query;
           runSearch({ updateHistory: false });
@@ -410,6 +760,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           closeDetail({ restoreFocus: false, updateHistory: false });
         }
         showView(requestedView, { updateHistory: false, scroll: false });
+        if (requestedView === "inbox") loadCurationQueue();
       }
 
       function seedSpotlight() {
@@ -906,7 +1257,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (!image) return;
         image.hidden = true;
         const fallback = image.nextElementSibling;
-        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder")) fallback.hidden = false;
+        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder")) {
+          fallback.hidden = false;
+        }
       }
 
       function personalRecordPanel(item) {
@@ -1496,6 +1849,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function clearManualSearch({ focus = true, updateHistory = true } = {}) {
+        const hadSearch = Boolean(activeQuery || fields.query.value.trim());
         if (externalSearchController) externalSearchController.abort();
         externalSearchController = null;
         externalSearchTimedOut = false;
@@ -1523,7 +1877,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.reviewPrevious.hidden = true;
         fields.reviewNext.hidden = true;
         setSearchState("idle");
-        if (updateHistory) syncRoute({ q: "" }, "replace");
+        if (updateHistory && hadSearch) syncRoute({ q: "", view: "catalog", movie: "" }, "push");
         render();
         renderDatabaseMenu();
         if (focus) fields.query.focus();

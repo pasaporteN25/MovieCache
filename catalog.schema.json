@@ -6,7 +6,7 @@
   "required": ["schema_version", "items"],
   "properties": {
     "schema_version": {
-      "const": 4
+      "const": 5
     },
     "items": {
       "type": "array",
@@ -52,7 +52,7 @@
       "type": "object",
       "required": [
         "id", "title", "kind", "status", "en_catalogo", "local_files",
-        "metadata_sources", "locked_fields"
+        "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions"
       ],
       "properties": {
         "id": {"type": "string"},
@@ -113,6 +113,22 @@
           },
           "uniqueItems": true
         },
+        "link_curation_status": {
+          "enum": ["pending", "deferred", "not_required", "resolved"]
+        },
+        "duplicate_decisions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["status", "updated_at"],
+            "properties": {
+              "status": {"enum": ["deferred", "not_duplicate"]},
+              "updated_at": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "curation_updated_at": {"type": "string"},
         "added_at": {"type": "string"}
       },
       "additionalProperties": true

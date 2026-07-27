@@ -39,7 +39,7 @@ Eso habilita un unico comando con subcomandos:
 movie-inbox import links.txt --json catalog.json --fetch
 movie-inbox scan --config scanner.json --dry-run
 movie-inbox serve catalog.json
-movie-inbox migrate catalog-viejo.json --json catalog-v4.json
+movie-inbox migrate catalog-viejo.json --json catalog-v5.json
 movie-inbox enrich catalog.json --json catalog-enriquecido.json
 movie-inbox match catalog.json --json catalog-con-links.json
 movie-inbox db import catalog.json --db data/movie-inbox.db
@@ -295,7 +295,9 @@ El panel lateral permite editar el tipo con un selector: `pelicula`, `serie`, `a
 
 Al combinar un resultado externo se guarda el link especifico de la fuente (`wikipedia_url`, `imdb_url` o `filmaffinity_url`) sin perder el link principal que ya tuviera la entrada.
 
-La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por ver, cuantas tienen links o portada y cuantas necesitan revision. Tambien expone el catalogo editable, los archivos cargados y el estado de Wikipedia, IMDb y FilmAffinity. Sus herramientas permiten recorrer sistematicamente entradas sin link y revisar duplicados.
+La navegacion principal incluye una `Bandeja` para curar el catalogo sin mezclar ese trabajo con la exploracion. Reune pendientes, posibles duplicados y entradas sin referencia externa; tambien conserva una cola separada de casos pospuestos. Las decisiones `Posponer`, `No son duplicados` y `No requiere referencia` se guardan en JSON o SQLite y sobreviven reinicios. Un caso puede volver a pendientes desde la misma Bandeja.
+
+La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por ver y cuantas tienen links o portada. Tambien expone el catalogo editable, los archivos cargados y el estado de Wikipedia, IMDb y FilmAffinity. Los accesos de depuracion abren directamente la cola correspondiente de la Bandeja.
 
 `Random` abre una ficha al azar sin modificar el JSON. Su casilla permite limitar la eleccion a obras disponibles en catalogo. Dentro de `Coleccion`, `Mezclar vista` cambia solamente el orden visual de los resultados actuales y `Restablecer orden` recupera el orden elegido.
 
@@ -321,12 +323,12 @@ Un titulo exacto sin ano, con ano distinto o con tipo incompatible nunca se comb
 
 ## Esquema versionado y migracion
 
-Las escrituras nuevas usan `schema_version: 4` y guardan las entradas dentro de `items`. Los catalogos legacy y las versiones 1 a 3 pasan por migraciones explicitas antes de usarse. Una version futura, una raiz mal formada o una fila invalida se rechazan y nunca se interpretan como catalogo vacio ni se reescriben silenciosamente. Cada obra puede tener varios archivos fisicos en `local_files`; `local_name` y `local_path` se mantienen por compatibilidad. La version 3 sumo procedencia y bloqueos de metadata. La version 4 agrega a cada archivo `library_id`, `relative_path`, `fingerprint`, `last_seen_at` y `available` para soportar sincronizacion incremental sin eliminar campos anteriores.
+Las escrituras nuevas usan `schema_version: 5` y guardan las entradas dentro de `items`. Los catalogos legacy y las versiones 1 a 4 pasan por migraciones explicitas antes de usarse. Una version futura, una raiz mal formada o una fila invalida se rechazan y nunca se interpretan como catalogo vacio ni se reescriben silenciosamente. Cada obra puede tener varios archivos fisicos en `local_files`; `local_name` y `local_path` se mantienen por compatibilidad. La version 3 sumo procedencia y bloqueos de metadata. La version 4 agrego a cada archivo `library_id`, `relative_path`, `fingerprint`, `last_seen_at` y `available` para soportar sincronizacion incremental. La version 5 agrega `link_curation_status`, `duplicate_decisions` y `curation_updated_at` para que las decisiones de la Bandeja sean persistentes.
 
 Para convertir un catalogo completo sin reemplazar el original:
 
 ```powershell
-py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalogv4.json
+py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalogv5.json
 ```
 
 Las escrituras del visor y del importador son atomicas: primero se completa un archivo temporal y luego se reemplaza el JSON. El visor bloquea cada catalogo durante operaciones de escritura concurrentes y conserva un unico backup automatico reemplazable.

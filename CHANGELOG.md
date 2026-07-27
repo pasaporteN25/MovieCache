@@ -26,7 +26,7 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Proteccion ante discos desconectados y escaneos parciales antes de marcar archivos no disponibles.
 - Esquema v4 con identidad de biblioteca, ruta relativa, huella, ultimo avistamiento y disponibilidad por archivo.
 - Modelos canonicos para catalogo, archivos locales y procedencia de metadata.
-- Migraciones explicitas desde formatos legacy y esquemas v1, v2 y v3.
+- Migraciones explicitas desde formatos legacy y esquemas v1, v2, v3 y v4.
 - Token por sesion, validacion de origen/host y respuestas HTTP con estados reales en el visor.
 - Limite de cuerpo aplicado durante la lectura del stream y documentacion OpenAPI deshabilitada.
 - El token del cache de imagenes sale de la URL y pasa a una cookie `HttpOnly` con `SameSite=Strict`.
@@ -44,6 +44,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Cards de proporcion estable 2:3 con titulo, ano, disponibilidad, estado personal y puntuacion visible cuando existe.
 - Ficha tipo dossier con registro personal en modo lectura, edicion explicita y acciones inmediatas para estado y disponibilidad.
 - Navegacion contextual entre fichas, variante `Otro al azar` y confirmacion para guardar o descartar borradores antes de salir.
+- Bandeja principal con contador de pendientes y colas dedicadas para posibles duplicados, entradas sin link y casos pospuestos.
+- Decisiones de curaduria persistentes para `Posponer`, `No son duplicados` y `No requiere referencia`, con opcion de devolver un caso a pendientes.
+- Esquema JSON v5 y esquema SQLite v3 para guardar el estado de referencias y las decisiones sobre pares duplicados.
 
 ### Corregido
 
@@ -54,12 +57,13 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Los valores de texto `false` en metadata y archivos locales ya no se interpretan como verdaderos.
 - Los dominios externos se validan por hostname exacto o subdominio, sin aceptar nombres como `imdb.com.example.org`.
 - Los titulos iguales sin ano ya no se combinan automaticamente.
-- Los catalogos futuros o mal formados ya no se leen como listas vacias ni se reescriben como v4.
+- Los catalogos futuros o mal formados ya no se leen como listas vacias ni se reescriben como v5.
 - SQLite sincroniza solamente items y relaciones modificadas; los cambios de estado usan un `UPDATE` directo.
 - Importacion y exportacion comparan documentos canonicos completos para detectar perdida de reviews, metadata, aliases o archivos.
 - La normalizacion legacy ya no duplica un archivo local que tambien tiene `library_id` y `relative_path`.
 - Los comandos batch ya no importan la interfaz web ni el importador monolitico.
 - Los titulos largos y los estados de las cards se adaptan sin cambiar el alto de la grilla ni depender de hover en dispositivos tactiles.
+- `Ver coleccion` y la navegacion principal abren la estanteria sin una busqueda anterior; Atrás y Adelante restauran cada consulta desde la URL.
 
 ## [0.1.0] - 2026-07-13
 
