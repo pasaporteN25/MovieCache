@@ -11,11 +11,19 @@ from fastapi import BackgroundTasks, Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from movie_inbox.application.curation_history import CurationHistoryError
+from movie_inbox.application.curation_workflow import (
+    CatalogPointer,
+    CurationConflict,
+    CurationItemNotFound,
+    CurationWorkflowError,
+)
 from movie_inbox.application.repository import (
     CatalogBusyError,
     CatalogFormatError,
     CatalogRepositoryError,
 )
+from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION
 from movie_inbox.web.assets import render_html, static_asset
@@ -23,6 +31,7 @@ from movie_inbox.web.catalog_api import (
     append_item,
     background_enrich_catalog_item,
     build_curation_payload,
+    curation_workflow,
     curation_counts,
     delete_item_anywhere,
     enrich_selected_result,
@@ -33,9 +42,7 @@ from movie_inbox.web.catalog_api import (
     resolved_files,
     search_sources,
     update_item_catalog_status,
-    update_duplicate_curation,
     update_item_kind,
-    update_link_curation,
     update_item_metadata,
     update_item_personal,
     update_item_status,
@@ -53,6 +60,7 @@ from movie_inbox.web.security import (
 
 MAX_JSON_BODY_BYTES = 2 * 1024 * 1024
 SESSION_COOKIE = "movie_inbox_session"
+HISTORY_SESSION_COOKIE = "movie_inbox_history_session"
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; img-src 'self' data: https:; style-src 'self'; "
@@ -80,6 +88,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         openapi_url=None,
     )
     app.state.viewer_config = config
+    workflow = curation_workflow(config)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
 
     @app.middleware("http")
@@ -109,16 +118,57 @@ def create_app(config: ViewerConfig) -> FastAPI:
         require_origin(request)
         return await read_json_object(request)
 
+    def history_session_id(request: Request) -> str:
+        return str(
+            request.cookies.get(HISTORY_SESSION_COOKIE)
+            or request.headers.get("X-Movie-Inbox-Token")
+            or "anonymous"
+        )
+
+    def catalog_pointer(payload: Any) -> CatalogPointer:
+        if not isinstance(payload, dict):
+            raise ValueError("Missing catalog reference")
+        return CatalogPointer(
+            write_path_for(config, str(payload.get("source_file") or "")),
+            str(payload.get("id") or ""),
+        )
+
+    def comparison_inputs(
+        body: dict[str, Any],
+    ) -> tuple[CatalogPointer, CatalogPointer | None, dict[str, Any] | None]:
+        left = catalog_pointer(body.get("left"))
+        right_payload = body.get("right")
+        incoming_payload = body.get("incoming") or body.get("result")
+        right = catalog_pointer(right_payload) if isinstance(right_payload, dict) else None
+        incoming = None
+        if isinstance(incoming_payload, dict):
+            candidate = (
+                incoming_payload
+                if body.get("incoming_reviewed")
+                else enrich_selected_result(incoming_payload)
+            )
+            incoming = item_from_search_result(candidate)
+        return left, right, incoming
+
     @app.get("/healthz")
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.get("/", response_class=HTMLResponse)
-    def index() -> HTMLResponse:
+    def index(request: Request) -> HTMLResponse:
         response = HTMLResponse(render_html(config.title, config.api_token))
         response.set_cookie(
             SESSION_COOKIE,
             config.api_token,
+            httponly=True,
+            secure=config.public_origin.casefold().startswith("https://"),
+            samesite="strict",
+            path="/",
+        )
+        history_session_id = str(request.cookies.get(HISTORY_SESSION_COOKIE) or secrets.token_urlsafe(24))
+        response.set_cookie(
+            HISTORY_SESSION_COOKIE,
+            history_session_id,
             httponly=True,
             secure=config.public_origin.casefold().startswith("https://"),
             samesite="strict",
@@ -166,6 +216,98 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return JSONResponse(build_curation_payload(rows))
         except CatalogRepositoryError as error:
             return repository_error_response(error)
+
+    @app.get("/api/curation/history", dependencies=[Depends(require_token)])
+    def curation_history(request: Request, mode: str = "persistent") -> JSONResponse:
+        try:
+            return JSONResponse(workflow.history(mode, history_session_id(request)))
+        except (ValueError, CurationHistoryError) as error:
+            return curation_application_error_response(error)
+
+    @app.post("/api/curation/compare")
+    def compare_curation(
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        try:
+            left, right, incoming = comparison_inputs(body)
+            review = workflow.compare(
+                left,
+                right=right,
+                incoming=incoming,
+                survivor_side=str(body.get("survivor_side") or "left"),
+            )
+            if incoming is not None:
+                review["incoming"] = incoming
+            return JSONResponse(review)
+        except (
+            ValueError,
+            MergeReviewError,
+            CurationWorkflowError,
+            CatalogRepositoryError,
+        ) as error:
+            return curation_application_error_response(error)
+
+    @app.post("/api/curation/merge")
+    def merge_curation(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        try:
+            left, right, incoming = comparison_inputs(body)
+            result = workflow.merge(
+                left,
+                right=right,
+                incoming=incoming,
+                survivor_side=str(body.get("survivor_side") or "left"),
+                choices=body.get("choices") if isinstance(body.get("choices"), dict) else {},
+                expected_review_id=str(body.get("review_id") or ""),
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
+            )
+            return JSONResponse({"ok": True, "reason": "merged", **result})
+        except (
+            ValueError,
+            MergeReviewError,
+            CurationWorkflowError,
+            CurationHistoryError,
+            CatalogRepositoryError,
+        ) as error:
+            return curation_application_error_response(error)
+
+    @app.post("/api/curation/undo")
+    def undo_curation(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        try:
+            operation = workflow.undo(
+                str(body.get("operation_id") or ""),
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
+            )
+            return JSONResponse({"ok": True, "reason": "undone", "operation": operation})
+        except (
+            ValueError,
+            CurationWorkflowError,
+            CurationHistoryError,
+            CatalogRepositoryError,
+        ) as error:
+            return curation_application_error_response(error)
+
+    @app.post("/api/curation/history/clear")
+    def clear_curation_history(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        try:
+            count = workflow.clear_history(
+                str(body.get("history_mode") or "persistent"),
+                history_session_id(request),
+                confirmed=body.get("confirmed") is True,
+            )
+            return JSONResponse({"ok": True, "reason": "cleared", "cleared": count})
+        except (ValueError, CurationHistoryError) as error:
+            return curation_application_error_response(error)
 
     @app.get("/api/search", dependencies=[Depends(require_token)])
     def search(q: str = "", source: str = "all") -> JSONResponse:
@@ -318,29 +460,47 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return application_error_response(error)
 
     @app.post("/api/curation/link")
-    def curate_link(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def curate_link(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
         try:
-            updated, reason = update_link_curation(
-                write_path_for(config, str(body.get("source_file") or "")),
-                item_id=str(body.get("id") or ""),
-                status=str(body.get("status") or ""),
+            result = workflow.update_link_decision(
+                catalog_pointer(body),
+                str(body.get("status") or ""),
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
             )
-            return operation_response(updated, reason)
-        except (ValueError, CatalogRepositoryError) as error:
-            return application_error_response(error)
+            return JSONResponse({"ok": True, "reason": "updated", **result})
+        except (
+            ValueError,
+            CurationWorkflowError,
+            CurationHistoryError,
+            CatalogRepositoryError,
+        ) as error:
+            return curation_application_error_response(error)
 
     @app.post("/api/curation/duplicate")
-    def curate_duplicate(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def curate_duplicate(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
         try:
-            updated, reason = update_duplicate_curation(
-                write_path_for(config, str(body.get("source_file") or "")),
-                item_id=str(body.get("id") or ""),
-                other_reference=str(body.get("other_reference") or ""),
-                status=str(body.get("status") or ""),
+            result = workflow.update_duplicate_decision(
+                catalog_pointer(body),
+                str(body.get("other_reference") or ""),
+                str(body.get("status") or ""),
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
             )
-            return operation_response(updated, reason)
-        except (ValueError, CatalogRepositoryError) as error:
-            return application_error_response(error)
+            return JSONResponse({"ok": True, "reason": "updated", **result})
+        except (
+            ValueError,
+            CurationWorkflowError,
+            CurationHistoryError,
+            CatalogRepositoryError,
+        ) as error:
+            return curation_application_error_response(error)
 
     @app.post("/api/metadata")
     def metadata(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
@@ -405,6 +565,18 @@ def operation_status(ok: bool, reason: str) -> int:
 def application_error_response(error: Exception) -> JSONResponse:
     if isinstance(error, CatalogRepositoryError):
         return repository_error_response(error)
+    return error_response(str(error), 400)
+
+
+def curation_application_error_response(error: Exception) -> JSONResponse:
+    if isinstance(error, CatalogRepositoryError):
+        return repository_error_response(error)
+    if isinstance(error, CurationConflict):
+        return error_response(str(error), 409)
+    if isinstance(error, CurationItemNotFound):
+        return error_response(str(error), 404)
+    if isinstance(error, CurationHistoryError):
+        return error_response(str(error), 500)
     return error_response(str(error), 400)
 
 

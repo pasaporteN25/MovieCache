@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.curation_service import build_curation_payload, curation_counts
+from movie_inbox.application.curation_workflow import CurationWorkflowService
 from movie_inbox.infrastructure.external_catalog import (
     enrich_external_result,
     external_metadata_by_title,
@@ -20,11 +21,17 @@ from movie_inbox.domain import catalog as domain
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.infrastructure.repositories import CATALOG_SUFFIXES, open_catalog_repository
+from movie_inbox.infrastructure.curation_history import (
+    JsonCurationHistoryRepository,
+    MemoryCurationHistoryRepository,
+    curation_history_path,
+)
 from movie_inbox.domain.metadata import METADATA_FIELDS
 from movie_inbox.web.config import ViewerConfig
 
 
 _CATALOG_SERVICES: dict[str, CatalogService] = {}
+_CURATION_WORKFLOWS: dict[str, CurationWorkflowService] = {}
 
 
 def first_catalog_file(patterns: list[str]) -> str:
@@ -93,6 +100,21 @@ def catalog_service(path: Path) -> CatalogService:
     if key not in _CATALOG_SERVICES:
         _CATALOG_SERVICES[key] = CatalogService(open_catalog_repository(Path(key), domain.normalize_item))
     return _CATALOG_SERVICES[key]
+
+
+def curation_workflow(config: ViewerConfig) -> CurationWorkflowService:
+    primary_path = Path(config.write_json)
+    try:
+        key = str(primary_path.resolve())
+    except OSError:
+        key = str(primary_path.absolute())
+    if key not in _CURATION_WORKFLOWS:
+        _CURATION_WORKFLOWS[key] = CurationWorkflowService(
+            lambda path: catalog_service(path).repository,
+            JsonCurationHistoryRepository(curation_history_path(primary_path)),
+            MemoryCurationHistoryRepository(),
+        )
+    return _CURATION_WORKFLOWS[key]
 
 
 annotate_duplicate_items = domain.annotate_duplicate_items

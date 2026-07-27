@@ -25,6 +25,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let curationFilter = "pending";
       let selectedCurationCaseId = "";
       let curationLoading = false;
+      let curationHistory = [];
+      let curationHistoryLoading = false;
+      let curationHistoryMode = storedHistoryMode();
+      let mergeReview = null;
+      let mergeContext = null;
+      let mergeChoices = {};
+      let mergeTouchedChoices = new Set();
+      let mergeSubmitting = false;
+      let mergeRequestSequence = 0;
       let activeQuery = "";
       let writeJsonPath = "";
       let currentView = "home";
@@ -80,6 +89,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         curationDuplicateCount: document.querySelector("#curationDuplicateCount"),
         curationMissingCount: document.querySelector("#curationMissingCount"),
         curationDeferredCount: document.querySelector("#curationDeferredCount"),
+        curationHistoryCount: document.querySelector("#curationHistoryCount"),
+        persistCurationHistory: document.querySelector("#persistCurationHistory"),
+        clearCurationHistory: document.querySelector("#clearCurationHistory"),
         curationFeedback: document.querySelector("#curationFeedback"),
         curationQueueTitle: document.querySelector("#curationQueueTitle"),
         curationQueueMeta: document.querySelector("#curationQueueMeta"),
@@ -145,6 +157,21 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         descriptionDialogTitle: document.querySelector("#descriptionDialogTitle"),
         descriptionDialogText: document.querySelector("#descriptionDialogText"),
         closeDescriptionDialog: document.querySelector("#closeDescriptionDialog"),
+        mergeComparatorDialog: document.querySelector("#mergeComparatorDialog"),
+        mergeComparatorTitle: document.querySelector("#mergeComparatorTitle"),
+        mergeComparatorSubtitle: document.querySelector("#mergeComparatorSubtitle"),
+        mergeSurvivorControl: document.querySelector("#mergeSurvivorControl"),
+        mergeSurvivorLeft: document.querySelector("#mergeSurvivorLeft"),
+        mergeSurvivorRight: document.querySelector("#mergeSurvivorRight"),
+        mergeShowAllFields: document.querySelector("#mergeShowAllFields"),
+        mergeComparatorSummary: document.querySelector("#mergeComparatorSummary"),
+        mergeComparatorFeedback: document.querySelector("#mergeComparatorFeedback"),
+        mergeComparatorFields: document.querySelector("#mergeComparatorFields"),
+        mergeDecisionStatus: document.querySelector("#mergeDecisionStatus"),
+        mergeDecisionMeta: document.querySelector("#mergeDecisionMeta"),
+        closeMergeComparator: document.querySelector("#closeMergeComparator"),
+        cancelMergeComparator: document.querySelector("#cancelMergeComparator"),
+        confirmReviewedMerge: document.querySelector("#confirmReviewedMerge"),
         empty: document.querySelector("#empty")
       };
 
@@ -157,6 +184,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.homeCollectionButton.addEventListener("click", goToCollectionRoot);
       fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
       fields.inboxView.addEventListener("click", handleCurationClick);
+      fields.persistCurationHistory.checked = curationHistoryMode === "persistent";
+      fields.persistCurationHistory.nextElementSibling.textContent = curationHistoryMode === "persistent"
+        ? "Historial persistente"
+        : "Sólo esta sesión";
+      fields.persistCurationHistory.addEventListener("change", changeCurationHistoryMode);
+      fields.clearCurationHistory.addEventListener("click", clearCurationHistory);
       fields.randomButton.addEventListener("click", openRandomDetail);
       fields.randomCatalogOnly.addEventListener("change", syncRandomControl);
       fields.spotlightToggle.addEventListener("click", toggleSpotlight);
@@ -197,6 +230,19 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       });
       fields.catalogLoadMore.addEventListener("click", showMoreCatalogItems);
       fields.closeDescriptionDialog.addEventListener("click", () => fields.descriptionDialog.close());
+      fields.closeMergeComparator.addEventListener("click", () => closeMergeComparator());
+      fields.cancelMergeComparator.addEventListener("click", () => closeMergeComparator());
+      fields.confirmReviewedMerge.addEventListener("click", submitReviewedMerge);
+      fields.mergeShowAllFields.addEventListener("change", renderMergeComparator);
+      fields.mergeSurvivorControl.addEventListener("change", changeMergeSurvivor);
+      fields.mergeComparatorFields.addEventListener("change", changeMergeChoice);
+      fields.mergeComparatorDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeMergeComparator();
+      });
+      fields.mergeComparatorDialog.addEventListener("click", (event) => {
+        if (event.target === fields.mergeComparatorDialog) closeMergeComparator();
+      });
       fields.query.addEventListener("keydown", (event) => {
         if (event.key === "Enter") runSearch();
         if (event.key === "Escape") clearManualSearch();
@@ -377,6 +423,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           if (!visible.some((entry) => entry.id === selectedCurationCaseId)) {
             selectedCurationCaseId = visible[0]?.id || "";
           }
+          await loadCurationHistory();
           syncCurationCounts();
           renderCuration();
           if (announce) setCurationFeedback("Bandeja actualizada", "success");
@@ -391,11 +438,99 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
       }
 
+      async function loadCurationHistory() {
+        if (curationHistoryLoading) return;
+        curationHistoryLoading = true;
+        try {
+          const response = await apiFetch(`/api/curation/history?mode=${encodeURIComponent(curationHistoryMode)}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          curationHistory = payload.operations || [];
+          fields.curationHistoryCount.textContent = payload.count || 0;
+        } catch (error) {
+          console.error("[catalog-viewer] curation history load failed", error);
+          curationHistory = [];
+          fields.curationHistoryCount.textContent = "!";
+          if (curationFilter === "history") {
+            setCurationFeedback("No se pudo cargar el historial de curaduría.", "error");
+          }
+        } finally {
+          curationHistoryLoading = false;
+        }
+      }
+
+      function storedHistoryMode() {
+        try {
+          return localStorage.getItem("movie-inbox-curation-history-mode") === "session"
+            ? "session"
+            : "persistent";
+        } catch (_) {
+          return "persistent";
+        }
+      }
+
+      async function changeCurationHistoryMode() {
+        curationHistoryMode = fields.persistCurationHistory.checked ? "persistent" : "session";
+        try {
+          localStorage.setItem("movie-inbox-curation-history-mode", curationHistoryMode);
+        } catch (_) {
+          // The preference remains active for this page even when storage is unavailable.
+        }
+        fields.persistCurationHistory.nextElementSibling.textContent = curationHistoryMode === "persistent"
+          ? "Historial persistente"
+          : "Sólo esta sesión";
+        selectedCurationCaseId = "";
+        await loadCurationHistory();
+        renderCuration();
+        setCurationFeedback(
+          curationHistoryMode === "persistent"
+            ? "Las próximas decisiones conservarán Deshacer después de reiniciar."
+            : "Las próximas decisiones podrán deshacerse sólo durante esta sesión.",
+          "success"
+        );
+      }
+
+      async function clearCurationHistory() {
+        const count = curationHistory.length;
+        if (!count) {
+          setCurationFeedback("No hay actividad para limpiar.", "");
+          return;
+        }
+        const confirmed = confirm(
+          `Eliminar ${count} ${count === 1 ? "operación" : "operaciones"} del historial? Ya no podrán deshacerse.`
+        );
+        if (!confirmed) return;
+        fields.clearCurationHistory.disabled = true;
+        try {
+          const response = await apiFetch("/api/curation/history/clear", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              history_mode: curationHistoryMode,
+              confirmed: true
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          curationHistory = [];
+          selectedCurationCaseId = "";
+          syncCurationCounts();
+          renderCuration();
+          setCurationFeedback("Historial eliminado.", "success");
+        } catch (error) {
+          console.error("[catalog-viewer] history clear failed", error);
+          setCurationFeedback("No se pudo limpiar el historial. El catálogo no fue modificado.", "error");
+        } finally {
+          fields.clearCurationHistory.disabled = false;
+        }
+      }
+
       function syncCurationCounts() {
         fields.curationPendingCount.textContent = curationCounts.pending || 0;
         fields.curationDuplicateCount.textContent = curationCounts.duplicates || 0;
         fields.curationMissingCount.textContent = curationCounts.missing_link || 0;
         fields.curationDeferredCount.textContent = curationCounts.deferred || 0;
+        fields.curationHistoryCount.textContent = curationHistory.length || 0;
         fields.inboxBadge.textContent = curationCounts.pending || 0;
         fields.inboxBadge.hidden = !(curationCounts.pending > 0);
         fields.inboxButton.setAttribute(
@@ -424,9 +559,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         const action = event.target.closest("[data-curation-action]");
         if (!action) return;
+        const actionName = action.dataset.curationAction;
+        if (actionName === "undo-operation") {
+          undoCurationOperation(action.dataset.operationId || selectedCurationCaseId);
+          return;
+        }
         const selected = curationCases.find((entry) => entry.id === selectedCurationCaseId);
         if (!selected) return;
-        const actionName = action.dataset.curationAction;
         if (actionName === "open-primary") {
           openCurationItem(selected.primary);
           return;
@@ -439,6 +578,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           findLinkFromCuration(selected.primary);
           return;
         }
+        if (actionName === "compare-duplicate" && selected.secondary) {
+          openInternalMergeComparator(selected);
+          return;
+        }
         if (actionName === "link-deferred") updateLinkCuration(selected, "deferred");
         if (actionName === "link-not-required") updateLinkCuration(selected, "not_required");
         if (actionName === "link-pending") updateLinkCuration(selected, "pending");
@@ -448,6 +591,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function visibleCurationCases() {
+        if (curationFilter === "history") return [];
         if (curationFilter === "deferred") {
           return curationCases.filter((entry) => entry.status === "deferred");
         }
@@ -458,6 +602,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function renderCuration() {
+        if (curationFilter === "history") {
+          renderCurationHistory();
+          return;
+        }
         const visible = visibleCurationCases();
         if (!visible.some((entry) => entry.id === selectedCurationCaseId)) {
           selectedCurationCaseId = visible[0]?.id || "";
@@ -485,6 +633,93 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.curationDetail.innerHTML = selected
           ? curationCaseDetail(selected)
           : curationEmptyState("Sin caso seleccionado", "La evidencia aparecerá cuando haya una decisión disponible.");
+      }
+
+      function renderCurationHistory() {
+        if (!curationHistory.some((entry) => entry.id === selectedCurationCaseId)) {
+          selectedCurationCaseId = curationHistory[0]?.id || "";
+        }
+        fields.inboxView.querySelectorAll("[data-curation-filter]").forEach((button) => {
+          const active = button.dataset.curationFilter === "history";
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        fields.curationQueueTitle.textContent = curationHistoryMode === "persistent"
+          ? "Actividad persistente"
+          : "Actividad de esta sesión";
+        fields.curationQueueMeta.textContent = `${curationHistory.length} ${
+          curationHistory.length === 1 ? "operación" : "operaciones"
+        }`;
+        fields.curationQueue.innerHTML = curationHistory.length
+          ? curationHistory.map(curationHistoryItem).join("")
+          : curationEmptyState("Todavía no hay actividad", "Las decisiones nuevas aparecerán en este registro.");
+        const selected = curationHistory.find((entry) => entry.id === selectedCurationCaseId);
+        fields.curationDetail.innerHTML = selected
+          ? curationHistoryDetail(selected)
+          : curationEmptyState("Sin operación seleccionada", "Elegí una actividad para revisar su estado.");
+      }
+
+      function curationHistoryItem(operation) {
+        const selected = operation.id === selectedCurationCaseId;
+        return `<button class="curation-queue-item history-item ${selected ? "selected" : ""}" type="button"
+          data-curation-case="${escapeAttr(operation.id)}" aria-pressed="${selected}">
+          <span class="history-operation-mark" aria-hidden="true">${operation.action === "merge" ? "M" : "D"}</span>
+          <span class="curation-queue-copy">
+            <span class="curation-queue-type">${escapeHtml(curationActionLabel(operation.action))}</span>
+            <strong>${escapeHtml(operation.label || "Decisión de curaduría")}</strong>
+            <small>${escapeHtml(formatHistoryDate(operation.created_at))}</small>
+          </span>
+          <span class="pill ${operation.status === "undone" ? "muted" : "good"}">${
+            operation.status === "undone" ? "deshecha" : "aplicada"
+          }</span>
+        </button>`;
+      }
+
+      function curationHistoryDetail(operation) {
+        const summary = operation.summary || {};
+        const changedFields = asList(summary.changed_fields);
+        return `<section class="history-detail">
+          <header class="curation-case-heading">
+            <div>
+              <span class="curation-case-kicker">${escapeHtml(curationActionLabel(operation.action))}</span>
+              <h3>${escapeHtml(operation.label || "Decisión de curaduría")}</h3>
+            </div>
+            <span class="pill ${operation.status === "undone" ? "muted" : "good"}">${
+              operation.status === "undone" ? "Deshecha" : "Aplicada"
+            }</span>
+          </header>
+          <dl class="history-facts">
+            <div><dt>Fecha</dt><dd>${escapeHtml(formatHistoryDate(operation.created_at))}</dd></div>
+            <div><dt>Alcance</dt><dd>${operation.mode === "session" ? "Sólo esta sesión" : "Persistente"}</dd></div>
+            ${summary.survivor_title ? `<div><dt>Entrada final</dt><dd>${escapeHtml(summary.survivor_title)}</dd></div>` : ""}
+            ${changedFields.length ? `<div><dt>Campos revisados</dt><dd>${changedFields.length}</dd></div>` : ""}
+          </dl>
+          ${changedFields.length
+            ? `<div class="history-field-list">${changedFields.map((field) => `<span>${escapeHtml(mergeFieldLabel(field))}</span>`).join("")}</div>`
+            : ""}
+          <footer class="curation-actions">
+            ${operation.can_undo
+              ? `<button class="action-primary" type="button" data-curation-action="undo-operation"
+                   data-operation-id="${escapeAttr(operation.id)}">Deshacer operación</button>`
+              : `<span class="history-closed-note">Esta operación ya fue deshecha.</span>`}
+          </footer>
+        </section>`;
+      }
+
+      function curationActionLabel(action) {
+        return {
+          merge: "Combinación",
+          link_curation: "Referencia",
+          duplicate_curation: "Duplicado"
+        }[action] || "Curaduría";
+      }
+
+      function formatHistoryDate(value) {
+        if (!value) return "Sin fecha";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime())
+          ? String(value)
+          : date.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
       }
 
       function curationQueueItem(entry) {
@@ -527,8 +762,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           </div>
           <footer class="curation-actions">
             ${deferred
-              ? `<button class="action-primary" type="button" data-curation-action="duplicate-pending">Volver a pendientes</button>`
-              : `<button class="action-primary" type="button" data-curation-action="duplicate-not-duplicate">No son duplicados</button>
+              ? `<button class="action-primary" type="button" data-curation-action="compare-duplicate">Comparar y combinar</button>
+                 <button class="quiet-action" type="button" data-curation-action="duplicate-pending">Volver a pendientes</button>`
+              : `<button class="action-primary" type="button" data-curation-action="compare-duplicate">Comparar y combinar</button>
+                 <button class="quiet-action" type="button" data-curation-action="duplicate-not-duplicate">No son duplicados</button>
                  <button class="quiet-action" type="button" data-curation-action="duplicate-deferred">Posponer</button>`}
           </footer>
         `;
@@ -645,13 +882,16 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           const response = await apiFetch(path, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
+            body: JSON.stringify({
+              ...body,
+              history_mode: curationHistoryMode
+            })
           });
           const payload = await response.json();
           if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           selectedCurationCaseId = "";
           await loadCatalog();
-          setCurationFeedback("Decisión guardada", "success");
+          setCurationFeedback("Decisión guardada", "success", payload.operation);
         } catch (error) {
           console.error("[catalog-viewer] curation update failed", error);
           setCurationFeedback("No se pudo guardar la decisión. Reintentá sin salir de la Bandeja.", "error");
@@ -659,9 +899,444 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
       }
 
-      function setCurationFeedback(message, tone = "") {
-        fields.curationFeedback.textContent = message;
+      async function undoCurationOperation(operationId) {
+        if (!operationId) return;
+        fields.curationDetail.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+        setCurationFeedback("Restaurando estado anterior…", "working");
+        try {
+          const response = await apiFetch("/api/curation/undo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operation_id: operationId,
+              history_mode: curationHistoryMode
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            const reason = payload.reason || `HTTP ${response.status}`;
+            if (response.status === 409) {
+              throw new Error("La entrada cambió después de esta operación. Revisala antes de restaurar.");
+            }
+            throw new Error(reason);
+          }
+          selectedCurationCaseId = operationId;
+          await loadCatalog();
+          curationFilter = "history";
+          renderCuration();
+          setCurationFeedback("Operación deshecha. Se restauró el estado anterior.", "success");
+        } catch (error) {
+          console.error("[catalog-viewer] curation undo failed", error);
+          setCurationFeedback(error.message || "No se pudo deshacer la operación.", "error");
+          renderCuration();
+        }
+      }
+
+      function setCurationFeedback(message, tone = "", operation = null) {
+        fields.curationFeedback.innerHTML = operation?.can_undo
+          ? `<span>${escapeHtml(message)}</span>
+             <button class="text-action" type="button" data-curation-action="undo-operation"
+               data-operation-id="${escapeAttr(operation.id)}">Deshacer</button>`
+          : escapeHtml(message);
         fields.curationFeedback.dataset.tone = tone;
+      }
+
+      async function openInternalMergeComparator(entry) {
+        if (!entry?.primary || !entry?.secondary) return;
+        await openMergeComparator({
+          type: "internal",
+          left: {
+            id: entry.primary.id,
+            source_file: entry.primary.source_file
+          },
+          right: {
+            id: entry.secondary.id,
+            source_file: entry.secondary.source_file
+          }
+        });
+      }
+
+      async function openExternalMergeComparator(index, targetId) {
+        const result = manualResults[index];
+        const target = items.find((entry) => entry.id === targetId);
+        if (!result || !target) {
+          setCurationFeedback("La entrada o el resultado ya no están disponibles.", "error");
+          return;
+        }
+        await openMergeComparator({
+          type: "external",
+          resultIndex: index,
+          left: {
+            id: target.id,
+            source_file: target._source_file || ""
+          },
+          result
+        });
+      }
+
+      async function openMergeComparator(context) {
+        mergeContext = context;
+        mergeReview = null;
+        mergeChoices = {};
+        mergeTouchedChoices = new Set();
+        mergeSubmitting = false;
+        fields.mergeShowAllFields.checked = false;
+        fields.mergeComparatorFeedback.textContent = "";
+        fields.mergeComparatorFeedback.dataset.tone = "";
+        fields.mergeComparatorTitle.textContent = "Preparando comparación";
+        fields.mergeComparatorSubtitle.textContent = "Cargando los valores actuales del catálogo.";
+        fields.mergeComparatorFields.innerHTML = mergeComparatorLoading();
+        fields.confirmReviewedMerge.disabled = true;
+        fields.mergeDecisionStatus.textContent = "Leyendo entradas";
+        fields.mergeDecisionMeta.textContent = "";
+        if (!fields.mergeComparatorDialog.open) fields.mergeComparatorDialog.showModal();
+        await requestMergeComparison("left");
+      }
+
+      async function requestMergeComparison(survivorSide) {
+        if (!mergeContext) return;
+        const requestId = ++mergeRequestSequence;
+        const requestContext = mergeContext;
+        fields.mergeComparatorDialog.dataset.loading = "true";
+        fields.confirmReviewedMerge.disabled = true;
+        fields.mergeComparatorFeedback.textContent = "";
+        try {
+          const body = {
+            left: mergeContext.left,
+            survivor_side: survivorSide
+          };
+          if (mergeContext.type === "internal") body.right = mergeContext.right;
+          else body.result = mergeContext.result;
+          const response = await apiFetch("/api/curation/compare", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          if (requestId !== mergeRequestSequence || mergeContext !== requestContext) return;
+          mergeReview = payload;
+          if (payload.incoming) mergeContext.incoming = payload.incoming;
+          mergeChoices = Object.fromEntries(
+            payload.fields
+              .filter((field) => field.default_choice)
+              .map((field) => [field.key, field.default_choice])
+          );
+          mergeTouchedChoices = new Set();
+          renderMergeComparator();
+        } catch (error) {
+          if (requestId !== mergeRequestSequence || mergeContext !== requestContext) return;
+          console.error("[catalog-viewer] merge comparison failed", error);
+          mergeReview = null;
+          fields.mergeComparatorTitle.textContent = "No se pudo comparar";
+          fields.mergeComparatorSubtitle.textContent = "Las entradas no fueron modificadas.";
+          fields.mergeComparatorFields.innerHTML = curationEmptyState(
+            "Comparación no disponible",
+            "Cerrá esta mesa y volvé a intentarlo desde la Bandeja."
+          );
+          fields.mergeComparatorFeedback.textContent = error.message || "Error de comparación";
+          fields.mergeComparatorFeedback.dataset.tone = "error";
+        } finally {
+          if (requestId === mergeRequestSequence) {
+            fields.mergeComparatorDialog.dataset.loading = "false";
+          }
+        }
+      }
+
+      function renderMergeComparator() {
+        if (!mergeReview) return;
+        const leftTitle = mergeReview.left?.title || "Entrada A";
+        const rightTitle = mergeReview.right?.title || "Entrada B";
+        fields.mergeComparatorTitle.textContent = `${leftTitle} / ${rightTitle}`;
+        fields.mergeComparatorSubtitle.textContent = mergeReview.can_select_survivor
+          ? "Elegí qué identidad permanece y resolvé los campos señalados."
+          : "La entrada del catálogo conservará su identidad.";
+        fields.mergeSurvivorControl.hidden = !mergeReview.can_select_survivor;
+        fields.mergeSurvivorLeft.textContent = `Conservar A · ${leftTitle}`;
+        fields.mergeSurvivorRight.textContent = `Conservar B · ${rightTitle}`;
+        fields.mergeSurvivorControl.querySelectorAll('input[name="merge-survivor"]').forEach((input) => {
+          input.checked = input.value === mergeReview.survivor_side;
+        });
+        fields.mergeComparatorSummary.innerHTML = `
+          ${mergeEntrySummary(mergeReview.left, "Entrada A", mergeReview.survivor_side === "left")}
+          <span class="merge-summary-divider" aria-hidden="true">↔</span>
+          ${mergeEntrySummary(mergeReview.right, "Entrada B", mergeReview.survivor_side === "right")}
+        `;
+
+        const visibleFields = mergeReview.fields.filter((field) => (
+          fields.mergeShowAllFields.checked || field.different
+        ));
+        fields.mergeComparatorFields.innerHTML = mergeReview.groups
+          .map((group) => {
+            const rows = visibleFields.filter((field) => field.group === group.key);
+            if (!rows.length) return "";
+            return `<section class="merge-field-group" aria-labelledby="merge-group-${escapeAttr(group.key)}">
+              <header>
+                <h3 id="merge-group-${escapeAttr(group.key)}">${escapeHtml(group.label)}</h3>
+                <span>${rows.length} ${rows.length === 1 ? "campo" : "campos"}</span>
+              </header>
+              ${rows.map(mergeFieldRow).join("")}
+            </section>`;
+          })
+          .join("") || curationEmptyState("Las entradas coinciden", "No hay diferencias para revisar.");
+        updateMergeDecisionStatus();
+      }
+
+      function mergeEntrySummary(item, label, survivor) {
+        return `<article class="merge-entry-summary ${survivor ? "survivor" : ""}">
+          ${curationThumb(item, true)}
+          <div>
+            <span>${escapeHtml(label)}${survivor ? " · permanece" : ""}</span>
+            <strong>${escapeHtml(item.title || "Sin título")}</strong>
+            <small>${escapeHtml([item.year, item.kind, item.source].filter(Boolean).join(" · "))}</small>
+            <div class="card-badges">
+              <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "en catálogo" : "fuera de catálogo"}</span>
+              <span class="pill ${item.local_files_count ? "good" : "muted"}">${item.local_files_count || 0} archivos</span>
+            </div>
+          </div>
+        </article>`;
+      }
+
+      function mergeFieldRow(field) {
+        const choice = mergeChoices[field.key] || "";
+        const states = [
+          { side: "left", label: "Entrada A", value: field.left },
+          ...(field.allowed.includes("combine")
+            ? [{ side: "combine", label: mergeCombineLabel(field), value: mergeCombinedValue(field) }]
+            : []),
+          { side: "right", label: "Entrada B", value: field.right }
+        ].filter((state) => field.allowed.includes(state.side));
+        const options = field.different
+          ? states.map((state) => `
+              <label class="merge-choice ${state.side}">
+                <input type="radio" name="merge-field-${escapeAttr(field.key)}"
+                  data-merge-choice="${escapeAttr(field.key)}" value="${state.side}"
+                  ${choice === state.side ? "checked" : ""}>
+                <span class="merge-choice-label">${escapeHtml(state.label)}</span>
+                ${mergeValue(state.value, field)}
+              </label>
+            `).join("")
+          : `<div class="merge-field-same">${mergeValue(field.left, field)}<span>Coinciden</span></div>`;
+        return `<article class="merge-field-row ${field.required && !choice ? "needs-decision" : ""}"
+          data-merge-field="${escapeAttr(field.key)}">
+          <header>
+            <strong>${escapeHtml(field.label)}</strong>
+            <span class="merge-field-signals">
+              ${field.protected ? '<span class="pill warning">protegido</span>' : ""}
+              ${field.locked ? '<span class="pill muted">bloqueado</span>' : ""}
+              ${field.required && !choice ? '<span class="pill warning">elegir</span>' : ""}
+            </span>
+          </header>
+          <div class="merge-field-options ${states.length === 3 ? "three" : "two"}">${options}</div>
+        </article>`;
+      }
+
+      function mergeValue(value, field) {
+        if (field.strategy === "local_files") {
+          const files = Array.isArray(value) ? value : [];
+          if (!files.length) return '<span class="merge-value empty">Sin archivos</span>';
+          return `<span class="merge-value merge-file-list">${files.map((file) => `
+            <span><strong>${escapeHtml(file.name || "Archivo")}</strong><small>${escapeHtml(file.path || file.relative_path || "")}</small></span>
+          `).join("")}</span>`;
+        }
+        if (field.strategy === "list") {
+          const values = asList(value);
+          return values.length
+            ? `<span class="merge-value merge-list-value">${values.map((entry) => `<span>${escapeHtml(entry)}</span>`).join("")}</span>`
+            : '<span class="merge-value empty">Sin datos</span>';
+        }
+        if (field.strategy === "boolean_or") {
+          return `<span class="merge-value">${value ? "Sí" : "No"}</span>`;
+        }
+        if (["page_image", "backdrop_image"].includes(field.key) && value) {
+          return `<span class="merge-value merge-image-value">
+            <img src="${escapeAttr(cachedImageSrc(String(value)))}" alt="" loading="lazy">
+            <small>${escapeHtml(urlHost(value))}</small>
+          </span>`;
+        }
+        const text = String(value ?? "").trim();
+        return `<span class="merge-value ${text ? "" : "empty"}">${escapeHtml(text || "Sin datos")}</span>`;
+      }
+
+      function mergeCombinedValue(field) {
+        if (field.strategy === "list") {
+          const seen = new Set();
+          return [...asList(field.left), ...asList(field.right)].filter((value) => {
+            const key = normalizeText(value);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+        if (field.strategy === "local_files") {
+          const seen = new Set();
+          return [...asList(field.left), ...asList(field.right)].filter((file) => {
+            const key = `${file.library_id || ""}|${file.relative_path || ""}|${file.path || ""}`.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+        if (field.strategy === "boolean_or") return Boolean(field.left || field.right);
+        return field.left;
+      }
+
+      function mergeCombineLabel(field) {
+        if (field.strategy === "boolean_or") return "Preservar sí";
+        if (field.strategy === "local_files") return "Conservar todos";
+        return "Combinar";
+      }
+
+      function changeMergeChoice(event) {
+        const input = event.target.closest("[data-merge-choice]");
+        if (!input || !mergeReview) return;
+        mergeChoices[input.dataset.mergeChoice] = input.value;
+        mergeTouchedChoices.add(input.dataset.mergeChoice);
+        const row = fields.mergeComparatorFields.querySelector(
+          `[data-merge-field="${CSS.escape(input.dataset.mergeChoice)}"]`
+        );
+        if (row) {
+          row.classList.remove("needs-decision");
+          row.querySelectorAll(".merge-field-signals .warning").forEach((badge) => {
+            if (badge.textContent.trim() === "elegir") badge.remove();
+          });
+        }
+        updateMergeDecisionStatus();
+      }
+
+      async function changeMergeSurvivor(event) {
+        const input = event.target.closest('input[name="merge-survivor"]');
+        if (!input || !mergeReview || input.value === mergeReview.survivor_side) return;
+        fields.mergeComparatorFields.innerHTML = mergeComparatorLoading();
+        fields.mergeDecisionStatus.textContent = "Recalculando resultado";
+        await requestMergeComparison(input.value);
+      }
+
+      function updateMergeDecisionStatus() {
+        if (!mergeReview) return;
+        const unresolved = mergeReview.fields.filter((field) => (
+          field.different
+          && field.required
+          && !field.allowed.includes(mergeChoices[field.key])
+        ));
+        const different = mergeReview.different_count || 0;
+        fields.mergeDecisionStatus.textContent = unresolved.length
+          ? `${unresolved.length} ${unresolved.length === 1 ? "decisión pendiente" : "decisiones pendientes"}`
+          : "Resultado listo para combinar";
+        fields.mergeDecisionMeta.textContent = `${different} ${different === 1 ? "diferencia" : "diferencias"} revisadas`;
+        fields.confirmReviewedMerge.disabled = mergeSubmitting || unresolved.length > 0;
+      }
+
+      async function submitReviewedMerge() {
+        if (!mergeReview || !mergeContext || mergeSubmitting) return;
+        mergeSubmitting = true;
+        updateMergeDecisionStatus();
+        fields.mergeComparatorFeedback.textContent = "Guardando combinación…";
+        fields.mergeComparatorFeedback.dataset.tone = "working";
+        try {
+          const body = {
+            left: mergeContext.left,
+            survivor_side: mergeReview.survivor_side,
+            choices: mergeChoices,
+            review_id: mergeReview.review_id,
+            history_mode: curationHistoryMode
+          };
+          if (mergeContext.type === "internal") {
+            body.right = mergeContext.right;
+          } else {
+            body.incoming = mergeContext.incoming || mergeContext.result;
+            body.incoming_reviewed = true;
+          }
+          const response = await apiFetch("/api/curation/merge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            if (response.status === 409) throw new Error("Las entradas cambiaron. Cerrá y volvé a comparar.");
+            throw new Error(payload.reason || `HTTP ${response.status}`);
+          }
+          const externalMerge = mergeContext.type === "external";
+          closeMergeComparator(true);
+          selectedCurationCaseId = "";
+          await loadCatalog();
+          setCurationFeedback("Entradas combinadas", "success", payload.operation);
+          if (externalMerge) {
+            selectedExistingIdForSearch = null;
+            fields.manualSearchStatus.textContent = "Combinación guardada. Deshacer está disponible en Bandeja > Actividad.";
+            renderManualResults();
+            renderCatalogMergeResults();
+          }
+        } catch (error) {
+          console.error("[catalog-viewer] reviewed merge failed", error);
+          fields.mergeComparatorFeedback.textContent = error.message || "No se pudo combinar.";
+          fields.mergeComparatorFeedback.dataset.tone = "error";
+        } finally {
+          mergeSubmitting = false;
+          updateMergeDecisionStatus();
+        }
+      }
+
+      function closeMergeComparator(force = false) {
+        if (mergeSubmitting && !force) return;
+        mergeRequestSequence += 1;
+        if (fields.mergeComparatorDialog.open) fields.mergeComparatorDialog.close();
+        mergeReview = null;
+        mergeContext = null;
+        mergeChoices = {};
+        mergeTouchedChoices = new Set();
+        fields.mergeComparatorFeedback.textContent = "";
+      }
+
+      function mergeComparatorLoading() {
+        return `<div class="merge-loading" aria-label="Cargando comparación">
+          <span></span><span></span><span></span>
+        </div>`;
+      }
+
+      function urlHost(value) {
+        try {
+          return new URL(String(value)).hostname.replace(/^www\./, "");
+        } catch (_) {
+          return String(value || "");
+        }
+      }
+
+      function mergeFieldLabel(key) {
+        return {
+          title: "Título principal",
+          original_title: "Título original",
+          spanish_title: "Título en español",
+          english_title: "Título en inglés",
+          alternative_titles: "Títulos alternativos",
+          kind: "Tipo de obra",
+          year: "Año",
+          description: "Descripción",
+          wikipedia_extract: "Extracto de Wikipedia",
+          genres: "Géneros",
+          directors: "Dirección",
+          writers: "Guion",
+          cast: "Reparto",
+          page_image: "Portada",
+          backdrop_image: "Imagen panorámica",
+          source: "Fuente principal",
+          url: "URL principal",
+          wikipedia_url: "Wikipedia",
+          imdb_url: "IMDb",
+          filmaffinity_url: "FilmAffinity",
+          wikipedia_title: "Título de Wikipedia",
+          wikidata_id: "Wikidata",
+          tmdb_id: "TMDB",
+          status: "Estado personal",
+          watched_at: "Fecha de vista",
+          rating: "Puntaje",
+          review: "Review",
+          notes: "Notas",
+          tags: "Etiquetas",
+          en_catalogo: "En catálogo",
+          local_files: "Archivos locales"
+        }[key] || key;
       }
 
       function openRandomDetail() {
@@ -1983,11 +2658,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function catalogMergeResult(item) {
         const incoming = selectedManualIndex === null ? null : manualResults[selectedManualIndex];
-        const comparison = incoming ? diffComparison(incoming, item) : "";
         const summary = item.wikipedia_extract || item.description || item.notes || item.review || item.local_name || "";
         const shownTitle = displayTitle(item);
         const subtitle = titleSubtitle(item);
-        return `<article class="search-result ${comparison ? "comparison-result" : "compact-result"}">
+        return `<article class="search-result compact-result">
           ${resultMedia(shownTitle || item.local_name, item.page_image)}
           <div class="result-body">
             <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
@@ -2000,7 +2674,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <span class="pill ${isInCatalog(item.en_catalogo) ? "good" : "muted"}">${isInCatalog(item.en_catalogo) ? "catalogo: si" : "catalogo: no"}</span>
             </div>
             ${searchDescription(summary, "catalog", item.id)}
-            ${comparison}
             <div class="result-actions">
               <button class="action-primary ${incoming ? "" : "span-all"}" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Detalle</button>
               ${incoming ? `<button class="action-secondary" type="button" data-click="merge-result" data-index="${selectedManualIndex}" data-id="${escapeAttr(item.id)}">Combinar</button>` : ""}
@@ -2093,7 +2766,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const cards = [...fields.manualSearchResults.querySelectorAll("[data-index]")];
         const button = cards.find((element) => Number(element.dataset.index) === index);
         button.disabled = true;
-        button.textContent = selectedExistingIdForSearch ? "Combinando..." : "Agregando...";
+        button.textContent = selectedExistingIdForSearch ? "Preparando..." : "Agregando...";
         if (selectedExistingIdForSearch) {
           if (!isExternalResult(manualResults[index])) {
             button.disabled = false;
@@ -2103,6 +2776,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             return;
           }
           await mergeSearchResult(index, selectedExistingIdForSearch);
+          button.disabled = false;
+          button.textContent = "Combinar";
           return;
         }
         const response = await apiFetch("/api/add", {
@@ -2156,33 +2831,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           console.warn("[catalog-viewer] blocked result without trusted link", { targetId, result: manualResults[index] });
           return;
         }
-        const beforeCounts = linkCounts();
-        const response = await postAdd(manualResults[index], "merge", targetId);
-        const payload = await response.json();
-        if (!payload.ok) {
-          alert(payload.reason || "No se pudo combinar");
-          return;
-        }
-        await load();
-        const afterCounts = linkCounts();
-        console.log("[catalog-viewer] link merge", {
-          targetId,
-          result: manualResults[index],
-          before: beforeCounts,
-          after: afterCounts
-        });
-        selectedExistingIdForSearch = null;
-        if (wikiReviewQueue.length) {
-          wikiReviewQueue = items.filter((item) => !hasExternalLink(item));
-          wikiReviewIndex = Math.min(wikiReviewIndex, Math.max(wikiReviewQueue.length - 1, 0));
-          if (wikiReviewQueue.length) {
-            await reviewCurrentWikiItem();
-          } else {
-            fields.wikiReviewStatus.textContent = "No quedan entradas sin link.";
-          }
-          return;
-        }
-        await runSearch();
+        await openExternalMergeComparator(index, targetId);
       }
 
       async function forceAddSearchResult(index) {
@@ -2225,55 +2874,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (titles.includes(normalizeText(query))) score += 5;
         if (year && query.includes(year)) score += 2;
         return score;
-      }
-
-      function diffComparison(incoming, existing) {
-        const fieldsToCompare = [
-          ["Titulo", "title"],
-          ["Original", "original_title"],
-          ["Español", "spanish_title"],
-          ["Inglés", "english_title"],
-          ["Alternativos", "alternative_titles"],
-          ["Año", "year"],
-          ["Fuente", "source"],
-          ["URL", "url"],
-          ["Wikidata", "wikidata_id"],
-          ["Genero", "genres"],
-          ["Director", "directors"],
-          ["Guion", "writers"],
-          ["Reparto", "cast"],
-          ["Catalogo", "en_catalogo"],
-          ["Archivo", "local_name"],
-          ["Archivos", "local_files"],
-          ["Estado", "status"],
-          ["Vista", "watched_at"],
-          ["Puntaje", "rating"],
-          ["Review", "review"]
-        ];
-        const rows = fieldsToCompare
-          .map(([label, key]) => {
-            const left = displayField(existing[key], key);
-            const right = displayField(incoming[key], key);
-            if (!left && !right) return "";
-            return `<div class="diff-row">
-              <strong>${escapeHtml(label)}</strong>
-              <span>${escapeHtml(left || "-")}</span>
-              <span>${escapeHtml(right || "-")}</span>
-            </div>`;
-          })
-          .filter(Boolean)
-          .join("");
-        return `<section class="compare-box">
-          <strong>Comparación: existente / resultado nuevo</strong>
-          <div class="diff-grid">${rows}</div>
-        </section>`;
-      }
-
-      function displayField(value, key) {
-        if (key === "en_catalogo") return isInCatalog(value) ? "si" : "no";
-        if (key === "local_files") return localFilesText({ local_files: value });
-        if (["alternative_titles", "genres", "directors", "writers", "cast"].includes(key)) return asList(value).join(", ");
-        return String(value || "");
       }
 
       function normalizeText(value) {

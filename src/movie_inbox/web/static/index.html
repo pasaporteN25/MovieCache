@@ -73,7 +73,14 @@
             <h2>Bandeja de curaduría</h2>
             <p>Decisiones pendientes sobre referencias externas y posibles obras repetidas.</p>
           </div>
-          <button id="refreshCuration" class="quiet-action" type="button">Actualizar bandeja</button>
+          <div class="curation-heading-actions">
+            <label class="history-mode-control">
+              <input id="persistCurationHistory" type="checkbox" checked>
+              <span>Historial persistente</span>
+            </label>
+            <button id="clearCurationHistory" class="quiet-action" type="button">Limpiar historial</button>
+            <button id="refreshCuration" class="quiet-action" type="button">Actualizar bandeja</button>
+          </div>
         </header>
 
         <nav class="curation-tabs" aria-label="Filtrar casos de curaduría">
@@ -88,6 +95,9 @@
           </button>
           <button class="curation-tab" type="button" data-curation-filter="deferred" aria-pressed="false">
             Pospuestas <span id="curationDeferredCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="history" aria-pressed="false">
+            Actividad <span id="curationHistoryCount">0</span>
           </button>
         </nav>
 
@@ -295,6 +305,52 @@
           <button id="discardDetailChanges" class="quiet-action" type="button">Descartar</button>
           <button id="saveDetailChanges" type="button">Guardar cambios</button>
         </div>
+      </div>
+    </dialog>
+
+    <dialog id="mergeComparatorDialog" class="merge-comparator-dialog" aria-labelledby="mergeComparatorTitle">
+      <div class="merge-comparator-surface">
+        <header class="merge-comparator-header">
+          <div>
+            <span class="drawer-kicker">Mesa de comparación</span>
+            <h2 id="mergeComparatorTitle">Revisar combinación</h2>
+            <p id="mergeComparatorSubtitle"></p>
+          </div>
+          <button id="closeMergeComparator" class="drawer-close" type="button" aria-label="Cerrar comparación">Cerrar</button>
+        </header>
+
+        <div class="merge-comparator-toolbar">
+          <fieldset id="mergeSurvivorControl" class="merge-survivor-control">
+            <legend>Identidad que permanece</legend>
+            <label>
+              <input type="radio" name="merge-survivor" value="left" checked>
+              <span id="mergeSurvivorLeft">Entrada A</span>
+            </label>
+            <label>
+              <input type="radio" name="merge-survivor" value="right">
+              <span id="mergeSurvivorRight">Entrada B</span>
+            </label>
+          </fieldset>
+          <label class="merge-show-all">
+            <input id="mergeShowAllFields" type="checkbox">
+            <span>Ver todos los campos</span>
+          </label>
+        </div>
+
+        <div id="mergeComparatorSummary" class="merge-comparator-summary"></div>
+        <div id="mergeComparatorFeedback" class="merge-comparator-feedback" aria-live="polite"></div>
+        <div id="mergeComparatorFields" class="merge-comparator-fields"></div>
+
+        <footer class="merge-comparator-footer">
+          <div>
+            <strong id="mergeDecisionStatus">Preparando comparación</strong>
+            <span id="mergeDecisionMeta"></span>
+          </div>
+          <div class="merge-comparator-actions">
+            <button id="cancelMergeComparator" class="quiet-action" type="button">Cancelar</button>
+            <button id="confirmReviewedMerge" type="button" disabled>Combinar entradas</button>
+          </div>
+        </footer>
       </div>
     </dialog>
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -43,6 +43,43 @@ def normalize_duplicate_decisions(value: Any) -> dict[str, dict[str, str]]:
             continue
         decisions[reference] = {"status": status, "updated_at": updated_at}
     return decisions
+
+
+def apply_link_curation_decision(
+    item: MutableMapping[str, Any],
+    status: str,
+    *,
+    linked: bool = False,
+) -> None:
+    requested = str(status or "").strip().casefold()
+    if requested not in {"pending", "deferred", "not_required"}:
+        raise ValueError("Invalid link curation status")
+    item["link_curation_status"] = normalize_link_curation_status(requested, linked=linked)
+    item["curation_updated_at"] = curation_timestamp()
+
+
+def apply_duplicate_curation_decision(
+    item: MutableMapping[str, Any],
+    other_reference: str,
+    status: str,
+) -> None:
+    reference = str(other_reference or "").strip()
+    if not reference:
+        raise ValueError("Missing duplicate reference")
+    requested = str(status or "").strip().casefold()
+    if requested not in {*DUPLICATE_DECISION_STATUSES, "pending"}:
+        raise ValueError("Invalid duplicate curation status")
+    decisions = normalize_duplicate_decisions(item.get("duplicate_decisions"))
+    if requested == "pending":
+        decisions.pop(reference, None)
+        decisions.pop(reference.split("::", 1)[0], None)
+    else:
+        decisions[reference] = {
+            "status": requested,
+            "updated_at": curation_timestamp(),
+        }
+    item["duplicate_decisions"] = decisions
+    item["curation_updated_at"] = curation_timestamp()
 
 
 def curation_item_reference(item: Mapping[str, Any]) -> str:

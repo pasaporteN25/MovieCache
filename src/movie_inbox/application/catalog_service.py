@@ -7,10 +7,8 @@ from typing import Any
 
 from movie_inbox.application.repository import CatalogRepository
 from movie_inbox.domain.curation import (
-    DUPLICATE_DECISION_STATUSES,
-    curation_timestamp,
-    normalize_duplicate_decisions,
-    normalize_link_curation_status,
+    apply_duplicate_curation_decision,
+    apply_link_curation_decision,
 )
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.metadata import normalize_local_files, normalize_locked_fields, normalize_metadata_sources
@@ -151,16 +149,13 @@ class CatalogService:
     def update_link_curation(self, item_id: str, status: str) -> tuple[bool, str]:
         if not item_id:
             raise ValueError("Missing item id")
-        requested = str(status or "").strip().casefold()
-        if requested not in {"pending", "deferred", "not_required"}:
-            raise ValueError("Invalid link curation status")
 
         def update(item: CatalogItem) -> None:
-            item["link_curation_status"] = normalize_link_curation_status(
-                requested,
+            apply_link_curation_decision(
+                item,
+                status,
                 linked=has_external_link(item),
             )
-            item["curation_updated_at"] = curation_timestamp()
 
         return self._update_item(item_id, update)
 
@@ -172,25 +167,9 @@ class CatalogService:
     ) -> tuple[bool, str]:
         if not item_id:
             raise ValueError("Missing item id")
-        other_reference = str(other_reference or "").strip()
-        if not other_reference:
-            raise ValueError("Missing duplicate reference")
-        requested = str(status or "").strip().casefold()
-        if requested not in {*DUPLICATE_DECISION_STATUSES, "pending"}:
-            raise ValueError("Invalid duplicate curation status")
 
         def update(item: CatalogItem) -> None:
-            decisions = normalize_duplicate_decisions(item.get("duplicate_decisions"))
-            if requested == "pending":
-                decisions.pop(other_reference, None)
-                decisions.pop(other_reference.split("::", 1)[0], None)
-            else:
-                decisions[other_reference] = {
-                    "status": requested,
-                    "updated_at": curation_timestamp(),
-                }
-            item["duplicate_decisions"] = decisions
-            item["curation_updated_at"] = curation_timestamp()
+            apply_duplicate_curation_decision(item, other_reference, status)
 
         return self._update_item(item_id, update)
 
