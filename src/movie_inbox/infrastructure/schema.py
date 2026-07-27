@@ -11,6 +11,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from movie_inbox.domain.curation import (
+    DUPLICATE_DECISION_STATUSES,
+    LINK_CURATION_STATUSES,
+    normalize_duplicate_decisions,
+    normalize_link_curation_status,
+)
 from movie_inbox.domain.metadata import (
     METADATA_FIELDS,
     merge_local_files,
@@ -22,7 +28,7 @@ from movie_inbox.domain.metadata import (
 from movie_inbox.domain.normalization import VALID_KINDS, VALID_STATUSES, normalize_bool, normalize_kind, normalize_status
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 BACKUP_LIMIT = 1
 CATALOG_FIELDS = [
     "id",
@@ -61,12 +67,15 @@ CATALOG_FIELDS = [
     "review",
     "metadata_sources",
     "locked_fields",
+    "link_curation_status",
+    "duplicate_decisions",
+    "curation_updated_at",
     "added_at",
 ]
 
 REQUIRED_ITEM_FIELDS = {
     "id", "title", "kind", "status", "en_catalogo", "local_files",
-    "metadata_sources", "locked_fields",
+    "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions",
 }
 LOCAL_FILE_FIELDS = {
     "path", "name", "size_bytes", "modified_at", "part", "library_id",
@@ -74,7 +83,7 @@ LOCAL_FILE_FIELDS = {
 }
 LIST_ITEM_FIELDS = {"alternative_titles", "genres", "directors", "writers", "cast", "tags", "locked_fields"}
 STRING_ITEM_FIELDS = set(CATALOG_FIELDS) - LIST_ITEM_FIELDS - {
-    "rating", "en_catalogo", "local_files", "metadata_sources",
+    "rating", "en_catalogo", "local_files", "metadata_sources", "duplicate_decisions",
 }
 
 
@@ -128,7 +137,7 @@ def migrate_catalog_document(raw: Any) -> dict[str, Any]:
     else:
         raise CatalogSchemaError("Catalog root must be an object or a legacy array")
 
-    migrations = {1: v1_to_v2, 2: v2_to_v3, 3: v3_to_v4}
+    migrations = {1: v1_to_v2, 2: v2_to_v3, 3: v3_to_v4, 4: v4_to_v5}
     while document["schema_version"] < SCHEMA_VERSION:
         migration = migrations.get(document["schema_version"])
         if migration is None:
@@ -183,6 +192,19 @@ def v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
     return {"schema_version": 4, "items": rows}
 
 
+def v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for row in copy_item_rows(document.get("items"), "v4"):
+        item = normalize_legacy_item(row)
+        item["local_files"] = normalize_local_files(
+            item.get("local_files"), str(item.get("local_name") or ""), str(item.get("local_path") or "")
+        )
+        item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
+        item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
+        rows.append(item)
+    return {"schema_version": 5, "items": rows}
+
+
 def validate_catalog_document(document: Mapping[str, Any]) -> None:
     extra = set(document) - {"schema_version", "items"}
     if extra:
@@ -222,6 +244,22 @@ def validate_catalog_item(row: Any, index: int = 0) -> None:
     locked_fields = row.get("locked_fields", [])
     if len(locked_fields) != len(set(locked_fields)) or any(field not in METADATA_FIELDS for field in locked_fields):
         raise CatalogSchemaError(f"items[{index}].locked_fields contains invalid or duplicate values")
+    if row.get("link_curation_status") not in LINK_CURATION_STATUSES:
+        raise CatalogSchemaError(f"items[{index}].link_curation_status is invalid")
+    duplicate_decisions = row.get("duplicate_decisions")
+    if not isinstance(duplicate_decisions, Mapping):
+        raise CatalogSchemaError(f"items[{index}].duplicate_decisions must be an object")
+    for reference, decision in duplicate_decisions.items():
+        if not isinstance(reference, str) or not reference or not isinstance(decision, Mapping):
+            raise CatalogSchemaError(f"items[{index}].duplicate_decisions contains an invalid decision")
+        if set(decision) != {"status", "updated_at"}:
+            raise CatalogSchemaError(
+                f"items[{index}].duplicate_decisions.{reference} must contain status and updated_at"
+            )
+        if decision.get("status") not in DUPLICATE_DECISION_STATUSES:
+            raise CatalogSchemaError(f"items[{index}].duplicate_decisions.{reference}.status is invalid")
+        if not isinstance(decision.get("updated_at"), str):
+            raise CatalogSchemaError(f"items[{index}].duplicate_decisions.{reference}.updated_at must be string")
     validate_local_files(row.get("local_files"), index)
     validate_metadata_sources(row.get("metadata_sources"), index)
 
@@ -304,6 +342,9 @@ def normalize_legacy_item(row: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(value, str):
             value = [part.strip() for part in value.split(",") if part.strip()]
         item[field] = list(value) if isinstance(value, list) else []
+    item["link_curation_status"] = normalize_link_curation_status(item.get("link_curation_status"))
+    item["duplicate_decisions"] = normalize_duplicate_decisions(item.get("duplicate_decisions"))
+    item["curation_updated_at"] = str(item.get("curation_updated_at") or "")
     return item
 
 

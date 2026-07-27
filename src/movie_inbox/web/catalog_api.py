@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from movie_inbox.application.catalog_service import CatalogService
+from movie_inbox.application.curation_service import build_curation_payload, curation_counts
 from movie_inbox.infrastructure.external_catalog import (
     enrich_external_result,
     external_metadata_by_title,
@@ -227,6 +228,19 @@ def update_item_catalog_status(path: Path, item_id: str, en_catalogo: Any) -> tu
 
 def update_item_personal(path: Path, item_id: str, watched_at: str, rating: Any, review: str) -> tuple[bool, str]:
     return catalog_service(path).update_personal(item_id, watched_at, rating, review)
+
+
+def update_link_curation(path: Path, item_id: str, status: str) -> tuple[bool, str]:
+    return catalog_service(path).update_link_curation(item_id, status)
+
+
+def update_duplicate_curation(
+    path: Path,
+    item_id: str,
+    other_reference: str,
+    status: str,
+) -> tuple[bool, str]:
+    return catalog_service(path).update_duplicate_curation(item_id, other_reference, status)
 
 
 def update_item_metadata(

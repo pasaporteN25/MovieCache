@@ -12,6 +12,12 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
+from movie_inbox.domain.curation import (
+    curation_item_reference,
+    duplicate_decision_status,
+    normalize_duplicate_decisions,
+    normalize_link_curation_status,
+)
 from movie_inbox.domain.metadata import (
     METADATA_FIELDS,
     merge_local_files,
@@ -82,6 +88,7 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         "local_path",
         "notes",
         "review",
+        "curation_updated_at",
     }
     for field in string_fields:
         item[field] = str(item.get(field) or "")
@@ -126,6 +133,11 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
     item["watched_at"] = normalize_date(item.get("watched_at"))
     item["rating"] = normalize_rating(item.get("rating"))
     item["en_catalogo"] = normalize_bool(item.get("en_catalogo"))
+    item["link_curation_status"] = normalize_link_curation_status(
+        item.get("link_curation_status"),
+        linked=has_external_link(item),
+    )
+    item["duplicate_decisions"] = normalize_duplicate_decisions(item.get("duplicate_decisions"))
     if not item["id"]:
         seed = item["url"] or item["local_path"] or item["local_name"] or f"{item['title']} {item['year']}".strip()
         item["id"] = stable_id(seed) if seed else ""
@@ -360,8 +372,18 @@ def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
             parents[right_root] = left_root
 
     for index, item in enumerate(items):
-        for field in ("_duplicate_count", "_duplicate_ids", "_duplicate_reason"):
+        for field in (
+            "_curation_ref",
+            "_duplicate_count",
+            "_duplicate_ids",
+            "_duplicate_refs",
+            "_duplicate_deferred_count",
+            "_duplicate_deferred_ids",
+            "_duplicate_deferred_refs",
+            "_duplicate_reason",
+        ):
             item.pop(field, None)
+        item["_curation_ref"] = curation_item_reference(item)
         keys = [f"url:{url}" for url in sorted(external_urls(item))]
         year = str(item.get("year") or "").strip()
         if year:
@@ -375,12 +397,28 @@ def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
     for indexes in groups.values():
         if len(indexes) < 2:
             continue
-        ids = [str(items[index].get("id") or "") for index in indexes]
         for index in indexes:
             item = items[index]
-            item["_duplicate_count"] = len(indexes) - 1
-            item["_duplicate_ids"] = [value for value in ids if value and value != str(item.get("id") or "")]
-            item["_duplicate_reason"] = "misma URL o titulo/ano"
+            pending = [
+                items[other_index]
+                for other_index in indexes
+                if other_index != index and duplicate_decision_status(item, items[other_index]) == "pending"
+            ]
+            deferred = [
+                items[other_index]
+                for other_index in indexes
+                if other_index != index and duplicate_decision_status(item, items[other_index]) == "deferred"
+            ]
+            if pending:
+                item["_duplicate_count"] = len(pending)
+                item["_duplicate_ids"] = [str(other.get("id") or "") for other in pending]
+                item["_duplicate_refs"] = [curation_item_reference(other) for other in pending]
+            if deferred:
+                item["_duplicate_deferred_count"] = len(deferred)
+                item["_duplicate_deferred_ids"] = [str(other.get("id") or "") for other in deferred]
+                item["_duplicate_deferred_refs"] = [curation_item_reference(other) for other in deferred]
+            if pending or deferred:
+                item["_duplicate_reason"] = "misma URL o titulo/ano"
 
 
 def metadata_source_record(source: str, url: str, inferred: bool, updated_at: str = "") -> dict[str, Any]:
@@ -498,5 +536,9 @@ def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping
         existing["tags"] = sorted(set(normalize_tags(existing.get("tags")) + normalize_tags(incoming.get("tags"))))
         existing["locked_fields"] = normalize_locked_fields(existing.get("locked_fields"))
         existing["metadata_sources"] = ensure_metadata_sources(existing)
+        existing["link_curation_status"] = normalize_link_curation_status(
+            existing.get("link_curation_status"),
+            linked=has_external_link(existing),
+        )
         return True
     return False

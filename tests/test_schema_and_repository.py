@@ -18,7 +18,7 @@ from movie_inbox.infrastructure.schema import (
 
 
 class SchemaAndRepositoryTests(unittest.TestCase):
-    def test_legacy_list_is_migrated_to_v4_shape(self) -> None:
+    def test_legacy_list_is_migrated_to_v5_shape(self) -> None:
         rows = extract_catalog_items([{"title": "Heat", "year": "1995", "en_catalogo": "si"}])
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["kind"], "pelicula")
@@ -26,18 +26,20 @@ class SchemaAndRepositoryTests(unittest.TestCase):
         self.assertTrue(rows[0]["en_catalogo"])
         self.assertIn("local_files", rows[0])
         self.assertIn("metadata_sources", rows[0])
+        self.assertEqual(rows[0]["link_curation_status"], "pending")
+        self.assertEqual(rows[0]["duplicate_decisions"], {})
 
     def test_future_and_malformed_catalogs_are_rejected(self) -> None:
         with self.assertRaises(UnsupportedCatalogVersion):
-            extract_catalog_items({"schema_version": 5, "items": []})
+            extract_catalog_items({"schema_version": 6, "items": []})
         with self.assertRaises(CatalogSchemaError):
-            extract_catalog_items({"schema_version": 4, "items": "not-an-array"})
+            extract_catalog_items({"schema_version": 5, "items": "not-an-array"})
         with self.assertRaises(CatalogSchemaError):
-            extract_catalog_items({"schema_version": 4, "items": [], "unexpected": True})
+            extract_catalog_items({"schema_version": 5, "items": [], "unexpected": True})
         with self.assertRaises(CatalogSchemaError):
-            extract_catalog_items({"schema_version": 4, "items": [None]})
+            extract_catalog_items({"schema_version": 5, "items": [None]})
 
-    def test_invalid_v4_item_cannot_be_written(self) -> None:
+    def test_invalid_v5_item_cannot_be_written(self) -> None:
         with self.assertRaises(CatalogSchemaError):
             catalog_document([{"id": "one", "title": "Heat"}])
 
@@ -66,11 +68,22 @@ class SchemaAndRepositoryTests(unittest.TestCase):
             repository.write([item])
             loaded = repository.read()
             self.assertEqual(loaded[0].title, "Heat")
-            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 4)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 5)
 
-            path.write_text('{"schema_version": 5, "items": []}', encoding="utf-8")
+            path.write_text('{"schema_version": 6, "items": []}', encoding="utf-8")
             with self.assertRaises(CatalogFormatError):
                 repository.read()
+
+    def test_v4_catalog_is_migrated_with_pending_curation(self) -> None:
+        item = normalize_item({"id": "heat", "title": "Heat", "kind": "pelicula"}).to_dict()
+        item.pop("link_curation_status")
+        item.pop("duplicate_decisions")
+        item.pop("curation_updated_at")
+
+        rows = extract_catalog_items({"schema_version": 4, "items": [item]})
+
+        self.assertEqual(rows[0]["link_curation_status"], "pending")
+        self.assertEqual(rows[0]["duplicate_decisions"], {})
 
     def test_normalization_repairs_identifier_titles_and_detects_series(self) -> None:
         item = normalize_item(

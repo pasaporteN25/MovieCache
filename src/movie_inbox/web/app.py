@@ -22,6 +22,8 @@ from movie_inbox.web.assets import render_html, static_asset
 from movie_inbox.web.catalog_api import (
     append_item,
     background_enrich_catalog_item,
+    build_curation_payload,
+    curation_counts,
     delete_item_anywhere,
     enrich_selected_result,
     has_external_link,
@@ -31,7 +33,9 @@ from movie_inbox.web.catalog_api import (
     resolved_files,
     search_sources,
     update_item_catalog_status,
+    update_duplicate_curation,
     update_item_kind,
+    update_link_curation,
     update_item_metadata,
     update_item_personal,
     update_item_status,
@@ -150,9 +154,18 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 "write_json": config.write_json,
                 "schema_version": SCHEMA_VERSION,
                 "duplicate_items": duplicate_items,
+                "curation": {"counts": curation_counts(rows)},
                 "external": external_sources_snapshot(),
             }
         )
+
+    @app.get("/api/curation", dependencies=[Depends(require_token)])
+    def curation() -> JSONResponse:
+        try:
+            rows = load_items(config.patterns)
+            return JSONResponse(build_curation_payload(rows))
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
 
     @app.get("/api/search", dependencies=[Depends(require_token)])
     def search(q: str = "", source: str = "all") -> JSONResponse:
@@ -299,6 +312,31 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 watched_at=str(body.get("watched_at") or ""),
                 rating=body.get("rating"),
                 review=str(body.get("review") or ""),
+            )
+            return operation_response(updated, reason)
+        except (ValueError, CatalogRepositoryError) as error:
+            return application_error_response(error)
+
+    @app.post("/api/curation/link")
+    def curate_link(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+        try:
+            updated, reason = update_link_curation(
+                write_path_for(config, str(body.get("source_file") or "")),
+                item_id=str(body.get("id") or ""),
+                status=str(body.get("status") or ""),
+            )
+            return operation_response(updated, reason)
+        except (ValueError, CatalogRepositoryError) as error:
+            return application_error_response(error)
+
+    @app.post("/api/curation/duplicate")
+    def curate_duplicate(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+        try:
+            updated, reason = update_duplicate_curation(
+                write_path_for(config, str(body.get("source_file") or "")),
+                item_id=str(body.get("id") or ""),
+                other_reference=str(body.get("other_reference") or ""),
+                status=str(body.get("status") or ""),
             )
             return operation_response(updated, reason)
         except (ValueError, CatalogRepositoryError) as error:

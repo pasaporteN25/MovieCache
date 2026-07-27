@@ -137,12 +137,16 @@ class CatalogItem(ModelMapping):
     review: str = ""
     metadata_sources: dict[str, MetadataSource] = field(default_factory=dict)
     locked_fields: list[str] = field(default_factory=list)
+    link_curation_status: str = "pending"
+    duplicate_decisions: dict[str, dict[str, str]] = field(default_factory=dict)
+    curation_updated_at: str = ""
     added_at: str = ""
     extra: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.local_files = self.coerce_field("local_files", self.local_files)
         self.metadata_sources = self.coerce_field("metadata_sources", self.metadata_sources)
+        self.duplicate_decisions = self.coerce_field("duplicate_decisions", self.duplicate_decisions)
 
     def coerce_field(self, key: str, value: Any) -> Any:
         if key == "local_files":
@@ -154,6 +158,17 @@ class CatalogItem(ModelMapping):
             return {
                 str(field_name): row if isinstance(row, MetadataSource) else MetadataSource.from_mapping(row)
                 for field_name, row in value.items()
+                if isinstance(row, Mapping)
+            }
+        if key == "duplicate_decisions":
+            if not isinstance(value, Mapping):
+                return {}
+            return {
+                str(reference): {
+                    "status": str(row.get("status") or ""),
+                    "updated_at": str(row.get("updated_at") or ""),
+                }
+                for reference, row in value.items()
                 if isinstance(row, Mapping)
             }
         return value

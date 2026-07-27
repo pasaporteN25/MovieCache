@@ -113,7 +113,7 @@ emit_json() {
   now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   echo "Scanning: $ROOT" >&2
-  printf '{\n  "schema_version": 4,\n  "items": [\n'
+  printf '{\n  "schema_version": 5,\n  "items": [\n'
   while IFS= read -r -d '' file; do
     TOTAL_FILES=$((TOTAL_FILES + 1))
     if ! is_video_file "$file"; then
@@ -177,6 +177,9 @@ emit_json() {
     printf '    "review": "",\n'
     printf '    "metadata_sources": {"title": {"source": "local_files", "url": "", "updated_at": "%s", "inferred": false}, "kind": {"source": "local_files", "url": "", "updated_at": "%s", "inferred": false}},\n' "$now" "$now"
     printf '    "locked_fields": [],\n'
+    printf '    "link_curation_status": "pending",\n'
+    printf '    "duplicate_decisions": {},\n'
+    printf '    "curation_updated_at": "",\n'
     printf '    "added_at": "%s"\n' "$now"
     printf '  }'
   done < <(find "$ROOT" -type f -print0)

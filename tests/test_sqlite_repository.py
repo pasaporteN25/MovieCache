@@ -66,6 +66,14 @@ def sample_item(item_id: str = "heat-1995"):
                 }
             },
             "locked_fields": ["title"],
+            "link_curation_status": "resolved",
+            "duplicate_decisions": {
+                "other::catalog.json": {
+                    "status": "not_duplicate",
+                    "updated_at": "2026-07-25T00:00:00Z",
+                }
+            },
+            "curation_updated_at": "2026-07-25T00:00:00Z",
             "added_at": "2026-07-15T00:00:00Z",
             "custom_field": "preserved",
         }
@@ -84,10 +92,12 @@ class SqliteRepositoryTests(unittest.TestCase):
                 connection.commit()
 
             repository = SqliteCatalogRepository(path, normalize_item)
-            self.assertEqual(repository.database_version(), 2)
+            self.assertEqual(repository.database_version(), 3)
             with closing(sqlite3.connect(path)) as connection:
                 columns = {row[1] for row in connection.execute("PRAGMA table_info(catalog_items)")}
-            self.assertTrue({"backdrop_image", "tmdb_id"} <= columns)
+                tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+            self.assertTrue({"backdrop_image", "tmdb_id", "link_curation_status", "curation_updated_at"} <= columns)
+            self.assertIn("duplicate_decisions", tables)
 
     def test_relational_round_trip_preserves_catalog_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -103,6 +113,8 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.wikidata_id, "Q42198")
             self.assertEqual(loaded.backdrop_image, "https://images.example/backdrop.jpg")
             self.assertEqual(loaded.tmdb_id, "949")
+            self.assertEqual(loaded.link_curation_status, "resolved")
+            self.assertEqual(loaded.duplicate_decisions["other::catalog.json"]["status"], "not_duplicate")
             self.assertEqual(loaded.local_files[0].library_id, "movies-a")
             self.assertEqual(loaded.metadata_sources["title"].source, "imdb")
             self.assertEqual(loaded.extra["custom_field"], "preserved")
@@ -112,8 +124,11 @@ class SqliteRepositoryTests(unittest.TestCase):
                     row[0]
                     for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
                 }
-            self.assertTrue({"catalog_items", "external_ids", "local_files", "seasons", "episodes"} <= tables)
-            self.assertEqual(repository.database_version(), 2)
+            self.assertTrue(
+                {"catalog_items", "external_ids", "local_files", "seasons", "episodes", "duplicate_decisions"}
+                <= tables
+            )
+            self.assertEqual(repository.database_version(), 3)
 
     def test_catalog_service_mutates_sqlite_transactionally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -263,7 +278,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 self.assertEqual(import_json(source, database), 0)
                 self.assertEqual(export_json(database, exported), 0)
             payload = json.loads(exported.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema_version"], 4)
+            self.assertEqual(payload["schema_version"], 5)
             self.assertEqual(payload["items"][0]["id"], "heat-1995")
 
     def test_round_trip_verification_compares_complete_documents(self) -> None:

@@ -26,7 +26,7 @@ from movie_inbox.domain.catalog import possible_duplicate_candidates
 from movie_inbox.infrastructure.schema import CATALOG_FIELDS, CatalogSchemaError, catalog_document
 
 
-DATABASE_SCHEMA_VERSION = 2
+DATABASE_SCHEMA_VERSION = 3
 LIST_METADATA_FIELDS = ("genres", "directors", "writers", "cast")
 
 SCHEMA_V1 = """
@@ -167,6 +167,22 @@ MIGRATIONS = {
         (
             "ALTER TABLE catalog_items ADD COLUMN backdrop_image TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE catalog_items ADD COLUMN tmdb_id TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    3: (
+        "persistent curation decisions",
+        (
+            "ALTER TABLE catalog_items ADD COLUMN link_curation_status TEXT NOT NULL DEFAULT 'pending'",
+            "ALTER TABLE catalog_items ADD COLUMN curation_updated_at TEXT NOT NULL DEFAULT ''",
+            """CREATE TABLE duplicate_decisions (
+                item_id TEXT NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+                other_reference TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('deferred', 'not_duplicate')),
+                updated_at TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (item_id, other_reference)
+            )""",
+            "CREATE INDEX ix_catalog_items_link_curation ON catalog_items(link_curation_status)",
+            "CREATE INDEX ix_duplicate_decisions_status ON duplicate_decisions(status)",
         ),
     ),
 }
@@ -504,6 +520,9 @@ class SqliteCatalogRepository:
             "review": row["review"],
             "metadata_sources": self._metadata_sources(connection, item_id),
             "locked_fields": self._values(connection, "locked_fields", item_id, "field", order="field"),
+            "link_curation_status": row["link_curation_status"],
+            "duplicate_decisions": self._duplicate_decisions(connection, item_id),
+            "curation_updated_at": row["curation_updated_at"],
             "added_at": row["added_at"],
         }
         for field in LIST_METADATA_FIELDS:
@@ -583,6 +602,20 @@ class SqliteCatalogRepository:
         }
 
     @staticmethod
+    def _duplicate_decisions(connection: sqlite3.Connection, item_id: str) -> dict[str, dict[str, str]]:
+        rows = connection.execute(
+            "SELECT other_reference, status, updated_at FROM duplicate_decisions WHERE item_id = ?",
+            (item_id,),
+        ).fetchall()
+        return {
+            str(row["other_reference"]): {
+                "status": str(row["status"]),
+                "updated_at": str(row["updated_at"]),
+            }
+            for row in rows
+        }
+
+    @staticmethod
     def _apply_external_ids(connection: sqlite3.Connection, item: dict[str, Any]) -> None:
         rows = connection.execute(
             "SELECT source, external_id, url, title FROM external_ids WHERE item_id = ?",
@@ -637,8 +670,9 @@ class SqliteCatalogRepository:
                     id, position, primary_url, source, title, original_title, spanish_title, english_title,
                     kind, status, watched_at, rating, year, description, page_image, backdrop_image, tmdb_id,
                     wikipedia_extract,
-                    en_catalogo, local_name, local_path, notes, review, added_at, extra_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    en_catalogo, local_name, local_path, notes, review, link_curation_status,
+                    curation_updated_at, added_at, extra_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     position = excluded.position,
                     primary_url = excluded.primary_url,
@@ -662,6 +696,8 @@ class SqliteCatalogRepository:
                     local_path = excluded.local_path,
                     notes = excluded.notes,
                     review = excluded.review,
+                    link_curation_status = excluded.link_curation_status,
+                    curation_updated_at = excluded.curation_updated_at,
                     added_at = excluded.added_at,
                     extra_json = excluded.extra_json""",
                 (
@@ -672,7 +708,8 @@ class SqliteCatalogRepository:
                     item.get("page_image", ""), item.get("backdrop_image", ""), item.get("tmdb_id", ""),
                     item.get("wikipedia_extract", ""),
                     int(bool(item.get("en_catalogo"))), item.get("local_name", ""), item.get("local_path", ""),
-                    item.get("notes", ""), item.get("review", ""), item.get("added_at", ""), _json_dump(extra),
+                    item.get("notes", ""), item.get("review", ""), item.get("link_curation_status", "pending"),
+                    item.get("curation_updated_at", ""), item.get("added_at", ""), _json_dump(extra),
                 ),
             )
 
@@ -696,6 +733,19 @@ class SqliteCatalogRepository:
                 connection.execute(
                     "INSERT INTO locked_fields(item_id, field) VALUES (?, ?)",
                     (item_id, str(field)),
+                )
+        if previous is None or previous.get("duplicate_decisions") != item.get("duplicate_decisions"):
+            connection.execute("DELETE FROM duplicate_decisions WHERE item_id = ?", (item_id,))
+            for other_reference, decision in item.get("duplicate_decisions", {}).items():
+                connection.execute(
+                    """INSERT INTO duplicate_decisions(item_id, other_reference, status, updated_at)
+                    VALUES (?, ?, ?, ?)""",
+                    (
+                        item_id,
+                        str(other_reference),
+                        str(decision.get("status") or ""),
+                        str(decision.get("updated_at") or ""),
+                    ),
                 )
         external_fields = ("wikipedia_url", "wikipedia_title", "imdb_url", "filmaffinity_url", "wikidata_id")
         if previous is None or any(previous.get(field) != item.get(field) for field in external_fields):
