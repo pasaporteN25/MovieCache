@@ -57,6 +57,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 ### Corregido
 
 - Las consultas batch de metadata vuelven a continuar ante timeouts o respuestas invalidas, mientras el buscador conserva errores para el panel de salud.
+- La ficha reinicia su scroll al cambiar de obra y las vistas restauran foco, URL y contexto sin conservar hashes ajenos.
+- Formularios, estados deshabilitados y microtipografia comparten el mismo acabado; busquedas y comparaciones fallidas ofrecen recuperacion visible sin alertas tecnicas.
 - La politica CSP del visor ya no necesita permitir JavaScript ni estilos inline.
 - El visor vuelve a cargar catalogos tras completar el refactor que habia dejado normalizadores duplicados.
 - Las expresiones regulares JavaScript embebidas ya no producen `SyntaxWarning` en Python.
