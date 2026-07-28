@@ -12,6 +12,10 @@
         --case: #080a18;
         --line: rgba(139, 124, 255, 0.34);
         --panel: rgba(17, 21, 42, 0.9);
+        --control-height: 38px;
+        --touch-target: 44px;
+        --focus-ring: 3px solid var(--teal);
+        --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         font-family: "Space Grotesk", "Trebuchet MS", Verdana, ui-sans-serif, system-ui, sans-serif;
         color: var(--ink);
         background: #080a18;
@@ -103,7 +107,7 @@
         background: transparent;
         border: 0;
         color: var(--muted);
-        min-height: 32px;
+        min-height: var(--control-height);
         padding: 6px 10px;
         width: auto;
       }
@@ -114,7 +118,7 @@
         border-radius: 999px;
         color: #fff;
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         line-height: 1;
         min-width: 18px;
@@ -128,7 +132,7 @@
         cursor: pointer;
         display: flex;
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         gap: 5px;
         line-height: 1.1;
         padding: 4px 7px 4px 4px;
@@ -195,7 +199,7 @@
         color: var(--teal);
         font-family: "Courier New", monospace;
         font-size: 10px;
-        min-height: 32px;
+        min-height: var(--control-height);
         padding: 5px 9px;
         text-transform: uppercase;
         width: auto;
@@ -223,7 +227,7 @@
       }
       .spotlight-empty span { font-size: 12px; }
       .spotlight-slide {
-        animation: spotlight-in 520ms ease both;
+        animation: spotlight-in 520ms var(--ease-out) both;
         background: linear-gradient(135deg, #1a1e3d, #090b1d 70%);
         height: 100%;
         isolation: isolate;
@@ -364,27 +368,51 @@
         gap: 8px;
         grid-template-columns: repeat(3, minmax(120px, 1fr));
       }
-      input, select, button {
+      input, select, textarea, button {
         background: #0c1025;
         border: 1px solid #454c78;
         border-radius: 3px;
         color: var(--ink);
         font: inherit;
-        min-height: 38px;
+        min-height: var(--control-height);
         padding: 8px 10px;
         width: 100%;
       }
-      input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible {
-        outline: 3px solid var(--teal);
+      textarea { line-height: 1.5; }
+      input::placeholder,
+      textarea::placeholder { color: #9297b8; opacity: 1; }
+      input[type="checkbox"],
+      input[type="radio"] { accent-color: var(--teal); }
+      input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible {
+        outline: var(--focus-ring);
         outline-offset: 2px;
+      }
+      .view-focus-target:focus { outline: none; }
+      body[data-input-method="keyboard"] .view-focus-target:focus {
+        outline: var(--focus-ring);
+        outline-offset: 6px;
       }
       .source-toggle input {
         min-height: auto;
         padding: 0;
         width: auto;
       }
-      button { cursor: pointer; font-weight: 700; }
-      button:hover { filter: brightness(0.96); }
+      button {
+        cursor: pointer;
+        font-weight: 700;
+        transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, filter 160ms ease;
+      }
+      button:not(:disabled):hover { filter: brightness(0.96); }
+      button:not(:disabled):active { box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.035); }
+      button:disabled,
+      input:disabled,
+      select:disabled,
+      textarea:disabled {
+        cursor: not-allowed;
+        filter: none;
+        opacity: 0.58;
+      }
+      button[aria-busy="true"] { cursor: progress; }
       .kind-select {
         font-size: 12px;
         min-height: 30px;
@@ -508,7 +536,7 @@
       .section-kicker {
         color: var(--teal);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
       }
@@ -556,7 +584,7 @@
       .search-result h3.title-long { font-size: 12px; }
       .search-result h3.title-xlong { font-size: 11px; line-height: 1.2; }
       .search-result h3.title-xxlong { font-size: 10px; line-height: 1.18; }
-      .search-result h3.title-ultra { font-size: 9px; line-height: 1.16; }
+      .search-result h3.title-ultra { font-size: 10px; line-height: 1.16; }
       .search-result p {
         color: var(--muted);
         font-size: 12px;
@@ -1052,7 +1080,7 @@
         border: 1px solid #39240a;
         box-shadow: 0 0 16px rgba(255, 190, 85, 0.34);
         color: #24170b;
-        font-size: 8px;
+        font-size: 9px;
         font-weight: 900;
         letter-spacing: 0.05em;
         padding: 4px 6px;
@@ -1090,7 +1118,7 @@
         color: var(--teal);
         display: block;
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         letter-spacing: 0.14em;
         margin-bottom: 5px;
@@ -1128,7 +1156,7 @@
         border: 1px solid rgba(120, 92, 255, 0.55);
         color: #d9d4ff;
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         padding: 4px 5px;
         text-transform: uppercase;
       }
@@ -1137,7 +1165,7 @@
       .dvd-back-hint {
         color: #ff79bf;
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         letter-spacing: 0.04em;
         text-transform: uppercase;
@@ -1243,6 +1271,12 @@
         min-height: 132px;
         resize: vertical;
       }
+      .personal-grid input,
+      .personal-grid select,
+      .personal-grid textarea,
+      .metadata-row input,
+      .metadata-row select,
+      .metadata-row textarea { font-size: 14px; }
       .personal-grid .review-field,
       .personal-actions { grid-column: 1 / -1; }
       .personal-actions {
@@ -1297,7 +1331,7 @@
         padding: 0;
         width: min(960px, calc(100vw - 36px));
       }
-      .detail-drawer[open] { animation: movie-dialog-in 220ms ease both; display: grid; }
+      .detail-drawer[open] { animation: movie-dialog-in 220ms var(--ease-out) both; display: grid; }
       .detail-drawer::backdrop {
         backdrop-filter: blur(7px);
         background: rgba(3, 4, 14, 0.82);
@@ -1340,7 +1374,7 @@
         background: rgba(8, 10, 24, 0.62);
         border-color: rgba(120, 92, 255, 0.42);
         color: var(--ink);
-        min-height: 40px;
+        min-height: var(--touch-target);
         padding: 7px 10px;
         width: auto;
       }
@@ -1350,7 +1384,7 @@
       .drawer-navigation-label {
         color: var(--muted);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         max-width: 190px;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1414,7 +1448,7 @@
       .drawer-kicker {
         color: var(--teal);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         letter-spacing: 0.12em;
         margin-bottom: 6px;
@@ -1535,12 +1569,12 @@
       }
       .drawer-accordion[open] > summary::after { content: "−"; }
       .drawer-accordion > summary > span { font-size: 12px; font-weight: 800; }
-      .drawer-accordion > summary > small { color: var(--muted); font-size: 9px; margin-left: auto; text-align: right; }
+      .drawer-accordion > summary > small { color: var(--muted); font-size: 10px; margin-left: auto; text-align: right; }
       .drawer-accordion-body { border-top: 1px dashed var(--line); display: grid; gap: 10px; padding: 13px; }
       .availability-list { display: grid; gap: 7px; margin: 0; }
       .availability-list > div { display: grid; gap: 8px; grid-template-columns: 100px minmax(0, 1fr); }
       .availability-list dt { color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
-      .availability-list dd { font-size: 11px; margin: 0; overflow-wrap: anywhere; }
+      .availability-list dd { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
       .drawer-secondary-action { justify-self: start; width: auto; }
       .danger-zone { border-color: rgba(255, 102, 122, 0.48); }
       .danger-zone .drawer-accordion-body { background: rgba(255, 102, 122, 0.08); }
@@ -1855,9 +1889,10 @@
         gap: 3px;
         overflow-x: auto;
         padding: 6px 0;
-        scrollbar-width: none;
+        scrollbar-color: rgba(34, 216, 229, 0.5) rgba(8, 10, 24, 0.38);
+        scrollbar-width: thin;
+        scroll-snap-type: x proximity;
       }
-      .curation-tabs::-webkit-scrollbar { display: none; }
       .curation-tab {
         align-items: center;
         background: transparent;
@@ -1868,6 +1903,7 @@
         gap: 8px;
         min-height: 40px;
         padding: 8px 12px;
+        scroll-snap-align: start;
         width: auto;
       }
       .curation-tab span {
@@ -1875,7 +1911,7 @@
         border-radius: 999px;
         color: var(--ink);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         min-width: 22px;
         padding: 3px 5px;
       }
@@ -1923,7 +1959,7 @@
       .curation-panel-heading span {
         color: var(--muted);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         text-transform: uppercase;
       }
       .curation-queue {
@@ -1962,7 +1998,7 @@
       .curation-queue-type {
         color: var(--gold);
         font-family: "Courier New", monospace;
-        font-size: 8px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
       }
@@ -2014,7 +2050,7 @@
       .curation-record-label {
         color: var(--teal);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
       }
@@ -2028,7 +2064,7 @@
       .curation-evidence strong {
         color: var(--gold);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         text-transform: uppercase;
       }
       .curation-evidence ul { display: grid; gap: 4px; margin: 0; padding-left: 18px; }
@@ -2117,7 +2153,7 @@
       .history-facts dt {
         color: var(--muted);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
       }
@@ -2144,7 +2180,7 @@
         width: calc(100% - 28px);
       }
       .merge-comparator-dialog[open] {
-        animation: movie-dialog-in 220ms ease both;
+        animation: movie-dialog-in 220ms var(--ease-out) both;
         display: grid;
       }
       .merge-comparator-dialog::backdrop {
@@ -2198,7 +2234,7 @@
       .merge-survivor-control legend {
         color: var(--muted);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
         margin-bottom: 5px;
         text-transform: uppercase;
@@ -2259,7 +2295,7 @@
       .merge-entry-summary > div > span {
         color: var(--teal);
         font-family: "Courier New", monospace;
-        font-size: 8px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
       }
@@ -2305,7 +2341,7 @@
       .merge-field-group > header span {
         color: var(--muted);
         font-family: "Courier New", monospace;
-        font-size: 9px;
+        font-size: 10px;
         text-transform: uppercase;
       }
       .merge-field-row {
@@ -2351,7 +2387,7 @@
       .merge-choice-label {
         color: var(--muted);
         font-family: "Courier New", monospace;
-        font-size: 8px;
+        font-size: 10px;
         font-weight: 800;
         text-transform: uppercase;
       }
@@ -2390,7 +2426,7 @@
       .merge-field-same > span:last-child {
         color: var(--teal);
         font-family: "Courier New", monospace;
-        font-size: 8px;
+        font-size: 10px;
         text-transform: uppercase;
       }
       .merge-comparator-footer {
@@ -2404,7 +2440,8 @@
       }
       .merge-comparator-footer > div:first-child { display: grid; gap: 3px; }
       .merge-comparator-footer strong { font-size: 13px; }
-      .merge-comparator-footer span { color: var(--muted); font-size: 10px; }
+      .merge-comparator-footer span { color: var(--muted); font-size: 11px; }
+      .merge-error-action { justify-self: center; margin-top: 5px; width: auto; }
       .merge-comparator-actions { display: flex; gap: 8px; }
       .merge-comparator-actions button { width: auto; }
       .merge-loading {
@@ -2450,6 +2487,9 @@
         overflow-x: auto;
         padding: 6px 0;
         position: sticky;
+        scrollbar-color: rgba(34, 216, 229, 0.5) rgba(8, 10, 24, 0.38);
+        scrollbar-width: thin;
+        scroll-snap-type: x proximity;
         top: 0;
         z-index: 10;
       }
@@ -2458,7 +2498,17 @@
         flex: 0 0 auto;
         min-height: 38px;
         padding: 10px 12px;
+        scroll-snap-align: start;
       }
+      .curation-tabs::-webkit-scrollbar,
+      .admin-section-nav::-webkit-scrollbar,
+      .active-filters::-webkit-scrollbar { height: 4px; }
+      .curation-tabs::-webkit-scrollbar-track,
+      .admin-section-nav::-webkit-scrollbar-track,
+      .active-filters::-webkit-scrollbar-track { background: rgba(8, 10, 24, 0.38); }
+      .curation-tabs::-webkit-scrollbar-thumb,
+      .admin-section-nav::-webkit-scrollbar-thumb,
+      .active-filters::-webkit-scrollbar-thumb { background: rgba(34, 216, 229, 0.5); }
       .admin-section-nav a:hover,
       .admin-section-nav a:focus-visible {
         background: rgba(34, 216, 229, 0.1);
@@ -2654,7 +2704,7 @@
         .drawer-navigation-label { justify-self: start; max-width: none; }
         .drawer-navigation:has(.drawer-navigation-random) { grid-template-columns: minmax(0, 1fr) auto; }
         .drawer-intro h2 { font-size: 28px; }
-        .drawer-byline span { font-size: 8px; }
+        .drawer-byline span { font-size: 10px; }
         .drawer-quick-actions { grid-template-columns: 1fr 1fr; }
         .drawer-state.rating-state { grid-column: 1 / -1; min-height: 70px; }
         .drawer-accordion > summary > small { display: none; }
@@ -2687,7 +2737,7 @@
         .dvd-front-statuses { display: grid; grid-template-columns: 1fr 1fr; }
         .dvd-front-status { font-size: 10px; min-width: 0; padding-inline: 4px; text-align: center; white-space: normal; }
         .drawer-navigation button span { display: none; }
-        .drawer-navigation-counter { font-size: 8px; }
+        .drawer-navigation-counter { font-size: 10px; }
       }
       @media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
         main {
@@ -2756,7 +2806,7 @@
         }
         .inbox-nav-action { gap: 5px; }
         .nav-count {
-          font-size: 8px;
+          font-size: 10px;
           min-width: 17px;
           padding: 4px;
         }
@@ -2828,10 +2878,10 @@
           flex-wrap: nowrap;
           max-width: 100%;
           overflow-x: auto;
-          padding: 1px 0 3px;
-          scrollbar-width: none;
+          padding: 1px 0 5px;
+          scrollbar-color: rgba(34, 216, 229, 0.5) rgba(8, 10, 24, 0.38);
+          scrollbar-width: thin;
         }
-        .active-filters::-webkit-scrollbar { display: none; }
         .active-filters > span,
         .active-filters button { flex: 0 0 auto; }
         .catalog-heading {
@@ -2869,7 +2919,7 @@
         .dvd-card h2.title-ultra { font-size: 10px; }
         .dvd-title-meta > span,
         .dvd-title-meta > strong {
-          font-size: 9px;
+          font-size: 10px;
           letter-spacing: 0.04em;
         }
         .dvd-front-statuses {
@@ -2877,7 +2927,7 @@
           grid-template-columns: 1fr 1fr;
         }
         .dvd-front-status {
-          font-size: 9px;
+          font-size: 10px;
           min-width: 0;
           padding-inline: 3px;
           text-align: center;
@@ -2893,7 +2943,7 @@
         .quiet-action:active { filter: brightness(1.14); }
       }
       @media (prefers-reduced-motion: reduce) {
-        .dvd-flipper, .dvd-case, .detail-drawer { transition: none; }
+        button, .dvd-flipper, .dvd-case, .detail-drawer { transition: none; }
         .detail-drawer[open], .merge-comparator-dialog[open], .spotlight-slide { animation: none; }
         .merge-loading span { animation: none; opacity: 0.8; }
         .dvd-card:hover .dvd-flipper,

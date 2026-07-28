@@ -75,6 +75,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         inboxBadge: document.querySelector("#inboxBadge"),
         adminButton: document.querySelector("#adminButton"),
         systemMenu: document.querySelector("#systemMenu"),
+        searchConsole: document.querySelector(".search-console"),
         collectionUtilityMenu: document.querySelector(".collection-view .utility-menu"),
         randomButton: document.querySelector("#randomButton"),
         randomCatalogOnly: document.querySelector("#randomCatalogOnly"),
@@ -254,6 +255,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (event.key === "Escape") clearManualSearch();
       });
       document.addEventListener("visibilitychange", handleVisibilityChange);
+      document.addEventListener("keydown", handleKeyboardModality, true);
+      document.addEventListener("pointerdown", handlePointerModality, true);
       window.addEventListener("beforeunload", handleBeforeUnload);
       window.addEventListener("popstate", restoreRoute);
       document.addEventListener("error", handlePosterError, true);
@@ -287,6 +290,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "detail-previous": () => navigateDetail(-1),
           "detail-next": () => navigateDetail(1),
           "detail-random": openAnotherRandomDetail,
+          "retry-merge-comparison": retryMergeComparison,
           "show-more-manual": showMoreManualResults,
           "show-more-catalog": showMoreCatalogResults,
           "merge-result": () => mergeSearchResult(index, id),
@@ -298,6 +302,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "run-search": runSearch
         };
         actions[target.dataset.click]?.();
+      }
+
+      function handleKeyboardModality(event) {
+        if (["Tab", "Enter", " "].includes(event.key)) document.body.dataset.inputMethod = "keyboard";
+      }
+
+      function handlePointerModality() {
+        document.body.dataset.inputMethod = "pointer";
       }
 
       function runDetailAwareAction(target, action) {
@@ -354,7 +366,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         seedSpotlight();
         renderSpotlight();
         render();
-        showView("home", { updateHistory: false });
+        showView("home", { updateHistory: false, focus: true });
         syncRoute(routeValuesForView("home"), "push");
       }
 
@@ -365,7 +377,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function goToCollectionRoot() {
         resetCollectionFilters();
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
-        showView("catalog", { updateHistory: false });
+        showView("catalog", { updateHistory: false, focus: true });
         syncRoute(routeValuesForView("catalog"), "push");
       }
 
@@ -379,7 +391,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         showView("admin", options);
       }
 
-      function showView(view, { updateHistory = true, scroll = true } = {}) {
+      function showView(view, options = {}) {
+        const updateHistory = options.updateHistory !== false;
+        const scroll = options.scroll !== false;
+        const focus = options.focus ?? updateHistory;
         currentView = ["home", "catalog", "inbox", "admin"].includes(view) ? view : "home";
         fields.homeView.hidden = currentView !== "home";
         fields.collectionView.hidden = currentView !== "catalog";
@@ -392,7 +407,24 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (fields.systemMenu.open) fields.systemMenu.open = false;
         if (updateHistory) syncRoute(routeValuesForView(currentView), "push");
         renderHeaderStats();
-        if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+        if (scroll) scrollPageTop();
+        if (focus) requestAnimationFrame(() => focusViewHeading(currentView));
+      }
+
+      function scrollPageTop() {
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+      }
+
+      function focusViewHeading(view) {
+        const selector = {
+          home: "#spotlightTitle",
+          catalog: "#catalogTitle",
+          inbox: "#inboxTitle",
+          admin: "#adminTitle"
+        }[view];
+        if (!selector) return;
+        document.querySelector(selector)?.focus({ preventScroll: true });
       }
 
       function setActiveNavigation(view) {
@@ -414,6 +446,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       async function loadCurationQueue({ announce = false } = {}) {
         if (curationLoading) return;
         curationLoading = true;
+        fields.inboxView.setAttribute("aria-busy", "true");
         fields.refreshCuration.disabled = true;
         if (announce) setCurationFeedback("Actualizando bandeja…", "working");
         try {
@@ -443,6 +476,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           fields.curationDetail.innerHTML = curationEmptyState("Bandeja no disponible", "La colección permanece intacta.");
         } finally {
           curationLoading = false;
+          fields.inboxView.setAttribute("aria-busy", "false");
           fields.refreshCuration.disabled = false;
         }
       }
@@ -994,6 +1028,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.mergeComparatorFeedback.dataset.tone = "";
         fields.mergeComparatorTitle.textContent = "Preparando comparación";
         fields.mergeComparatorSubtitle.textContent = "Cargando los valores actuales del catálogo.";
+        fields.mergeSurvivorControl.hidden = true;
+        fields.mergeComparatorSummary.innerHTML = "";
         fields.mergeComparatorFields.innerHTML = mergeComparatorLoading();
         fields.confirmReviewedMerge.disabled = true;
         fields.mergeDecisionStatus.textContent = "Leyendo entradas";
@@ -1006,6 +1042,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (!mergeContext) return;
         const requestId = ++mergeRequestSequence;
         const requestContext = mergeContext;
+        mergeContext.survivor_side = survivorSide;
         fields.mergeComparatorDialog.dataset.loading = "true";
         fields.confirmReviewedMerge.disabled = true;
         fields.mergeComparatorFeedback.textContent = "";
@@ -1023,6 +1060,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           });
           const payload = await response.json();
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          if (
+            !payload
+            || !payload.left
+            || !payload.right
+            || !Array.isArray(payload.fields)
+            || !Array.isArray(payload.groups)
+          ) {
+            throw new Error("invalid_comparison_payload");
+          }
           if (requestId !== mergeRequestSequence || mergeContext !== requestContext) return;
           mergeReview = payload;
           if (payload.incoming) mergeContext.incoming = payload.incoming;
@@ -1039,17 +1085,35 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           mergeReview = null;
           fields.mergeComparatorTitle.textContent = "No se pudo comparar";
           fields.mergeComparatorSubtitle.textContent = "Las entradas no fueron modificadas.";
-          fields.mergeComparatorFields.innerHTML = curationEmptyState(
-            "Comparación no disponible",
-            "Cerrá esta mesa y volvé a intentarlo desde la Bandeja."
-          );
-          fields.mergeComparatorFeedback.textContent = error.message || "Error de comparación";
+          fields.mergeSurvivorControl.hidden = true;
+          fields.mergeComparatorSummary.innerHTML = "";
+          fields.mergeComparatorFields.innerHTML = `<div class="curation-empty">
+            <strong>Comparación no disponible</strong>
+            <p>No pudimos leer ambas entradas. Podés reintentar sin cerrar esta mesa.</p>
+            <button class="quiet-action merge-error-action" type="button" data-click="retry-merge-comparison">Reintentar comparación</button>
+          </div>`;
+          fields.mergeComparatorFeedback.textContent = "La comparación se interrumpió. El catálogo permanece intacto.";
           fields.mergeComparatorFeedback.dataset.tone = "error";
+          fields.mergeDecisionStatus.textContent = "Comparación interrumpida";
+          fields.mergeDecisionMeta.textContent = "";
         } finally {
           if (requestId === mergeRequestSequence) {
             fields.mergeComparatorDialog.dataset.loading = "false";
           }
         }
+      }
+
+      function retryMergeComparison() {
+        if (!mergeContext || fields.mergeComparatorDialog.dataset.loading === "true") return;
+        fields.mergeComparatorTitle.textContent = "Preparando comparación";
+        fields.mergeComparatorSubtitle.textContent = "Volviendo a leer los valores actuales del catálogo.";
+        fields.mergeSurvivorControl.hidden = true;
+        fields.mergeComparatorSummary.innerHTML = "";
+        fields.mergeComparatorFields.innerHTML = mergeComparatorLoading();
+        fields.mergeDecisionStatus.textContent = "Leyendo entradas";
+        fields.mergeComparatorFeedback.textContent = "";
+        fields.mergeComparatorFeedback.dataset.tone = "";
+        requestMergeComparison(mergeContext.survivor_side || "left");
       }
 
       function renderMergeComparator() {
@@ -1428,6 +1492,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           if (value) url.searchParams.set(key, value);
           else url.searchParams.delete(key);
         }
+        if (Object.prototype.hasOwnProperty.call(values, "view")) url.hash = "";
         history[method === "push" ? "pushState" : "replaceState"]({}, "", url);
       }
 
@@ -2179,6 +2244,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         syncSpotlightControl();
         clearDetailFeedback();
         renderDetail({ force: true });
+        fields.detailBody.scrollTop = 0;
         if (!fields.detailDrawer.open) fields.detailDrawer.showModal();
         document.body.classList.add("drawer-open");
         if (updateHistory) syncRoute({ movie: id }, "push");
@@ -2597,6 +2663,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.manualSearchStatus.textContent = statusPrefix || "Buscando...";
         fields.manualSearchResults.innerHTML = "";
         fields.searchButton.disabled = true;
+        fields.searchButton.setAttribute("aria-busy", "true");
+        fields.searchConsole.setAttribute("aria-busy", "true");
         fields.searchButton.textContent = "Buscando...";
         setSearchState(
           "searching",
@@ -2614,14 +2682,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           externalHealth = payload.external || externalHealth;
           externalSourcesAttempted = source === "all" ? ["wikipedia", "imdb", "filmaffinity"] : [source];
           externalSourcesLastUsed = [...new Set(manualResults.map((result) => result.source || "").filter(Boolean))];
-          console.log("[catalog-viewer] search results", {
-            source,
-            query,
-            count: manualResults.length,
-            sources: [...new Set(manualResults.map((result) => result.source || ""))]
-          });
           fields.manualSearchStatus.textContent = manualResults.length
-            ? `${manualResults.length} resultados${source === "wikipedia" ? " de Wikipedia" : ""}`
+            ? `${manualResults.length} ${manualResults.length === 1 ? "resultado" : "resultados"}${source === "wikipedia" ? " de Wikipedia" : ""}`
             : "Sin resultados";
           setSearchState(
             "results",
@@ -2644,6 +2706,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             externalSearchController = null;
             externalSearchTimedOut = false;
             fields.searchButton.disabled = false;
+            fields.searchButton.removeAttribute("aria-busy");
+            fields.searchConsole.setAttribute("aria-busy", "false");
             fields.searchButton.textContent = "Buscar";
           }
         }
@@ -2655,6 +2719,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         externalSearchController.abort();
         externalSearchController = null;
         fields.searchButton.disabled = false;
+        fields.searchButton.removeAttribute("aria-busy");
+        fields.searchConsole.setAttribute("aria-busy", "false");
         fields.searchButton.textContent = "Buscar";
         fields.manualSearchStatus.textContent = "Búsqueda externa cancelada.";
         setSearchState(
@@ -2670,6 +2736,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         externalSearchController = null;
         externalSearchTimedOut = false;
         fields.searchButton.disabled = false;
+        fields.searchButton.removeAttribute("aria-busy");
+        fields.searchConsole.setAttribute("aria-busy", "false");
         fields.searchButton.textContent = "Buscar";
         manualResults = [];
         catalogMergeResults = [];
@@ -2743,7 +2811,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ? "Coincidencias de la colección"
           : "Elegí una entrada local";
         fields.catalogMergeStatus.textContent = selectedManualIndex === null
-          ? `${catalogMergeResults.length} coincidencias locales.`
+          ? `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "coincidencia local" : "coincidencias locales"}.`
           : `${catalogMergeResults.length} entradas encontradas para comparar.`;
         renderCatalogMergeResults();
       }
@@ -2920,37 +2988,49 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       async function addSearchResult(index) {
         const cards = [...fields.manualSearchResults.querySelectorAll("[data-index]")];
         const button = cards.find((element) => Number(element.dataset.index) === index);
+        if (!button) return;
+        const targetId = selectedExistingIdForSearch;
+        const idleLabel = targetId ? "Combinar" : "Agregar";
+        let completed = false;
         button.disabled = true;
-        button.textContent = selectedExistingIdForSearch ? "Preparando..." : "Agregando...";
-        if (selectedExistingIdForSearch) {
-          if (!isExternalResult(manualResults[index])) {
-            button.disabled = false;
-            button.textContent = "Combinar";
-            alert("Este resultado no tiene un link externo reconocido. Elegí Wikipedia, IMDb o FilmAffinity.");
-            console.warn("[catalog-viewer] blocked result without trusted link", { result: manualResults[index] });
+        button.textContent = targetId ? "Preparando..." : "Agregando...";
+        try {
+          if (targetId) {
+            if (!isExternalResult(manualResults[index])) {
+              reportExternalResultProblem("Ese resultado no tiene un enlace reconocido. Elegí una opción de Wikipedia, IMDb o FilmAffinity.");
+              return;
+            }
+            await mergeSearchResult(index, targetId);
             return;
           }
-          await mergeSearchResult(index, selectedExistingIdForSearch);
-          button.disabled = false;
-          button.textContent = "Combinar";
-          return;
-        }
-        const response = await apiFetch("/api/add", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(manualResults[index])
-        });
-        const payload = await response.json();
-        if (payload.reason === "possible_duplicate") {
-          button.disabled = false;
-          button.textContent = "Agregar";
-          showDuplicateChoice(index, payload.candidates || []);
-          return;
-        }
-        button.textContent = payload.ok ? "Agregado" : payload.reason === "duplicate" ? "Ya existe" : "Error";
-        await load();
-        if (payload.background_enrichment === "scheduled") {
-          window.setTimeout(() => load(), 12000);
+          const response = await apiFetch("/api/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(manualResults[index])
+          });
+          const payload = await response.json();
+          if (payload.reason === "possible_duplicate") {
+            button.textContent = idleLabel;
+            showDuplicateChoice(index, payload.candidates || []);
+            return;
+          }
+          if (!response.ok || (!payload.ok && payload.reason !== "duplicate")) {
+            throw new Error(payload.reason || `HTTP ${response.status}`);
+          }
+          completed = true;
+          button.textContent = payload.reason === "duplicate" ? "Ya existe" : "Agregado";
+          await load();
+          if (payload.background_enrichment === "scheduled") {
+            window.setTimeout(() => load(), 12000);
+          }
+        } catch (error) {
+          console.error("[catalog-viewer] add result failed", error);
+          reportExternalResultProblem("No pudimos guardar ese resultado. Reintentá desde esta búsqueda.");
+        } finally {
+          if (button.isConnected) {
+            button.disabled = completed;
+            if (["Preparando...", "Agregando..."].includes(button.textContent)) button.textContent = idleLabel;
+          }
         }
       }
 
@@ -2982,11 +3062,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       async function mergeSearchResult(index, targetId) {
         if (!isExternalResult(manualResults[index])) {
-          alert("Este resultado no tiene un link externo reconocido. Elegí un resultado de Wikipedia, IMDb o FilmAffinity.");
-          console.warn("[catalog-viewer] blocked result without trusted link", { targetId, result: manualResults[index] });
+          reportExternalResultProblem("Ese resultado no se puede comparar porque no tiene un enlace externo reconocido.");
           return;
         }
         await openExternalMergeComparator(index, targetId);
+      }
+
+      function reportExternalResultProblem(message) {
+        fields.manualSearchStatus.textContent = message;
+        setSearchState("error", `${message} La colección no fue modificada.`);
       }
 
       async function forceAddSearchResult(index) {
@@ -3078,25 +3162,36 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       async function deleteCatalogItem(event, id) {
         event.preventDefault();
         const item = items.find((entry) => entry.id === id);
-        const title = item?.title || item?.local_name || "Sin titulo";
-        const confirmed = confirm(`Eliminar "${title}" del catalogo? Esta accion modifica los datos.`);
+        const title = item?.title || item?.local_name || "Sin título";
+        const confirmed = confirm(`¿Eliminar "${title}" del catálogo? Esta acción modifica los datos.`);
         if (!confirmed) return;
-        const response = await apiFetch("/api/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id,
-            confirmed: true,
-            source_file: item?._source_file || "",
-            url: item?.url || "",
-            title: item?.title || title,
-            year: item?.year || "",
-            local_name: item?.local_name || ""
-          })
-        });
-        const payload = await response.json();
-        if (!payload.ok) alert(payload.reason || "No se pudo eliminar");
-        await load();
+        const button = event.target.closest("[data-click='delete-item']");
+        if (button) button.disabled = true;
+        setDetailFeedback("Eliminando entrada…", "working", 0);
+        try {
+          const response = await apiFetch("/api/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id,
+              confirmed: true,
+              source_file: item?._source_file || "",
+              url: item?.url || "",
+              title: item?.title || title,
+              year: item?.year || "",
+              local_name: item?.local_name || ""
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          closeDetail({ restoreFocus: false, updateHistory: true, skipGuard: true });
+          await load();
+        } catch (error) {
+          console.error("[catalog-viewer] delete failed", error);
+          setDetailFeedback("No pudimos eliminar la entrada. Reintentá.", "error", 0);
+        } finally {
+          if (button?.isConnected) button.disabled = false;
+        }
       }
 
       async function toggleWatched(event, id, currentStatus) {
@@ -3122,8 +3217,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           await load();
         } catch (error) {
           console.error("[catalog-viewer] status update failed", error);
-          if (detailAction) setDetailFeedback("No se pudo guardar el estado", "error", 0);
-          else alert(error.message || "No se pudo cambiar el estado");
+          if (detailAction) setDetailFeedback("No pudimos guardar el estado. Reintentá.", "error", 0);
+          else setSearchState("error", "No pudimos guardar el estado. Reintentá.");
         }
       }
 
@@ -3146,8 +3241,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           await load();
         } catch (error) {
           console.error("[catalog-viewer] catalog update failed", error);
-          if (detailAction) setDetailFeedback("No se pudo guardar la disponibilidad", "error", 0);
-          else alert(error.message || "No se pudo cambiar el estado de catalogo");
+          if (detailAction) setDetailFeedback("No pudimos guardar la disponibilidad. Reintentá.", "error", 0);
+          else setSearchState("error", "No pudimos guardar la disponibilidad. Reintentá.");
         }
       }
 
