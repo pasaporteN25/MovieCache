@@ -2,12 +2,28 @@
 
 Movie Inbox mantiene un modelo canonico independiente del formato de persistencia. Los casos de uso dependen de `CatalogRepository`; la extension del archivo selecciona `JsonCatalogRepository` o `SqliteCatalogRepository`.
 
+La identidad de la instancia vive en una segunda base SQLite. Esta separacion evita que usuarios, contrasenas o sesiones entren en el esquema portable del catalogo.
+
 ## Responsabilidades
 
 - SQLite es la opcion recomendada como fuente de verdad para un proceso de servidor.
 - JSON es el formato de importacion, exportacion, auditoria y backup portable.
 - Los datos personales no se guardan en Git.
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
+- `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
+
+## Base de instancia v1
+
+La base de instancia contiene:
+
+- `users`: owner inicial, hash `scrypt`, rol y estado de la cuenta.
+- `catalogs`: catalogo personal predeterminado de cada usuario.
+- `catalog_sources`: archivos JSON/SQLite que forman ese catalogo y fuente writable.
+- `sessions`: hashes de tokens opacos y expiracion absoluta.
+
+El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
+
+Una exportacion JSON incluye solamente el catalogo. No incluye cuentas ni sesiones. Para restaurar una instancia completa se respaldan por separado el catalogo, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
 
 ## Esquema SQLite v3
 

@@ -1622,6 +1622,26 @@
         min-height: 38px;
         padding: 7px 10px;
       }
+      .account-mark {
+        align-items: center;
+        background: var(--teal);
+        border-radius: 50%;
+        color: #071018;
+        display: inline-flex;
+        font-family: "Courier New", monospace;
+        font-size: 9px;
+        font-weight: 900;
+        height: 24px;
+        justify-content: center;
+        margin-right: 7px;
+        width: 24px;
+      }
+      #currentUserLabel {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .system-menu > summary::-webkit-details-marker { display: none; }
       .system-menu > summary::after {
         color: var(--teal);
@@ -1641,7 +1661,7 @@
         box-shadow: 0 18px 44px rgba(0, 0, 0, 0.52), 0 0 24px rgba(120, 92, 255, 0.12);
         display: grid;
         gap: 7px;
-        min-width: 190px;
+        min-width: 224px;
         padding: 9px;
         position: absolute;
         right: 0;
@@ -1657,6 +1677,22 @@
         padding: 3px 5px;
         text-transform: uppercase;
       }
+      .account-overview {
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 3px;
+        padding: 5px 6px 10px;
+      }
+      .account-overview .system-menu-kicker { padding: 0; }
+      .account-overview strong { font-size: 14px; overflow-wrap: anywhere; }
+      .account-overview > span:not(.system-menu-kicker) { color: var(--muted); font-size: 12px; }
+      .account-overview small {
+        color: var(--teal);
+        font-family: "Courier New", monospace;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
       .system-menu-action {
         background: rgba(34, 216, 229, 0.08);
         border-color: rgba(34, 216, 229, 0.34);
@@ -1664,6 +1700,11 @@
         text-align: left;
       }
       .system-menu-action.active { color: var(--teal); }
+      .logout-action {
+        background: transparent;
+        border-color: rgba(255, 62, 165, 0.34);
+        color: #ff9dca;
+      }
       .system-menu-toggle {
         align-items: center;
         color: var(--ink);
@@ -1679,6 +1720,109 @@
         width: auto;
       }
       .system-menu-toggle span { font-size: 12px; font-weight: 700; }
+      .login-shell { min-height: 100dvh; }
+      .login-main {
+        align-items: center;
+        display: grid;
+        min-height: 100dvh;
+        padding-block: 40px;
+      }
+      .login-stage {
+        align-items: center;
+        display: grid;
+        gap: clamp(28px, 6vw, 88px);
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 430px);
+        margin: 0 auto;
+        max-width: 1120px;
+        width: 100%;
+      }
+      .login-brand { max-width: 620px; }
+      .login-brand h1 { font-size: clamp(42px, 8vw, 82px); }
+      .login-brand p {
+        color: var(--muted);
+        font-size: clamp(16px, 2vw, 20px);
+        line-height: 1.5;
+        margin: 18px 0 0;
+        max-width: 34ch;
+      }
+      .login-pass {
+        background: #11152a;
+        border: 1px solid rgba(34, 216, 229, 0.5);
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.56), -5px 0 0 var(--violet);
+        display: grid;
+        min-height: 470px;
+      }
+      .login-pass-stripe,
+      .login-pass-footer {
+        align-items: center;
+        background: #080a18;
+        display: flex;
+        font-family: "Courier New", monospace;
+        font-size: 10px;
+        font-weight: 800;
+        justify-content: space-between;
+        letter-spacing: 0.12em;
+        padding: 10px 14px;
+        text-transform: uppercase;
+      }
+      .login-pass-stripe { border-bottom: 1px solid rgba(255, 62, 165, 0.42); }
+      .login-pass-stripe strong { background: var(--red); color: #fff; padding: 5px 9px; }
+      .login-pass-footer { border-top: 1px solid var(--line); color: var(--muted); }
+      .login-pass-body {
+        align-content: center;
+        display: grid;
+        gap: 24px;
+        padding: 30px;
+      }
+      .login-heading h2 {
+        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-size: 34px;
+        font-style: italic;
+        line-height: 1;
+        margin: 0;
+        text-transform: uppercase;
+      }
+      .login-form { display: grid; gap: 14px; }
+      .login-form > label:not(.login-password-toggle) { display: grid; gap: 6px; }
+      .login-form > label > span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .login-form input:not([type="checkbox"]) { font-size: 16px; min-height: 46px; }
+      .login-password-toggle {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: 8px;
+        justify-self: start;
+      }
+      .login-password-toggle input { min-height: auto; width: auto; }
+      .login-password-toggle span { color: var(--muted); font-size: 12px; }
+      .login-feedback {
+        background: rgba(255, 190, 85, 0.1);
+        border: 1px solid rgba(255, 190, 85, 0.46);
+        color: #ffe0a2;
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0;
+        padding: 9px 10px;
+      }
+      .login-submit {
+        background: var(--red);
+        border-color: var(--red);
+        color: #fff;
+        min-height: 46px;
+      }
+      @media (max-width: 760px) {
+        .login-main { align-items: start; padding: 28px 18px; }
+        .login-stage { gap: 26px; grid-template-columns: 1fr; }
+        .login-brand h1 { font-size: clamp(38px, 13vw, 58px); }
+        .login-brand p { font-size: 15px; margin-top: 12px; }
+        .login-pass { min-height: 430px; }
+        .login-pass-body { padding: 24px 20px; }
+        #currentUserLabel { max-width: 76px; }
+      }
       .home-shelf {
         border-top: 1px solid var(--line);
         padding-top: 22px;

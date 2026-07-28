@@ -10,7 +10,9 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from movie_inbox.application.auth_service import AuthService
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.web.app import MAX_JSON_BODY_BYTES, create_app
 from movie_inbox.web.catalog_api import background_enrich_catalog_item
@@ -24,6 +26,15 @@ class ViewerHttpTests(unittest.TestCase):
         JsonCatalogRepository(self.catalog_path, normalize_item).write(
             [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
         )
+        self.owner_password = "a-long-local-password"
+        self.instance_path = Path(self.temporary.name) / "instance.db"
+        AuthService(SqliteIdentityRepository(self.instance_path)).bootstrap_owner(
+            "lucas",
+            self.owner_password,
+            catalog_name="Catalogo de Lucas",
+            source_paths=[str(self.catalog_path)],
+            write_path=str(self.catalog_path),
+        )
         self.config = ViewerConfig(
             patterns=[str(self.catalog_path)],
             title="Movie Inbox Test",
@@ -33,9 +44,16 @@ class ViewerHttpTests(unittest.TestCase):
             image_cache_max_bytes=1024,
             port=8765,
             api_token="test-token",
+            instance_db=str(self.instance_path),
         )
         self.client_context = TestClient(create_app(self.config), base_url="http://127.0.0.1:8765")
         self.client = self.client_context.__enter__()
+        self.login_response = self.client.post(
+            "/auth/login",
+            content=json.dumps({"username": "lucas", "password": self.owner_password}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(self.login_response.status_code, 200, self.login_response.content)
 
     def tearDown(self) -> None:
         self.client_context.__exit__(None, None, None)
@@ -56,17 +74,70 @@ class ViewerHttpTests(unittest.TestCase):
         status, _ = self.request("GET", "/api/items")
         self.assertEqual(status, 403)
 
+    def test_catalog_and_api_require_an_authenticated_session(self) -> None:
+        with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:
+            root = client.get("/", follow_redirects=False)
+            api = client.get("/api/items", headers={"X-Movie-Inbox-Token": self.config.api_token})
+            login = client.get("/login")
+        self.assertEqual(root.status_code, 303)
+        self.assertEqual(root.headers["location"], "/login")
+        self.assertEqual(api.status_code, 401)
+        self.assertEqual(login.status_code, 200)
+        self.assertIn(b'id="loginForm"', login.content)
+        self.assertIn(b'/static/login.js', login.content)
+
+    def test_login_requires_token_origin_and_json(self) -> None:
+        body = json.dumps({"username": "lucas", "password": self.owner_password})
+        with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:
+            missing_token = client.post(
+                "/auth/login",
+                content=body,
+                headers={"Origin": "http://127.0.0.1:8765", "Content-Type": "application/json"},
+            )
+            wrong_origin = client.post(
+                "/auth/login",
+                content=body,
+                headers={
+                    "X-Movie-Inbox-Token": self.config.api_token,
+                    "Origin": "https://attacker.example",
+                    "Content-Type": "application/json",
+                },
+            )
+            wrong_type = client.post(
+                "/auth/login",
+                content=body,
+                headers=self.post_headers("text/plain"),
+            )
+        self.assertEqual(missing_token.status_code, 403)
+        self.assertEqual(wrong_origin.status_code, 403)
+        self.assertEqual(wrong_type.status_code, 400)
+
+    def test_invalid_login_is_generic_and_logout_revokes_the_session(self) -> None:
+        with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:
+            invalid = client.post(
+                "/auth/login",
+                content=json.dumps({"username": "lucas", "password": "incorrect-password"}),
+                headers=self.post_headers(),
+            )
+        self.assertEqual(invalid.status_code, 401)
+        self.assertEqual(invalid.json()["reason"], "invalid_credentials")
+
+        logout = self.client.post("/auth/logout", content="{}", headers=self.post_headers())
+        after = self.client.get("/api/items", headers={"X-Movie-Inbox-Token": self.config.api_token})
+        self.assertEqual(logout.status_code, 200)
+        self.assertEqual(after.status_code, 401)
+
     def test_healthcheck_does_not_expose_catalog_data(self) -> None:
         status, payload = self.request("GET", "/healthz")
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(payload), {"status": "ok"})
 
     def test_image_cache_does_not_accept_session_tokens_in_urls(self) -> None:
-        status, _ = self.request(
-            "GET",
-            "/image-cache?url=https%3A%2F%2Fimages.example.com%2Fposter.jpg&token=test-token",
-        )
-        self.assertEqual(status, 403)
+        with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:
+            response = client.get(
+                "/image-cache?url=https%3A%2F%2Fimages.example.com%2Fposter.jpg&token=test-token",
+            )
+        self.assertEqual(response.status_code, 401)
 
     def test_image_cache_rejects_hosts_outside_the_allowlist(self) -> None:
         status, payload = self.request(
@@ -85,8 +156,8 @@ class ViewerHttpTests(unittest.TestCase):
         response = self.client.get("/")
         status, body = response.status_code, response.content
         self.assertEqual(status, 200)
-        self.assertIn("HttpOnly", response.headers.get("set-cookie", ""))
-        self.assertIn("SameSite=strict", response.headers.get("set-cookie", ""))
+        self.assertIn("HttpOnly", self.login_response.headers.get("set-cookie", ""))
+        self.assertIn("SameSite=strict", self.login_response.headers.get("set-cookie", ""))
         self.assertIn(b'/static/style.css', body)
         self.assertIn(b'/static/app.js', body)
         self.assertIn(b'viewport-fit=cover', body)
@@ -111,6 +182,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="adminView"', body)
         self.assertIn(b'id="adminButton"', body)
         self.assertIn(b'id="systemMenu"', body)
+        self.assertIn(b'id="currentUserName"', body)
+        self.assertIn(b'id="currentCatalogName"', body)
+        self.assertIn(b'id="logoutButton"', body)
         self.assertIn(b'id="homeGrid"', body)
         self.assertIn(b'id="activeFilters"', body)
         self.assertIn(b'id="catalogSummary"', body)
@@ -183,6 +257,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'function changeRandomScope(source)', javascript)
         self.assertIn(b'mobileRandomCatalogOnly', javascript)
         self.assertIn(b'function focusViewHeading(view)', javascript)
+        self.assertIn(b'function loadIdentity()', javascript)
+        self.assertIn(b'function logout()', javascript)
         self.assertIn(b'function handleKeyboardModality(event)', javascript)
         self.assertIn(b'fields.detailBody.scrollTop = 0;', javascript)
         self.assertIn(b'function retryMergeComparison()', javascript)
@@ -435,9 +511,15 @@ class ViewerHttpTests(unittest.TestCase):
         }
         body = json.dumps({"id": "heat", "status": "watched", "watched_at": "2026-07-15"})
         with TestClient(create_app(proxy_config), base_url="https://movies.example.com") as client:
+            login = client.post(
+                "/auth/login",
+                content=json.dumps({"username": "lucas", "password": self.owner_password}),
+                headers=headers,
+            )
             root = client.get("/")
             response = client.post("/api/status", content=body, headers=headers)
-        self.assertIn("Secure", root.headers.get("set-cookie", ""))
+        self.assertIn("Secure", login.headers.get("set-cookie", ""))
+        self.assertEqual(root.status_code, 200)
         self.assertEqual(response.status_code, 200, response.content)
 
     def test_json_body_limit_is_enforced(self) -> None:

@@ -11,6 +11,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from movie_inbox.application.auth_service import AuthService, AuthenticationError
 from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.curation_workflow import (
     CatalogPointer,
@@ -23,10 +24,13 @@ from movie_inbox.application.repository import (
     CatalogFormatError,
     CatalogRepositoryError,
 )
+from movie_inbox.application.identity_repository import IdentityRepositoryError
+from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
+from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION
-from movie_inbox.web.assets import render_html, static_asset
+from movie_inbox.web.assets import render_html, render_login_html, static_asset
 from movie_inbox.web.catalog_api import (
     append_item,
     background_enrich_catalog_item,
@@ -51,6 +55,7 @@ from movie_inbox.web.catalog_api import (
 from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.image_proxy import cached_image
 from movie_inbox.web.security import (
+    LoginAttemptLimiter,
     UnsafeRemoteUrl,
     validate_public_http_url,
     viewer_allowed_hosts,
@@ -59,7 +64,7 @@ from movie_inbox.web.security import (
 
 
 MAX_JSON_BODY_BYTES = 2 * 1024 * 1024
-SESSION_COOKIE = "movie_inbox_session"
+AUTH_SESSION_COOKIE = "movie_inbox_auth"
 HISTORY_SESSION_COOKIE = "movie_inbox_history_session"
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -81,6 +86,17 @@ class ApiRequestError(ValueError):
 
 
 def create_app(config: ViewerConfig) -> FastAPI:
+    if not config.instance_db:
+        raise RuntimeError("ViewerConfig.instance_db is required")
+    identity_repository = SqliteIdentityRepository(config.instance_db)
+    identity_repository.initialize()
+    if not identity_repository.has_users():
+        raise RuntimeError("Movie Inbox owner account has not been bootstrapped")
+    auth_service = AuthService(
+        identity_repository,
+        session_ttl_seconds=config.session_ttl_seconds,
+    )
+    login_limiter = LoginAttemptLimiter()
     app = FastAPI(
         title="Movie Inbox",
         docs_url=None,
@@ -88,12 +104,35 @@ def create_app(config: ViewerConfig) -> FastAPI:
         openapi_url=None,
     )
     app.state.viewer_config = config
+    app.state.identity_repository = identity_repository
+    app.state.auth_service = auth_service
     workflow = curation_workflow(config)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
 
     @app.middleware("http")
-    async def security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
-        response = await call_next(request)
+    async def security_and_authentication(request: Request, call_next):  # type: ignore[no-untyped-def]
+        path = request.url.path
+        identity: AuthenticatedIdentity | None = None
+        token = str(request.cookies.get(AUTH_SESSION_COOKIE) or "")
+        if token and not path.startswith("/static/") and path != "/healthz":
+            try:
+                identity = auth_service.authenticate(token)
+            except IdentityRepositoryError:
+                response = error_response("identity_store_unavailable", 503)
+                return apply_security_headers(response)
+        request.state.identity = identity
+
+        if path == "/login" and identity is not None:
+            response = RedirectResponse("/", status_code=303)
+        elif path == "/" and identity is None:
+            response = RedirectResponse("/login", status_code=303)
+        elif _requires_authentication(path) and identity is None:
+            response = error_response("authentication_required", 401)
+        else:
+            response = await call_next(request)
+        return apply_security_headers(response)
+
+    def apply_security_headers(response: Response) -> Response:
         for name, value in SECURITY_HEADERS.items():
             response.headers.setdefault(name, value)
         response.headers.setdefault("Cache-Control", "no-store")
@@ -113,7 +152,21 @@ def create_app(config: ViewerConfig) -> FastAPI:
         if origin not in viewer_allowed_origins(config.port, config.public_origin):
             raise ApiRequestError("invalid_origin", 403)
 
-    async def authorized_json(request: Request) -> dict[str, Any]:
+    def require_identity(request: Request) -> AuthenticatedIdentity:
+        identity = getattr(request.state, "identity", None)
+        if not isinstance(identity, AuthenticatedIdentity):
+            raise ApiRequestError("authentication_required", 401)
+        return identity
+
+    async def authorized_json(
+        request: Request,
+        _: AuthenticatedIdentity = Depends(require_identity),
+    ) -> dict[str, Any]:
+        require_token(request)
+        require_origin(request)
+        return await read_json_object(request)
+
+    async def login_json(request: Request) -> dict[str, Any]:
         require_token(request)
         require_origin(request)
         return await read_json_object(request)
@@ -154,17 +207,65 @@ def create_app(config: ViewerConfig) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/", response_class=HTMLResponse)
-    def index(request: Request) -> HTMLResponse:
-        response = HTMLResponse(render_html(config.title, config.api_token))
+    @app.get("/login", response_class=HTMLResponse)
+    def login_page() -> HTMLResponse:
+        return HTMLResponse(render_login_html(config.title, config.api_token))
+
+    @app.post("/auth/login")
+    def login(
+        request: Request,
+        body: dict[str, Any] = Depends(login_json),
+    ) -> JSONResponse:
+        username = str(body.get("username") or "")
+        client_host = request.client.host if request.client else "unknown"
+        limiter_key = f"{client_host}:{username.strip().casefold()[:64]}"
+        retry_after = login_limiter.retry_after(limiter_key)
+        if retry_after:
+            response = error_response("too_many_attempts", 429)
+            response.headers["Retry-After"] = str(retry_after)
+            return response
+        try:
+            token, identity = auth_service.login(username, str(body.get("password") or ""))
+        except AuthenticationError:
+            login_limiter.record_failure(limiter_key)
+            return error_response("invalid_credentials", 401)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+        login_limiter.clear(limiter_key)
+        response = JSONResponse({"ok": True, **identity_payload(identity)})
         response.set_cookie(
-            SESSION_COOKIE,
-            config.api_token,
+            AUTH_SESSION_COOKIE,
+            token,
+            max_age=config.session_ttl_seconds,
             httponly=True,
             secure=config.public_origin.casefold().startswith("https://"),
             samesite="strict",
             path="/",
         )
+        return response
+
+    @app.post("/auth/logout")
+    def logout(
+        request: Request,
+        _: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        try:
+            auth_service.logout(str(request.cookies.get(AUTH_SESSION_COOKIE) or ""))
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+        response = JSONResponse({"ok": True, "reason": "logged_out"})
+        response.delete_cookie(
+            AUTH_SESSION_COOKIE,
+            path="/",
+            secure=config.public_origin.casefold().startswith("https://"),
+            httponly=True,
+            samesite="strict",
+        )
+        return response
+
+    @app.get("/", response_class=HTMLResponse)
+    def index(request: Request) -> HTMLResponse:
+        response = HTMLResponse(render_html(config.title, config.api_token))
         history_session_id = str(request.cookies.get(HISTORY_SESSION_COOKIE) or secrets.token_urlsafe(24))
         response.set_cookie(
             HISTORY_SESSION_COOKIE,
@@ -183,6 +284,10 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return error_response("static_asset_not_found", 404)
         body, content_type = asset
         return Response(body, headers={"Content-Type": content_type})
+
+    @app.get("/api/session", dependencies=[Depends(require_token)])
+    def session(request: Request) -> JSONResponse:
+        return JSONResponse(identity_payload(require_identity(request)))
 
     @app.get("/api/items", dependencies=[Depends(require_token)])
     def items() -> JSONResponse:
@@ -325,9 +430,6 @@ def create_app(config: ViewerConfig) -> FastAPI:
 
     @app.get("/image-cache")
     def image_cache(request: Request, url: str = "") -> Response:
-        supplied = str(request.cookies.get(SESSION_COOKIE) or request.headers.get("X-Movie-Inbox-Token") or "")
-        if not supplied or not secrets.compare_digest(supplied, config.api_token):
-            return error_response("invalid_token", 403)
         if not url:
             return error_response("missing_image_url", 400)
         if not config.image_cache:
@@ -516,6 +618,33 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return application_error_response(error)
 
     return app
+
+
+def _requires_authentication(path: str) -> bool:
+    return (
+        path == "/"
+        or path == "/image-cache"
+        or path == "/auth/logout"
+        or path.startswith("/api/")
+    )
+
+
+def identity_payload(identity: AuthenticatedIdentity) -> dict[str, Any]:
+    return {
+        "user": {
+            "id": identity.user.id,
+            "username": identity.user.username,
+            "role": identity.user.role,
+            "must_change_password": identity.user.must_change_password,
+        },
+        "catalog": {
+            "id": identity.catalog.id,
+            "name": identity.catalog.name,
+        },
+        "session": {
+            "expires_at": identity.expires_at,
+        },
+    }
 
 
 async def read_json_object(request: Request) -> dict[str, Any]:

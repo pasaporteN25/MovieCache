@@ -6,7 +6,7 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
-- Paquete instalable `movie-inbox` con subcomandos `import`, `scan`, `serve`, `migrate`, `enrich`, `match`, `db` y `cache`.
+- Paquete instalable `movie-inbox` con subcomandos `account`, `import`, `scan`, `serve`, `migrate`, `enrich`, `match`, `db` y `cache`.
 - Estructura `src/movie_inbox` con capas de dominio, aplicacion, infraestructura, clientes externos y web.
 - Clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity, con registro concurrente y cache compartido.
 - HTML, CSS y JavaScript del visor como assets estaticos empaquetados.
@@ -53,6 +53,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Proteccion de estado, fecha de vista, puntaje, review y notas ante conflictos; listas, links y archivos locales admiten combinacion controlada.
 - Historial de las ultimas 50 decisiones de curaduria con Deshacer exacto para merges, casos pospuestos y descartes.
 - Modos de historial persistente o limitado a la sesion, limpieza confirmada y bloqueo de restauraciones que pisarian ediciones posteriores.
+- Autenticacion local con owner inicial, contrasenas `scrypt`, sesiones opacas persistidas por hash y limite de intentos de login.
+- Base de instancia separada para cuentas, sesiones y pertenencia del catalogo, sin contaminar importaciones o exportaciones JSON.
+- Bootstrap interactivo o mediante `movie-inbox account bootstrap`, con adopcion no destructiva del catalogo existente.
+- Pantalla de acceso, identidad activa en el menu y cierre de sesion con revocacion inmediata.
 
 ### Corregido
 

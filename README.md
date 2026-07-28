@@ -4,7 +4,7 @@ Pequena base para convertir una lista desordenada de links de peliculas/series e
 
 ## Estado del proyecto
 
-La version de desarrollo actual es **v0.2.0**. Movie Inbox funciona como un gestor local de catalogo con almacenamiento JSON o SQLite: importa listas y archivos, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews desde una interfaz web.
+La version de desarrollo actual es **v0.2.0**. Movie Inbox funciona como un gestor local de catalogo con almacenamiento JSON o SQLite: importa listas y archivos, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews desde una interfaz web con autenticacion local.
 
 El catalogo usa esquemas versionados. JSON sigue siendo el formato legible y portable de intercambio y backup; SQLite puede usarse como fuente de verdad transaccional. Los catalogos personales, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
 
@@ -38,6 +38,7 @@ Eso habilita un unico comando con subcomandos:
 ```powershell
 movie-inbox import links.txt --json catalog.json --fetch
 movie-inbox scan --config scanner.json --dry-run
+movie-inbox account bootstrap --instance-db .movie-inbox/instance.db --catalog catalog.json --username lucas
 movie-inbox serve catalog.json
 movie-inbox migrate catalog-viejo.json --json catalog-v5.json
 movie-inbox enrich catalog.json --json catalog-enriquecido.json
@@ -56,6 +57,29 @@ py -m movie_inbox serve catalog.json
 El ejecutable suele quedar en `%LocalAppData%\Programs\Python\Python314\Scripts`. Agregar esa carpeta al `PATH` permite invocar directamente `movie-inbox` desde una terminal nueva.
 
 Los comandos `py scripts/txt_to_catalog.py ...`, `py scripts/scan_library.py ...` y `py scripts/view_catalog.py ...` siguen funcionando y llaman a la misma implementacion del paquete.
+
+### Primer acceso
+
+El visor requiere una cuenta owner. En el primer `serve`, si la instancia todavia no tiene usuarios, la terminal solicita una contrasena y adopta el catalogo indicado sin reescribirlo:
+
+```powershell
+movie-inbox serve catalog.json --owner-username lucas
+```
+
+Para preparar un servicio sin terminal interactiva se puede hacer el bootstrap por separado:
+
+```powershell
+movie-inbox account bootstrap `
+  --instance-db data/instance.db `
+  --catalog data/movie-inbox.db `
+  --username lucas
+
+movie-inbox serve data/movie-inbox.db --instance-db data/instance.db
+```
+
+El comando solicita la contrasena sin mostrarla. `--password-file` permite usar un secreto temporal durante un despliegue automatizado; ese archivo debe eliminarse despues. La base de instancia guarda cuentas, hashes de contrasena, sesiones y la relacion owner/catalogo. Por defecto vive en `.movie-inbox/instance.db` junto al catalogo editable.
+
+El catalogo conserva su formato normal y sigue pudiendo importarse o exportarse como JSON. La adopcion inicial solamente registra su propiedad en la base de instancia: no mueve ni modifica obras, reviews o archivos locales.
 
 ## SQLite y backups JSON
 
@@ -249,7 +273,7 @@ python scripts/view_catalog.py exports/*.json --port 8765
 
 El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibilidad, `--write-json` sigue disponible como alias de `--write-catalog`.
 
-Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada.
+Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el owner y el catalogo personal activo y permite cerrar todas las operaciones de esa sesion.
 
 La interfaz se divide en tres espacios. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Administrar`, dentro del menu de sistema, agrupa resumen, base de datos, salud de fuentes externas, matching y duplicados.
 
@@ -339,9 +363,11 @@ Las escrituras del visor y del importador son atomicas: primero se completa un a
 
 ## Seguridad del visor web
 
-El visor genera un token aleatorio en cada inicio y lo exige en todas las operaciones de API. FastAPI valida hosts confiables y, para escrituras, un origen exacto; acepta solamente `Content-Type: application/json`, limita el cuerpo a 2 MB y devuelve estados HTTP 4xx/5xx. El proxy de imagenes limita los destinos a una allowlist exacta, valida sus IPs publicas y vuelve a aplicar ambas reglas en cada redireccion. SVG remoto no se acepta. La documentacion OpenAPI publica esta deshabilitada y `/healthz` no expone datos.
+El visor exige una cuenta local y guarda solamente hashes `scrypt` de las contrasenas. Las sesiones usan tokens aleatorios opacos: el navegador recibe el token en una cookie `HttpOnly`, `SameSite=Strict` y `Secure` cuando el origen publico usa HTTPS; SQLite conserva unicamente su hash y una expiracion absoluta. El login devuelve errores genericos y limita intentos repetidos en memoria.
 
-Detras de Nginx se indica el origen externo con `--public-origin` y se limita la confianza de headers reenviados con `--forwarded-allow-ips`. El token de sesion no reemplaza autenticacion: el acceso debe protegerse con una VPN o en el proxy HTTPS.
+Ademas, el visor genera un token anti-CSRF en cada inicio y lo exige junto con la sesion. FastAPI valida hosts confiables y, para escrituras y login, un origen exacto; acepta solamente `Content-Type: application/json`, limita el cuerpo a 2 MB y devuelve estados HTTP 4xx/5xx. El proxy de imagenes exige sesion, limita los destinos a una allowlist exacta, valida sus IPs y vuelve a aplicar ambas reglas en cada redireccion. SVG remoto no se acepta. La documentacion OpenAPI publica esta deshabilitada y `/healthz` no expone datos.
+
+Detras de Nginx se indica el origen externo con `--public-origin` y se limita la confianza de headers reenviados con `--forwarded-allow-ips`. La aplicacion autentica usuarios, pero HTTPS y una VPN siguen siendo recomendables para una instancia personal expuesta fuera de la red local.
 
 ## Pruebas
 
@@ -367,7 +393,7 @@ En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/w
 
 ## Despliegue en servidor
 
-El checkout contiene codigo, no datos. En un servidor, la base debe vivir fuera del repo, por ejemplo en `/var/lib/movie-inbox/movie-inbox.db`, y los backups en otra ruta persistente. Nginx apunta al proceso web que escucha en loopback; nunca apunta al directorio Git ni sirve la base directamente.
+El checkout contiene codigo, no datos. En un servidor, el catalogo y `instance.db` deben vivir fuera del repo, por ejemplo en `/var/lib/movie-inbox/`, y los backups en otra ruta persistente. Nginx apunta al proceso web que escucha en loopback; nunca apunta al directorio Git ni sirve ninguna base directamente.
 
 El flujo completo, los flags de proxy y las plantillas de `systemd`/Nginx estan documentados en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). Uvicorn debe permanecer en loopback; Nginx o una VPN controlan el acceso externo.
 

@@ -29,14 +29,23 @@
             </label>
           </nav>
           <details id="systemMenu" class="system-menu">
-            <summary aria-label="Abrir menú de sistema">Menú</summary>
+            <summary aria-label="Abrir menú de cuenta">
+              <span id="currentUserInitial" class="account-mark" aria-hidden="true">MI</span>
+              <span id="currentUserLabel">Perfil</span>
+            </summary>
             <div class="system-menu-panel">
-              <span class="system-menu-kicker">Sistema</span>
+              <div class="account-overview">
+                <span class="system-menu-kicker">Cuenta activa</span>
+                <strong id="currentUserName">Cargando…</strong>
+                <span id="currentCatalogName">Catálogo personal</span>
+                <small id="currentUserRole">Owner</small>
+              </div>
               <label class="system-menu-toggle mobile-random-scope">
                 <input id="mobileRandomCatalogOnly" type="checkbox" checked>
                 <span>Random solo en catálogo</span>
               </label>
               <button id="adminButton" class="system-menu-action" type="button">Administrar</button>
+              <button id="logoutButton" class="system-menu-action logout-action" type="button">Cerrar sesión</button>
             </div>
           </details>
           <div class="format-mark" aria-hidden="true">

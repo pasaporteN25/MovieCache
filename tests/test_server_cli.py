@@ -17,10 +17,19 @@ class ServerCliTests(unittest.TestCase):
     def test_serve_starts_uvicorn_with_one_loopback_worker(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             catalog = Path(temporary) / "catalog.json"
+            password_file = Path(temporary) / "owner-password.txt"
+            password_file.write_text("a-long-local-password\n", encoding="utf-8")
             JsonCatalogRepository(catalog, normalize_item).write([])
 
             with patch("movie_inbox.web.server.uvicorn.run") as run, redirect_stdout(StringIO()):
-                result = server.main([str(catalog), "--no-open"])
+                result = server.main([
+                    str(catalog),
+                    "--owner-username",
+                    "lucas",
+                    "--owner-password-file",
+                    str(password_file),
+                    "--no-open",
+                ])
 
             self.assertEqual(result, 0)
             app = run.call_args.args[0]
@@ -29,6 +38,7 @@ class ServerCliTests(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs["workers"], 1)
             self.assertEqual(run.call_args.kwargs["forwarded_allow_ips"], "127.0.0.1")
             self.assertFalse(run.call_args.kwargs["access_log"])
+            self.assertTrue((Path(temporary) / ".movie-inbox" / "instance.db").is_file())
 
     def test_non_loopback_bind_requires_public_origin(self) -> None:
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:

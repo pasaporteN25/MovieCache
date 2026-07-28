@@ -12,9 +12,9 @@ Movie Inbox sirve hoy a una persona que administra su propia biblioteca audiovis
 desde una computadora o un servidor personal. El usuario necesita distinguir lo que
 posee, lo que quiere ver y lo que ya vio, y conservar una memoria propia de cada obra.
 
-El producto incorporara login y multiples usuarios. El modelo de permisos, el grado
-de separacion entre bibliotecas y la posibilidad de compartir catalogos siguen
-abiertos.
+El producto comienza con una instancia self-hosted privada: el administrador crea
+cuentas y no existe registro publico. Cada usuario tiene un catalogo personal; las
+obras agregadas por una persona no entran automaticamente en catalogos ajenos.
 
 ## Product Purpose
 
@@ -62,8 +62,12 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - La aplicacion web es la interfaz principal actual.
 - Un cliente Kotlin es una integracion futura importante, pero no forma parte de la
   siguiente etapa inmediata.
-- Login y multiples usuarios son una prioridad cercana. Autenticacion, roles y
-  aislamiento de datos todavia no estan decididos.
+- La primera etapa de identidad usa owner local, sesiones seguras y un catalogo
+  personal creado o adoptado durante el bootstrap.
+- `status`, `watched_at` e historial tendran una visibilidad general por usuario;
+  rating y review tendran defaults independientes y overrides por obra.
+- Compartir o seguir catalogos, perfiles publicos y registro abierto quedan para
+  fases posteriores.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

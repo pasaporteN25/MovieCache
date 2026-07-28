@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import secrets
 import webbrowser
 from pathlib import Path
 
 import uvicorn
 
+from movie_inbox.application.auth_service import AuthService
+from movie_inbox.application.identity_repository import IdentityCatalogMismatch
+from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
+from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.web.app import create_app
-from movie_inbox.web.catalog_api import first_catalog_file
-from movie_inbox.web.config import DEFAULT_IMAGE_ALLOWED_HOSTS, ViewerConfig
+from movie_inbox.web.catalog_api import first_catalog_file, resolved_files
+from movie_inbox.web.config import DEFAULT_IMAGE_ALLOWED_HOSTS, DEFAULT_SESSION_TTL_SECONDS, ViewerConfig
 from movie_inbox.web.security import InvalidPublicOrigin, normalize_public_origin
 
 
@@ -27,6 +33,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated proxy IPs trusted by Uvicorn for forwarded headers.",
     )
     parser.add_argument("--title", default="Movie Inbox", help="Viewer title.")
+    parser.add_argument(
+        "--instance-db",
+        type=Path,
+        help="Private account/session database. Defaults to .movie-inbox/instance.db next to the writable catalog.",
+    )
+    parser.add_argument("--owner-username", default="owner", help="Username created on the first server start.")
+    parser.add_argument(
+        "--owner-password-file",
+        type=Path,
+        help="Read the first owner password from a file instead of prompting.",
+    )
+    parser.add_argument(
+        "--session-days",
+        type=int,
+        default=DEFAULT_SESSION_TTL_SECONDS // (24 * 60 * 60),
+        help="Absolute login session lifetime in days.",
+    )
     parser.add_argument(
         "--write-catalog", "--write-json",
         dest="write_catalog",
@@ -60,6 +83,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--image-cache-max-mb must be greater than zero")
     if args.image_cache_total_mb < args.image_cache_max_mb:
         parser.error("--image-cache-total-mb must be at least --image-cache-max-mb")
+    if not 1 <= args.session_days <= 365:
+        parser.error("--session-days must be between 1 and 365")
     try:
         public_origin = normalize_public_origin(args.public_origin)
     except InvalidPublicOrigin as error:
@@ -67,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.host.casefold() not in {"127.0.0.1", "localhost", "::1"} and not public_origin:
         parser.error("--public-origin is required when binding to a non-loopback host")
     write_catalog = args.write_catalog or first_catalog_file(args.inputs)
+    ensure_catalog_exists(Path(write_catalog))
+    instance_db = args.instance_db or (Path(write_catalog).resolve().parent / ".movie-inbox" / "instance.db")
     image_cache_dir = args.image_cache_dir or (Path(write_catalog).resolve().parent / ".catalog-cache" / "images")
     config = ViewerConfig(
         patterns=args.inputs,
@@ -77,15 +104,43 @@ def main(argv: list[str] | None = None) -> int:
         image_cache_max_bytes=max(1, int(args.image_cache_max_mb * 1024 * 1024)),
         port=args.port,
         api_token=secrets.token_urlsafe(32),
+        instance_db=str(instance_db),
+        session_ttl_seconds=args.session_days * 24 * 60 * 60,
         host=args.host,
         public_origin=public_origin,
         forwarded_allow_ips=args.forwarded_allow_ips,
         image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),
         image_allowed_hosts=tuple(dict.fromkeys([*DEFAULT_IMAGE_ALLOWED_HOSTS, *args.image_host])),
     )
+    identity_repository = SqliteIdentityRepository(instance_db)
+    identity_repository.initialize()
+    auth_service = AuthService(identity_repository, session_ttl_seconds=config.session_ttl_seconds)
+    sources = resolved_files(args.inputs)
+    if not identity_repository.has_users():
+        print("Creating the initial Movie Inbox owner account.")
+        try:
+            password = owner_password(args.owner_password_file)
+            owner, personal_catalog = auth_service.bootstrap_owner(
+                args.owner_username,
+                password,
+                catalog_name="Mi catalogo",
+                source_paths=sources,
+                write_path=write_catalog,
+            )
+        except ValueError as error:
+            parser.error(str(error))
+        print(f"Owner created: {owner.username}")
+        print(f"Personal catalog adopted: {personal_catalog.write_path}")
+    else:
+        try:
+            personal_catalog = auth_service.validate_owner_catalog(sources, write_catalog)
+        except IdentityCatalogMismatch as error:
+            parser.error(str(error))
     url = public_origin or f"http://127.0.0.1:{args.port}"
     print(f"Viewing {', '.join(args.inputs)}")
     print(f"Writing changes to {write_catalog}")
+    print(f"Identity store: {instance_db}")
+    print(f"Personal catalog: {personal_catalog.name}")
     print(
         f"Image cache: {config.image_cache_dir} (max {args.image_cache_total_mb:g} MB)"
         if config.image_cache else "Image cache: disabled"
@@ -105,6 +160,26 @@ def main(argv: list[str] | None = None) -> int:
         access_log=False,
     )
     return 0
+
+
+def ensure_catalog_exists(path: Path) -> None:
+    if not path.exists():
+        open_catalog_repository(path, normalize_item).write([])
+
+
+def owner_password(password_file: Path | None) -> str:
+    if password_file:
+        try:
+            if password_file.stat().st_size > 4096:
+                raise ValueError("Owner password file is too large")
+            return password_file.read_text(encoding="utf-8").rstrip("\r\n")
+        except OSError as error:
+            raise ValueError(f"Cannot read owner password file: {password_file}") from error
+    first = getpass.getpass("Initial owner password: ")
+    second = getpass.getpass("Repeat owner password: ")
+    if first != second:
+        raise ValueError("Owner passwords do not match")
+    return first
 
 
 if __name__ == "__main__":

@@ -14,19 +14,23 @@ from urllib.request import urlopen
 
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
-from movie_inbox.web.assets import render_html, static_asset
+from movie_inbox.web.assets import render_html, render_login_html, static_asset
 
 
 def main() -> int:
     assert "Movie Inbox wheel smoke" in render_html("Movie Inbox wheel smoke", "token")
+    assert "Movie Inbox wheel smoke" in render_login_html("Movie Inbox wheel smoke", "token")
     assert static_asset("style.css") is not None
     assert static_asset("app.js") is not None
+    assert static_asset("login.js") is not None
 
     with tempfile.TemporaryDirectory() as temporary:
         catalog = Path(temporary) / "catalog.json"
         JsonCatalogRepository(catalog, normalize_item).write(
             [normalize_item({"id": "wheel-smoke", "title": "Wheel Smoke", "kind": "pelicula"})]
         )
+        password_file = Path(temporary) / "owner-password.txt"
+        password_file.write_text("a-long-local-password\n", encoding="utf-8")
         port = available_port()
         process = subprocess.Popen(
             [
@@ -39,6 +43,8 @@ def main() -> int:
                 str(port),
                 "--no-open",
                 "--no-image-cache",
+                "--owner-password-file",
+                str(password_file),
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

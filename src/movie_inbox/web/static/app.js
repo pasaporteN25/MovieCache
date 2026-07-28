@@ -1,4 +1,5 @@
 const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
+      let currentIdentity = null;
       let items = [];
       let sourceFiles = [];
       let manualResults = [];
@@ -60,10 +61,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       const SPOTLIGHT_INTERVAL_MS = 8000;
       const COLLECTION_ROUTE_KEYS = ["q", "status", "kind", "source", "sort", "duplicates", "external"];
 
-      function apiFetch(url, options = {}) {
+      async function apiFetch(url, options = {}) {
         const headers = new Headers(options.headers || {});
         headers.set("X-Movie-Inbox-Token", API_TOKEN);
-        return fetch(url, { ...options, headers, credentials: "same-origin" });
+        const response = await fetch(url, { ...options, headers, credentials: "same-origin" });
+        if (response.status === 401) {
+          window.location.replace("/login?expired=1");
+          throw new Error("authentication_required");
+        }
+        return response;
       }
       const fields = {
         query: document.querySelector("#query"),
@@ -75,6 +81,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         inboxBadge: document.querySelector("#inboxBadge"),
         adminButton: document.querySelector("#adminButton"),
         systemMenu: document.querySelector("#systemMenu"),
+        currentUserInitial: document.querySelector("#currentUserInitial"),
+        currentUserLabel: document.querySelector("#currentUserLabel"),
+        currentUserName: document.querySelector("#currentUserName"),
+        currentCatalogName: document.querySelector("#currentCatalogName"),
+        currentUserRole: document.querySelector("#currentUserRole"),
+        logoutButton: document.querySelector("#logoutButton"),
         searchConsole: document.querySelector(".search-console"),
         collectionUtilityMenu: document.querySelector(".collection-view .utility-menu"),
         randomButton: document.querySelector("#randomButton"),
@@ -187,6 +199,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
       fields.inboxButton.addEventListener("click", () => goToInbox());
       fields.adminButton.addEventListener("click", goToAdmin);
+      fields.logoutButton.addEventListener("click", logout);
       fields.homeCollectionButton.addEventListener("click", goToCollectionRoot);
       fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
       fields.inboxView.addEventListener("click", handleCurationClick);
@@ -322,11 +335,46 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       async function load() {
         try {
+          if (!currentIdentity) await loadIdentity();
           await loadCatalog();
         } catch (error) {
           console.error("[catalog-viewer] catalog load failed", error);
           fields.empty.textContent = `No se pudo cargar el catalogo: ${error.message || error}`;
           fields.empty.hidden = false;
+        }
+      }
+
+      async function loadIdentity() {
+        const response = await apiFetch("/api/session");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+        currentIdentity = payload;
+        const user = payload.user || {};
+        const catalog = payload.catalog || {};
+        const username = user.username || "Owner";
+        fields.currentUserInitial.textContent = username.slice(0, 2).toUpperCase();
+        fields.currentUserLabel.textContent = username;
+        fields.currentUserName.textContent = username;
+        fields.currentCatalogName.textContent = catalog.name || "Mi catálogo";
+        fields.currentUserRole.textContent = user.role === "owner" ? "Administrador" : "Miembro";
+        fields.adminButton.hidden = user.role !== "owner";
+      }
+
+      async function logout() {
+        fields.logoutButton.disabled = true;
+        fields.logoutButton.textContent = "Cerrando…";
+        try {
+          const response = await apiFetch("/auth/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}"
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          window.location.replace("/login");
+        } catch (error) {
+          if (error.message === "authentication_required") return;
+          fields.logoutButton.disabled = false;
+          fields.logoutButton.textContent = "Reintentar cierre";
         }
       }
 

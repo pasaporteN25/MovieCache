@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import threading
+import time
+from collections import deque
 from collections.abc import Callable, Collection
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -21,6 +24,50 @@ class UnsafeRemoteUrl(ValueError):
 
 class InvalidPublicOrigin(ValueError):
     pass
+
+
+class LoginAttemptLimiter:
+    """Small in-memory limiter for a single-process self-hosted login."""
+
+    def __init__(
+        self,
+        *,
+        max_failures: int = 5,
+        window_seconds: int = 5 * 60,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.max_failures = max(1, max_failures)
+        self.window_seconds = max(1, window_seconds)
+        self.clock = clock
+        self._attempts: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def retry_after(self, key: str) -> int:
+        now = self.clock()
+        with self._lock:
+            attempts = self._active_attempts(key, now)
+            if len(attempts) < self.max_failures:
+                return 0
+            return max(1, int(self.window_seconds - (now - attempts[0])))
+
+    def record_failure(self, key: str) -> None:
+        now = self.clock()
+        with self._lock:
+            attempts = self._active_attempts(key, now)
+            attempts.append(now)
+
+    def clear(self, key: str) -> None:
+        with self._lock:
+            self._attempts.pop(key, None)
+
+    def _active_attempts(self, key: str, now: float) -> deque[float]:
+        attempts = self._attempts.setdefault(key, deque())
+        cutoff = now - self.window_seconds
+        while attempts and attempts[0] <= cutoff:
+            attempts.popleft()
+        if not attempts:
+            self._attempts[key] = attempts
+        return attempts
 
 
 def normalize_public_origin(value: str) -> str:
