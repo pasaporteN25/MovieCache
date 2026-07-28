@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import unittest
+import tempfile
+from pathlib import Path
 
+from movie_inbox.application.auth_service import AuthService
 from movie_inbox.cli.main import COMMANDS
 from movie_inbox.external.registry import ExternalSourceService
+from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.web.app import create_app
-from movie_inbox.web.assets import render_html, static_asset
+from movie_inbox.web.assets import render_html, render_login_html, static_asset
 from movie_inbox.web.config import ViewerConfig
 
 
 class PackageLayoutTests(unittest.TestCase):
     def test_installed_command_surface_is_complete(self) -> None:
-        self.assertEqual(set(COMMANDS), {"import", "scan", "serve", "migrate", "enrich", "match", "db", "cache"})
+        self.assertEqual(
+            set(COMMANDS),
+            {"account", "import", "scan", "serve", "migrate", "enrich", "match", "db", "cache"},
+        )
 
     def test_external_clients_are_registered_independently(self) -> None:
         service = ExternalSourceService()
@@ -21,27 +28,47 @@ class PackageLayoutTests(unittest.TestCase):
         html = render_html("Catalog <Test>", "session-token")
         self.assertIn("Catalog &lt;Test&gt;", html)
         self.assertIn('content="session-token"', html)
+        login_html = render_login_html("Catalog <Test>", "session-token")
+        self.assertIn("Catalog &lt;Test&gt;", login_html)
+        self.assertIn('src="/static/login.js"', login_html)
         self.assertIsNotNone(static_asset("style.css"))
         self.assertIsNotNone(static_asset("app.js"))
+        self.assertIsNotNone(static_asset("login.js"))
         self.assertIsNone(static_asset("../pyproject.toml"))
 
     def test_fastapi_application_disables_public_api_documentation(self) -> None:
-        app = create_app(
-            ViewerConfig(
-                patterns=["catalog.json"],
-                title="Movie Inbox",
-                write_json="catalog.json",
-                image_cache=False,
-                image_cache_dir=".catalog-cache/images",
-                image_cache_max_bytes=1024,
-                port=8765,
-                api_token="test-token",
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            catalog = root / "catalog.json"
+            catalog.write_text('{"schema_version": 5, "items": []}\n', encoding="utf-8")
+            instance = root / "instance.db"
+            repository = SqliteIdentityRepository(instance)
+            AuthService(repository).bootstrap_owner(
+                "owner",
+                "a-long-local-password",
+                catalog_name="Mi catalogo",
+                source_paths=[str(catalog)],
+                write_path=str(catalog),
             )
-        )
-        paths = {route.path for route in app.routes}
-        self.assertNotIn("/docs", paths)
-        self.assertNotIn("/openapi.json", paths)
-        self.assertIn("/healthz", paths)
+            app = create_app(
+                ViewerConfig(
+                    patterns=[str(catalog)],
+                    title="Movie Inbox",
+                    write_json=str(catalog),
+                    image_cache=False,
+                    image_cache_dir=str(root / "images"),
+                    image_cache_max_bytes=1024,
+                    port=8765,
+                    api_token="test-token",
+                    instance_db=str(instance),
+                )
+            )
+            paths = {route.path for route in app.routes}
+            self.assertNotIn("/docs", paths)
+            self.assertNotIn("/openapi.json", paths)
+            self.assertIn("/healthz", paths)
+            self.assertIn("/login", paths)
+            self.assertIn("/auth/login", paths)
 
 
 if __name__ == "__main__":

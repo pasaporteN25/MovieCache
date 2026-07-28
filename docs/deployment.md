@@ -12,10 +12,10 @@ GitHub Actions: compile + tests
 revision aprobada en el servidor
         |
         v
-systemd -> Uvicorn/FastAPI -> 127.0.0.1:8765
+systemd -> Uvicorn/FastAPI + login -> 127.0.0.1:8765
         |
         v
-Nginx -> HTTPS y autenticacion -> navegador
+Nginx -> HTTPS -> navegador
 
 /opt/movie-inbox            codigo del checkout
 /var/lib/movie-inbox        SQLite y cache persistentes
@@ -33,8 +33,9 @@ El primer despliegue puede ser manual y auditable:
 1. Actualizar el checkout a un commit cuyo workflow haya pasado.
 2. Crear un entorno virtual e instalar con `python -m pip install -e .`.
 3. Importar el JSON inicial a una ruta persistente con `movie-inbox db import`.
-4. Ejecutar el proceso bajo un usuario sin privilegios mediante `systemd`.
-5. Exportar JSON periodicamente hacia un volumen de backups distinto.
+4. Crear el owner y adoptar ese catalogo con `movie-inbox account bootstrap`.
+5. Ejecutar el proceso bajo un usuario sin privilegios mediante `systemd`.
+6. Exportar JSON periodicamente hacia un volumen de backups distinto.
 
 Una automatizacion posterior puede hacer esos pasos al publicar una version. No es necesario instalar un runner de CI en el servidor.
 
@@ -50,6 +51,17 @@ python3 -m venv .venv
 
 El checkout puede pertenecer al usuario de despliegue y ser solamente legible para `movie-inbox`. La base y el cache si deben pertenecer al usuario del servicio.
 
+Antes de activar `systemd`, crear el owner desde una terminal:
+
+```bash
+sudo -u movie-inbox /opt/movie-inbox/.venv/bin/movie-inbox account bootstrap \
+  --instance-db /var/lib/movie-inbox/instance.db \
+  --catalog /var/lib/movie-inbox/movie-inbox.db \
+  --username lucas
+```
+
+La contrasena se solicita sin eco. Para automatizacion se admite `--password-file`, usando un archivo temporal legible solamente por `movie-inbox`.
+
 ## Ejecutar la aplicacion
 
 El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public-origin` habilita ese origen exacto para validacion de `Host` y escrituras del navegador; no cambia la direccion de escucha:
@@ -57,6 +69,7 @@ El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public
 ```bash
 /opt/movie-inbox/.venv/bin/movie-inbox serve \
   /var/lib/movie-inbox/movie-inbox.db \
+  --instance-db /var/lib/movie-inbox/instance.db \
   --host 127.0.0.1 \
   --port 8765 \
   --public-origin https://movies.example.com \
@@ -88,28 +101,28 @@ Antes de iniciarla hay que reemplazar dominio, rutas y usuario en la unidad. El 
 
 ## Nginx y acceso
 
-La plantilla [nginx.movie-inbox.conf.example](../deploy/nginx.movie-inbox.conf.example) termina HTTPS, limita el cuerpo a 2 MB, preserva el `Host` publico y reenvia headers al proceso local. Copiala despues de reemplazar dominio y certificados:
+La plantilla [nginx.movie-inbox.conf.example](../deploy/nginx.movie-inbox.conf.example) termina HTTPS, limita el cuerpo a 2 MB, preserva el `Host` publico y reenvia headers al proceso local. Movie Inbox presenta su propio login; `auth_basic` puede agregarse como una segunda barrera, pero no es necesario para el flujo normal.
 
 ```bash
-sudo htpasswd -c /etc/nginx/.htpasswd-movie-inbox lucas
 sudo cp deploy/nginx.movie-inbox.conf.example /etc/nginx/sites-available/movie-inbox
 sudo ln -s /etc/nginx/sites-available/movie-inbox /etc/nginx/sites-enabled/movie-inbox
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-El token embebido por Movie Inbox protege operaciones contra otras paginas web, pero no autentica personas: cualquiera que pueda abrir la portada recibe su propio acceso a la API de esa sesion. Las imagenes usan una cookie `HttpOnly` y no colocan el token en la URL; Uvicorn no registra access logs y Nginx omite el log de esa ruta para no guardar URLs de imagenes del catalogo. La plantilla conserva `auth_basic`; para un servicio estrictamente personal es preferible limitar Nginx mediante Tailscale/VPN y no publicarlo en Internet.
+Movie Inbox autentica la cuenta antes de entregar el visor. La cookie de sesion es `HttpOnly`, `SameSite=Strict` y `Secure` bajo este origen HTTPS; el token opaco nunca aparece en la URL y SQLite guarda solamente su hash. El token anti-CSRF, la validacion de `Origin` y la sesion se exigen juntos. Uvicorn no registra access logs y Nginx omite el log del proxy de imagenes para no guardar URLs del catalogo.
 
 ## Checklist de publicacion
 
 - Los checks pasan sobre el commit desplegado.
 - El proceso corre como usuario sin privilegios.
-- SQLite, cache y backups estan fuera de `/opt/movie-inbox`.
+- Catalogo, `instance.db`, cache y backups estan fuera de `/opt/movie-inbox`.
 - El cache tiene un limite total y la allowlist contiene solamente proveedores de imagenes confiables.
 - Nginx es el unico proceso publico y Uvicorn escucha en `127.0.0.1`.
 - `--public-origin` coincide exactamente con el origen HTTPS del navegador.
 - `--forwarded-allow-ips` contiene solamente la direccion del proxy.
-- Hay autenticacion en Nginx o acceso limitado por VPN.
+- El owner fue creado y el login funciona a traves del origen HTTPS.
+- `instance.db` no se publica y tiene un backup protegido separado.
 - La restauracion desde una exportacion JSON fue probada.
 
 La automatizacion de deploy sigue fuera del workflow de CI por ahora: primero conviene hacer un despliegue manual completo y verificar backup/restauracion.

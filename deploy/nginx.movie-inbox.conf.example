@@ -13,9 +13,8 @@ server {
 
     client_max_body_size 2m;
 
-    # Keep this or replace it with access through a private VPN.
-    auth_basic "Movie Inbox";
-    auth_basic_user_file /etc/nginx/.htpasswd-movie-inbox;
+    # Movie Inbox authenticates local accounts. A private VPN or optional
+    # auth_basic layer can still be added as defense in depth.
 
     location = /image-cache {
         access_log off;

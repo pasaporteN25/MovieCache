@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 
 DEFAULT_IMAGE_CACHE_TOTAL_BYTES = 512 * 1024 * 1024
+DEFAULT_SESSION_TTL_SECONDS = 14 * 24 * 60 * 60
 DEFAULT_IMAGE_ALLOWED_HOSTS = (
     "upload.wikimedia.org",
     "m.media-amazon.com",
@@ -25,6 +26,8 @@ class ViewerConfig:
     image_cache_max_bytes: int
     port: int
     api_token: str
+    instance_db: str = ""
+    session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS
     host: str = "127.0.0.1"
     public_origin: str = ""
     forwarded_allow_ips: str = "127.0.0.1"

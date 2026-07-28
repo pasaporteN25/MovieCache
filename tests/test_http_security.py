@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from movie_inbox.web.security import (
     InvalidPublicOrigin,
+    LoginAttemptLimiter,
     UnsafeRemoteUrl,
     normalize_public_origin,
     open_public_url,
@@ -27,6 +28,16 @@ def resolver_for(address: str):
 
 
 class HttpSecurityTests(unittest.TestCase):
+    def test_login_attempt_limiter_recovers_after_its_window(self) -> None:
+        now = [100.0]
+        limiter = LoginAttemptLimiter(max_failures=2, window_seconds=60, clock=lambda: now[0])
+        limiter.record_failure("client:owner")
+        self.assertEqual(limiter.retry_after("client:owner"), 0)
+        limiter.record_failure("client:owner")
+        self.assertGreater(limiter.retry_after("client:owner"), 0)
+        now[0] = 161.0
+        self.assertEqual(limiter.retry_after("client:owner"), 0)
+
     def test_public_origin_is_normalized_for_proxy_validation(self) -> None:
         self.assertEqual(normalize_public_origin("HTTPS://Movies.Example.com:443/"), "https://movies.example.com")
         self.assertIn("movies.example.com", viewer_allowed_hosts("https://movies.example.com"))

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="movie-inbox-token" content="__MOVIE_INBOX_TOKEN__">
+    <title>Acceso &middot; __MOVIE_INBOX_TITLE__</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body class="login-shell">
+    <main class="login-main">
+      <section class="login-stage" aria-labelledby="loginTitle">
+        <header class="login-brand">
+          <span class="brand-kicker">Video club // acceso privado</span>
+          <h1>__MOVIE_INBOX_TITLE__</h1>
+          <p>Tu cat&aacute;logo personal abre donde lo dejaste.</p>
+        </header>
+
+        <div class="login-pass">
+          <div class="login-pass-stripe" aria-hidden="true">
+            <span>MEMBER</span>
+            <strong>PLAY</strong>
+            <span>ARCHIVE</span>
+          </div>
+          <div class="login-pass-body">
+            <div class="login-heading">
+              <span class="eyebrow">Credencial del videoclub</span>
+              <h2 id="loginTitle">Ingresar</h2>
+            </div>
+            <form id="loginForm" class="login-form">
+              <label>
+                <span>Usuario</span>
+                <input id="loginUsername" name="username" autocomplete="username" required autofocus>
+              </label>
+              <label>
+                <span>Contrase&ntilde;a</span>
+                <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+              </label>
+              <label class="login-password-toggle">
+                <input id="showPassword" type="checkbox">
+                <span>Mostrar contrase&ntilde;a</span>
+              </label>
+              <p id="loginFeedback" class="login-feedback" role="alert" aria-live="polite" hidden></p>
+              <button id="loginSubmit" class="login-submit" type="submit">Entrar</button>
+            </form>
+          </div>
+          <footer class="login-pass-footer">
+            <span>Instancia privada</span>
+            <span>Sesi&oacute;n protegida</span>
+          </footer>
+        </div>
+      </section>
+    </main>
+    <script src="/static/login.js"></script>
+  </body>
+</html>

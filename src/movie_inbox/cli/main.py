@@ -5,12 +5,13 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 
-from movie_inbox.cli import cache, database, enrich_catalog, import_catalog, match_external_links, migrate, scan_library
+from movie_inbox.cli import account, cache, database, enrich_catalog, import_catalog, match_external_links, migrate, scan_library
 from movie_inbox.web import server
 
 
 Command = Callable[[list[str] | None], int]
 COMMANDS: dict[str, tuple[Command, str]] = {
+    "account": (account.main, "Bootstrap the local owner account."),
     "import": (import_catalog.main, "Import or merge TXT, JSON and CSV catalogs."),
     "scan": (scan_library.main, "Scan a local video library incrementally."),
     "serve": (server.main, "Open the local catalog viewer."),
