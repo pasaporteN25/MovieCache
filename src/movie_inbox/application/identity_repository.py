@@ -19,6 +19,18 @@ class IdentityCatalogMismatch(IdentityRepositoryError):
     """Raised when the configured catalog differs from the owner's catalog."""
 
 
+class IdentityConflict(IdentityRepositoryError):
+    """Raised when an account conflicts with an existing identity."""
+
+
+class IdentityNotFound(IdentityRepositoryError):
+    """Raised when an account does not exist."""
+
+
+class IdentityOwnerProtected(IdentityRepositoryError):
+    """Raised when a member-only operation targets the owner."""
+
+
 class IdentityRepository(Protocol):
     path: object
 
@@ -34,6 +46,29 @@ class IdentityRepository(Protocol):
         source_paths: list[str],
         write_path: str,
     ) -> tuple[UserAccount, PersonalCatalog]: ...
+
+    def create_member(
+        self,
+        username: str,
+        password_hash: str,
+        catalog_name: str,
+        source_paths: list[str],
+        write_path: str,
+    ) -> tuple[UserAccount, PersonalCatalog]: ...
+
+    def list_accounts(self) -> list[tuple[UserAccount, PersonalCatalog]]: ...
+
+    def account(self, user_id: str) -> UserAccount | None: ...
+
+    def set_user_active(self, user_id: str, active: bool) -> UserAccount: ...
+
+    def replace_password(
+        self,
+        user_id: str,
+        password_hash: str,
+        *,
+        must_change_password: bool,
+    ) -> UserAccount: ...
 
     def credentials_for(self, username: str) -> tuple[UserAccount, str] | None: ...
 

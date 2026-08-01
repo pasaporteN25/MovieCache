@@ -14,9 +14,12 @@ from movie_inbox.application.auth_service import (
     session_token_hash,
 )
 from movie_inbox.application.identity_repository import IdentityCatalogMismatch
+from movie_inbox.application.member_service import MemberService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
+from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
+from movie_inbox.infrastructure.repositories import open_catalog_repository
 
 
 class IdentityTests(unittest.TestCase):
@@ -124,6 +127,73 @@ class IdentityTests(unittest.TestCase):
         self.assertFalse(hasher.verify("another-password", encoded))
         with self.assertRaises(PasswordPolicyError):
             hasher.hash("short")
+
+    def test_member_lifecycle_provisions_an_isolated_catalog(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            owner_catalog = root / "owner.json"
+            JsonCatalogRepository(owner_catalog, normalize_item).write(
+                [normalize_item({"id": "heat", "title": "Heat", "year": "1995"})]
+            )
+            repository = SqliteIdentityRepository(root / "instance.db")
+            auth = AuthService(repository)
+            owner, _ = auth.bootstrap_owner(
+                "owner",
+                "a-long-owner-password",
+                catalog_name="Owner catalog",
+                source_paths=[str(owner_catalog)],
+                write_path=str(owner_catalog),
+            )
+            members = MemberService(
+                repository,
+                SqlitePersonalCatalogProvisioner(root / "member-catalogs"),
+            )
+
+            provisioned = members.create_member(
+                owner,
+                "maria",
+                temporary_password="a-temporary-password",
+            )
+
+            member = provisioned.member
+            member_path = Path(member.catalog.write_path)
+            self.assertTrue(member.user.must_change_password)
+            self.assertEqual(member.user.role, "member")
+            self.assertTrue(member_path.exists())
+            self.assertEqual(open_catalog_repository(member_path, normalize_item).read(), [])
+            self.assertEqual([record.user.username for record in members.list_members(owner)], ["maria"])
+
+            old_token, temporary_identity = auth.login("maria", "a-temporary-password")
+            self.assertTrue(temporary_identity.user.must_change_password)
+            new_token, ready_identity = auth.change_password(
+                temporary_identity,
+                "a-temporary-password",
+                "a-permanent-password",
+            )
+            self.assertFalse(ready_identity.user.must_change_password)
+            self.assertIsNone(auth.authenticate(old_token))
+            self.assertIsNotNone(auth.authenticate(new_token))
+
+            members.set_active(owner, member.user.id, False)
+            self.assertIsNone(auth.authenticate(new_token))
+            with self.assertRaises(AuthenticationError):
+                auth.login("maria", "a-permanent-password")
+
+            members.set_active(owner, member.user.id, True)
+            active_token, _ = auth.login("maria", "a-permanent-password")
+            reset = members.reset_password(
+                owner,
+                member.user.id,
+                temporary_password="another-temporary-password",
+            )
+            self.assertTrue(reset.member.user.must_change_password)
+            self.assertIsNone(auth.authenticate(active_token))
+            _, reset_identity = auth.login("maria", "another-temporary-password")
+            self.assertTrue(reset_identity.user.must_change_password)
+            self.assertEqual(
+                [item.id for item in JsonCatalogRepository(owner_catalog, normalize_item).read()],
+                ["heat"],
+            )
 
 
 if __name__ == "__main__":

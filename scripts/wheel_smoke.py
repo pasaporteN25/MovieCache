@@ -14,15 +14,22 @@ from urllib.request import urlopen
 
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
-from movie_inbox.web.assets import render_html, render_login_html, static_asset
+from movie_inbox.web.assets import (
+    render_html,
+    render_login_html,
+    render_password_change_html,
+    static_asset,
+)
 
 
 def main() -> int:
     assert "Movie Inbox wheel smoke" in render_html("Movie Inbox wheel smoke", "token")
     assert "Movie Inbox wheel smoke" in render_login_html("Movie Inbox wheel smoke", "token")
+    assert "Movie Inbox wheel smoke" in render_password_change_html("Movie Inbox wheel smoke", "token")
     assert static_asset("style.css") is not None
     assert static_asset("app.js") is not None
     assert static_asset("login.js") is not None
+    assert static_asset("password-change.js") is not None
 
     with tempfile.TemporaryDirectory() as temporary:
         catalog = Path(temporary) / "catalog.json"

@@ -13,6 +13,9 @@ from pathlib import Path
 from movie_inbox.application.identity_repository import (
     IdentityAlreadyInitialized,
     IdentityCatalogMismatch,
+    IdentityConflict,
+    IdentityNotFound,
+    IdentityOwnerProtected,
     IdentityRepositoryError,
 )
 from movie_inbox.domain.identity import (
@@ -150,6 +153,145 @@ class SqliteIdentityRepository:
             now,
         )
         return user, catalog
+
+    def create_member(
+        self,
+        username: str,
+        password_hash: str,
+        catalog_name: str,
+        source_paths: list[str],
+        write_path: str,
+    ) -> tuple[UserAccount, PersonalCatalog]:
+        sources, writable_path = _catalog_paths(source_paths, write_path)
+        now = _utc_now()
+        user_id = uuid.uuid4().hex
+        catalog_id = uuid.uuid4().hex
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    connection.execute(
+                        """INSERT INTO users(
+                            id, username, username_key, password_hash, role, active,
+                            must_change_password, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, 'member', 1, 1, ?, ?)""",
+                        (user_id, username, username_key(username), password_hash, now, now),
+                    )
+                    connection.execute(
+                        """INSERT INTO catalogs(id, owner_user_id, name, is_default, created_at)
+                        VALUES (?, ?, ?, 1, ?)""",
+                        (catalog_id, user_id, str(catalog_name or "Mi catalogo").strip(), now),
+                    )
+                    for position, path in enumerate(sources):
+                        connection.execute(
+                            """INSERT INTO catalog_sources(catalog_id, position, storage_path, writable)
+                            VALUES (?, ?, ?, ?)""",
+                            (catalog_id, position, path, int(path == writable_path)),
+                        )
+                    connection.commit()
+            except sqlite3.IntegrityError as error:
+                raise IdentityConflict("Username is already in use") from error
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot create member account in: {self.path}") from error
+        user = UserAccount(user_id, username, "member", True, True, now)
+        catalog = PersonalCatalog(
+            catalog_id,
+            user_id,
+            str(catalog_name or "Mi catalogo").strip(),
+            tuple(CatalogSource(path, path == writable_path) for path in sources),
+            now,
+        )
+        return user, catalog
+
+    def list_accounts(self) -> list[tuple[UserAccount, PersonalCatalog]]:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    rows = connection.execute(
+                        """SELECT * FROM users
+                        ORDER BY CASE role WHEN 'owner' THEN 0 ELSE 1 END, username_key"""
+                    ).fetchall()
+                    accounts: list[tuple[UserAccount, PersonalCatalog]] = []
+                    for row in rows:
+                        user = _user(row)
+                        catalog = self._catalog(connection, user.id)
+                        if catalog is None:
+                            raise IdentityRepositoryError(
+                                f"Account {user.id} does not have a default personal catalog"
+                            )
+                        accounts.append((user, catalog))
+                    return accounts
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot list accounts from: {self.path}") from error
+
+    def account(self, user_id: str) -> UserAccount | None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    return _user(row) if row else None
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot read account from: {self.path}") from error
+
+    def set_user_active(self, user_id: str, active: bool) -> UserAccount:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    if row is None:
+                        connection.rollback()
+                        raise IdentityNotFound("Member account was not found")
+                    if str(row["role"]) == "owner":
+                        connection.rollback()
+                        raise IdentityOwnerProtected("The owner account cannot be deactivated")
+                    connection.execute(
+                        "UPDATE users SET active = ?, updated_at = ? WHERE id = ?",
+                        (int(active), _utc_now(), user_id),
+                    )
+                    if not active:
+                        connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+                    updated = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    connection.commit()
+                    return _user(updated)
+            except (IdentityNotFound, IdentityOwnerProtected):
+                raise
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot update account in: {self.path}") from error
+
+    def replace_password(
+        self,
+        user_id: str,
+        password_hash: str,
+        *,
+        must_change_password: bool,
+    ) -> UserAccount:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    cursor = connection.execute(
+                        """UPDATE users
+                        SET password_hash = ?, must_change_password = ?, updated_at = ?
+                        WHERE id = ?""",
+                        (password_hash, int(must_change_password), _utc_now(), user_id),
+                    )
+                    if cursor.rowcount != 1:
+                        connection.rollback()
+                        raise IdentityNotFound("Account was not found")
+                    connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+                    updated = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    connection.commit()
+                    return _user(updated)
+            except IdentityNotFound:
+                raise
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot replace password in: {self.path}") from error
 
     def credentials_for(self, username: str) -> tuple[UserAccount, str] | None:
         try:

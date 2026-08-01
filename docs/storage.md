@@ -16,12 +16,16 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 
 La base de instancia contiene:
 
-- `users`: owner inicial, hash `scrypt`, rol y estado de la cuenta.
+- `users`: owner y miembros locales, hash `scrypt`, rol, estado y cambio obligatorio de contrasena.
 - `catalogs`: catalogo personal predeterminado de cada usuario.
 - `catalog_sources`: archivos JSON/SQLite que forman ese catalogo y fuente writable.
 - `sessions`: hashes de tokens opacos y expiracion absoluta.
 
 El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
+
+Los miembros nuevos reciben una base SQLite vacia en el directorio configurado con `--member-catalog-dir`, por defecto `catalogs/` junto a `instance.db`. El nombre fisico usa un identificador aleatorio y no depende del username. Desactivar una cuenta o restablecer su contrasena revoca todas sus sesiones, pero conserva su catalogo.
+
+El servidor resuelve las fuentes desde la sesion autenticada. Las rutas absolutas permanecen en `instance.db`; el frontend recibe referencias opacas y no puede seleccionar otro catalogo enviando una ruta manual.
 
 Una exportacion JSON incluye solamente el catalogo. No incluye cuentas ni sesiones. Para restaurar una instancia completa se respaldan por separado el catalogo, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
 
@@ -57,6 +61,14 @@ py -m movie_inbox db export data/movie-inbox.db --json backups/catalog.json
 `db import` no reemplaza una base no vacia sin `--replace`. Antes de un reemplazo crea una exportacion `pre-import-*.bak.json`. Tanto import como export vuelven a leer el destino y comparan el documento canonico completo, incluidos aliases, reviews, metadata, procedencia y archivos locales.
 
 No se migra automaticamente ningun catalogo del usuario. El comando siempre recibe origen y destino explicitos.
+
+## Paquetes de catalogo (pendiente)
+
+La CLI puede importar y exportar un catalogo completo, pero la interfaz web todavia no ofrece paquetes compartibles ni una bandeja de importacion. Esta capacidad debe diseniarse por encima del documento canonico, sin convertir un archivo recibido en la fuente de verdad del usuario.
+
+El formato futuro deberia incluir un manifiesto versionado y un catalogo JSON portable. Antes de escribir, la interfaz debe mostrar cantidad de obras, origen, diferencias y posibles duplicados. El usuario elegira entre copiar obras seleccionadas a su catalogo personal o seguir la coleccion como referencia externa; ninguna opcion debe reemplazar entradas ni propagar estados personales de forma silenciosa.
+
+Las primeras versiones no necesitan incluir imagenes ni archivos de video dentro del paquete. Las portadas pueden resolverse desde sus URLs y los archivos locales deben permanecer vinculados solamente al servidor que los posee.
 
 ## Historial de curaduria
 

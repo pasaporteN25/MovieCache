@@ -38,6 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Private account/session database. Defaults to .movie-inbox/instance.db next to the writable catalog.",
     )
+    parser.add_argument(
+        "--member-catalog-dir",
+        type=Path,
+        help="Directory for automatically provisioned member catalogs. Defaults next to the instance database.",
+    )
     parser.add_argument("--owner-username", default="owner", help="Username created on the first server start.")
     parser.add_argument(
         "--owner-password-file",
@@ -94,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     write_catalog = args.write_catalog or first_catalog_file(args.inputs)
     ensure_catalog_exists(Path(write_catalog))
     instance_db = args.instance_db or (Path(write_catalog).resolve().parent / ".movie-inbox" / "instance.db")
+    member_catalog_dir = args.member_catalog_dir or (instance_db.resolve().parent / "catalogs")
     image_cache_dir = args.image_cache_dir or (Path(write_catalog).resolve().parent / ".catalog-cache" / "images")
     config = ViewerConfig(
         patterns=args.inputs,
@@ -105,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
         port=args.port,
         api_token=secrets.token_urlsafe(32),
         instance_db=str(instance_db),
+        member_catalog_dir=str(member_catalog_dir),
         session_ttl_seconds=args.session_days * 24 * 60 * 60,
         host=args.host,
         public_origin=public_origin,
@@ -140,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Viewing {', '.join(args.inputs)}")
     print(f"Writing changes to {write_catalog}")
     print(f"Identity store: {instance_db}")
+    print(f"Member catalogs: {member_catalog_dir}")
     print(f"Personal catalog: {personal_catalog.name}")
     print(
         f"Image cache: {config.image_cache_dir} (max {args.image_cache_total_mb:g} MB)"

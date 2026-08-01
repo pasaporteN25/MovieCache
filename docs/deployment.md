@@ -43,7 +43,7 @@ Una preparacion minima del host seria:
 
 ```bash
 sudo useradd --system --home /var/lib/movie-inbox --shell /usr/sbin/nologin movie-inbox
-sudo install -d -o movie-inbox -g movie-inbox /var/lib/movie-inbox /var/backups/movie-inbox
+sudo install -d -o movie-inbox -g movie-inbox /var/lib/movie-inbox /var/lib/movie-inbox/member-catalogs /var/backups/movie-inbox
 cd /opt/movie-inbox
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
@@ -70,6 +70,7 @@ El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public
 /opt/movie-inbox/.venv/bin/movie-inbox serve \
   /var/lib/movie-inbox/movie-inbox.db \
   --instance-db /var/lib/movie-inbox/instance.db \
+  --member-catalog-dir /var/lib/movie-inbox/member-catalogs \
   --host 127.0.0.1 \
   --port 8765 \
   --public-origin https://movies.example.com \

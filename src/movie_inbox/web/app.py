@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import secrets
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 
@@ -11,7 +13,11 @@ from fastapi import BackgroundTasks, Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from movie_inbox.application.auth_service import AuthService, AuthenticationError
+from movie_inbox.application.auth_service import (
+    AuthService,
+    AuthenticationError,
+    PasswordPolicyError,
+)
 from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.curation_workflow import (
     CatalogPointer,
@@ -24,13 +30,29 @@ from movie_inbox.application.repository import (
     CatalogFormatError,
     CatalogRepositoryError,
 )
-from movie_inbox.application.identity_repository import IdentityRepositoryError
+from movie_inbox.application.identity_repository import (
+    IdentityConflict,
+    IdentityNotFound,
+    IdentityOwnerProtected,
+    IdentityRepositoryError,
+)
+from movie_inbox.application.member_service import (
+    ManagedMember,
+    MemberAuthorizationError,
+    MemberService,
+)
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
+from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION
-from movie_inbox.web.assets import render_html, render_login_html, static_asset
+from movie_inbox.web.assets import (
+    render_html,
+    render_login_html,
+    render_password_change_html,
+    static_asset,
+)
 from movie_inbox.web.catalog_api import (
     append_item,
     background_enrich_catalog_item,
@@ -85,6 +107,68 @@ class ApiRequestError(ValueError):
         self.status_code = status_code
 
 
+@dataclass(frozen=True)
+class SessionCatalog:
+    config: ViewerConfig
+    references: dict[str, str]
+    references_by_path: dict[str, str]
+    source_names: tuple[str, ...]
+    write_name: str
+
+    @classmethod
+    def from_identity(cls, base: ViewerConfig, identity: AuthenticatedIdentity) -> "SessionCatalog":
+        source_paths = [source.path for source in identity.catalog.sources]
+        if not source_paths or not identity.catalog.write_path:
+            raise ApiRequestError("catalog_unavailable", 503)
+        references = {
+            f"source-{position}": path
+            for position, path in enumerate(source_paths, start=1)
+        }
+        references_by_path = {
+            _resolved_path(path): reference
+            for reference, path in references.items()
+        }
+        runtime = replace(
+            base,
+            patterns=source_paths,
+            write_json=identity.catalog.write_path,
+        )
+        return cls(
+            runtime,
+            references,
+            references_by_path,
+            tuple(Path(path).name for path in source_paths),
+            Path(identity.catalog.write_path).name,
+        )
+
+    def source_path(self, reference: str) -> str:
+        return self.references.get(str(reference or ""), "")
+
+    def public_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        public: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            item["_source_file"] = self.references_by_path.get(
+                _resolved_path(str(row.get("_source_file") or "")),
+                "",
+            )
+            public.append(item)
+        return public
+
+    def public_payload(self, value: Any) -> Any:
+        if isinstance(value, list):
+            return [self.public_payload(item) for item in value]
+        if isinstance(value, dict):
+            public: dict[str, Any] = {}
+            for key, item in value.items():
+                if key in {"source_file", "_source_file"} and isinstance(item, str):
+                    public[key] = self.references_by_path.get(_resolved_path(item), "")
+                else:
+                    public[key] = self.public_payload(item)
+            return public
+        return value
+
+
 def create_app(config: ViewerConfig) -> FastAPI:
     if not config.instance_db:
         raise RuntimeError("ViewerConfig.instance_db is required")
@@ -96,6 +180,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
         identity_repository,
         session_ttl_seconds=config.session_ttl_seconds,
     )
+    member_catalog_dir = Path(config.member_catalog_dir or Path(config.instance_db).parent / "catalogs")
+    member_service = MemberService(
+        identity_repository,
+        SqlitePersonalCatalogProvisioner(member_catalog_dir),
+    )
     login_limiter = LoginAttemptLimiter()
     app = FastAPI(
         title="Movie Inbox",
@@ -106,7 +195,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.viewer_config = config
     app.state.identity_repository = identity_repository
     app.state.auth_service = auth_service
-    workflow = curation_workflow(config)
+    app.state.member_service = member_service
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
 
     @app.middleware("http")
@@ -123,9 +212,22 @@ def create_app(config: ViewerConfig) -> FastAPI:
         request.state.identity = identity
 
         if path == "/login" and identity is not None:
+            destination = "/password-change" if identity.user.must_change_password else "/"
+            response = RedirectResponse(destination, status_code=303)
+        elif path == "/password-change" and identity is None:
+            response = RedirectResponse("/login", status_code=303)
+        elif path == "/password-change" and identity is not None and not identity.user.must_change_password:
             response = RedirectResponse("/", status_code=303)
         elif path == "/" and identity is None:
             response = RedirectResponse("/login", status_code=303)
+        elif path == "/" and identity is not None and identity.user.must_change_password:
+            response = RedirectResponse("/password-change", status_code=303)
+        elif (
+            identity is not None
+            and identity.user.must_change_password
+            and _blocked_until_password_change(path)
+        ):
+            response = error_response("password_change_required", 403)
         elif _requires_authentication(path) and identity is None:
             response = error_response("authentication_required", 401)
         else:
@@ -158,7 +260,27 @@ def create_app(config: ViewerConfig) -> FastAPI:
             raise ApiRequestError("authentication_required", 401)
         return identity
 
+    def require_ready_identity(request: Request) -> AuthenticatedIdentity:
+        identity = require_identity(request)
+        if identity.user.must_change_password:
+            raise ApiRequestError("password_change_required", 403)
+        return identity
+
+    def require_owner(request: Request) -> AuthenticatedIdentity:
+        identity = require_ready_identity(request)
+        if not identity.user.is_owner:
+            raise ApiRequestError("owner_required", 403)
+        return identity
+
     async def authorized_json(
+        request: Request,
+        _: AuthenticatedIdentity = Depends(require_ready_identity),
+    ) -> dict[str, Any]:
+        require_token(request)
+        require_origin(request)
+        return await read_json_object(request)
+
+    async def authenticated_json(
         request: Request,
         _: AuthenticatedIdentity = Depends(require_identity),
     ) -> dict[str, Any]:
@@ -178,21 +300,42 @@ def create_app(config: ViewerConfig) -> FastAPI:
             or "anonymous"
         )
 
-    def catalog_pointer(payload: Any) -> CatalogPointer:
+    def set_auth_cookie(response: Response, token: str) -> None:
+        response.set_cookie(
+            AUTH_SESSION_COOKIE,
+            token,
+            max_age=config.session_ttl_seconds,
+            httponly=True,
+            secure=config.public_origin.casefold().startswith("https://"),
+            samesite="strict",
+            path="/",
+        )
+
+    def session_catalog(request: Request) -> SessionCatalog:
+        return SessionCatalog.from_identity(config, require_ready_identity(request))
+
+    def request_workflow(request: Request):  # type: ignore[no-untyped-def]
+        return curation_workflow(session_catalog(request).config)
+
+    def catalog_pointer(catalog: SessionCatalog, payload: Any) -> CatalogPointer:
         if not isinstance(payload, dict):
             raise ValueError("Missing catalog reference")
         return CatalogPointer(
-            write_path_for(config, str(payload.get("source_file") or "")),
+            write_path_for(
+                catalog.config,
+                catalog.source_path(str(payload.get("source_file") or "")),
+            ),
             str(payload.get("id") or ""),
         )
 
     def comparison_inputs(
+        catalog: SessionCatalog,
         body: dict[str, Any],
     ) -> tuple[CatalogPointer, CatalogPointer | None, dict[str, Any] | None]:
-        left = catalog_pointer(body.get("left"))
+        left = catalog_pointer(catalog, body.get("left"))
         right_payload = body.get("right")
         incoming_payload = body.get("incoming") or body.get("result")
-        right = catalog_pointer(right_payload) if isinstance(right_payload, dict) else None
+        right = catalog_pointer(catalog, right_payload) if isinstance(right_payload, dict) else None
         incoming = None
         if isinstance(incoming_payload, dict):
             candidate = (
@@ -210,6 +353,10 @@ def create_app(config: ViewerConfig) -> FastAPI:
     @app.get("/login", response_class=HTMLResponse)
     def login_page() -> HTMLResponse:
         return HTMLResponse(render_login_html(config.title, config.api_token))
+
+    @app.get("/password-change", response_class=HTMLResponse)
+    def password_change_page() -> HTMLResponse:
+        return HTMLResponse(render_password_change_html(config.title, config.api_token))
 
     @app.post("/auth/login")
     def login(
@@ -233,21 +380,37 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return error_response("identity_store_unavailable", 503)
         login_limiter.clear(limiter_key)
         response = JSONResponse({"ok": True, **identity_payload(identity)})
-        response.set_cookie(
-            AUTH_SESSION_COOKIE,
-            token,
-            max_age=config.session_ttl_seconds,
-            httponly=True,
-            secure=config.public_origin.casefold().startswith("https://"),
-            samesite="strict",
-            path="/",
-        )
+        set_auth_cookie(response, token)
+        return response
+
+    @app.post("/auth/change-password")
+    def change_password(
+        request: Request,
+        body: dict[str, Any] = Depends(authenticated_json),
+    ) -> JSONResponse:
+        new_password = str(body.get("new_password") or "")
+        if new_password != str(body.get("confirm_password") or ""):
+            return error_response("password_confirmation_mismatch", 400)
+        try:
+            token, identity = auth_service.change_password(
+                require_identity(request),
+                str(body.get("current_password") or ""),
+                new_password,
+            )
+        except AuthenticationError:
+            return error_response("invalid_current_password", 401)
+        except PasswordPolicyError as error:
+            return error_response(str(error), 400)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+        response = JSONResponse({"ok": True, "reason": "password_changed", **identity_payload(identity)})
+        set_auth_cookie(response, token)
         return response
 
     @app.post("/auth/logout")
     def logout(
         request: Request,
-        _: dict[str, Any] = Depends(authorized_json),
+        _: dict[str, Any] = Depends(authenticated_json),
     ) -> JSONResponse:
         try:
             auth_service.logout(str(request.cookies.get(AUTH_SESSION_COOKIE) or ""))
@@ -289,10 +452,110 @@ def create_app(config: ViewerConfig) -> FastAPI:
     def session(request: Request) -> JSONResponse:
         return JSONResponse(identity_payload(require_identity(request)))
 
-    @app.get("/api/items", dependencies=[Depends(require_token)])
-    def items() -> JSONResponse:
+    @app.get("/api/members", dependencies=[Depends(require_token)])
+    def members(request: Request) -> JSONResponse:
+        identity = require_owner(request)
         try:
-            rows = load_items(config.patterns)
+            records = member_service.list_members(identity.user)
+            return JSONResponse({"members": [managed_member_payload(record) for record in records]})
+        except MemberAuthorizationError:
+            return error_response("owner_required", 403)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.post("/api/members")
+    def create_member(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_owner(request)
+        try:
+            result = member_service.create_member(
+                identity.user,
+                str(body.get("username") or ""),
+                temporary_password=str(body.get("temporary_password") or ""),
+                catalog_name=str(body.get("catalog_name") or ""),
+            )
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "reason": "member_created",
+                    "member": managed_member_payload(result.member),
+                    "temporary_password": result.temporary_password,
+                },
+                status_code=201,
+            )
+        except IdentityConflict:
+            return error_response("username_unavailable", 409)
+        except (ValueError, PasswordPolicyError) as error:
+            return error_response(str(error), 400)
+        except MemberAuthorizationError:
+            return error_response("owner_required", 403)
+        except (CatalogRepositoryError, IdentityRepositoryError, OSError):
+            return error_response("member_provisioning_failed", 503)
+
+    @app.post("/api/members/{user_id}/status")
+    def member_status(
+        user_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_owner(request)
+        if not isinstance(body.get("active"), bool):
+            return error_response("active_must_be_boolean", 400)
+        try:
+            member = member_service.set_active(identity.user, user_id, bool(body["active"]))
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "reason": "member_activated" if member.user.active else "member_deactivated",
+                    "member": managed_member_payload(member),
+                }
+            )
+        except (IdentityNotFound, ValueError):
+            return error_response("member_not_found", 404)
+        except IdentityOwnerProtected:
+            return error_response("owner_account_protected", 409)
+        except MemberAuthorizationError:
+            return error_response("owner_required", 403)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.post("/api/members/{user_id}/password-reset")
+    def reset_member_password(
+        user_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_owner(request)
+        try:
+            result = member_service.reset_password(
+                identity.user,
+                user_id,
+                temporary_password=str(body.get("temporary_password") or ""),
+            )
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "reason": "password_reset",
+                    "member": managed_member_payload(result.member),
+                    "temporary_password": result.temporary_password,
+                }
+            )
+        except PasswordPolicyError as error:
+            return error_response(str(error), 400)
+        except (IdentityNotFound, ValueError):
+            return error_response("member_not_found", 404)
+        except MemberAuthorizationError:
+            return error_response("owner_required", 403)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.get("/api/items", dependencies=[Depends(require_token)])
+    def items(request: Request) -> JSONResponse:
+        try:
+            catalog = session_catalog(request)
+            rows = catalog.public_rows(load_items(catalog.config.patterns))
         except CatalogRepositoryError as error:
             return repository_error_response(error)
         with_link = sum(1 for item in rows if has_external_link(item))
@@ -305,8 +568,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
         return JSONResponse(
             {
                 "items": rows,
-                "sources": resolved_files(config.patterns),
-                "write_json": config.write_json,
+                "sources": list(catalog.source_names),
+                "write_json": catalog.write_name,
                 "schema_version": SCHEMA_VERSION,
                 "duplicate_items": duplicate_items,
                 "curation": {"counts": curation_counts(rows)},
@@ -315,9 +578,10 @@ def create_app(config: ViewerConfig) -> FastAPI:
         )
 
     @app.get("/api/curation", dependencies=[Depends(require_token)])
-    def curation() -> JSONResponse:
+    def curation(request: Request) -> JSONResponse:
         try:
-            rows = load_items(config.patterns)
+            catalog = session_catalog(request)
+            rows = catalog.public_rows(load_items(catalog.config.patterns))
             return JSONResponse(build_curation_payload(rows))
         except CatalogRepositoryError as error:
             return repository_error_response(error)
@@ -325,17 +589,19 @@ def create_app(config: ViewerConfig) -> FastAPI:
     @app.get("/api/curation/history", dependencies=[Depends(require_token)])
     def curation_history(request: Request, mode: str = "persistent") -> JSONResponse:
         try:
-            return JSONResponse(workflow.history(mode, history_session_id(request)))
+            return JSONResponse(request_workflow(request).history(mode, history_session_id(request)))
         except (ValueError, CurationHistoryError) as error:
             return curation_application_error_response(error)
 
     @app.post("/api/curation/compare")
     def compare_curation(
+        request: Request,
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         try:
-            left, right, incoming = comparison_inputs(body)
-            review = workflow.compare(
+            catalog = session_catalog(request)
+            left, right, incoming = comparison_inputs(catalog, body)
+            review = request_workflow(request).compare(
                 left,
                 right=right,
                 incoming=incoming,
@@ -343,7 +609,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
             )
             if incoming is not None:
                 review["incoming"] = incoming
-            return JSONResponse(review)
+            return JSONResponse(catalog.public_payload(review))
         except (
             ValueError,
             MergeReviewError,
@@ -358,8 +624,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         try:
-            left, right, incoming = comparison_inputs(body)
-            result = workflow.merge(
+            catalog = session_catalog(request)
+            left, right, incoming = comparison_inputs(catalog, body)
+            result = request_workflow(request).merge(
                 left,
                 right=right,
                 incoming=incoming,
@@ -385,7 +652,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         try:
-            operation = workflow.undo(
+            operation = request_workflow(request).undo(
                 str(body.get("operation_id") or ""),
                 history_mode=str(body.get("history_mode") or "persistent"),
                 session_id=history_session_id(request),
@@ -405,7 +672,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         try:
-            count = workflow.clear_history(
+            count = request_workflow(request).clear_history(
                 str(body.get("history_mode") or "persistent"),
                 history_session_id(request),
                 confirmed=body.get("confirmed") is True,
@@ -454,14 +721,19 @@ def create_app(config: ViewerConfig) -> FastAPI:
 
     @app.post("/api/add")
     def add(
+        request: Request,
         background_tasks: BackgroundTasks,
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         try:
+            catalog = session_catalog(request)
             result = body.get("result") if isinstance(body.get("result"), dict) else body
             result = enrich_selected_result(result)
             item = item_from_search_result(result)
-            write_path = write_path_for(config, str(body.get("target_source_file") or ""))
+            write_path = write_path_for(
+                catalog.config,
+                catalog.source_path(str(body.get("target_source_file") or "")),
+            )
             target_id = str(body.get("target_id") or "")
             added, reason, extra = append_item(
                 write_path,
@@ -494,11 +766,12 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return application_error_response(error)
 
     @app.post("/api/delete")
-    def delete(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def delete(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
         try:
+            catalog = session_catalog(request)
             deleted, reason = delete_item_anywhere(
-                config,
-                source_file=str(body.get("source_file") or ""),
+                catalog.config,
+                source_file=catalog.source_path(str(body.get("source_file") or "")),
                 item_id=str(body.get("id") or ""),
                 item_url=str(body.get("url") or ""),
                 title=str(body.get("title") or ""),
@@ -511,10 +784,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return application_error_response(error)
 
     @app.post("/api/status")
-    def status(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def status(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
         try:
+            catalog = session_catalog(request)
             updated, reason = update_item_status(
-                write_path_for(config, str(body.get("source_file") or "")),
+                write_path_for(
+                    catalog.config,
+                    catalog.source_path(str(body.get("source_file") or "")),
+                ),
                 item_id=str(body.get("id") or ""),
                 status=str(body.get("status") or ""),
                 watched_at=str(body.get("watched_at") or ""),
@@ -524,10 +801,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return application_error_response(error)
 
     @app.post("/api/kind")
-    def kind(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def kind(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
         try:
+            catalog = session_catalog(request)
             updated, reason = update_item_kind(
-                write_path_for(config, str(body.get("source_file") or "")),
+                write_path_for(
+                    catalog.config,
+                    catalog.source_path(str(body.get("source_file") or "")),
+                ),
                 item_id=str(body.get("id") or ""),
                 kind=str(body.get("kind") or ""),
             )
@@ -536,10 +817,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return application_error_response(error)
 
     @app.post("/api/catalog")
-    def catalog(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def catalog(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
         try:
+            session = session_catalog(request)
             updated, reason = update_item_catalog_status(
-                write_path_for(config, str(body.get("source_file") or "")),
+                write_path_for(
+                    session.config,
+                    session.source_path(str(body.get("source_file") or "")),
+                ),
                 item_id=str(body.get("id") or ""),
                 en_catalogo=body.get("en_catalogo"),
             )
@@ -548,10 +833,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return application_error_response(error)
 
     @app.post("/api/personal")
-    def personal(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def personal(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
         try:
+            catalog = session_catalog(request)
             updated, reason = update_item_personal(
-                write_path_for(config, str(body.get("source_file") or "")),
+                write_path_for(
+                    catalog.config,
+                    catalog.source_path(str(body.get("source_file") or "")),
+                ),
                 item_id=str(body.get("id") or ""),
                 watched_at=str(body.get("watched_at") or ""),
                 rating=body.get("rating"),
@@ -567,8 +856,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         try:
-            result = workflow.update_link_decision(
-                catalog_pointer(body),
+            catalog = session_catalog(request)
+            result = request_workflow(request).update_link_decision(
+                catalog_pointer(catalog, body),
                 str(body.get("status") or ""),
                 history_mode=str(body.get("history_mode") or "persistent"),
                 session_id=history_session_id(request),
@@ -588,8 +878,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         try:
-            result = workflow.update_duplicate_decision(
-                catalog_pointer(body),
+            catalog = session_catalog(request)
+            result = request_workflow(request).update_duplicate_decision(
+                catalog_pointer(catalog, body),
                 str(body.get("other_reference") or ""),
                 str(body.get("status") or ""),
                 history_mode=str(body.get("history_mode") or "persistent"),
@@ -605,10 +896,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return curation_application_error_response(error)
 
     @app.post("/api/metadata")
-    def metadata(body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    def metadata(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
         try:
+            catalog = session_catalog(request)
             updated, reason = update_item_metadata(
-                write_path_for(config, str(body.get("source_file") or "")),
+                write_path_for(
+                    catalog.config,
+                    catalog.source_path(str(body.get("source_file") or "")),
+                ),
                 item_id=str(body.get("id") or ""),
                 values=body.get("values") if isinstance(body.get("values"), dict) else {},
                 locked_fields=body.get("locked_fields"),
@@ -623,10 +918,32 @@ def create_app(config: ViewerConfig) -> FastAPI:
 def _requires_authentication(path: str) -> bool:
     return (
         path == "/"
+        or path == "/password-change"
         or path == "/image-cache"
+        or path == "/auth/change-password"
         or path == "/auth/logout"
         or path.startswith("/api/")
     )
+
+
+def _blocked_until_password_change(path: str) -> bool:
+    if path.startswith("/static/") or path == "/healthz":
+        return False
+    return path not in {
+        "/login",
+        "/password-change",
+        "/auth/change-password",
+        "/auth/logout",
+        "/api/session",
+    }
+
+
+def _resolved_path(value: str) -> str:
+    path = Path(str(value or ""))
+    try:
+        return str(path.resolve())
+    except OSError:
+        return str(path.absolute())
 
 
 def identity_payload(identity: AuthenticatedIdentity) -> dict[str, Any]:
@@ -643,6 +960,21 @@ def identity_payload(identity: AuthenticatedIdentity) -> dict[str, Any]:
         },
         "session": {
             "expires_at": identity.expires_at,
+        },
+    }
+
+
+def managed_member_payload(member: ManagedMember) -> dict[str, Any]:
+    return {
+        "id": member.user.id,
+        "username": member.user.username,
+        "role": member.user.role,
+        "active": member.user.active,
+        "must_change_password": member.user.must_change_password,
+        "created_at": member.user.created_at,
+        "catalog": {
+            "id": member.catalog.id,
+            "name": member.catalog.name,
         },
     }
 

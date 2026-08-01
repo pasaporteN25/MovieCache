@@ -243,6 +243,7 @@
 
         <nav class="admin-section-nav" aria-label="Secciones de administración">
           <a href="#adminSummary">Resumen</a>
+          <a href="#adminMembers">Miembros</a>
           <a href="#adminDatabase">Base de datos</a>
           <a href="#adminExternal">Fuentes externas</a>
           <a href="#adminMatching">Matching y duplicados</a>
@@ -268,6 +269,24 @@
             <div class="metric"><span>FilmAffinity</span><strong id="faLinks">0</strong></div>
             <div class="metric"><span>Duplicadas</span><strong id="duplicateCount">0</strong></div>
             <div class="metric"><span>Catálogos</span><strong id="sourceFiles">0</strong></div>
+          </div>
+        </section>
+
+        <section id="adminMembers" class="admin-section" aria-labelledby="adminMembersTitle">
+          <div class="admin-section-heading member-section-heading">
+            <div>
+              <h3 id="adminMembersTitle">Miembros</h3>
+              <p>Cuentas locales y cat&aacute;logos personales aislados.</p>
+            </div>
+            <button id="createMemberButton" type="button">Agregar miembro</button>
+          </div>
+          <div class="member-roster-summary">
+            <span id="memberCount">0 miembros</span>
+            <span>Sin registro p&uacute;blico</span>
+          </div>
+          <p id="memberFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+          <div id="memberList" class="member-list" aria-live="polite">
+            <p class="member-list-empty">Abr&iacute; Administrar para cargar las cuentas.</p>
           </div>
         </section>
 
@@ -308,6 +327,65 @@
         </section>
       </section>
     </main>
+
+    <dialog id="memberDialog" class="member-dialog" aria-labelledby="memberDialogTitle">
+      <form id="memberForm" class="member-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Nueva credencial</span>
+            <h2 id="memberDialogTitle">Agregar miembro</h2>
+          </div>
+          <button id="closeMemberDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields">
+          <label>
+            <span>Usuario</span>
+            <input id="memberUsername" name="username" autocomplete="off" minlength="3" maxlength="64" required>
+          </label>
+          <label>
+            <span>Nombre del cat&aacute;logo</span>
+            <input id="memberCatalogName" name="catalog_name" maxlength="120" placeholder="Se completa autom&aacute;ticamente">
+          </label>
+          <label>
+            <span>Contrase&ntilde;a temporal</span>
+            <input id="memberTemporaryPassword" name="temporary_password" type="password" autocomplete="new-password" minlength="12" placeholder="Dejar vac&iacute;o para generar una">
+          </label>
+          <label class="login-password-toggle">
+            <input id="showMemberPassword" type="checkbox">
+            <span>Mostrar contrase&ntilde;a</span>
+          </label>
+          <p id="memberDialogFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelMemberDialog" class="quiet-action" type="button">Cancelar</button>
+          <button id="submitMember" type="submit">Crear cuenta y cat&aacute;logo</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="temporaryPasswordDialog" class="member-dialog" aria-labelledby="temporaryPasswordTitle">
+      <div class="member-dialog-surface temporary-password-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Mostrar una sola vez</span>
+            <h2 id="temporaryPasswordTitle">Credencial temporal</h2>
+          </div>
+          <button id="closeTemporaryPasswordDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="temporary-password-body">
+          <p>Entreg&aacute; esta contrase&ntilde;a a <strong id="temporaryPasswordUsername"></strong>.</p>
+          <label>
+            <span>Contrase&ntilde;a temporal</span>
+            <input id="temporaryPasswordValue" type="text" readonly>
+          </label>
+          <p id="temporaryPasswordFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="copyTemporaryPassword" type="button">Copiar contrase&ntilde;a</button>
+          <button id="finishTemporaryPassword" class="quiet-action" type="button">Listo</button>
+        </footer>
+      </div>
+    </dialog>
 
     <dialog id="detailDrawer" class="detail-drawer" aria-labelledby="detailDrawerTitle">
       <div class="movie-dialog-surface">
