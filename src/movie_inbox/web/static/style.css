@@ -1814,12 +1814,24 @@
         color: #fff;
         min-height: 46px;
       }
+      .password-pass { min-height: 570px; }
+      .login-exit {
+        background: transparent;
+        border: 0;
+        color: var(--teal);
+        font: inherit;
+        min-height: 28px;
+        padding: 2px 4px;
+        width: auto;
+      }
+      .login-exit:hover { color: var(--ink); }
       @media (max-width: 760px) {
         .login-main { align-items: start; padding: 28px 18px; }
         .login-stage { gap: 26px; grid-template-columns: 1fr; }
         .login-brand h1 { font-size: clamp(38px, 13vw, 58px); }
         .login-brand p { font-size: 15px; margin-top: 12px; }
         .login-pass { min-height: 430px; }
+        .password-pass { min-height: 560px; }
         .login-pass-body { padding: 24px 20px; }
         #currentUserLabel { max-width: 76px; }
       }
@@ -2688,6 +2700,146 @@
         grid-template-columns: repeat(2, minmax(180px, 320px));
         max-width: 660px;
       }
+      .member-section-heading {
+        align-items: end;
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+      }
+      .member-section-heading button { width: auto; }
+      .member-roster-summary {
+        align-items: center;
+        color: var(--muted);
+        display: flex;
+        font-family: "Courier New", monospace;
+        font-size: 10px;
+        font-weight: 800;
+        gap: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .member-roster-summary span + span {
+        border-left: 1px solid var(--line);
+        padding-left: 14px;
+      }
+      .admin-inline-feedback {
+        background: rgba(34, 216, 229, 0.08);
+        border: 1px solid rgba(34, 216, 229, 0.34);
+        color: #a7f7fb;
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0;
+        padding: 9px 10px;
+      }
+      .admin-inline-feedback[data-tone="error"] {
+        background: rgba(255, 190, 85, 0.09);
+        border-color: rgba(255, 190, 85, 0.45);
+        color: #ffe0a2;
+      }
+      .member-list {
+        border-top: 1px solid var(--line);
+        display: grid;
+        max-width: 1080px;
+        transition: opacity 180ms var(--ease-out);
+      }
+      .member-list[aria-busy="true"] { opacity: 0.55; }
+      .member-list-empty {
+        color: var(--muted);
+        display: grid;
+        gap: 5px;
+        margin: 0;
+        padding: 24px 0;
+      }
+      .member-list-empty strong { color: var(--ink); }
+      .member-row {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(210px, 1fr) minmax(180px, auto) auto;
+        min-height: 76px;
+        padding: 12px 0;
+      }
+      .member-row[data-active="false"] { opacity: 0.72; }
+      .member-row-identity {
+        align-items: center;
+        display: grid;
+        gap: 11px;
+        grid-template-columns: 36px minmax(0, 1fr);
+        min-width: 0;
+      }
+      .member-row-identity > div { display: grid; gap: 3px; min-width: 0; }
+      .member-row-identity strong,
+      .member-row-identity span { overflow-wrap: anywhere; }
+      .member-row-identity > div > span { color: var(--muted); font-size: 12px; }
+      .member-avatar {
+        align-items: center;
+        background: rgba(34, 216, 229, 0.1);
+        border: 1px solid rgba(34, 216, 229, 0.62);
+        border-radius: 4px;
+        color: var(--teal);
+        display: flex;
+        font-size: 11px;
+        font-weight: 900;
+        height: 36px;
+        justify-content: center;
+        width: 36px;
+      }
+      .member-row-status,
+      .member-row-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; }
+      .member-state {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-family: "Courier New", monospace;
+        font-size: 9px;
+        font-weight: 800;
+        padding: 4px 7px;
+        text-transform: uppercase;
+      }
+      .member-state-active { border-color: rgba(34, 216, 229, 0.52); color: var(--teal); }
+      .member-state-disabled { border-color: rgba(167, 170, 199, 0.35); }
+      .member-state-attention { border-color: rgba(255, 190, 85, 0.55); color: var(--gold); }
+      .member-row-actions { justify-content: end; }
+      .member-row-actions button { min-height: 34px; width: auto; }
+      .member-deactivate { border-color: rgba(255, 190, 85, 0.44); color: #ffe0a2; }
+      .member-activate { border-color: rgba(34, 216, 229, 0.48); color: var(--teal); }
+      .member-dialog { max-width: 590px; }
+      .member-dialog-surface { display: grid; grid-template-rows: auto 1fr auto; margin: 0; }
+      .member-dialog-header {
+        align-items: start;
+        background: #080a18;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        padding: 16px 18px;
+      }
+      .member-dialog-header h2 {
+        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-size: 28px;
+        font-style: italic;
+        margin: 4px 0 0;
+        text-transform: uppercase;
+      }
+      .member-form-fields,
+      .temporary-password-body { display: grid; gap: 14px; padding: 20px 18px; }
+      .member-form-fields > label:not(.login-password-toggle),
+      .temporary-password-body label { display: grid; gap: 6px; }
+      .member-form-fields label > span,
+      .temporary-password-body label > span { color: var(--muted); font-size: 12px; font-weight: 800; }
+      .member-dialog-actions {
+        align-items: center;
+        border-top: 1px solid var(--line);
+        display: flex;
+        gap: 8px;
+        justify-content: end;
+        padding: 12px 18px;
+      }
+      .member-dialog-actions button { width: auto; }
+      .temporary-password-body p { color: var(--muted); line-height: 1.5; margin: 0; }
+      .temporary-password-body strong { color: var(--ink); }
+      #temporaryPasswordValue { font-family: "Courier New", monospace; font-size: 15px; }
       .empty {
         border: 1px dashed var(--line);
         border-radius: 8px;
@@ -2786,6 +2938,28 @@
         .dvd-front-status { font-size: 11px; }
         .admin-section-nav a { min-height: 44px; }
         .admin-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .member-section-heading { align-items: stretch; display: grid; }
+        .member-section-heading button { width: 100%; }
+        .member-row {
+          align-items: start;
+          gap: 11px;
+          grid-template-columns: 1fr;
+          padding-block: 15px;
+        }
+        .member-row-status { padding-left: 47px; }
+        .member-row-actions { display: grid; grid-template-columns: 1fr 1fr; justify-content: stretch; }
+        .member-row-actions button { min-height: 44px; width: 100%; }
+        .member-dialog {
+          border: 0;
+          height: 100dvh;
+          margin: 0;
+          max-height: 100dvh;
+          max-width: none;
+          width: 100vw;
+        }
+        .member-dialog-surface { min-height: 100%; }
+        .member-dialog-actions { align-self: end; display: grid; grid-template-columns: 1fr 1fr; }
+        .member-dialog-actions button { width: 100%; }
         .admin-tool-grid { grid-template-columns: 1fr; max-width: none; }
         .curation-tabs { margin-inline: -14px; padding-inline: 14px; }
         .curation-tab { min-height: 44px; }

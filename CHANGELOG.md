@@ -57,6 +57,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Base de instancia separada para cuentas, sesiones y pertenencia del catalogo, sin contaminar importaciones o exportaciones JSON.
 - Bootstrap interactivo o mediante `movie-inbox account bootstrap`, con adopcion no destructiva del catalogo existente.
 - Pantalla de acceso, identidad activa en el menu y cierre de sesion con revocacion inmediata.
+- Ciclo de vida local de miembros con alta, desactivacion, reactivacion y reset de acceso desde Administrar.
+- Contrasena temporal con cambio obligatorio y rotacion de la sesion al confirmar la credencial personal.
+- Catalogos SQLite vacios creados automaticamente para miembros dentro de un directorio administrado.
+- Resolucion del catalogo por sesion en todas las lecturas, mutaciones, merges, curacion y tareas en segundo plano.
+- Referencias opacas de fuentes en la API para no exponer rutas absolutas ni aceptar rutas de catalogos ajenos.
 
 ### Corregido
 

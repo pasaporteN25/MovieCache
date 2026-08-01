@@ -14,6 +14,7 @@ from movie_inbox.application.auth_service import AuthService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
+from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.web.app import MAX_JSON_BODY_BYTES, create_app
 from movie_inbox.web.catalog_api import background_enrich_catalog_item
 from movie_inbox.web.config import ViewerConfig
@@ -45,6 +46,7 @@ class ViewerHttpTests(unittest.TestCase):
             port=8765,
             api_token="test-token",
             instance_db=str(self.instance_path),
+            member_catalog_dir=str(Path(self.temporary.name) / "member-catalogs"),
         )
         self.client_context = TestClient(create_app(self.config), base_url="http://127.0.0.1:8765")
         self.client = self.client_context.__enter__()
@@ -85,6 +87,118 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(login.status_code, 200)
         self.assertIn(b'id="loginForm"', login.content)
         self.assertIn(b'/static/login.js', login.content)
+
+    def test_member_must_change_password_and_catalog_is_isolated_by_session(self) -> None:
+        created = self.client.post(
+            "/api/members",
+            content=json.dumps({
+                "username": "maria",
+                "temporary_password": "a-temporary-password",
+            }),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        member_payload = created.json()["member"]
+        self.assertNotIn(str(self.temporary.name), created.text)
+
+        identity_repository = SqliteIdentityRepository(self.instance_path)
+        member_catalog = identity_repository.default_catalog_for(member_payload["id"])
+        self.assertIsNotNone(member_catalog)
+        member_repository = open_catalog_repository(Path(member_catalog.write_path), normalize_item)
+        member_repository.write([
+            normalize_item({"id": "heat", "title": "Heat", "year": "1995", "status": "to_watch"})
+        ])
+
+        with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as member_client:
+            login = member_client.post(
+                "/auth/login",
+                content=json.dumps({"username": "maria", "password": "a-temporary-password"}),
+                headers=self.post_headers(),
+            )
+            self.assertEqual(login.status_code, 200, login.content)
+            self.assertTrue(login.json()["user"]["must_change_password"])
+
+            blocked = member_client.get(
+                "/api/items",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            password_page = member_client.get("/password-change")
+            self.assertEqual(blocked.status_code, 403)
+            self.assertEqual(blocked.json()["reason"], "password_change_required")
+            self.assertEqual(password_page.status_code, 200)
+
+            changed = member_client.post(
+                "/auth/change-password",
+                content=json.dumps({
+                    "current_password": "a-temporary-password",
+                    "new_password": "a-permanent-password",
+                    "confirm_password": "a-permanent-password",
+                }),
+                headers=self.post_headers(),
+            )
+            self.assertEqual(changed.status_code, 200, changed.content)
+            self.assertFalse(changed.json()["user"]["must_change_password"])
+
+            member_items = member_client.get(
+                "/api/items",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            self.assertEqual(member_items.status_code, 200, member_items.content)
+            self.assertEqual([item["id"] for item in member_items.json()["items"]], ["heat"])
+            self.assertEqual(member_items.json()["items"][0]["_source_file"], "source-1")
+            self.assertNotIn(str(member_catalog.write_path), member_items.text)
+
+            updated = member_client.post(
+                "/api/status",
+                content=json.dumps({
+                    "id": "heat",
+                    "status": "watched",
+                    "source_file": str(self.catalog_path),
+                }),
+                headers=self.post_headers(),
+            )
+            forbidden_members = member_client.get(
+                "/api/members",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            self.assertEqual(updated.status_code, 200, updated.content)
+            self.assertEqual(forbidden_members.status_code, 403)
+
+        owner_item = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
+        member_item = member_repository.get("heat")
+        self.assertEqual(owner_item.status, "to_watch")
+        self.assertEqual(member_item.status, "watched")
+
+    def test_owner_can_deactivate_and_reset_a_member(self) -> None:
+        created = self.client.post(
+            "/api/members",
+            content=json.dumps({"username": "maria"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        member_id = created.json()["member"]["id"]
+        generated_password = created.json()["temporary_password"]
+        self.assertGreaterEqual(len(generated_password), 12)
+
+        deactivated = self.client.post(
+            f"/api/members/{member_id}/status",
+            content=json.dumps({"active": False}),
+            headers=self.post_headers(),
+        )
+        reset = self.client.post(
+            f"/api/members/{member_id}/password-reset",
+            content="{}",
+            headers=self.post_headers(),
+        )
+        listed = self.client.get(
+            "/api/members",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(deactivated.status_code, 200, deactivated.content)
+        self.assertFalse(deactivated.json()["member"]["active"])
+        self.assertEqual(reset.status_code, 200, reset.content)
+        self.assertTrue(reset.json()["member"]["must_change_password"])
+        self.assertEqual(len(listed.json()["members"]), 1)
 
     def test_login_requires_token_origin_and_json(self) -> None:
         body = json.dumps({"username": "lucas", "password": self.owner_password})
@@ -185,6 +299,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="currentUserName"', body)
         self.assertIn(b'id="currentCatalogName"', body)
         self.assertIn(b'id="logoutButton"', body)
+        self.assertIn(b'id="adminMembers"', body)
+        self.assertIn(b'id="memberList"', body)
+        self.assertIn(b'id="memberDialog"', body)
+        self.assertIn(b'id="temporaryPasswordDialog"', body)
         self.assertIn(b'id="homeGrid"', body)
         self.assertIn(b'id="activeFilters"', body)
         self.assertIn(b'id="catalogSummary"', body)
@@ -214,6 +332,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'.merge-field-options', css)
         self.assertIn(b'.history-operation-mark', css)
         self.assertIn(b'.admin-section-nav', css)
+        self.assertIn(b'.member-row', css)
+        self.assertIn(b'.member-dialog', css)
         self.assertIn(b'.system-menu-panel', css)
         self.assertIn(b'.active-filters', css)
         self.assertIn(b'.collection-view.is-compare-mode #grid', css)
@@ -259,6 +379,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'function focusViewHeading(view)', javascript)
         self.assertIn(b'function loadIdentity()', javascript)
         self.assertIn(b'function logout()', javascript)
+        self.assertIn(b'function loadMembers(', javascript)
+        self.assertIn(b'function createMember(', javascript)
+        self.assertIn(b'function handleMemberAction(', javascript)
         self.assertIn(b'function handleKeyboardModality(event)', javascript)
         self.assertIn(b'fields.detailBody.scrollTop = 0;', javascript)
         self.assertIn(b'function retryMergeComparison()', javascript)

@@ -81,6 +81,19 @@ El comando solicita la contrasena sin mostrarla. `--password-file` permite usar 
 
 El catalogo conserva su formato normal y sigue pudiendo importarse o exportarse como JSON. La adopcion inicial solamente registra su propiedad en la base de instancia: no mueve ni modifica obras, reviews o archivos locales.
 
+### Miembros y catalogos personales
+
+El owner administra miembros desde `Administrar > Miembros`. Una cuenta nueva recibe una contrasena temporal, debe reemplazarla en su primer acceso y obtiene un catalogo SQLite vacio. Desactivar o restablecer una cuenta revoca inmediatamente sus sesiones; reactivarla no elimina su catalogo.
+
+Por defecto, los catalogos nuevos se crean en `.movie-inbox/catalogs/` junto a `instance.db`. La ubicacion puede definirse al iniciar el servidor:
+
+```powershell
+py -m movie_inbox serve scripts/catalogv4.json `
+  --member-catalog-dir data/member-catalogs
+```
+
+Cada request abre exclusivamente las fuentes registradas para la cuenta autenticada. La API usa referencias opacas como `source-1`, por lo que no publica rutas absolutas del servidor. JSON permanece disponible como importacion y exportacion individual; cuentas, sesiones y pertenencia siguen viviendo solamente en `instance.db`.
+
 ## SQLite y backups JSON
 
 Para crear una base SQLite sin modificar el JSON original:
@@ -273,7 +286,7 @@ python scripts/view_catalog.py exports/*.json --port 8765
 
 El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibilidad, `--write-json` sigue disponible como alias de `--write-catalog`.
 
-Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el owner y el catalogo personal activo y permite cerrar todas las operaciones de esa sesion.
+Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el usuario y el catalogo personal activos y permite cerrar todas las operaciones de esa sesion.
 
 La interfaz se divide en tres espacios. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Administrar`, dentro del menu de sistema, agrupa resumen, base de datos, salud de fuentes externas, matching y duplicados.
 

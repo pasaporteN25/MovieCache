@@ -125,7 +125,6 @@ class AuthService:
             not credentials
             or not valid
             or not credentials[0].active
-            or not credentials[0].is_owner
         ):
             raise AuthenticationError("invalid_credentials")
 
@@ -133,6 +132,42 @@ class AuthService:
         catalog = self.repository.default_catalog_for(user.id)
         if catalog is None:
             raise AuthenticationError("catalog_unavailable")
+        return self._create_session(user, catalog)
+
+    def change_password(
+        self,
+        identity: AuthenticatedIdentity,
+        current_password: str,
+        new_password: str,
+    ) -> tuple[str, AuthenticatedIdentity]:
+        current_password_value = str(current_password or "")
+        current_password_in_bounds = len(current_password_value) <= PASSWORD_MAX_LENGTH
+        credentials = self.repository.credentials_for(identity.user.username)
+        if (
+            not credentials
+            or credentials[0].id != identity.user.id
+            or not credentials[0].active
+            or not current_password_in_bounds
+            or not self.hasher.verify(current_password_value, credentials[1])
+        ):
+            raise AuthenticationError("invalid_credentials")
+        if hmac.compare_digest(current_password_value, str(new_password or "")):
+            raise PasswordPolicyError("New password must be different from the current password")
+        updated = self.repository.replace_password(
+            identity.user.id,
+            self.hasher.hash(new_password),
+            must_change_password=False,
+        )
+        catalog = self.repository.default_catalog_for(updated.id)
+        if catalog is None:
+            raise AuthenticationError("catalog_unavailable")
+        return self._create_session(updated, catalog)
+
+    def _create_session(
+        self,
+        user: UserAccount,
+        catalog: PersonalCatalog,
+    ) -> tuple[str, AuthenticatedIdentity]:
         now = int(self.clock())
         expires_at = now + self.session_ttl_seconds
         token = secrets.token_urlsafe(SESSION_TOKEN_BYTES)

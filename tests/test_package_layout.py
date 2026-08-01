@@ -9,7 +9,12 @@ from movie_inbox.cli.main import COMMANDS
 from movie_inbox.external.registry import ExternalSourceService
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.web.app import create_app
-from movie_inbox.web.assets import render_html, render_login_html, static_asset
+from movie_inbox.web.assets import (
+    render_html,
+    render_login_html,
+    render_password_change_html,
+    static_asset,
+)
 from movie_inbox.web.config import ViewerConfig
 
 
@@ -31,9 +36,13 @@ class PackageLayoutTests(unittest.TestCase):
         login_html = render_login_html("Catalog <Test>", "session-token")
         self.assertIn("Catalog &lt;Test&gt;", login_html)
         self.assertIn('src="/static/login.js"', login_html)
+        password_html = render_password_change_html("Catalog <Test>", "session-token")
+        self.assertIn("Catalog &lt;Test&gt;", password_html)
+        self.assertIn('src="/static/password-change.js"', password_html)
         self.assertIsNotNone(static_asset("style.css"))
         self.assertIsNotNone(static_asset("app.js"))
         self.assertIsNotNone(static_asset("login.js"))
+        self.assertIsNotNone(static_asset("password-change.js"))
         self.assertIsNone(static_asset("../pyproject.toml"))
 
     def test_fastapi_application_disables_public_api_documentation(self) -> None:
@@ -69,6 +78,9 @@ class PackageLayoutTests(unittest.TestCase):
             self.assertIn("/healthz", paths)
             self.assertIn("/login", paths)
             self.assertIn("/auth/login", paths)
+            self.assertIn("/password-change", paths)
+            self.assertIn("/auth/change-password", paths)
+            self.assertIn("/api/members", paths)
 
 
 if __name__ == "__main__":

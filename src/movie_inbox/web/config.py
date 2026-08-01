@@ -27,6 +27,7 @@ class ViewerConfig:
     port: int
     api_token: str
     instance_db: str = ""
+    member_catalog_dir: str = ""
     session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS
     host: str = "127.0.0.1"
     public_origin: str = ""

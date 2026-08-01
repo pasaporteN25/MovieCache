@@ -62,12 +62,15 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - La aplicacion web es la interfaz principal actual.
 - Un cliente Kotlin es una integracion futura importante, pero no forma parte de la
   siguiente etapa inmediata.
-- La primera etapa de identidad usa owner local, sesiones seguras y un catalogo
-  personal creado o adoptado durante el bootstrap.
+- La identidad usa owner local, miembros creados por invitacion, sesiones seguras y
+  un catalogo personal creado o adoptado para cada cuenta.
 - `status`, `watched_at` e historial tendran una visibilidad general por usuario;
   rating y review tendran defaults independientes y overrides por obra.
 - Compartir o seguir catalogos, perfiles publicos y registro abierto quedan para
   fases posteriores.
+- La interfaz todavia no importa paquetes de catalogo. Esa capacidad futura debe
+  permitir previsualizar, deduplicar y elegir entre copiar obras al catalogo personal
+  o seguir una coleccion externa sin mezclar automaticamente ambas fuentes.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

@@ -1,5 +1,7 @@
 const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let currentIdentity = null;
+      let members = [];
+      let membersLoading = false;
       let items = [];
       let sourceFiles = [];
       let manualResults = [];
@@ -68,6 +70,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (response.status === 401) {
           window.location.replace("/login?expired=1");
           throw new Error("authentication_required");
+        }
+        if (response.status === 403) {
+          const payload = await response.clone().json().catch(() => ({}));
+          if (payload.reason === "password_change_required") {
+            window.location.replace("/password-change");
+            throw new Error("password_change_required");
+          }
         }
         return response;
       }
@@ -161,6 +170,27 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogMergeResults: document.querySelector("#catalogMergeResults"),
         databaseCatalogPanel: document.querySelector("#databaseCatalogPanel"),
         databaseExternalPanel: document.querySelector("#databaseExternalPanel"),
+        createMemberButton: document.querySelector("#createMemberButton"),
+        memberCount: document.querySelector("#memberCount"),
+        memberFeedback: document.querySelector("#memberFeedback"),
+        memberList: document.querySelector("#memberList"),
+        memberDialog: document.querySelector("#memberDialog"),
+        memberForm: document.querySelector("#memberForm"),
+        memberUsername: document.querySelector("#memberUsername"),
+        memberCatalogName: document.querySelector("#memberCatalogName"),
+        memberTemporaryPassword: document.querySelector("#memberTemporaryPassword"),
+        showMemberPassword: document.querySelector("#showMemberPassword"),
+        memberDialogFeedback: document.querySelector("#memberDialogFeedback"),
+        closeMemberDialog: document.querySelector("#closeMemberDialog"),
+        cancelMemberDialog: document.querySelector("#cancelMemberDialog"),
+        submitMember: document.querySelector("#submitMember"),
+        temporaryPasswordDialog: document.querySelector("#temporaryPasswordDialog"),
+        temporaryPasswordUsername: document.querySelector("#temporaryPasswordUsername"),
+        temporaryPasswordValue: document.querySelector("#temporaryPasswordValue"),
+        temporaryPasswordFeedback: document.querySelector("#temporaryPasswordFeedback"),
+        copyTemporaryPassword: document.querySelector("#copyTemporaryPassword"),
+        closeTemporaryPasswordDialog: document.querySelector("#closeTemporaryPasswordDialog"),
+        finishTemporaryPassword: document.querySelector("#finishTemporaryPassword"),
         detailDrawer: document.querySelector("#detailDrawer"),
         detailBody: document.querySelector("#detailBody"),
         closeDetail: document.querySelector("#closeDetail"),
@@ -200,6 +230,25 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.inboxButton.addEventListener("click", () => goToInbox());
       fields.adminButton.addEventListener("click", goToAdmin);
       fields.logoutButton.addEventListener("click", logout);
+      fields.createMemberButton.addEventListener("click", openMemberDialog);
+      fields.memberForm.addEventListener("submit", createMember);
+      fields.memberList.addEventListener("click", handleMemberAction);
+      fields.closeMemberDialog.addEventListener("click", closeMemberDialog);
+      fields.cancelMemberDialog.addEventListener("click", closeMemberDialog);
+      fields.showMemberPassword.addEventListener("change", () => {
+        fields.memberTemporaryPassword.type = fields.showMemberPassword.checked ? "text" : "password";
+      });
+      fields.copyTemporaryPassword.addEventListener("click", copyTemporaryPassword);
+      fields.closeTemporaryPasswordDialog.addEventListener("click", closeTemporaryPasswordDialog);
+      fields.finishTemporaryPassword.addEventListener("click", closeTemporaryPasswordDialog);
+      fields.memberDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeMemberDialog();
+      });
+      fields.temporaryPasswordDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeTemporaryPasswordDialog();
+      });
       fields.homeCollectionButton.addEventListener("click", goToCollectionRoot);
       fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
       fields.inboxView.addEventListener("click", handleCurationClick);
@@ -352,6 +401,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const user = payload.user || {};
         const catalog = payload.catalog || {};
         const username = user.username || "Owner";
+        if (user.must_change_password) {
+          window.location.replace("/password-change");
+          throw new Error("password_change_required");
+        }
         fields.currentUserInitial.textContent = username.slice(0, 2).toUpperCase();
         fields.currentUserLabel.textContent = username;
         fields.currentUserName.textContent = username;
@@ -376,6 +429,200 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           fields.logoutButton.disabled = false;
           fields.logoutButton.textContent = "Reintentar cierre";
         }
+      }
+
+      async function loadMembers({ announce = false } = {}) {
+        if (membersLoading || currentIdentity?.user?.role !== "owner") return;
+        membersLoading = true;
+        fields.memberList.setAttribute("aria-busy", "true");
+        fields.createMemberButton.disabled = true;
+        if (announce) setMemberFeedback("Actualizando miembros\u2026");
+        try {
+          const response = await apiFetch("/api/members");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          members = payload.members || [];
+          renderMembers();
+          if (announce) setMemberFeedback("Miembros actualizados.");
+        } catch (error) {
+          setMemberFeedback(memberErrorMessage(error.message), "error");
+        } finally {
+          membersLoading = false;
+          fields.memberList.removeAttribute("aria-busy");
+          fields.createMemberButton.disabled = false;
+        }
+      }
+
+      function renderMembers() {
+        const activeCount = members.filter((member) => member.active).length;
+        fields.memberCount.textContent = `${members.length} ${members.length === 1 ? "miembro" : "miembros"} · ${activeCount} activos`;
+        if (!members.length) {
+          fields.memberList.innerHTML = `
+            <div class="member-list-empty">
+              <strong>Todav\u00eda no hay miembros</strong>
+              <span>El owner es la \u00fanica cuenta de esta instancia.</span>
+            </div>`;
+          return;
+        }
+        fields.memberList.innerHTML = members.map((member) => {
+          const username = member.username || "Miembro";
+          const initials = username.slice(0, 2).toUpperCase();
+          const status = member.active ? "Activo" : "Desactivado";
+          const passwordState = member.must_change_password
+            ? '<span class="member-state member-state-attention">Cambio pendiente</span>'
+            : '<span class="member-state">Acceso confirmado</span>';
+          return `
+            <div class="member-row" data-member-id="${escapeAttr(member.id || "")}" data-active="${member.active ? "true" : "false"}">
+              <div class="member-row-identity">
+                <span class="member-avatar" aria-hidden="true">${escapeHtml(initials)}</span>
+                <div>
+                  <strong>${escapeHtml(username)}</strong>
+                  <span>${escapeHtml(member.catalog?.name || "Cat\u00e1logo personal")}</span>
+                </div>
+              </div>
+              <div class="member-row-status">
+                <span class="member-state ${member.active ? "member-state-active" : "member-state-disabled"}">${status}</span>
+                ${passwordState}
+              </div>
+              <div class="member-row-actions">
+                <button class="quiet-action" type="button" data-member-action="reset-password" data-member-id="${escapeAttr(member.id || "")}">Restablecer acceso</button>
+                <button class="quiet-action ${member.active ? "member-deactivate" : "member-activate"}" type="button" data-member-action="toggle-active" data-member-id="${escapeAttr(member.id || "")}">${member.active ? "Desactivar" : "Reactivar"}</button>
+              </div>
+            </div>`;
+        }).join("");
+      }
+
+      function openMemberDialog() {
+        fields.memberForm.reset();
+        fields.memberTemporaryPassword.type = "password";
+        setMemberDialogFeedback("");
+        fields.memberDialog.showModal();
+        fields.memberUsername.focus();
+      }
+
+      function closeMemberDialog() {
+        fields.memberDialog.close();
+        fields.memberForm.reset();
+        setMemberDialogFeedback("");
+      }
+
+      async function createMember(event) {
+        event.preventDefault();
+        const requestedUsername = fields.memberUsername.value;
+        fields.submitMember.disabled = true;
+        fields.submitMember.setAttribute("aria-busy", "true");
+        fields.submitMember.textContent = "Creando\u2026";
+        setMemberDialogFeedback("");
+        try {
+          const response = await apiFetch("/api/members", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: fields.memberUsername.value,
+              catalog_name: fields.memberCatalogName.value,
+              temporary_password: fields.memberTemporaryPassword.value
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            setMemberDialogFeedback(memberErrorMessage(payload.reason), "error");
+            return;
+          }
+          closeMemberDialog();
+          showTemporaryPassword(payload.member?.username || requestedUsername, payload.temporary_password);
+          await loadMembers();
+        } catch (error) {
+          setMemberDialogFeedback(memberErrorMessage(error.message), "error");
+        } finally {
+          fields.submitMember.disabled = false;
+          fields.submitMember.removeAttribute("aria-busy");
+          fields.submitMember.textContent = "Crear cuenta y cat\u00e1logo";
+        }
+      }
+
+      async function handleMemberAction(event) {
+        const button = event.target.closest("[data-member-action]");
+        if (!button) return;
+        const member = members.find((entry) => entry.id === button.dataset.memberId);
+        if (!member) return;
+        const action = button.dataset.memberAction;
+        if (action === "toggle-active" && member.active) {
+          const confirmed = confirm(`\u00bfDesactivar a "${member.username}"? Sus sesiones abiertas se cerrar\u00e1n.`);
+          if (!confirmed) return;
+        }
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        try {
+          const endpoint = action === "reset-password"
+            ? `/api/members/${encodeURIComponent(member.id)}/password-reset`
+            : `/api/members/${encodeURIComponent(member.id)}/status`;
+          const body = action === "reset-password" ? {} : { active: !member.active };
+          const response = await apiFetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          if (action === "reset-password") {
+            showTemporaryPassword(member.username, payload.temporary_password);
+          } else {
+            setMemberFeedback(payload.member?.active ? `${member.username} fue reactivado.` : `${member.username} fue desactivado.`);
+          }
+          await loadMembers();
+        } catch (error) {
+          setMemberFeedback(memberErrorMessage(error.message), "error");
+        } finally {
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
+        }
+      }
+
+      function showTemporaryPassword(username, password) {
+        fields.temporaryPasswordUsername.textContent = username;
+        fields.temporaryPasswordValue.value = password || "";
+        fields.temporaryPasswordFeedback.hidden = true;
+        fields.temporaryPasswordDialog.showModal();
+        fields.copyTemporaryPassword.focus();
+      }
+
+      function closeTemporaryPasswordDialog() {
+        fields.temporaryPasswordDialog.close();
+        fields.temporaryPasswordValue.value = "";
+        fields.temporaryPasswordFeedback.hidden = true;
+      }
+
+      async function copyTemporaryPassword() {
+        try {
+          await navigator.clipboard.writeText(fields.temporaryPasswordValue.value);
+          fields.temporaryPasswordFeedback.textContent = "Contrase\u00f1a copiada.";
+          fields.temporaryPasswordFeedback.hidden = false;
+        } catch {
+          fields.temporaryPasswordValue.select();
+          fields.temporaryPasswordFeedback.textContent = "Seleccion\u00e1 el texto y copialo manualmente.";
+          fields.temporaryPasswordFeedback.hidden = false;
+        }
+      }
+
+      function setMemberFeedback(message, tone = "") {
+        fields.memberFeedback.textContent = message;
+        fields.memberFeedback.dataset.tone = tone;
+        fields.memberFeedback.hidden = !message;
+      }
+
+      function setMemberDialogFeedback(message, tone = "") {
+        fields.memberDialogFeedback.textContent = message;
+        fields.memberDialogFeedback.dataset.tone = tone;
+        fields.memberDialogFeedback.hidden = !message;
+      }
+
+      function memberErrorMessage(reason) {
+        if (reason === "username_unavailable") return "Ese usuario ya existe.";
+        if (reason === "member_not_found") return "La cuenta ya no est\u00e1 disponible.";
+        if (reason === "member_provisioning_failed") return "No pudimos crear el cat\u00e1logo personal.";
+        if (String(reason || "").includes("at least 12")) return "La contrase\u00f1a debe tener al menos 12 caracteres.";
+        if (String(reason || "").includes("Username must")) return "Us\u00e1 entre 3 y 64 letras, n\u00fameros, puntos, guiones o guiones bajos.";
+        return "No pudimos actualizar la cuenta.";
       }
 
       async function loadCatalog() {
@@ -437,12 +684,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function goToAdmin(options = {}) {
         showView("admin", options);
+        loadMembers();
       }
 
       function showView(view, options = {}) {
         const updateHistory = options.updateHistory !== false;
         const scroll = options.scroll !== false;
         const focus = options.focus ?? updateHistory;
+        if (view === "admin" && currentIdentity?.user?.role !== "owner") view = "home";
         currentView = ["home", "catalog", "inbox", "admin"].includes(view) ? view : "home";
         fields.homeView.hidden = currentView !== "home";
         fields.collectionView.hidden = currentView !== "catalog";
@@ -1626,6 +1875,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         showView(requestedView, { updateHistory: false, scroll: false });
         if (requestedView === "inbox") loadCurationQueue();
+        if (requestedView === "admin") loadMembers();
       }
 
       function seedSpotlight() {

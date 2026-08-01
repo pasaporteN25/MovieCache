@@ -35,7 +35,7 @@ form.addEventListener("submit", async (event) => {
       password.select();
       return;
     }
-    window.location.replace("/");
+    window.location.replace(payload.user?.must_change_password ? "/password-change" : "/");
   } catch {
     setFeedback("No pudimos contactar la instancia. Revis\u00e1 el servidor y volv\u00e9 a intentar.");
   } finally {
