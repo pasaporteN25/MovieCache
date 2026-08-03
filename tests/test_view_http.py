@@ -460,6 +460,108 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertFalse(item.en_catalogo)
         self.assertEqual(item.extra["collection_sources"][0]["collection_id"], collection["id"])
 
+    def test_import_draft_previews_and_idempotently_writes_the_personal_catalog(self) -> None:
+        raw_private_path = "D:/Private/Ikiru.mkv"
+        created = self.client.post(
+            "/api/imports",
+            content=json.dumps({
+                "source_name": "watched.json",
+                "source_format": "json",
+                "content": json.dumps([{
+                    "title": "Ikiru",
+                    "year": "1952",
+                    "status": "watched",
+                    "watched_at": "2026-08-01",
+                    "rating": 10,
+                    "review": "Una obra enorme.",
+                    "en_catalogo": True,
+                    "local_path": raw_private_path,
+                    "local_files": [{"name": "Ikiru.mkv", "path": raw_private_path}],
+                }]),
+            }),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        draft = created.json()
+        self.assertEqual(draft["counts"]["new"], 1)
+        self.assertTrue(draft["items"][0]["catalog_eligible"])
+        self.assertEqual(draft["items"][0]["item"]["local_files"], [])
+        self.assertNotIn(raw_private_path, created.text)
+        self.assertNotIn(raw_private_path.encode("utf-8"), self.instance_path.read_bytes())
+
+        body = json.dumps({
+            "destination": "catalog",
+            "item_ids": [draft["items"][0]["id"]],
+            "personal_options": {
+                "include_status": True,
+                "include_watched_at": True,
+                "include_rating": True,
+                "include_review": True,
+            },
+        })
+        first = self.client.post(
+            f"/api/imports/{draft['id']}/apply",
+            content=body,
+            headers=self.post_headers(),
+        )
+        repeated = self.client.post(
+            f"/api/imports/{draft['id']}/apply",
+            content=body,
+            headers=self.post_headers(),
+        )
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(first.json(), repeated.json())
+        self.assertEqual(first.json()["summary"]["added"], 1)
+
+        catalog = JsonCatalogRepository(self.catalog_path, normalize_item).read()
+        self.assertEqual([item.title for item in catalog].count("Ikiru"), 1)
+        ikiru = next(item for item in catalog if item.title == "Ikiru")
+        self.assertEqual(ikiru.status, "watched")
+        self.assertEqual(ikiru.rating, 10)
+        self.assertEqual(ikiru.review, "Una obra enorme.")
+        self.assertEqual(ikiru.local_files, [])
+
+    def test_owner_can_turn_a_draft_into_a_private_collection_without_catalog_writes(self) -> None:
+        created = self.client.post(
+            "/api/imports",
+            content=json.dumps({
+                "source_name": "japanese.csv",
+                "source_format": "csv",
+                "content": "title,year,status,rating,review\nHeat,1995,watched,8,Great\nIkiru,1952,watched,10,Perfect\n",
+            }),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        draft = created.json()
+        selected = [entry["id"] for entry in draft["items"] if entry["collection_eligible"]]
+        self.assertEqual(len(selected), 2)
+
+        applied = self.client.post(
+            f"/api/imports/{draft['id']}/apply",
+            content=json.dumps({
+                "destination": "collection",
+                "item_ids": selected,
+                "collection_title": "Noches japonesas",
+                "collection_description": "Selección privada",
+            }),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(applied.status_code, 200, applied.content)
+        collection_id = applied.json()["collection"]["id"]
+        detail = self.client.get(
+            f"/api/collections/{collection_id}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(detail.status_code, 200, detail.content)
+        self.assertEqual(detail.json()["visibility"], "private")
+        self.assertEqual(detail.json()["source_kind"], "import")
+        self.assertEqual(len(detail.json()["items"]), 2)
+        for entry in detail.json()["items"]:
+            self.assertNotIn("status", entry)
+            self.assertNotIn("rating", entry)
+            self.assertNotIn("review", entry)
+        self.assertEqual([item.title for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()], ["Heat"])
+
     def test_login_requires_token_origin_and_json(self) -> None:
         body = json.dumps({"username": "lucas", "password": self.owner_password})
         with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:

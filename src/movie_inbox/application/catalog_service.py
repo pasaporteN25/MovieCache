@@ -70,13 +70,52 @@ class CatalogService:
                 merged = merge_into_existing(items, normalized, target_id)
                 return merged, (merged, "merged" if merged else "merge_target_not_found", {})
             item_urls = external_urls(normalized)
-            if item_urls and any(item_urls & external_urls(existing) for existing in items):
+            if any(
+                normalized.id == existing.id or (item_urls and item_urls & external_urls(existing))
+                for existing in items
+            ):
                 return False, (False, "duplicate", {})
             candidates = possible_duplicate_candidates(items, normalized)
             if action == "check" and candidates:
                 return False, (False, "possible_duplicate", {"candidates": candidates[:5]})
             items.insert(0, normalized)
             return True, (True, "added", {})
+
+        return self.repository.mutate(mutation)
+
+    def append_items(self, incoming: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Append a bounded import batch in one catalog transaction."""
+        normalized_items = [normalize_item(item) for item in incoming]
+
+        def mutation(items: list[CatalogItem]) -> tuple[bool, list[dict[str, Any]]]:
+            results: list[dict[str, Any]] = []
+            added_count = 0
+            for candidate in normalized_items:
+                item_urls = external_urls(candidate)
+                exact = any(
+                    candidate.id == existing.id or (item_urls and item_urls & external_urls(existing))
+                    for existing in items
+                )
+                if exact:
+                    outcome, reason, candidates = "present", "duplicate", []
+                else:
+                    candidates = possible_duplicate_candidates(items, candidate)
+                    if candidates:
+                        outcome, reason = "review", "possible_duplicate"
+                    else:
+                        items.insert(added_count, candidate)
+                        added_count += 1
+                        outcome, reason = "added", "added"
+                results.append(
+                    {
+                        "item_id": candidate.id,
+                        "title": candidate.title,
+                        "outcome": outcome,
+                        "reason": reason,
+                        "candidates": candidates[:5] if outcome == "review" else [],
+                    }
+                )
+            return added_count > 0, results
 
         return self.repository.mutate(mutation)
 

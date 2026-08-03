@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
-from movie_inbox.domain.catalog import external_urls, possible_duplicate_candidates
+from movie_inbox.domain.catalog import catalog_membership, possible_duplicate_candidates
 from movie_inbox.domain.collections import (
     CuratedCollection,
     catalog_item_from_collection,
@@ -39,7 +39,7 @@ class CollectionService:
         rows = []
         counts = {"total": len(collection.items), "missing": 0, "present": 0, "review": 0}
         for entry in collection.items:
-            membership = _catalog_membership(entry.item, catalog_items)
+            membership = catalog_membership(entry.item, catalog_items)
             counts[membership["state"]] += 1
             rows.append({**entry.item, "collection_item_id": entry.id, "catalog": membership})
         return {**self._summary(collection), "counts": counts, "items": rows}
@@ -86,7 +86,7 @@ class CollectionService:
         for item_id in requested:
             entry = entries[item_id]
             item = catalog_item_from_collection(entry, collection, added_at=_utc_now())
-            membership = _catalog_membership(item, known_items)
+            membership = catalog_membership(item, known_items)
             if membership["state"] == "present":
                 added, reason, extra = False, "duplicate", {}
             elif membership["state"] == "review":
@@ -145,32 +145,5 @@ class CollectionService:
             "counts": {"total": len(collection.items)},
             "preview": [entry.item for entry in collection.items[:4]],
         }
-
-
-def _catalog_membership(
-    item: Mapping[str, Any],
-    catalog_items: list[Mapping[str, Any]],
-) -> dict[str, Any]:
-    item_id = str(item.get("id") or "")
-    urls = external_urls(item)
-    for existing in catalog_items:
-        same_id = item_id and item_id == str(existing.get("id") or "")
-        same_url = urls and urls & external_urls(existing)
-        if same_id or same_url:
-            return {
-                "state": "present",
-                "item_id": str(existing.get("id") or ""),
-                "candidate_count": 0,
-            }
-    candidates = possible_duplicate_candidates(catalog_items, item)
-    if candidates:
-        return {
-            "state": "review",
-            "item_id": "",
-            "candidate_count": len(candidates),
-        }
-    return {"state": "missing", "item_id": "", "candidate_count": 0}
-
-
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()

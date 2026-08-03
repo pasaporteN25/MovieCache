@@ -157,8 +157,8 @@
         <header class="curation-heading">
           <div>
             <span class="eyebrow">Mesa de ingresos</span>
-            <h2 id="inboxTitle" class="view-focus-target" tabindex="-1">Bandeja de curaduría</h2>
-            <p>Decisiones pendientes sobre referencias externas y posibles obras repetidas.</p>
+            <h2 id="inboxTitle" class="view-focus-target" tabindex="-1">Bandeja</h2>
+            <p>Revisá coincidencias y prepará ingresos antes de modificar tu catálogo.</p>
           </div>
           <div class="curation-heading-actions">
             <label class="history-mode-control">
@@ -170,6 +170,16 @@
           </div>
         </header>
 
+        <nav id="inboxModeTabs" class="inbox-mode-tabs" aria-label="Modos de la Bandeja">
+          <button id="inboxCurationMode" class="active" type="button" data-inbox-mode="curation" aria-pressed="true">
+            Curadur&iacute;a
+          </button>
+          <button id="inboxImportsMode" type="button" data-inbox-mode="imports" aria-pressed="false">
+            Importaciones <span id="importDraftCount">0</span>
+          </button>
+        </nav>
+
+        <section id="curationInboxPanel" class="inbox-mode-panel">
         <nav class="curation-tabs" aria-label="Filtrar casos de curaduría">
           <button class="curation-tab active" type="button" data-curation-filter="pending" aria-pressed="true">
             Pendientes <span id="curationPendingCount">0</span>
@@ -201,6 +211,163 @@
             <div class="curation-empty">
               <strong>Seleccioná un caso</strong>
               <p>La evidencia y las acciones disponibles aparecerán en esta mesa.</p>
+            </div>
+          </div>
+        </section>
+        </section>
+
+        <section id="importInboxPanel" class="inbox-mode-panel import-inbox-panel" hidden>
+          <div class="import-workbench">
+            <aside class="import-drafts-panel" aria-label="Borradores de importaci&oacute;n">
+              <div class="import-drafts-heading">
+                <div>
+                  <strong>Borradores</strong>
+                  <span>Expiran a las 48 horas</span>
+                </div>
+                <button id="newImportDraft" class="quiet-action" type="button">Nueva</button>
+              </div>
+              <div id="importDraftList" class="import-draft-list" aria-live="polite"></div>
+            </aside>
+
+            <div class="import-stage">
+              <section id="importSourcePanel" class="import-source-panel" aria-labelledby="importSourceTitle">
+                <header class="import-stage-heading">
+                  <div>
+                    <span class="section-kicker">Entrada controlada</span>
+                    <h3 id="importSourceTitle">Preparar importaci&oacute;n</h3>
+                    <p>Analizamos el contenido en esta instancia. El archivo original y sus rutas no se guardan.</p>
+                  </div>
+                  <span class="import-limit-note">TXT, CSV o JSON &middot; m&aacute;x. 8 MiB</span>
+                </header>
+
+                <form id="importSourceForm" class="import-source-form">
+                  <div id="importInputModes" class="import-input-modes" role="group" aria-label="Origen del contenido">
+                    <button class="active" type="button" data-import-input="file" aria-pressed="true">Archivo</button>
+                    <button type="button" data-import-input="paste" aria-pressed="false">Pegar texto</button>
+                  </div>
+
+                  <div id="importFileInputPanel" class="import-file-input-panel">
+                    <label class="import-file-picker">
+                      <span>Elegir archivo</span>
+                      <input id="importFile" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json">
+                    </label>
+                    <span id="importFileMeta" class="import-file-meta">Ning&uacute;n archivo seleccionado</span>
+                  </div>
+
+                  <div id="importPasteInputPanel" class="import-paste-input-panel" hidden>
+                    <label>
+                      <span>Nombre del origen</span>
+                      <input id="importSourceName" type="text" maxlength="180" value="contenido-pegado" autocomplete="off">
+                    </label>
+                    <label>
+                      <span>Contenido</span>
+                      <textarea id="importContent" rows="10" placeholder="Una obra o URL por l&iacute;nea, o peg&aacute; un CSV/JSON completo"></textarea>
+                    </label>
+                  </div>
+
+                  <div class="import-source-options">
+                    <label>
+                      <span>Formato</span>
+                      <select id="importFormat">
+                        <option value="auto">Detectar autom&aacute;ticamente</option>
+                        <option value="txt">TXT</option>
+                        <option value="csv">CSV</option>
+                        <option value="json">JSON</option>
+                      </select>
+                    </label>
+                    <button id="analyzeImport" class="action-primary" type="submit">Analizar contenido</button>
+                  </div>
+
+                  <details id="importCsvMapping" class="import-csv-mapping" hidden>
+                    <summary>Asignar columnas del CSV</summary>
+                    <p>Usalo s&oacute;lo cuando los encabezados no se reconozcan autom&aacute;ticamente.</p>
+                    <div id="importCsvFields" class="import-csv-fields"></div>
+                  </details>
+                  <div id="importSourceFeedback" class="import-feedback" aria-live="polite"></div>
+                </form>
+              </section>
+
+              <section id="importReviewPanel" class="import-review-panel" aria-live="polite" hidden>
+                <header class="import-stage-heading import-review-heading">
+                  <div>
+                    <span id="importReviewKicker" class="section-kicker">Borrador listo</span>
+                    <h3 id="importReviewTitle">Previsualizaci&oacute;n</h3>
+                    <p id="importReviewMeta"></p>
+                  </div>
+                  <button id="deleteImportDraft" class="danger-action" type="button">Eliminar borrador</button>
+                </header>
+
+                <div id="importMetrics" class="import-metrics" aria-label="Clasificaci&oacute;n del borrador"></div>
+
+                <div class="import-review-toolbar">
+                  <div id="importStateFilters" class="import-state-filters" role="group" aria-label="Filtrar previsualizaci&oacute;n">
+                    <button class="active" type="button" data-import-filter="all" aria-pressed="true">Todas</button>
+                    <button type="button" data-import-filter="new" aria-pressed="false">Nuevas</button>
+                    <button type="button" data-import-filter="present" aria-pressed="false">Presentes</button>
+                    <button type="button" data-import-filter="review" aria-pressed="false">Revisar</button>
+                    <button type="button" data-import-filter="invalid" aria-pressed="false">Inv&aacute;lidas</button>
+                  </div>
+                  <label class="import-select-all">
+                    <input id="selectVisibleImportItems" type="checkbox">
+                    <span>Seleccionar visibles</span>
+                  </label>
+                </div>
+
+                <div class="import-table-wrap">
+                  <table class="import-table">
+                    <thead>
+                      <tr>
+                        <th class="import-check-column"><span class="sr-only">Seleccionar</span></th>
+                        <th>Obra</th>
+                        <th>Datos</th>
+                        <th>Clasificaci&oacute;n</th>
+                      </tr>
+                    </thead>
+                    <tbody id="importPreviewRows"></tbody>
+                  </table>
+                </div>
+                <div id="importPreviewEmpty" class="curation-empty" hidden>
+                  <strong>No hay filas en este filtro</strong>
+                  <p>Prob&aacute; otra clasificaci&oacute;n para seguir revisando.</p>
+                </div>
+                <button id="loadMoreImportRows" class="quiet-action import-load-more" type="button" hidden>Cargar m&aacute;s</button>
+
+                <form id="importApplyForm" class="import-apply-panel">
+                  <div class="import-destination-control">
+                    <span>Destino</span>
+                    <div id="importDestinationModes" class="import-input-modes" role="group" aria-label="Destino de la importaci&oacute;n">
+                      <button class="active" type="button" data-import-destination="catalog" aria-pressed="true">Mi cat&aacute;logo</button>
+                      <button id="importCollectionDestination" type="button" data-import-destination="collection" aria-pressed="false">Colecci&oacute;n privada</button>
+                    </div>
+                  </div>
+
+                  <fieldset id="importPersonalOptions" class="import-personal-options">
+                    <legend>Conservar registro personal</legend>
+                    <label><input type="checkbox" data-import-option="include_status" checked><span>Estado</span></label>
+                    <label><input type="checkbox" data-import-option="include_watched_at" checked><span>Fecha de vista</span></label>
+                    <label><input type="checkbox" data-import-option="include_rating" checked><span>Puntaje</span></label>
+                    <label><input type="checkbox" data-import-option="include_review" checked><span>Review</span></label>
+                  </fieldset>
+
+                  <div id="importCollectionOptions" class="import-collection-options" hidden>
+                    <label>
+                      <span>Nombre de la colecci&oacute;n</span>
+                      <input id="importCollectionTitle" type="text" maxlength="120" autocomplete="off">
+                    </label>
+                    <label>
+                      <span>Descripci&oacute;n opcional</span>
+                      <textarea id="importCollectionDescription" rows="3" maxlength="1000"></textarea>
+                    </label>
+                    <p>La colecci&oacute;n ser&aacute; privada y no copiar&aacute; estados, fechas, puntajes ni reviews.</p>
+                  </div>
+
+                  <div class="import-apply-actions">
+                    <span id="importSelectionSummary">0 seleccionadas</span>
+                    <button id="applyImport" class="action-primary" type="submit" disabled>Importar selecci&oacute;n</button>
+                  </div>
+                  <div id="importApplyFeedback" class="import-feedback" aria-live="polite"></div>
+                </form>
+              </section>
             </div>
           </div>
         </section>
