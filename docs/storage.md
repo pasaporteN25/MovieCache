@@ -12,7 +12,7 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 - `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
 
-## Base de instancia v1
+## Base de instancia v2
 
 La base de instancia contiene:
 
@@ -20,14 +20,22 @@ La base de instancia contiene:
 - `catalogs`: catalogo personal predeterminado de cada usuario.
 - `catalog_sources`: archivos JSON/SQLite que forman ese catalogo y fuente writable.
 - `sessions`: hashes de tokens opacos y expiracion absoluta.
+- `user_privacy_preferences`: opt-in del catalogo y visibilidad general de estado,
+  fecha, actividad, puntajes y reviews.
+- `item_privacy_overrides`: excepciones `shared` o `private` para rating y review de
+  una obra; `inherit` se representa eliminando la excepcion.
+- `archived_members` y `archived_catalog_sources`: baja reversible de cuentas sin
+  borrar los archivos de su catalogo.
 
 El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
 
-Los miembros nuevos reciben una base SQLite vacia en el directorio configurado con `--member-catalog-dir`, por defecto `catalogs/` junto a `instance.db`. El nombre fisico usa un identificador aleatorio y no depende del username. Desactivar una cuenta o restablecer su contrasena revoca todas sus sesiones, pero conserva su catalogo.
+Los miembros nuevos reciben una base SQLite vacia en el directorio configurado con `--member-catalog-dir`, por defecto `catalogs/` junto a `instance.db`. El nombre fisico usa un identificador aleatorio y no depende del username. Desactivar una cuenta o restablecer su contrasena revoca todas sus sesiones, pero conserva su catalogo. Archivar elimina la identidad activa y guarda su vinculacion en las tablas de archivo; restaurar vuelve a enlazar el mismo archivo bajo una cuenta nueva con cambio obligatorio de contrasena. Por seguridad, la privacidad vuelve a sus defaults cerrados al restaurar.
 
 El servidor resuelve las fuentes desde la sesion autenticada. Las rutas absolutas permanecen en `instance.db`; el frontend recibe referencias opacas y no puede seleccionar otro catalogo enviando una ruta manual.
 
-Una exportacion JSON incluye solamente el catalogo. No incluye cuentas ni sesiones. Para restaurar una instancia completa se respaldan por separado el catalogo, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
+Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad ni overrides. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
+
+La migracion de instancia v1 a v2 se aplica al abrir la base y deja todas las cuentas existentes con catalogos privados. Una version superior se rechaza en lugar de reinterpretarse.
 
 ## Esquema SQLite v3
 

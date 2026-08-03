@@ -83,7 +83,7 @@ El catalogo conserva su formato normal y sigue pudiendo importarse o exportarse 
 
 ### Miembros y catalogos personales
 
-El owner administra miembros desde `Administrar > Miembros`. Una cuenta nueva recibe una contrasena temporal, debe reemplazarla en su primer acceso y obtiene un catalogo SQLite vacio. Desactivar o restablecer una cuenta revoca inmediatamente sus sesiones; reactivarla no elimina su catalogo.
+El owner administra miembros desde `Administrar > Miembros`. Una cuenta nueva recibe una contrasena temporal, debe reemplazarla en su primer acceso y obtiene un catalogo SQLite vacio. El owner puede editar el usuario y el nombre de su catalogo, desactivar o reactivar la cuenta, restablecer el acceso y archivarla de forma reversible. Desactivar o restablecer revoca inmediatamente sus sesiones; archivar exige desactivar primero y escribir el username como confirmacion. El archivo conserva el catalogo en disco y restaurarlo genera una credencial temporal nueva.
 
 Por defecto, los catalogos nuevos se crean en `.movie-inbox/catalogs/` junto a `instance.db`. La ubicacion puede definirse al iniciar el servidor:
 
@@ -93,6 +93,12 @@ py -m movie_inbox serve scripts/catalogv4.json `
 ```
 
 Cada request abre exclusivamente las fuentes registradas para la cuenta autenticada. La API usa referencias opacas como `source-1`, por lo que no publica rutas absolutas del servidor. JSON permanece disponible como importacion y exportacion individual; cuentas, sesiones y pertenencia siguen viviendo solamente en `instance.db`.
+
+### Club y privacidad
+
+Cada catalogo es privado por defecto. Desde `Privacidad`, cualquier cuenta puede habilitar su estante en `Club` para las demas cuentas activas de la misma instancia. `status`, `watched_at` y la actividad reciente tienen controles generales independientes. Puntajes y reviews tambien tienen un valor general, pero cada ficha puede heredarlo, compartir ese campo solamente para la obra actual o mantenerlo privado.
+
+`Club` es de solo lectura y no mezcla obras entre usuarios. La respuesta compartida usa una lista explicita de metadata publica: nunca incluye rutas, archivos locales, notas, bloqueos, procedencia ni referencias operativas del servidor. Desactivar o archivar una cuenta retira inmediatamente su catalogo del Club. Una cuenta restaurada comienza otra vez con privacidad cerrada, aunque conserva sus obras y su registro personal.
 
 ## SQLite y backups JSON
 
@@ -288,7 +294,7 @@ El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibi
 
 Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el usuario y el catalogo personal activos y permite cerrar todas las operaciones de esa sesion.
 
-La interfaz se divide en tres espacios. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Administrar`, dentro del menu de sistema, agrupa resumen, base de datos, salud de fuentes externas, matching y duplicados.
+La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Bandeja` reune la curaduria y `Club` muestra catalogos compartidos de solo lectura. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
 
 El visor tiene una consola de busqueda unica. Cada consulta filtra directamente `La coleccion`, sin repetir las mismas obras en una segunda lista local. `Buscar tambien en fuentes externas` agrega resultados de Wikipedia, IMDb y FilmAffinity solamente despues de tocar `Buscar` o presionar Enter. La consulta, los filtros y el orden quedan representados en la URL para que Atras y Adelante restauren la estanteria correcta. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
 
@@ -302,7 +308,7 @@ python scripts/view_catalog.py catalog_wiki_v5.json --write-json catalog_wiki_v5
 
 Las tarjetas del visor mantienen una proporcion 2:3 estable para poder escanear la coleccion sin saltos de altura. El frente muestra portada, titulo, ano, disponibilidad, estado personal y puntuacion cuando existe. En desktop el reverso tecnico aparece con hover o foco; hacer click o tap en cualquier punto abre la ficha completa. En movil la interaccion no depende del giro ni del hover.
 
-En movil, la navegacion principal pasa a una barra inferior con accesos tactiles a `Inicio`, `Coleccion`, `Bandeja` y `Random`; la cabecera conserva la marca y concentra las opciones secundarias en `Menu`. La coleccion usa una estanteria de dos columnas, controles compactos y margenes compatibles con las areas seguras del dispositivo.
+En movil, la navegacion principal pasa a una barra inferior con accesos tactiles a `Inicio`, `Coleccion`, `Bandeja`, `Club` y `Random`; la cabecera conserva la marca y concentra las opciones secundarias en el menu de cuenta. La coleccion y el Club usan estanterias de dos columnas, controles compactos y margenes compatibles con las areas seguras del dispositivo.
 
 El resumen muestra cuantas entradas tienen posibles duplicados por URL externa o por titulo y ano. `Ver duplicadas` filtra esas entradas, cada card lleva un badge y el detalle explica la coincidencia. Al agregar desde una fuente externa, el catalogo editable se revisa primero por URL y por todos sus titulos conocidos antes de insertar.
 
@@ -320,7 +326,7 @@ El panel lateral tiene accion `Eliminar`. Antes de borrar, el navegador pide con
 
 Cada tarjeta tambien permite cambiar rapidamente entre `to_watch` y `watched` con `Marcar vista` / `Marcar pendiente`. Al marcar una entrada como vista se guarda `watched_at` con la fecha local del dia.
 
-El panel lateral incluye el registro personal para editar `watched_at`, `rating` de 0 a 10 y `review`. Por defecto las entradas nuevas tienen `rating: 0`, `review: ""` y `watched_at: ""`.
+El panel lateral incluye el registro personal para editar `watched_at`, `rating` de 0 a 10 y `review`. Los controles de visibilidad de puntaje y review permiten heredar el default del usuario o definir un override para esa obra. Por defecto las entradas nuevas tienen `rating: 0`, `review: ""` y `watched_at: ""`.
 
 Marcar una entrada como pendiente no borra `watched_at`; si queres corregir o limpiar esa fecha, se hace desde el registro personal del panel lateral.
 

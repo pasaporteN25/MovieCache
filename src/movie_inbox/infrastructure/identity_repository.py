@@ -14,21 +14,24 @@ from movie_inbox.application.identity_repository import (
     IdentityAlreadyInitialized,
     IdentityCatalogMismatch,
     IdentityConflict,
+    IdentityMemberActive,
     IdentityNotFound,
     IdentityOwnerProtected,
     IdentityRepositoryError,
 )
 from movie_inbox.domain.identity import (
+    ArchivedMember,
     AuthenticatedIdentity,
     CatalogSource,
     PersonalCatalog,
     UserAccount,
     username_key,
 )
+from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
 
-INSTANCE_SCHEMA_VERSION = 1
-INSTANCE_SCHEMA = """
+INSTANCE_SCHEMA_VERSION = 2
+INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -76,6 +79,51 @@ CREATE TABLE sessions (
 CREATE INDEX ix_sessions_user ON sessions(user_id);
 CREATE INDEX ix_sessions_expiry ON sessions(expires_at);
 """
+
+INSTANCE_SCHEMA_V2 = """
+CREATE TABLE user_privacy_preferences (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    catalog_shared INTEGER NOT NULL DEFAULT 0 CHECK (catalog_shared IN (0, 1)),
+    share_status INTEGER NOT NULL DEFAULT 0 CHECK (share_status IN (0, 1)),
+    share_watched_at INTEGER NOT NULL DEFAULT 0 CHECK (share_watched_at IN (0, 1)),
+    share_history INTEGER NOT NULL DEFAULT 0 CHECK (share_history IN (0, 1)),
+    share_rating INTEGER NOT NULL DEFAULT 0 CHECK (share_rating IN (0, 1)),
+    share_review INTEGER NOT NULL DEFAULT 0 CHECK (share_review IN (0, 1)),
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE item_privacy_overrides (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    catalog_id TEXT NOT NULL REFERENCES catalogs(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL,
+    field TEXT NOT NULL CHECK (field IN ('rating', 'review')),
+    visibility TEXT NOT NULL CHECK (visibility IN ('shared', 'private')),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, catalog_id, item_id, field)
+);
+CREATE INDEX ix_item_privacy_catalog ON item_privacy_overrides(catalog_id, item_id);
+
+CREATE TABLE archived_members (
+    id TEXT PRIMARY KEY,
+    former_user_id TEXT NOT NULL,
+    username TEXT NOT NULL,
+    catalog_name TEXT NOT NULL,
+    archived_at TEXT NOT NULL
+);
+
+CREATE TABLE archived_catalog_sources (
+    archive_id TEXT NOT NULL REFERENCES archived_members(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    storage_path TEXT NOT NULL,
+    writable INTEGER NOT NULL DEFAULT 0 CHECK (writable IN (0, 1)),
+    PRIMARY KEY (archive_id, position),
+    UNIQUE (archive_id, storage_path)
+);
+"""
+
+INSTANCE_MIGRATIONS = {
+    2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
+}
 
 
 class SqliteIdentityRepository:
@@ -263,6 +311,207 @@ class SqliteIdentityRepository:
             except sqlite3.Error as error:
                 raise IdentityRepositoryError(f"Cannot update account in: {self.path}") from error
 
+    def update_member(
+        self,
+        user_id: str,
+        username: str,
+        catalog_name: str,
+    ) -> tuple[UserAccount, PersonalCatalog]:
+        now = _utc_now()
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    if row is None:
+                        connection.rollback()
+                        raise IdentityNotFound("Member account was not found")
+                    if str(row["role"]) == "owner":
+                        connection.rollback()
+                        raise IdentityOwnerProtected("The owner account cannot be edited as a member")
+                    connection.execute(
+                        "UPDATE users SET username = ?, username_key = ?, updated_at = ? WHERE id = ?",
+                        (username, username_key(username), now, user_id),
+                    )
+                    cursor = connection.execute(
+                        "UPDATE catalogs SET name = ? WHERE owner_user_id = ? AND is_default = 1",
+                        (catalog_name, user_id),
+                    )
+                    if cursor.rowcount != 1:
+                        connection.rollback()
+                        raise IdentityNotFound("Member personal catalog was not found")
+                    updated = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    catalog = self._catalog(connection, user_id)
+                    connection.commit()
+                    if catalog is None:
+                        raise IdentityNotFound("Member personal catalog was not found")
+                    return _user(updated), catalog
+            except (IdentityNotFound, IdentityOwnerProtected):
+                raise
+            except sqlite3.IntegrityError as error:
+                raise IdentityConflict("Username is already in use") from error
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot update member in: {self.path}") from error
+
+    def archive_member(self, user_id: str) -> ArchivedMember:
+        archive_id = uuid.uuid4().hex
+        archived_at = _utc_now()
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    user_row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    if user_row is None:
+                        connection.rollback()
+                        raise IdentityNotFound("Member account was not found")
+                    if str(user_row["role"]) == "owner":
+                        connection.rollback()
+                        raise IdentityOwnerProtected("The owner account cannot be archived")
+                    if bool(user_row["active"]):
+                        connection.rollback()
+                        raise IdentityMemberActive("Deactivate the member before archiving the account")
+                    catalog_row = connection.execute(
+                        "SELECT * FROM catalogs WHERE owner_user_id = ? AND is_default = 1",
+                        (user_id,),
+                    ).fetchone()
+                    if catalog_row is None:
+                        connection.rollback()
+                        raise IdentityNotFound("Member personal catalog was not found")
+                    source_rows = connection.execute(
+                        "SELECT * FROM catalog_sources WHERE catalog_id = ? ORDER BY position",
+                        (catalog_row["id"],),
+                    ).fetchall()
+                    if not source_rows:
+                        connection.rollback()
+                        raise IdentityNotFound("Member personal catalog has no sources")
+                    connection.execute(
+                        """INSERT INTO archived_members(
+                            id, former_user_id, username, catalog_name, archived_at
+                        ) VALUES (?, ?, ?, ?, ?)""",
+                        (
+                            archive_id,
+                            user_id,
+                            str(user_row["username"]),
+                            str(catalog_row["name"]),
+                            archived_at,
+                        ),
+                    )
+                    for source in source_rows:
+                        connection.execute(
+                            """INSERT INTO archived_catalog_sources(
+                                archive_id, position, storage_path, writable
+                            ) VALUES (?, ?, ?, ?)""",
+                            (
+                                archive_id,
+                                int(source["position"]),
+                                str(source["storage_path"]),
+                                int(source["writable"]),
+                            ),
+                        )
+                    connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                    connection.commit()
+                    return ArchivedMember(
+                        archive_id,
+                        user_id,
+                        str(user_row["username"]),
+                        str(catalog_row["name"]),
+                        tuple(
+                            CatalogSource(str(source["storage_path"]), bool(source["writable"]))
+                            for source in source_rows
+                        ),
+                        archived_at,
+                    )
+            except (IdentityMemberActive, IdentityNotFound, IdentityOwnerProtected):
+                raise
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot archive member in: {self.path}") from error
+
+    def list_archived_members(self) -> list[ArchivedMember]:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    rows = connection.execute(
+                        "SELECT * FROM archived_members ORDER BY archived_at DESC"
+                    ).fetchall()
+                    return [self._archived_member(connection, row) for row in rows]
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot list archived members from: {self.path}") from error
+
+    def restore_archived_member(
+        self,
+        archive_id: str,
+        username: str,
+        password_hash: str,
+    ) -> tuple[UserAccount, PersonalCatalog]:
+        now = _utc_now()
+        user_id = uuid.uuid4().hex
+        catalog_id = uuid.uuid4().hex
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    archive_row = connection.execute(
+                        "SELECT * FROM archived_members WHERE id = ?",
+                        (archive_id,),
+                    ).fetchone()
+                    if archive_row is None:
+                        connection.rollback()
+                        raise IdentityNotFound("Archived member was not found")
+                    source_rows = connection.execute(
+                        "SELECT * FROM archived_catalog_sources WHERE archive_id = ? ORDER BY position",
+                        (archive_id,),
+                    ).fetchall()
+                    if not source_rows:
+                        connection.rollback()
+                        raise IdentityNotFound("Archived personal catalog has no sources")
+                    connection.execute(
+                        """INSERT INTO users(
+                            id, username, username_key, password_hash, role, active,
+                            must_change_password, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, 'member', 1, 1, ?, ?)""",
+                        (user_id, username, username_key(username), password_hash, now, now),
+                    )
+                    connection.execute(
+                        """INSERT INTO catalogs(id, owner_user_id, name, is_default, created_at)
+                        VALUES (?, ?, ?, 1, ?)""",
+                        (catalog_id, user_id, str(archive_row["catalog_name"]), now),
+                    )
+                    for source in source_rows:
+                        connection.execute(
+                            """INSERT INTO catalog_sources(catalog_id, position, storage_path, writable)
+                            VALUES (?, ?, ?, ?)""",
+                            (
+                                catalog_id,
+                                int(source["position"]),
+                                str(source["storage_path"]),
+                                int(source["writable"]),
+                            ),
+                        )
+                    connection.execute("DELETE FROM archived_members WHERE id = ?", (archive_id,))
+                    connection.commit()
+                    user = UserAccount(user_id, username, "member", True, True, now)
+                    catalog = PersonalCatalog(
+                        catalog_id,
+                        user_id,
+                        str(archive_row["catalog_name"]),
+                        tuple(
+                            CatalogSource(str(source["storage_path"]), bool(source["writable"]))
+                            for source in source_rows
+                        ),
+                        now,
+                    )
+                    return user, catalog
+            except IdentityNotFound:
+                raise
+            except sqlite3.IntegrityError as error:
+                raise IdentityConflict("Username is already in use") from error
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot restore member in: {self.path}") from error
+
     def replace_password(
         self,
         user_id: str,
@@ -320,6 +569,127 @@ class SqliteIdentityRepository:
                     return self._catalog(connection, user_id)
             except sqlite3.Error as error:
                 raise IdentityRepositoryError(f"Cannot read personal catalog from: {self.path}") from error
+
+    def privacy_for(self, user_id: str) -> PrivacyPreferences:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    row = connection.execute(
+                        "SELECT * FROM user_privacy_preferences WHERE user_id = ?",
+                        (user_id,),
+                    ).fetchone()
+                    return _privacy(row)
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot read privacy preferences from: {self.path}") from error
+
+    def update_privacy(self, user_id: str, preferences: PrivacyPreferences) -> PrivacyPreferences:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    if connection.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone() is None:
+                        connection.rollback()
+                        raise IdentityNotFound("Account was not found")
+                    connection.execute(
+                        """INSERT INTO user_privacy_preferences(
+                            user_id, catalog_shared, share_status, share_watched_at,
+                            share_history, share_rating, share_review, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(user_id) DO UPDATE SET
+                            catalog_shared = excluded.catalog_shared,
+                            share_status = excluded.share_status,
+                            share_watched_at = excluded.share_watched_at,
+                            share_history = excluded.share_history,
+                            share_rating = excluded.share_rating,
+                            share_review = excluded.share_review,
+                            updated_at = excluded.updated_at""",
+                        (
+                            user_id,
+                            int(preferences.catalog_shared),
+                            int(preferences.share_status),
+                            int(preferences.share_watched_at),
+                            int(preferences.share_history),
+                            int(preferences.share_rating),
+                            int(preferences.share_review),
+                            _utc_now(),
+                        ),
+                    )
+                    connection.commit()
+                    return preferences
+            except IdentityNotFound:
+                raise
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot update privacy preferences in: {self.path}") from error
+
+    def item_privacy_overrides(
+        self,
+        user_id: str,
+        catalog_id: str,
+    ) -> dict[str, ItemPrivacyOverride]:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    self._require_owned_catalog(connection, user_id, catalog_id)
+                    rows = connection.execute(
+                        """SELECT item_id, field, visibility FROM item_privacy_overrides
+                        WHERE user_id = ? AND catalog_id = ? ORDER BY item_id, field""",
+                        (user_id, catalog_id),
+                    ).fetchall()
+                    values: dict[str, dict[str, str]] = {}
+                    for row in rows:
+                        values.setdefault(str(row["item_id"]), {})[str(row["field"])] = str(row["visibility"])
+                    return {
+                        item_id: ItemPrivacyOverride(
+                            rating=fields.get("rating", "inherit"),
+                            review=fields.get("review", "inherit"),
+                        )
+                        for item_id, fields in values.items()
+                    }
+            except IdentityNotFound:
+                raise
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot read item privacy from: {self.path}") from error
+
+    def set_item_privacy(
+        self,
+        user_id: str,
+        catalog_id: str,
+        item_id: str,
+        override: ItemPrivacyOverride,
+    ) -> ItemPrivacyOverride:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    self._require_owned_catalog(connection, user_id, catalog_id)
+                    for field in ("rating", "review"):
+                        visibility = getattr(override, field)
+                        if visibility == "inherit":
+                            connection.execute(
+                                """DELETE FROM item_privacy_overrides
+                                WHERE user_id = ? AND catalog_id = ? AND item_id = ? AND field = ?""",
+                                (user_id, catalog_id, item_id, field),
+                            )
+                        else:
+                            connection.execute(
+                                """INSERT INTO item_privacy_overrides(
+                                    user_id, catalog_id, item_id, field, visibility, updated_at
+                                ) VALUES (?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(user_id, catalog_id, item_id, field) DO UPDATE SET
+                                    visibility = excluded.visibility,
+                                    updated_at = excluded.updated_at""",
+                                (user_id, catalog_id, item_id, field, visibility, _utc_now()),
+                            )
+                    connection.commit()
+                    return override
+            except IdentityNotFound:
+                raise
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(f"Cannot update item privacy in: {self.path}") from error
 
     def save_session(self, token_hash: str, user_id: str, created_at: int, expires_at: int) -> None:
         with self._thread_lock:
@@ -464,7 +834,7 @@ class SqliteIdentityRepository:
                     f"Instance database has tables but no migration history: {self.path}"
                 )
             try:
-                connection.executescript("BEGIN IMMEDIATE;\n" + INSTANCE_SCHEMA)
+                connection.executescript("BEGIN IMMEDIATE;\n" + INSTANCE_SCHEMA_V1)
                 connection.execute(
                     "INSERT INTO instance_migrations(version, name, applied_at) VALUES (?, ?, ?)",
                     (1, "local accounts, sessions and personal catalogs", _utc_now()),
@@ -477,10 +847,25 @@ class SqliteIdentityRepository:
             "SELECT COALESCE(MAX(version), 0) AS version FROM instance_migrations"
         ).fetchone()
         version = int(row["version"] if row else 0)
-        if version != INSTANCE_SCHEMA_VERSION:
+        if version < 1 or version > INSTANCE_SCHEMA_VERSION:
             raise IdentityRepositoryError(
-                f"Unsupported instance schema v{version}; expected v{INSTANCE_SCHEMA_VERSION}: {self.path}"
+                f"Unsupported instance schema v{version}; latest is v{INSTANCE_SCHEMA_VERSION}: {self.path}"
             )
+        for target_version in range(version + 1, INSTANCE_SCHEMA_VERSION + 1):
+            migration = INSTANCE_MIGRATIONS.get(target_version)
+            if migration is None:
+                raise IdentityRepositoryError(f"Missing instance migration v{target_version}")
+            name, script = migration
+            try:
+                connection.executescript("BEGIN IMMEDIATE;\n" + script)
+                connection.execute(
+                    "INSERT INTO instance_migrations(version, name, applied_at) VALUES (?, ?, ?)",
+                    (target_version, name, _utc_now()),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
 
     @staticmethod
     def _catalog(connection: sqlite3.Connection, user_id: str) -> PersonalCatalog | None:
@@ -505,6 +890,35 @@ class SqliteIdentityRepository:
             str(row["created_at"]),
         )
 
+    @staticmethod
+    def _archived_member(connection: sqlite3.Connection, row: sqlite3.Row) -> ArchivedMember:
+        sources = connection.execute(
+            """SELECT storage_path, writable FROM archived_catalog_sources
+            WHERE archive_id = ? ORDER BY position""",
+            (row["id"],),
+        ).fetchall()
+        return ArchivedMember(
+            str(row["id"]),
+            str(row["former_user_id"]),
+            str(row["username"]),
+            str(row["catalog_name"]),
+            tuple(CatalogSource(str(source["storage_path"]), bool(source["writable"])) for source in sources),
+            str(row["archived_at"]),
+        )
+
+    @staticmethod
+    def _require_owned_catalog(
+        connection: sqlite3.Connection,
+        user_id: str,
+        catalog_id: str,
+    ) -> None:
+        row = connection.execute(
+            "SELECT 1 FROM catalogs WHERE id = ? AND owner_user_id = ?",
+            (catalog_id, user_id),
+        ).fetchone()
+        if row is None:
+            raise IdentityNotFound("Personal catalog was not found")
+
 
 def _user(row: sqlite3.Row) -> UserAccount:
     return UserAccount(
@@ -514,6 +928,19 @@ def _user(row: sqlite3.Row) -> UserAccount:
         active=bool(row["active"]),
         must_change_password=bool(row["must_change_password"]),
         created_at=str(row["created_at"]),
+    )
+
+
+def _privacy(row: sqlite3.Row | None) -> PrivacyPreferences:
+    if row is None:
+        return PrivacyPreferences()
+    return PrivacyPreferences(
+        catalog_shared=bool(row["catalog_shared"]),
+        share_status=bool(row["share_status"]),
+        share_watched_at=bool(row["share_watched_at"]),
+        share_history=bool(row["share_history"]),
+        share_rating=bool(row["share_rating"]),
+        share_review=bool(row["share_review"]),
     )
 
 

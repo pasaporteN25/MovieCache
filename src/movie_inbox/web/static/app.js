@@ -1,7 +1,23 @@
 const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let currentIdentity = null;
       let members = [];
+      let archivedMembers = [];
       let membersLoading = false;
+      let editingMemberId = "";
+      let archivingMemberId = "";
+      let privacyPreferences = {
+        catalog_shared: false,
+        share_status: false,
+        share_watched_at: false,
+        share_history: false,
+        share_rating: false,
+        share_review: false
+      };
+      let clubCatalogs = [];
+      let selectedClubUserId = "";
+      let sharedCatalog = null;
+      let clubLoading = false;
+      let clubVisibleCount = 24;
       let items = [];
       let sourceFiles = [];
       let manualResults = [];
@@ -59,6 +75,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let routeRestored = false;
       const SEARCH_PAGE_SIZE = 6;
       const CATALOG_PAGE_SIZE = 36;
+      const CLUB_PAGE_SIZE = 24;
       const SEARCH_TIMEOUT_MS = 10000;
       const SPOTLIGHT_INTERVAL_MS = 8000;
       const COLLECTION_ROUTE_KEYS = ["q", "status", "kind", "source", "sort", "duplicates", "external"];
@@ -87,6 +104,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         homeButton: document.querySelector("#homeButton"),
         catalogButton: document.querySelector("#catalogButton"),
         inboxButton: document.querySelector("#inboxButton"),
+        clubButton: document.querySelector("#clubButton"),
         inboxBadge: document.querySelector("#inboxBadge"),
         adminButton: document.querySelector("#adminButton"),
         systemMenu: document.querySelector("#systemMenu"),
@@ -95,6 +113,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         currentUserName: document.querySelector("#currentUserName"),
         currentCatalogName: document.querySelector("#currentCatalogName"),
         currentUserRole: document.querySelector("#currentUserRole"),
+        privacyButton: document.querySelector("#privacyButton"),
         logoutButton: document.querySelector("#logoutButton"),
         searchConsole: document.querySelector(".search-console"),
         collectionUtilityMenu: document.querySelector(".collection-view .utility-menu"),
@@ -103,12 +122,18 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         mobileRandomCatalogOnly: document.querySelector("#mobileRandomCatalogOnly"),
         randomScopeLabel: document.querySelector("#randomScopeLabel"),
         homeView: document.querySelector("#homeView"),
+        clubView: document.querySelector("#clubView"),
         inboxView: document.querySelector("#inboxView"),
         collectionView: document.querySelector("#collectionView"),
         adminView: document.querySelector("#adminView"),
         homeCollectionButton: document.querySelector("#homeCollectionButton"),
         homeGrid: document.querySelector("#homeGrid"),
         homeEmpty: document.querySelector("#homeEmpty"),
+        refreshClub: document.querySelector("#refreshClub"),
+        clubMemberTabs: document.querySelector("#clubMemberTabs"),
+        clubFeedback: document.querySelector("#clubFeedback"),
+        clubCatalogPanel: document.querySelector("#clubCatalogPanel"),
+        clubLoadMore: document.querySelector("#clubLoadMore"),
         refreshCuration: document.querySelector("#refreshCuration"),
         curationPendingCount: document.querySelector("#curationPendingCount"),
         curationDuplicateCount: document.querySelector("#curationDuplicateCount"),
@@ -174,6 +199,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         memberCount: document.querySelector("#memberCount"),
         memberFeedback: document.querySelector("#memberFeedback"),
         memberList: document.querySelector("#memberList"),
+        archivedMemberSection: document.querySelector("#archivedMemberSection"),
+        archivedMemberCount: document.querySelector("#archivedMemberCount"),
+        archivedMemberList: document.querySelector("#archivedMemberList"),
         memberDialog: document.querySelector("#memberDialog"),
         memberForm: document.querySelector("#memberForm"),
         memberUsername: document.querySelector("#memberUsername"),
@@ -191,6 +219,39 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         copyTemporaryPassword: document.querySelector("#copyTemporaryPassword"),
         closeTemporaryPasswordDialog: document.querySelector("#closeTemporaryPasswordDialog"),
         finishTemporaryPassword: document.querySelector("#finishTemporaryPassword"),
+        privacyDialog: document.querySelector("#privacyDialog"),
+        privacyForm: document.querySelector("#privacyForm"),
+        catalogShared: document.querySelector("#catalogShared"),
+        shareStatus: document.querySelector("#shareStatus"),
+        shareWatchedAt: document.querySelector("#shareWatchedAt"),
+        shareHistory: document.querySelector("#shareHistory"),
+        shareRating: document.querySelector("#shareRating"),
+        shareReview: document.querySelector("#shareReview"),
+        privacyFields: document.querySelector("#privacyFields"),
+        privacyFeedback: document.querySelector("#privacyFeedback"),
+        closePrivacyDialog: document.querySelector("#closePrivacyDialog"),
+        cancelPrivacy: document.querySelector("#cancelPrivacy"),
+        savePrivacy: document.querySelector("#savePrivacy"),
+        editMemberDialog: document.querySelector("#editMemberDialog"),
+        editMemberForm: document.querySelector("#editMemberForm"),
+        editMemberUsername: document.querySelector("#editMemberUsername"),
+        editMemberCatalogName: document.querySelector("#editMemberCatalogName"),
+        editMemberFeedback: document.querySelector("#editMemberFeedback"),
+        closeEditMemberDialog: document.querySelector("#closeEditMemberDialog"),
+        cancelEditMember: document.querySelector("#cancelEditMember"),
+        saveMemberProfile: document.querySelector("#saveMemberProfile"),
+        archiveMemberDialog: document.querySelector("#archiveMemberDialog"),
+        archiveMemberForm: document.querySelector("#archiveMemberForm"),
+        archiveMemberUsernameLabel: document.querySelector("#archiveMemberUsernameLabel"),
+        archiveMemberConfirmation: document.querySelector("#archiveMemberConfirmation"),
+        archiveMemberFeedback: document.querySelector("#archiveMemberFeedback"),
+        closeArchiveMemberDialog: document.querySelector("#closeArchiveMemberDialog"),
+        cancelArchiveMember: document.querySelector("#cancelArchiveMember"),
+        confirmArchiveMember: document.querySelector("#confirmArchiveMember"),
+        sharedDetailDialog: document.querySelector("#sharedDetailDialog"),
+        sharedDetailOwner: document.querySelector("#sharedDetailOwner"),
+        sharedDetailBody: document.querySelector("#sharedDetailBody"),
+        closeSharedDetail: document.querySelector("#closeSharedDetail"),
         detailDrawer: document.querySelector("#detailDrawer"),
         detailBody: document.querySelector("#detailBody"),
         closeDetail: document.querySelector("#closeDetail"),
@@ -228,11 +289,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.homeButton.addEventListener("click", goHome);
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
       fields.inboxButton.addEventListener("click", () => goToInbox());
+      fields.clubButton.addEventListener("click", goToClub);
       fields.adminButton.addEventListener("click", goToAdmin);
+      fields.privacyButton.addEventListener("click", openPrivacyDialog);
       fields.logoutButton.addEventListener("click", logout);
       fields.createMemberButton.addEventListener("click", openMemberDialog);
       fields.memberForm.addEventListener("submit", createMember);
       fields.memberList.addEventListener("click", handleMemberAction);
+      fields.archivedMemberList.addEventListener("click", handleArchivedMemberAction);
       fields.closeMemberDialog.addEventListener("click", closeMemberDialog);
       fields.cancelMemberDialog.addEventListener("click", closeMemberDialog);
       fields.showMemberPassword.addEventListener("change", () => {
@@ -248,6 +312,39 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.temporaryPasswordDialog.addEventListener("cancel", (event) => {
         event.preventDefault();
         closeTemporaryPasswordDialog();
+      });
+      fields.privacyForm.addEventListener("submit", savePrivacyPreferences);
+      fields.catalogShared.addEventListener("change", syncPrivacyControls);
+      fields.closePrivacyDialog.addEventListener("click", closePrivacyDialog);
+      fields.cancelPrivacy.addEventListener("click", closePrivacyDialog);
+      fields.privacyDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closePrivacyDialog();
+      });
+      fields.editMemberForm.addEventListener("submit", saveMemberProfile);
+      fields.closeEditMemberDialog.addEventListener("click", closeEditMemberDialog);
+      fields.cancelEditMember.addEventListener("click", closeEditMemberDialog);
+      fields.editMemberDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeEditMemberDialog();
+      });
+      fields.archiveMemberForm.addEventListener("submit", archiveMemberAccount);
+      fields.closeArchiveMemberDialog.addEventListener("click", closeArchiveMemberDialog);
+      fields.cancelArchiveMember.addEventListener("click", closeArchiveMemberDialog);
+      fields.archiveMemberDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeArchiveMemberDialog();
+      });
+      fields.refreshClub.addEventListener("click", () => loadClub({ announce: true }));
+      fields.clubMemberTabs.addEventListener("click", selectClubCatalog);
+      fields.clubLoadMore.addEventListener("click", showMoreClubItems);
+      fields.closeSharedDetail.addEventListener("click", closeSharedDetail);
+      fields.sharedDetailDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeSharedDetail();
+      });
+      fields.sharedDetailDialog.addEventListener("click", (event) => {
+        if (event.target === fields.sharedDetailDialog) closeSharedDetail();
       });
       fields.homeCollectionButton.addEventListener("click", goToCollectionRoot);
       fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
@@ -340,6 +437,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const index = Number(target.dataset.index);
         const actions = {
           "open-detail": () => openDetailFromTrigger(target, id),
+          "open-shared-detail": () => openSharedDetail(id),
           "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
           "focus-personal": editPersonalRecord,
           "edit-personal": editPersonalRecord,
@@ -442,6 +540,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           const payload = await response.json();
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           members = payload.members || [];
+          archivedMembers = payload.archived || [];
           renderMembers();
           if (announce) setMemberFeedback("Miembros actualizados.");
         } catch (error) {
@@ -462,9 +561,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <strong>Todav\u00eda no hay miembros</strong>
               <span>El owner es la \u00fanica cuenta de esta instancia.</span>
             </div>`;
-          return;
-        }
-        fields.memberList.innerHTML = members.map((member) => {
+        } else {
+          fields.memberList.innerHTML = members.map((member) => {
           const username = member.username || "Miembro";
           const initials = username.slice(0, 2).toUpperCase();
           const status = member.active ? "Activo" : "Desactivado";
@@ -485,8 +583,34 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
                 ${passwordState}
               </div>
               <div class="member-row-actions">
+                <button class="quiet-action" type="button" data-member-action="edit" data-member-id="${escapeAttr(member.id || "")}">Editar</button>
                 <button class="quiet-action" type="button" data-member-action="reset-password" data-member-id="${escapeAttr(member.id || "")}">Restablecer acceso</button>
                 <button class="quiet-action ${member.active ? "member-deactivate" : "member-activate"}" type="button" data-member-action="toggle-active" data-member-id="${escapeAttr(member.id || "")}">${member.active ? "Desactivar" : "Reactivar"}</button>
+                ${member.active ? "" : `<button class="quiet-action member-archive" type="button" data-member-action="archive" data-member-id="${escapeAttr(member.id || "")}">Archivar</button>`}
+              </div>
+            </div>`;
+          }).join("");
+        }
+        renderArchivedMembers();
+      }
+
+      function renderArchivedMembers() {
+        fields.archivedMemberSection.hidden = !archivedMembers.length;
+        fields.archivedMemberCount.textContent = `${archivedMembers.length} ${archivedMembers.length === 1 ? "archivo" : "archivos"}`;
+        fields.archivedMemberList.innerHTML = archivedMembers.map((member) => {
+          const username = member.username || "Miembro archivado";
+          return `
+            <div class="member-row archived-member-row" data-archive-id="${escapeAttr(member.id || "")}">
+              <div class="member-row-identity">
+                <span class="member-avatar archived-avatar" aria-hidden="true">${escapeHtml(username.slice(0, 2).toUpperCase())}</span>
+                <div><strong>${escapeHtml(username)}</strong><span>${escapeHtml(member.catalog?.name || "Catálogo preservado")}</span></div>
+              </div>
+              <div class="member-row-status">
+                <span class="member-state member-state-disabled">Archivado</span>
+                <span class="member-state ${member.catalog_available ? "" : "member-state-attention"}">${member.catalog_available ? "Catálogo disponible" : "Archivo no disponible"}</span>
+              </div>
+              <div class="member-row-actions">
+                <button class="quiet-action member-activate" type="button" data-archive-action="restore" data-archive-id="${escapeAttr(member.id || "")}" ${member.catalog_available ? "" : "disabled"}>Restaurar</button>
               </div>
             </div>`;
         }).join("");
@@ -546,6 +670,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const member = members.find((entry) => entry.id === button.dataset.memberId);
         if (!member) return;
         const action = button.dataset.memberAction;
+        if (action === "edit") {
+          openEditMemberDialog(member);
+          return;
+        }
+        if (action === "archive") {
+          openArchiveMemberDialog(member);
+          return;
+        }
         if (action === "toggle-active" && member.active) {
           const confirmed = confirm(`\u00bfDesactivar a "${member.username}"? Sus sesiones abiertas se cerrar\u00e1n.`);
           if (!confirmed) return;
@@ -575,6 +707,111 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         } finally {
           button.disabled = false;
           button.removeAttribute("aria-busy");
+        }
+      }
+
+      function openEditMemberDialog(member) {
+        editingMemberId = member.id;
+        fields.editMemberUsername.value = member.username || "";
+        fields.editMemberCatalogName.value = member.catalog?.name || "";
+        setInlineFeedback(fields.editMemberFeedback, "");
+        fields.editMemberDialog.showModal();
+        fields.editMemberUsername.focus();
+      }
+
+      function closeEditMemberDialog() {
+        fields.editMemberDialog.close();
+        editingMemberId = "";
+        fields.editMemberForm.reset();
+        setInlineFeedback(fields.editMemberFeedback, "");
+      }
+
+      async function saveMemberProfile(event) {
+        event.preventDefault();
+        if (!editingMemberId) return;
+        fields.saveMemberProfile.disabled = true;
+        try {
+          const response = await apiFetch(`/api/members/${encodeURIComponent(editingMemberId)}/profile`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: fields.editMemberUsername.value,
+              catalog_name: fields.editMemberCatalogName.value
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          const username = payload.member?.username || fields.editMemberUsername.value;
+          closeEditMemberDialog();
+          setMemberFeedback(`${username} fue actualizado.`);
+          await loadMembers();
+        } catch (error) {
+          setInlineFeedback(fields.editMemberFeedback, memberErrorMessage(error.message), "error");
+        } finally {
+          fields.saveMemberProfile.disabled = false;
+        }
+      }
+
+      function openArchiveMemberDialog(member) {
+        archivingMemberId = member.id;
+        fields.archiveMemberUsernameLabel.textContent = member.username || "";
+        fields.archiveMemberConfirmation.value = "";
+        setInlineFeedback(fields.archiveMemberFeedback, "");
+        fields.archiveMemberDialog.showModal();
+        fields.archiveMemberConfirmation.focus();
+      }
+
+      function closeArchiveMemberDialog() {
+        fields.archiveMemberDialog.close();
+        archivingMemberId = "";
+        fields.archiveMemberForm.reset();
+        setInlineFeedback(fields.archiveMemberFeedback, "");
+      }
+
+      async function archiveMemberAccount(event) {
+        event.preventDefault();
+        if (!archivingMemberId) return;
+        fields.confirmArchiveMember.disabled = true;
+        try {
+          const response = await apiFetch(`/api/members/${encodeURIComponent(archivingMemberId)}/archive`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ confirmed_username: fields.archiveMemberConfirmation.value })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          const username = payload.archived?.username || "La cuenta";
+          closeArchiveMemberDialog();
+          setMemberFeedback(`${username} fue archivado y su catálogo quedó preservado.`);
+          await loadMembers();
+        } catch (error) {
+          setInlineFeedback(fields.archiveMemberFeedback, memberErrorMessage(error.message), "error");
+        } finally {
+          fields.confirmArchiveMember.disabled = false;
+        }
+      }
+
+      async function handleArchivedMemberAction(event) {
+        const button = event.target.closest("[data-archive-action]");
+        if (!button || button.dataset.archiveAction !== "restore") return;
+        const archived = archivedMembers.find((entry) => entry.id === button.dataset.archiveId);
+        if (!archived) return;
+        button.disabled = true;
+        try {
+          const response = await apiFetch(`/api/member-archives/${encodeURIComponent(archived.id)}/restore`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}"
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          showTemporaryPassword(payload.member?.username || archived.username, payload.temporary_password);
+          setMemberFeedback(`${payload.member?.username || archived.username} fue restaurado.`);
+          await loadMembers();
+        } catch (error) {
+          setMemberFeedback(memberErrorMessage(error.message), "error");
+        } finally {
+          button.disabled = false;
         }
       }
 
@@ -616,13 +853,106 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.memberDialogFeedback.hidden = !message;
       }
 
+      function setInlineFeedback(field, message, tone = "") {
+        field.textContent = message;
+        field.dataset.tone = tone;
+        field.hidden = !message;
+      }
+
       function memberErrorMessage(reason) {
         if (reason === "username_unavailable") return "Ese usuario ya existe.";
         if (reason === "member_not_found") return "La cuenta ya no est\u00e1 disponible.";
+        if (reason === "member_must_be_inactive") return "Desactiv\u00e1 la cuenta antes de archivarla.";
+        if (reason === "archive_confirmation_mismatch") return "El nombre escrito no coincide con el usuario.";
+        if (reason === "archive_not_found") return "Ese archivo ya no est\u00e1 disponible.";
+        if (reason === "archived_catalog_unavailable") return "El archivo del cat\u00e1logo no est\u00e1 disponible en el servidor.";
         if (reason === "member_provisioning_failed") return "No pudimos crear el cat\u00e1logo personal.";
         if (String(reason || "").includes("at least 12")) return "La contrase\u00f1a debe tener al menos 12 caracteres.";
         if (String(reason || "").includes("Username must")) return "Us\u00e1 entre 3 y 64 letras, n\u00fameros, puntos, guiones o guiones bajos.";
         return "No pudimos actualizar la cuenta.";
+      }
+
+      async function openPrivacyDialog() {
+        fields.systemMenu.open = false;
+        setInlineFeedback(fields.privacyFeedback, "");
+        applyPrivacyForm(privacyPreferences);
+        fields.privacyDialog.showModal();
+        fields.savePrivacy.disabled = true;
+        try {
+          const response = await apiFetch("/api/privacy");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          privacyPreferences = { ...privacyPreferences, ...(payload.preferences || {}) };
+          applyPrivacyForm(privacyPreferences);
+        } catch (error) {
+          setInlineFeedback(fields.privacyFeedback, privacyErrorMessage(error.message), "error");
+        } finally {
+          fields.savePrivacy.disabled = false;
+          fields.catalogShared.focus();
+        }
+      }
+
+      function closePrivacyDialog() {
+        fields.privacyDialog.close();
+        setInlineFeedback(fields.privacyFeedback, "");
+      }
+
+      function applyPrivacyForm(preferences) {
+        fields.catalogShared.checked = Boolean(preferences.catalog_shared);
+        fields.shareStatus.checked = Boolean(preferences.share_status);
+        fields.shareWatchedAt.checked = Boolean(preferences.share_watched_at);
+        fields.shareHistory.checked = Boolean(preferences.share_history);
+        fields.shareRating.checked = Boolean(preferences.share_rating);
+        fields.shareReview.checked = Boolean(preferences.share_review);
+        syncPrivacyControls();
+      }
+
+      function syncPrivacyControls() {
+        fields.privacyFields.disabled = !fields.catalogShared.checked;
+        fields.privacyFields.dataset.enabled = fields.catalogShared.checked ? "true" : "false";
+      }
+
+      async function savePrivacyPreferences(event) {
+        event.preventDefault();
+        fields.savePrivacy.disabled = true;
+        setInlineFeedback(fields.privacyFeedback, "Guardando privacidad…");
+        const next = {
+          catalog_shared: fields.catalogShared.checked,
+          share_status: fields.shareStatus.checked,
+          share_watched_at: fields.shareWatchedAt.checked,
+          share_history: fields.shareHistory.checked,
+          share_rating: fields.shareRating.checked,
+          share_review: fields.shareReview.checked
+        };
+        try {
+          const response = await apiFetch("/api/privacy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(next)
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          privacyPreferences = { ...next, ...(payload.preferences || {}) };
+          syncPrivacySummary();
+          closePrivacyDialog();
+          if (currentView === "club") await loadClub();
+        } catch (error) {
+          setInlineFeedback(fields.privacyFeedback, privacyErrorMessage(error.message), "error");
+        } finally {
+          fields.savePrivacy.disabled = false;
+        }
+      }
+
+      function privacyErrorMessage(reason) {
+        if (String(reason || "").includes("Invalid visibility")) return "Elegí una opción de visibilidad válida.";
+        if (reason === "identity_store_unavailable") return "La configuración de cuentas no está disponible.";
+        return "No pudimos guardar la privacidad. Volvé a intentar.";
+      }
+
+      function syncPrivacySummary() {
+        fields.privacyButton.textContent = privacyPreferences.catalog_shared
+          ? "Privacidad · Compartiendo"
+          : "Privacidad";
       }
 
       async function loadCatalog() {
@@ -632,6 +962,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         items = payload.items || [];
         sourceFiles = payload.sources || [];
         writeJsonPath = payload.write_json || "";
+        privacyPreferences = { ...privacyPreferences, ...(payload.privacy || {}) };
+        syncPrivacySummary();
         externalHealth = payload.external || externalHealth;
         curationCounts = {
           ...curationCounts,
@@ -682,6 +1014,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         await loadCurationQueue();
       }
 
+      async function goToClub() {
+        closeDetail({ restoreFocus: false, updateHistory: false });
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
+        showView("club");
+        await loadClub();
+      }
+
       function goToAdmin(options = {}) {
         showView("admin", options);
         loadMembers();
@@ -692,8 +1031,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const scroll = options.scroll !== false;
         const focus = options.focus ?? updateHistory;
         if (view === "admin" && currentIdentity?.user?.role !== "owner") view = "home";
-        currentView = ["home", "catalog", "inbox", "admin"].includes(view) ? view : "home";
+        currentView = ["home", "catalog", "inbox", "club", "admin"].includes(view) ? view : "home";
         fields.homeView.hidden = currentView !== "home";
+        fields.clubView.hidden = currentView !== "club";
         fields.collectionView.hidden = currentView !== "catalog";
         fields.inboxView.hidden = currentView !== "inbox";
         fields.adminView.hidden = currentView !== "admin";
@@ -718,6 +1058,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           home: "#spotlightTitle",
           catalog: "#catalogTitle",
           inbox: "#inboxTitle",
+          club: "#clubTitle",
           admin: "#adminTitle"
         }[view];
         if (!selector) return;
@@ -729,6 +1070,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           home: fields.homeButton,
           catalog: fields.catalogButton,
           inbox: fields.inboxButton,
+          club: fields.clubButton,
           admin: fields.adminButton
         };
         for (const [name, button] of Object.entries(buttons)) {
@@ -738,6 +1080,168 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           else button.removeAttribute("aria-current");
         }
         fields.systemMenu.classList.toggle("active", view === "admin");
+      }
+
+      async function loadClub({ announce = false } = {}) {
+        if (clubLoading) return;
+        clubLoading = true;
+        fields.clubView.setAttribute("aria-busy", "true");
+        fields.refreshClub.disabled = true;
+        if (announce) setClubFeedback("Actualizando el Club…");
+        try {
+          const response = await apiFetch("/api/community");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          clubCatalogs = payload.catalogs || [];
+          if (!clubCatalogs.some((entry) => entry.user?.id === selectedClubUserId)) {
+            selectedClubUserId = clubCatalogs[0]?.user?.id || "";
+          }
+          renderClubTabs();
+          if (selectedClubUserId) await loadSharedCatalog(selectedClubUserId);
+          else {
+            sharedCatalog = null;
+            renderSharedCatalog();
+          }
+          if (announce) setClubFeedback("Club actualizado.");
+        } catch (error) {
+          console.error("[catalog-viewer] shared catalogs load failed", error);
+          clubCatalogs = [];
+          sharedCatalog = null;
+          renderClubTabs();
+          renderSharedCatalog();
+          setClubFeedback("No pudimos cargar los catálogos compartidos.", "error");
+        } finally {
+          clubLoading = false;
+          fields.clubView.setAttribute("aria-busy", "false");
+          fields.refreshClub.disabled = false;
+        }
+      }
+
+      async function selectClubCatalog(event) {
+        const button = event.target.closest("[data-club-user-id]");
+        if (!button || button.dataset.clubUserId === selectedClubUserId) return;
+        selectedClubUserId = button.dataset.clubUserId || "";
+        clubVisibleCount = CLUB_PAGE_SIZE;
+        renderClubTabs();
+        await loadSharedCatalog(selectedClubUserId);
+      }
+
+      async function loadSharedCatalog(userId) {
+        fields.clubCatalogPanel.setAttribute("aria-busy", "true");
+        setClubFeedback("Abriendo estante compartido…");
+        try {
+          const response = await apiFetch(`/api/community/${encodeURIComponent(userId)}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          sharedCatalog = payload;
+          renderSharedCatalog();
+          setClubFeedback("");
+        } catch (error) {
+          sharedCatalog = null;
+          renderSharedCatalog();
+          setClubFeedback(
+            error.message === "shared_catalog_not_found"
+              ? "Ese catálogo dejó de estar compartido."
+              : "No pudimos abrir este catálogo.",
+            "error"
+          );
+        } finally {
+          fields.clubCatalogPanel.setAttribute("aria-busy", "false");
+        }
+      }
+
+      function renderClubTabs() {
+        fields.clubMemberTabs.innerHTML = clubCatalogs.map((entry) => {
+          const active = entry.user?.id === selectedClubUserId;
+          const username = entry.user?.username || "Miembro";
+          return `<button type="button" data-club-user-id="${escapeAttr(entry.user?.id || "")}" aria-pressed="${active}" class="${active ? "active" : ""}">
+            <span class="club-member-mark" aria-hidden="true">${escapeHtml(username.slice(0, 2).toUpperCase())}</span>
+            <span><strong>${escapeHtml(entry.user?.is_self ? "Mi catálogo" : username)}</strong><small>${escapeHtml(entry.catalog?.name || "Catálogo personal")} · ${escapeHtml(entry.counts?.total || 0)} obras</small></span>
+          </button>`;
+        }).join("");
+      }
+
+      function renderSharedCatalog() {
+        if (!sharedCatalog) {
+          fields.clubCatalogPanel.innerHTML = `<div class="club-empty"><strong>El estante compartido está vacío</strong><p>Cuando alguien habilite su catálogo aparecerá en este espacio.</p></div>`;
+          fields.clubLoadMore.hidden = true;
+          return;
+        }
+        const catalogItems = sharedCatalog.items || [];
+        const visibleItems = catalogItems.slice(0, clubVisibleCount);
+        const username = sharedCatalog.user?.username || "Miembro";
+        const history = sharedCatalog.history || [];
+        const historySection = history.length ? `
+          <section class="club-history" aria-labelledby="clubHistoryTitle">
+            <div><h4 id="clubHistoryTitle">Actividad de vistas</h4><span>${history.length} recientes</span></div>
+            <ol>${history.slice(0, 8).map((entry) => `<li><strong>${escapeHtml(displayTitle(entry) || "Sin título")}</strong>${entry.watched_at ? `<time datetime="${escapeAttr(entry.watched_at)}">${escapeHtml(entry.watched_at)}</time>` : ""}</li>`).join("")}</ol>
+          </section>` : "";
+        fields.clubCatalogPanel.innerHTML = `
+          <header class="club-catalog-heading">
+            <div><span>${escapeHtml(username)}</span><h3>${escapeHtml(sharedCatalog.catalog?.name || "Catálogo compartido")}</h3></div>
+            <div class="club-catalog-count"><strong>${catalogItems.length}</strong><span>obras visibles</span></div>
+          </header>
+          ${historySection}
+          <div class="club-grid">${visibleItems.map((item) => sharedCard(item, username)).join("")}</div>`;
+        fields.clubLoadMore.hidden = visibleItems.length >= catalogItems.length;
+      }
+
+      function sharedCard(item, username) {
+        const title = displayTitle(item) || "Sin título";
+        const hasStatus = Object.prototype.hasOwnProperty.call(item, "status");
+        const hasRating = Object.prototype.hasOwnProperty.call(item, "rating");
+        const hasReview = Object.prototype.hasOwnProperty.call(item, "review");
+        const signals = [
+          hasStatus ? `<span>${item.status === "watched" ? "Vista" : "Pendiente"}</span>` : "",
+          hasRating && normalizeRating(item.rating) ? `<strong>${normalizeRating(item.rating)}/10</strong>` : "",
+          hasReview && String(item.review || "").trim() ? "<span>Con review</span>" : ""
+        ].filter(Boolean).join("");
+        return `<article class="club-card">
+          <div class="club-card-poster">${posterArtwork(item, title)}</div>
+          <div class="club-card-body">
+            <div><span>${escapeHtml([item.kind, item.year].filter(Boolean).join(" · ") || "Obra")}</span><h4 class="${titleSizeClass(title)}">${escapeHtml(title)}</h4></div>
+            <div class="club-card-signals">${signals || "<span>Registro privado</span>"}</div>
+            <button type="button" data-click="open-shared-detail" data-id="${escapeAttr(item.id || "")}" aria-label="Ver ficha compartida de ${escapeAttr(title)} por ${escapeAttr(username)}">Ver ficha</button>
+          </div>
+        </article>`;
+      }
+
+      function showMoreClubItems() {
+        clubVisibleCount += CLUB_PAGE_SIZE;
+        renderSharedCatalog();
+      }
+
+      function setClubFeedback(message, tone = "") {
+        fields.clubFeedback.textContent = message;
+        fields.clubFeedback.dataset.tone = tone;
+        fields.clubFeedback.hidden = !message;
+      }
+
+      function openSharedDetail(itemId) {
+        const item = sharedCatalog?.items?.find((entry) => String(entry.id || "") === String(itemId || ""));
+        if (!item) return;
+        const title = displayTitle(item) || "Sin título";
+        const summary = item.wikipedia_extract || item.description || "";
+        const personalRows = [
+          Object.prototype.hasOwnProperty.call(item, "status") ? `<div><dt>Estado</dt><dd>${item.status === "watched" ? "Vista" : "Pendiente"}</dd></div>` : "",
+          Object.prototype.hasOwnProperty.call(item, "watched_at") ? `<div><dt>Fecha vista</dt><dd>${escapeHtml(item.watched_at || "Sin fecha")}</dd></div>` : "",
+          Object.prototype.hasOwnProperty.call(item, "rating") ? `<div><dt>Puntaje</dt><dd>${normalizeRating(item.rating) ? `${normalizeRating(item.rating)}/10` : "Sin puntuar"}</dd></div>` : ""
+        ].filter(Boolean).join("");
+        const review = Object.prototype.hasOwnProperty.call(item, "review") ? String(item.review || "").trim() : "";
+        fields.sharedDetailOwner.textContent = `Compartida por ${sharedCatalog.user?.username || "un miembro"}`;
+        fields.sharedDetailBody.innerHTML = `
+          <section class="drawer-hero">${drawerPoster(item, title)}<div class="drawer-intro"><span class="drawer-kicker">Ficha del Club</span><h2>${escapeHtml(title)}</h2><div class="drawer-byline">${[item.year, firstListValue(item.directors), listText(item.genres, 2)].filter(Boolean).map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</div></div></section>
+          ${personalRows ? `<section class="shared-personal-record"><h3>Registro compartido</h3><dl>${personalRows}</dl>${review ? `<blockquote>${escapeHtml(review)}</blockquote>` : ""}</section>` : ""}
+          <section class="drawer-synopsis"><h3>Sinopsis</h3><p>${escapeHtml(summary || "No hay una sinopsis disponible.")}</p></section>
+          <details class="drawer-accordion"><summary><span>Ficha técnica</span><small>Dirección, reparto y títulos</small></summary><div class="drawer-accordion-body">${factsPanel(item) || '<span class="status-line">Sin ficha enriquecida.</span>'}</div></details>
+          <div class="links shared-detail-links">${detailLinks(item)}</div>`;
+        fields.sharedDetailDialog.showModal();
+        fields.closeSharedDetail.focus();
+      }
+
+      function closeSharedDetail() {
+        fields.sharedDetailDialog.close();
+        fields.sharedDetailBody.innerHTML = "";
       }
 
       async function loadCurationQueue({ announce = false } = {}) {
@@ -1837,7 +2341,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const params = new URLSearchParams(window.location.search);
         const rawQuery = params.get("q") || "";
         const movieId = params.get("movie") || "";
-        const requestedView = ["home", "catalog", "inbox", "admin"].includes(params.get("view"))
+        const requestedView = ["home", "catalog", "inbox", "club", "admin"].includes(params.get("view"))
           ? params.get("view")
           : rawQuery ? "catalog" : "home";
         const query = requestedView === "catalog" ? rawQuery : "";
@@ -1875,6 +2379,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         showView(requestedView, { updateHistory: false, scroll: false });
         if (requestedView === "inbox") loadCurationQueue();
+        if (requestedView === "club") loadClub();
         if (requestedView === "admin") loadMembers();
       }
 
@@ -2400,7 +2905,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const variant = posterVariant(item.id || title);
         const placeholder = `<div class="dvd-placeholder poster-${variant}"${item.page_image ? " hidden" : ""}>
           <span>Movie Inbox presenta</span>
-          <strong>${escapeHtml(title)}</strong>
+          <strong class="${titleSizeClass(title)}">${escapeHtml(title)}</strong>
           <small>Edición videoclub</small>
         </div>`;
         if (!item.page_image) return placeholder;
@@ -2432,6 +2937,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (detailPersonalEditing) return personalRecordEditor(item);
         const rating = normalizeRating(item.rating);
         const review = String(item.review || "").trim();
+        const privacy = item._privacy || {};
         return `<div class="personal-record-read">
           <div class="record-heading">
             <div>
@@ -2447,11 +2953,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             </div>
             <div>
               <dt>Puntuación</dt>
-              <dd>${rating ? `${rating}/10` : "Sin puntuar"}</dd>
+              <dd>${rating ? `${rating}/10` : "Sin puntuar"} ${personalVisibilityBadge("rating", privacy.rating)}</dd>
             </div>
           </dl>
           <div class="personal-review-read">
-            <span>Review</span>
+            <span>Review ${personalVisibilityBadge("review", privacy.review)}</span>
             <p>${escapeHtml(review || "Sin review")}</p>
           </div>
         </div>`;
@@ -2459,6 +2965,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function personalRecordEditor(item) {
         const rating = normalizeRating(item.rating);
+        const privacy = item._privacy || {};
         const ratingOptions = Array.from({ length: 11 }, (_, value) => (
           `<option value="${value}" ${value === rating ? "selected" : ""}>${value}</option>`
         )).join("");
@@ -2485,12 +2992,54 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               Review
               <textarea name="review" data-personal-review rows="6">${escapeHtml(item.review || "")}</textarea>
             </label>
+            <fieldset class="personal-privacy-fields">
+              <legend>Visibilidad en el Club</legend>
+              <label>
+                Puntaje
+                <select name="rating_privacy" data-personal-rating-privacy>
+                  ${personalPrivacyOptions("rating", privacy.rating)}
+                </select>
+              </label>
+              <label>
+                Review
+                <select name="review_privacy" data-personal-review-privacy>
+                  ${personalPrivacyOptions("review", privacy.review)}
+                </select>
+              </label>
+              <small>Estos ajustes reemplazan tu preferencia general solamente para esta obra.</small>
+            </fieldset>
             <div class="personal-actions">
               <button type="button" data-click="save-personal" data-detail-save data-id="${escapeAttr(item.id)}">Guardar cambios</button>
               <button class="quiet-action" type="button" data-click="cancel-personal" data-id="${escapeAttr(item.id)}">Cancelar</button>
             </div>
           </div>
         </div>`;
+      }
+
+      function personalPrivacyOptions(field, selectedMode = "inherit") {
+        const inheritedShared = field === "rating"
+          ? Boolean(privacyPreferences.share_rating)
+          : Boolean(privacyPreferences.share_review);
+        const selected = ["inherit", "shared", "private"].includes(selectedMode)
+          ? selectedMode
+          : "inherit";
+        const options = [
+          ["inherit", `Heredar (${inheritedShared ? "compartido" : "privado"})`],
+          ["shared", "Compartir esta obra"],
+          ["private", "Mantener privada"]
+        ];
+        return options.map(([value, label]) => (
+          `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`
+        )).join("");
+      }
+
+      function personalVisibilityBadge(field, mode = "inherit") {
+        const inheritedShared = field === "rating"
+          ? Boolean(privacyPreferences.share_rating)
+          : Boolean(privacyPreferences.share_review);
+        const shared = mode === "shared" || (mode !== "private" && inheritedShared);
+        const label = privacyPreferences.catalog_shared && shared ? "Visible en Club" : "Privado";
+        return `<small class="personal-visibility ${label === "Privado" ? "is-private" : "is-shared"}">${label}</small>`;
       }
 
       function factsPanel(item) {
@@ -3565,6 +4114,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const watchedAt = form.querySelector("[data-personal-watched-at]")?.value || "";
         const rating = normalizeRating(form.querySelector("[data-personal-rating]")?.value);
         const review = form.querySelector("[data-personal-review]")?.value || "";
+        const ratingPrivacy = form.querySelector("[data-personal-rating-privacy]")?.value || "inherit";
+        const reviewPrivacy = form.querySelector("[data-personal-review-privacy]")?.value || "inherit";
         const status = form.querySelector("[data-personal-status]");
         if (status) status.textContent = "Guardando…";
         try {
@@ -3575,6 +4126,16 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           });
           const payload = await response.json();
           if (!payload.ok) throw new Error(payload.reason || "No se pudo guardar");
+          const privacyResponse = await apiFetch(`/api/privacy/items/${encodeURIComponent(id)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rating: ratingPrivacy, review: reviewPrivacy })
+          });
+          const privacyPayload = await privacyResponse.json();
+          if (!privacyResponse.ok || !privacyPayload.ok) {
+            throw new Error(privacyPayload.reason || "No se pudo guardar la privacidad");
+          }
+          item._privacy = privacyPayload.privacy || { rating: ratingPrivacy, review: reviewPrivacy };
           if (status) status.textContent = "Guardado";
           form.dataset.initial = serializeDetailForm(form);
           return true;

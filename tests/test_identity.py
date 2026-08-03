@@ -13,10 +13,15 @@ from movie_inbox.application.auth_service import (
     PasswordPolicyError,
     session_token_hash,
 )
-from movie_inbox.application.identity_repository import IdentityCatalogMismatch
+from movie_inbox.application.identity_repository import (
+    IdentityCatalogMismatch,
+    IdentityMemberActive,
+    IdentityNotFound,
+)
 from movie_inbox.application.member_service import MemberService
 from movie_inbox.domain.catalog import normalize_item
-from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
+from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
+from movie_inbox.infrastructure.identity_repository import INSTANCE_SCHEMA_V1, SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -194,6 +199,114 @@ class IdentityTests(unittest.TestCase):
                 [item.id for item in JsonCatalogRepository(owner_catalog, normalize_item).read()],
                 ["heat"],
             )
+
+    def test_v1_instance_is_migrated_to_privacy_and_archive_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "instance.db"
+            with closing(sqlite3.connect(database)) as connection:
+                connection.executescript(INSTANCE_SCHEMA_V1)
+                connection.execute(
+                    "INSERT INTO instance_migrations(version, name, applied_at) VALUES (1, 'v1', 'now')"
+                )
+                connection.commit()
+
+            repository = SqliteIdentityRepository(database)
+            repository.initialize()
+
+            with closing(sqlite3.connect(database)) as connection:
+                versions = [row[0] for row in connection.execute(
+                    "SELECT version FROM instance_migrations ORDER BY version"
+                )]
+                tables = {row[0] for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )}
+            self.assertEqual(versions, [1, 2])
+            self.assertIn("user_privacy_preferences", tables)
+            self.assertIn("item_privacy_overrides", tables)
+            self.assertIn("archived_members", tables)
+
+    def test_privacy_and_archival_are_reversible_without_losing_catalog(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            owner_catalog = root / "owner.json"
+            JsonCatalogRepository(owner_catalog, normalize_item).write([])
+            repository = SqliteIdentityRepository(root / "instance.db")
+            auth = AuthService(repository)
+            owner, _ = auth.bootstrap_owner(
+                "owner",
+                "a-long-owner-password",
+                catalog_name="Owner catalog",
+                source_paths=[str(owner_catalog)],
+                write_path=str(owner_catalog),
+            )
+            members = MemberService(repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs"))
+            provisioned = members.create_member(
+                owner,
+                "maria",
+                temporary_password="a-temporary-password",
+            )
+            member = provisioned.member
+            member_repository = open_catalog_repository(Path(member.catalog.write_path), normalize_item)
+            member_repository.write([normalize_item({"id": "heat", "title": "Heat", "rating": 9})])
+
+            preferences = PrivacyPreferences(catalog_shared=True, share_rating=True)
+            repository.update_privacy(member.user.id, preferences)
+            repository.set_item_privacy(
+                member.user.id,
+                member.catalog.id,
+                "heat",
+                ItemPrivacyOverride(rating="private", review="inherit"),
+            )
+            self.assertEqual(repository.privacy_for(member.user.id), preferences)
+            self.assertEqual(
+                repository.item_privacy_overrides(member.user.id, member.catalog.id)["heat"].rating,
+                "private",
+            )
+
+            with self.assertRaises(IdentityMemberActive):
+                members.archive_member(owner, member.user.id, confirmed_username="maria")
+            members.set_active(owner, member.user.id, False)
+            archived = members.archive_member(owner, member.user.id, confirmed_username="maria")
+            self.assertIsNone(repository.account(member.user.id))
+            self.assertTrue(Path(archived.sources[0].path).exists())
+            self.assertEqual(member_repository.get("heat").title, "Heat")
+
+            restored = members.restore_member(
+                owner,
+                archived.id,
+                temporary_password="a-restored-password",
+            )
+            self.assertEqual(restored.member.user.username, "maria")
+            self.assertEqual(restored.member.catalog.write_path, member.catalog.write_path)
+            self.assertEqual(member_repository.get("heat").rating, 9)
+            _, restored_identity = auth.login("maria", "a-restored-password")
+            self.assertTrue(restored_identity.user.must_change_password)
+            self.assertEqual(repository.list_archived_members(), [])
+
+    def test_member_without_catalog_sources_is_not_archived(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            owner_catalog = root / "owner.json"
+            JsonCatalogRepository(owner_catalog, normalize_item).write([])
+            database = root / "instance.db"
+            repository = SqliteIdentityRepository(database)
+            owner, _ = AuthService(repository).bootstrap_owner(
+                "owner",
+                "a-long-owner-password",
+                catalog_name="Owner catalog",
+                source_paths=[str(owner_catalog)],
+                write_path=str(owner_catalog),
+            )
+            members = MemberService(repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs"))
+            member = members.create_member(owner, "maria").member
+            members.set_active(owner, member.user.id, False)
+            with closing(sqlite3.connect(database)) as connection:
+                connection.execute("DELETE FROM catalog_sources WHERE catalog_id = ?", (member.catalog.id,))
+                connection.commit()
+
+            with self.assertRaises(IdentityNotFound):
+                members.archive_member(owner, member.user.id, confirmed_username="maria")
+            self.assertIsNotNone(repository.account(member.user.id))
 
 
 if __name__ == "__main__":

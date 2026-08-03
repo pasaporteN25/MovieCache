@@ -37,12 +37,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Matching conservador y auditable con motivo y evidencia por candidato.
 - Pruebas de regresion para seguridad HTTP, esquema, repositorios JSON/SQLite, gateways externos, modelos, capas y matching.
 - Contratos durables de producto y diseno para preservar el posicionamiento, lenguaje visual y reglas de interaccion de Movie Inbox.
-- Navegacion del visor separada en `Inicio`, `Coleccion` y `Administrar`, con las tareas operativas fuera de la pantalla de descubrimiento.
+- Navegacion del visor separada en `Inicio`, `Coleccion`, `Bandeja`, `Club` y `Administrar`, con las tareas operativas fuera de la pantalla de descubrimiento.
 - Inicio con spotlight pausable y una seleccion breve de obras disponibles en el catalogo.
 - Coleccion con busqueda explicita, filtros combinables, orden, chips activos y carga incremental.
 - Administracion dedicada para resumen, base de datos, fuentes externas, matching y duplicados.
 - Cards de proporcion estable 2:3 con titulo, ano, disponibilidad, estado personal y puntuacion visible cuando existe.
-- Navegacion movil inferior para `Inicio`, `Coleccion`, `Bandeja` y `Random`, con cabecera compacta, areas seguras y controles tactiles.
+- Navegacion movil inferior para `Inicio`, `Coleccion`, `Bandeja`, `Club` y `Random`, con cabecera compacta, areas seguras y controles tactiles.
 - Coleccion movil en dos columnas con busqueda y filtros compactos, titulos adaptativos y feedback de pulsacion sin depender de hover.
 - Ficha tipo dossier con registro personal en modo lectura, edicion explicita y acciones inmediatas para estado y disponibilidad.
 - Navegacion contextual entre fichas, variante `Otro al azar` y confirmacion para guardar o descartar borradores antes de salir.
@@ -62,6 +62,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Catalogos SQLite vacios creados automaticamente para miembros dentro de un directorio administrado.
 - Resolucion del catalogo por sesion en todas las lecturas, mutaciones, merges, curacion y tareas en segundo plano.
 - Referencias opacas de fuentes en la API para no exponer rutas absolutas ni aceptar rutas de catalogos ajenos.
+- Privacidad opt-in por usuario para compartir catalogo, estado, fecha de vista, actividad, puntajes y reviews dentro de la instancia.
+- Overrides por obra para compartir o mantener privados rating y review sin cambiar el default del usuario.
+- Vista `Club` de solo lectura con estantes por miembro, actividad opcional y fichas compartidas sin rutas, archivos locales, notas ni metadata operativa.
+- Edicion de username y nombre del catalogo, baja reversible de miembros y restauracion con nueva contrasena temporal.
+- Esquema de instancia v2 con preferencias de privacidad, overrides por item y catalogos de miembros archivados.
 
 ### Corregido
 
@@ -83,6 +88,7 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - La busqueda local filtra una sola estanteria y reserva las cards auxiliares para fuentes externas o comparaciones explicitas.
 - Consultas, filtros, orden y duplicados se restauran desde la URL sin alterar las estadisticas globales de otras vistas.
 - `Ver coleccion` y la navegacion principal abren la estanteria sin una busqueda anterior; Atrás y Adelante restauran cada consulta desde la URL.
+- La ruta de `Club` se restaura con Atras y Adelante sin revivir una busqueda anterior de la Coleccion.
 
 ## [0.1.0] - 2026-07-13
 

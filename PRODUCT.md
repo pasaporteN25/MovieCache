@@ -64,10 +64,14 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   siguiente etapa inmediata.
 - La identidad usa owner local, miembros creados por invitacion, sesiones seguras y
   un catalogo personal creado o adoptado para cada cuenta.
-- `status`, `watched_at` e historial tendran una visibilidad general por usuario;
-  rating y review tendran defaults independientes y overrides por obra.
-- Compartir o seguir catalogos, perfiles publicos y registro abierto quedan para
-  fases posteriores.
+- Cada catalogo es privado por defecto y puede compartirse en modo lectura solamente
+  con las cuentas activas de la misma instancia.
+- `status`, `watched_at` e historial tienen visibilidad general por usuario; rating y
+  review tienen defaults independientes y overrides por obra.
+- Las vistas compartidas nunca publican rutas, archivos locales, notas ni estado
+  operativo. El owner no obtiene una excepcion a estas reglas de privacidad.
+- Seguir catalogos externos, perfiles accesibles sin cuenta y registro abierto quedan
+  para fases posteriores.
 - La interfaz todavia no importa paquetes de catalogo. Esa capacidad futura debe
   permitir previsualizar, deduplicar y elegir entre copiar obras al catalogo personal
   o seguir una coleccion externa sin mezclar automaticamente ambas fuentes.

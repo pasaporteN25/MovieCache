@@ -62,6 +62,16 @@ class PersonalCatalog:
 
 
 @dataclass(frozen=True)
+class ArchivedMember:
+    id: str
+    former_user_id: str
+    username: str
+    catalog_name: str
+    sources: tuple[CatalogSource, ...]
+    archived_at: str
+
+
+@dataclass(frozen=True)
 class AuthenticatedIdentity:
     user: UserAccount
     catalog: PersonalCatalog

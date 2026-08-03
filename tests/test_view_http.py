@@ -200,6 +200,217 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertTrue(reset.json()["member"]["must_change_password"])
         self.assertEqual(len(listed.json()["members"]), 1)
 
+    def test_owner_can_edit_archive_and_restore_a_member_catalog(self) -> None:
+        owner_id = self.login_response.json()["user"]["id"]
+        created = self.client.post(
+            "/api/members",
+            content=json.dumps({"username": "maria", "temporary_password": "a-temporary-password"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        member_id = created.json()["member"]["id"]
+        identity_repository = SqliteIdentityRepository(self.instance_path)
+        original_catalog = identity_repository.default_catalog_for(member_id)
+        self.assertIsNotNone(original_catalog)
+        original_catalog_path = Path(original_catalog.write_path)
+
+        updated = self.client.post(
+            f"/api/members/{member_id}/profile",
+            content=json.dumps({"username": "maria.cine", "catalog_name": "Videoteca de Maria"}),
+            headers=self.post_headers(),
+        )
+        invalid = self.client.post(
+            f"/api/members/{member_id}/profile",
+            content=json.dumps({"username": "", "catalog_name": "Videoteca de Maria"}),
+            headers=self.post_headers(),
+        )
+        active_archive = self.client.post(
+            f"/api/members/{member_id}/archive",
+            content=json.dumps({"confirmed_username": "maria.cine"}),
+            headers=self.post_headers(),
+        )
+        protected_owner = self.client.post(
+            f"/api/members/{owner_id}/archive",
+            content=json.dumps({"confirmed_username": "lucas"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(updated.status_code, 200, updated.content)
+        self.assertEqual(updated.json()["member"]["username"], "maria.cine")
+        self.assertEqual(updated.json()["member"]["catalog"]["name"], "Videoteca de Maria")
+        self.assertEqual(invalid.status_code, 400, invalid.content)
+        self.assertEqual(active_archive.status_code, 409, active_archive.content)
+        self.assertEqual(active_archive.json()["reason"], "member_must_be_inactive")
+        self.assertEqual(protected_owner.status_code, 409, protected_owner.content)
+        self.assertEqual(protected_owner.json()["reason"], "owner_account_protected")
+
+        deactivated = self.client.post(
+            f"/api/members/{member_id}/status",
+            content=json.dumps({"active": False}),
+            headers=self.post_headers(),
+        )
+        wrong_confirmation = self.client.post(
+            f"/api/members/{member_id}/archive",
+            content=json.dumps({"confirmed_username": "maria"}),
+            headers=self.post_headers(),
+        )
+        archived = self.client.post(
+            f"/api/members/{member_id}/archive",
+            content=json.dumps({"confirmed_username": "maria.cine"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(deactivated.status_code, 200, deactivated.content)
+        self.assertEqual(wrong_confirmation.status_code, 400, wrong_confirmation.content)
+        self.assertEqual(archived.status_code, 200, archived.content)
+        self.assertTrue(original_catalog_path.exists())
+        self.assertNotIn(str(self.temporary.name), archived.text)
+
+        listed = self.client.get(
+            "/api/members",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        archive_id = archived.json()["archived"]["id"]
+        self.assertEqual(listed.json()["members"], [])
+        self.assertEqual([entry["id"] for entry in listed.json()["archived"]], [archive_id])
+        self.assertNotIn(str(self.temporary.name), listed.text)
+
+        invalid_restore = self.client.post(
+            f"/api/member-archives/{archive_id}/restore",
+            content=json.dumps({"username": "!"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(invalid_restore.status_code, 400, invalid_restore.content)
+
+        restored = self.client.post(
+            f"/api/member-archives/{archive_id}/restore",
+            content="{}",
+            headers=self.post_headers(),
+        )
+        self.assertEqual(restored.status_code, 200, restored.content)
+        self.assertTrue(restored.json()["member"]["must_change_password"])
+        self.assertGreaterEqual(len(restored.json()["temporary_password"]), 12)
+        restored_catalog = identity_repository.default_catalog_for(restored.json()["member"]["id"])
+        self.assertIsNotNone(restored_catalog)
+        self.assertEqual(Path(restored_catalog.write_path), original_catalog_path)
+        self.assertFalse(identity_repository.privacy_for(restored.json()["member"]["id"]).catalog_shared)
+
+    def test_shared_catalog_respects_user_preferences_and_item_overrides(self) -> None:
+        owner_id = self.login_response.json()["user"]["id"]
+        JsonCatalogRepository(self.catalog_path, normalize_item).write([
+            normalize_item({
+                "id": "heat",
+                "title": "Heat",
+                "year": "1995",
+                "kind": "pelicula",
+                "status": "watched",
+                "watched_at": "2026-07-31",
+                "rating": 9,
+                "review": "Una review que puede compartirse.",
+                "notes": "nota privada",
+                "local_path": "D:/private/Heat.mkv",
+                "local_files": [{"name": "Heat.mkv", "path": "D:/private/Heat.mkv"}],
+                "locked_fields": ["title"],
+            })
+        ])
+        created = self.client.post(
+            "/api/members",
+            content=json.dumps({"username": "maria", "temporary_password": "a-temporary-password"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+
+        with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as member_client:
+            login = member_client.post(
+                "/auth/login",
+                content=json.dumps({"username": "maria", "password": "a-temporary-password"}),
+                headers=self.post_headers(),
+            )
+            self.assertEqual(login.status_code, 200, login.content)
+            changed = member_client.post(
+                "/auth/change-password",
+                content=json.dumps({
+                    "current_password": "a-temporary-password",
+                    "new_password": "a-permanent-password",
+                    "confirm_password": "a-permanent-password",
+                }),
+                headers=self.post_headers(),
+            )
+            self.assertEqual(changed.status_code, 200, changed.content)
+            private_list = member_client.get(
+                "/api/community",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            self.assertEqual(private_list.status_code, 200, private_list.content)
+            self.assertEqual(private_list.json()["catalogs"], [])
+
+            preferences = self.client.post(
+                "/api/privacy",
+                content=json.dumps({
+                    "catalog_shared": True,
+                    "share_status": True,
+                    "share_watched_at": False,
+                    "share_history": False,
+                    "share_rating": False,
+                    "share_review": True,
+                }),
+                headers=self.post_headers(),
+            )
+            override = self.client.post(
+                "/api/privacy/items/heat",
+                content=json.dumps({"rating": "shared", "review": "private"}),
+                headers=self.post_headers(),
+            )
+            self.assertEqual(preferences.status_code, 200, preferences.content)
+            self.assertEqual(override.status_code, 200, override.content)
+
+            shared_list = member_client.get(
+                "/api/community",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            shared_detail = member_client.get(
+                f"/api/community/{owner_id}",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            self.assertEqual(shared_list.status_code, 200, shared_list.content)
+            self.assertEqual([entry["user"]["id"] for entry in shared_list.json()["catalogs"]], [owner_id])
+            self.assertNotIn(str(self.temporary.name), shared_list.text)
+            self.assertEqual(shared_detail.status_code, 200, shared_detail.content)
+            shared_item = shared_detail.json()["items"][0]
+            self.assertEqual(shared_item["status"], "watched")
+            self.assertEqual(shared_item["rating"], 9)
+            self.assertNotIn("watched_at", shared_item)
+            self.assertNotIn("review", shared_item)
+            for private_field in (
+                "notes",
+                "local_path",
+                "local_files",
+                "locked_fields",
+                "metadata_sources",
+                "_source_file",
+                "_privacy",
+            ):
+                self.assertNotIn(private_field, shared_item)
+            self.assertEqual(shared_detail.json()["history"], [])
+            self.assertNotIn("D:/private", shared_detail.text)
+
+            hidden = self.client.post(
+                "/api/privacy",
+                content=json.dumps({
+                    "catalog_shared": False,
+                    "share_status": True,
+                    "share_watched_at": False,
+                    "share_history": False,
+                    "share_rating": False,
+                    "share_review": True,
+                }),
+                headers=self.post_headers(),
+            )
+            unavailable = member_client.get(
+                f"/api/community/{owner_id}",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            self.assertEqual(hidden.status_code, 200, hidden.content)
+            self.assertEqual(unavailable.status_code, 404, unavailable.content)
+
     def test_login_requires_token_origin_and_json(self) -> None:
         body = json.dumps({"username": "lucas", "password": self.owner_password})
         with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:
@@ -294,6 +505,12 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="mergeComparatorFields"', body)
         self.assertIn(b'id="collectionView"', body)
         self.assertIn(b'id="adminView"', body)
+        self.assertIn(b'id="clubButton"', body)
+        self.assertIn(b'id="clubView"', body)
+        self.assertIn(b'id="privacyDialog"', body)
+        self.assertIn(b'id="editMemberDialog"', body)
+        self.assertIn(b'id="archiveMemberDialog"', body)
+        self.assertIn(b'id="sharedDetailDialog"', body)
         self.assertIn(b'id="adminButton"', body)
         self.assertIn(b'id="systemMenu"', body)
         self.assertIn(b'id="currentUserName"', body)
@@ -334,11 +551,14 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'.admin-section-nav', css)
         self.assertIn(b'.member-row', css)
         self.assertIn(b'.member-dialog', css)
+        self.assertIn(b'.club-grid', css)
+        self.assertIn(b'.privacy-fieldset', css)
+        self.assertIn(b'.personal-privacy-fields', css)
         self.assertIn(b'.system-menu-panel', css)
         self.assertIn(b'.active-filters', css)
         self.assertIn(b'.collection-view.is-compare-mode #grid', css)
         self.assertIn(b'.system-menu-toggle.mobile-random-scope', css)
-        self.assertIn(b'grid-template-columns: repeat(4, minmax(0, 1fr))', css)
+        self.assertIn(b'grid-template-columns: repeat(5, minmax(0, 1fr))', css)
         self.assertIn(b'env(safe-area-inset-bottom', css)
         self.assertIn(b'input, select, textarea, button', css)
         self.assertIn(b'textarea:focus-visible', css)

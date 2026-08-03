@@ -8,8 +8,12 @@ from pathlib import Path
 from typing import Protocol
 
 from movie_inbox.application.auth_service import PasswordHasher
-from movie_inbox.application.identity_repository import IdentityRepository
-from movie_inbox.domain.identity import PersonalCatalog, UserAccount, normalize_username
+from movie_inbox.application.identity_repository import (
+    IdentityNotFound,
+    IdentityOwnerProtected,
+    IdentityRepository,
+)
+from movie_inbox.domain.identity import ArchivedMember, PersonalCatalog, UserAccount, normalize_username
 
 
 CATALOG_NAME_MAX_LENGTH = 120
@@ -37,6 +41,12 @@ class ProvisionedMember:
     temporary_password: str
 
 
+@dataclass(frozen=True)
+class MemberDirectory:
+    members: tuple[ManagedMember, ...]
+    archived: tuple[ArchivedMember, ...]
+
+
 class MemberService:
     def __init__(
         self,
@@ -56,6 +66,12 @@ class MemberService:
             for user, catalog in self.repository.list_accounts()
             if user.role == "member"
         ]
+
+    def member_directory(self, actor: UserAccount) -> MemberDirectory:
+        return MemberDirectory(
+            tuple(self.list_members(actor)),
+            tuple(self.repository.list_archived_members()),
+        )
 
     def create_member(
         self,
@@ -94,6 +110,67 @@ class MemberService:
         if catalog is None:
             raise ValueError("Member does not have a personal catalog")
         return ManagedMember(user, catalog)
+
+    def update_member(
+        self,
+        actor: UserAccount,
+        user_id: str,
+        *,
+        username: str,
+        catalog_name: str,
+    ) -> ManagedMember:
+        _require_owner(actor)
+        normalized_username = normalize_username(username)
+        resolved_catalog_name = _catalog_name(catalog_name, normalized_username)
+        user, catalog = self.repository.update_member(
+            str(user_id or ""),
+            normalized_username,
+            resolved_catalog_name,
+        )
+        return ManagedMember(user, catalog)
+
+    def archive_member(
+        self,
+        actor: UserAccount,
+        user_id: str,
+        *,
+        confirmed_username: str,
+    ) -> ArchivedMember:
+        _require_owner(actor)
+        target = self.repository.account(str(user_id or ""))
+        if target is None:
+            raise IdentityNotFound("Member account was not found")
+        if target.role != "member":
+            raise IdentityOwnerProtected("The owner account cannot be archived")
+        if str(confirmed_username or "").strip().casefold() != target.username.casefold():
+            raise ValueError("Username confirmation does not match")
+        return self.repository.archive_member(target.id)
+
+    def restore_member(
+        self,
+        actor: UserAccount,
+        archive_id: str,
+        *,
+        username: str = "",
+        temporary_password: str = "",
+    ) -> ProvisionedMember:
+        _require_owner(actor)
+        archive = next(
+            (row for row in self.repository.list_archived_members() if row.id == str(archive_id or "")),
+            None,
+        )
+        if archive is None:
+            raise IdentityNotFound("Archived member was not found")
+        if not archive.sources or any(not Path(source.path).exists() for source in archive.sources):
+            raise ValueError("Archived personal catalog is unavailable")
+        normalized_username = normalize_username(username or archive.username)
+        password = str(temporary_password or "") or generate_temporary_password()
+        user, catalog = self.repository.restore_archived_member(
+            archive.id,
+            normalized_username,
+            self.hasher.hash(password),
+        )
+        return ProvisionedMember(ManagedMember(user, catalog), password)
 
     def reset_password(
         self,
