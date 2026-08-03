@@ -17,6 +17,8 @@ class ServerCliTests(unittest.TestCase):
     def test_serve_starts_uvicorn_with_one_loopback_worker(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             catalog = Path(temporary) / "catalog.json"
+            media = Path(temporary) / "media"
+            media.mkdir()
             password_file = Path(temporary) / "owner-password.txt"
             password_file.write_text("a-long-local-password\n", encoding="utf-8")
             JsonCatalogRepository(catalog, normalize_item).write([])
@@ -28,6 +30,8 @@ class ServerCliTests(unittest.TestCase):
                     "lucas",
                     "--owner-password-file",
                     str(password_file),
+                    "--library-root",
+                    str(media),
                     "--no-open",
                 ])
 
@@ -39,10 +43,16 @@ class ServerCliTests(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs["forwarded_allow_ips"], "127.0.0.1")
             self.assertFalse(run.call_args.kwargs["access_log"])
             self.assertTrue((Path(temporary) / ".movie-inbox" / "instance.db").is_file())
+            self.assertEqual(app.state.viewer_config.library_allowed_roots, (str(media.resolve()),))
 
     def test_non_loopback_bind_requires_public_origin(self) -> None:
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
             server.main(["catalog.json", "--host", "0.0.0.0", "--no-open"])
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_managed_scanner_root_must_be_absolute(self) -> None:
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
+            server.main(["catalog.json", "--library-root", "relative-media", "--no-open"])
         self.assertEqual(raised.exception.code, 2)
 
 

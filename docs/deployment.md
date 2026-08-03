@@ -79,10 +79,17 @@ El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public
   --forwarded-allow-ips 127.0.0.1 \
   --image-cache-dir /var/lib/movie-inbox/image-cache \
   --image-cache-total-mb 512 \
+  --library-root /srv/media/peliculas \
   --no-open
 ```
 
 La app usa un solo worker. SQLite serializa escrituras y el cache de busquedas vive en memoria; agregar workers antes de medir carga sumaria contencion y estados duplicados sin aportar valor para un catalogo personal.
+
+Cada `--library-root` habilita unicamente ese arbol para el scanner administrado. El
+usuario `movie-inbox` necesita lectura y traversal sobre esas carpetas, pero no
+escritura. No se recomienda habilitar `/`, `/home` ni un punto de montaje que contenga
+datos ajenos a la biblioteca. Las rutas registradas y los reportes de archivos viven en
+`instance.db` y solamente se entregan a endpoints de owner.
 
 El proxy de imagenes acepta solamente los hosts conocidos de Wikimedia, IMDb y FilmAffinity. Si una fuente confiable nueva usa otro dominio, se agrega con `--image-host host.example`; no se recomienda permitir dominios aportados por usuarios. El cache se puede inspeccionar y mantener sin detener el servicio con `movie-inbox cache info|prune|clear --dir /var/lib/movie-inbox/image-cache`.
 
@@ -126,6 +133,12 @@ Movie Inbox autentica la cuenta antes de entregar el visor. La cookie de sesion 
 - `--forwarded-allow-ips` contiene solamente la direccion del proxy.
 - El owner fue creado y el login funciona a traves del origen HTTPS.
 - `instance.db` no se publica y tiene un backup protegido separado.
+- Cada `--library-root` es especifico, existe al arrancar y el usuario del servicio tiene
+  acceso de solo lectura; las rutas no aparecen en respuestas para miembros.
 - La restauracion desde una exportacion JSON fue probada.
 
 La automatizacion de deploy sigue fuera del workflow de CI por ahora: primero conviene hacer un despliegue manual completo y verificar backup/restauracion.
+
+El repositorio todavia no publica `Dockerfile` ni `compose.yaml`. El empaquetado Docker
+queda planificado despues de estabilizar el scanner en un servidor real; debera montar
+datos y backups como volumenes persistentes y cada biblioteca en modo de solo lectura.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import secrets
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,17 @@ from movie_inbox.application.import_service import (
     ImportPermissionError,
     ImportService,
 )
+from movie_inbox.application.library_repository import (
+    LibraryNotFound,
+    LibraryRepositoryError,
+    LibraryRunBusy,
+)
+from movie_inbox.application.library_service import (
+    AvailabilityService,
+    LibraryPathError,
+    ManagedLibraryScheduler,
+    ManagedLibraryService,
+)
 from movie_inbox.application.member_service import (
     ManagedMember,
     MemberAuthorizationError,
@@ -59,6 +71,7 @@ from movie_inbox.application.member_service import (
 )
 from movie_inbox.application.privacy_service import PrivacyService, SharedCatalogUnavailable
 from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity
+from movie_inbox.domain.libraries import LibraryValidationError
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
@@ -70,6 +83,8 @@ from movie_inbox.infrastructure.import_parsers import (
     parse_import_content,
 )
 from movie_inbox.infrastructure.import_repository import SqliteImportDraftRepository
+from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
+from movie_inbox.infrastructure.library_scanner import scan_media_files
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION
 from movie_inbox.infrastructure.starter_collections import (
@@ -218,11 +233,41 @@ def create_app(config: ViewerConfig) -> FastAPI:
         identity_repository,
         SqlitePersonalCatalogProvisioner(member_catalog_dir),
     )
-    privacy_service = PrivacyService(identity_repository, load_items)
-    collection_repository = SqliteCollectionRepository(config.instance_db)
+    library_repository = SqliteLibraryRepository(config.instance_db)
     owner = identity_repository.owner()
     if owner is None:
         raise RuntimeError("Movie Inbox owner account is unavailable")
+
+    def catalog_universe() -> list[dict[str, Any]]:
+        universe: list[dict[str, Any]] = []
+        for user, personal_catalog in identity_repository.list_accounts():
+            if not user.active:
+                continue
+            if user.id != owner.id and not identity_repository.privacy_for(user.id).catalog_shared:
+                continue
+            try:
+                universe.extend(load_items([source.path for source in personal_catalog.sources]))
+            except CatalogRepositoryError:
+                if user.id == owner.id:
+                    raise
+                continue
+        return universe
+
+    library_service = ManagedLibraryService(
+        library_repository,
+        allowed_roots=config.library_allowed_roots,
+        catalog_universe=catalog_universe,
+        scanner=scan_media_files,
+    )
+    availability_service = AvailabilityService(library_repository)
+    privacy_service = PrivacyService(
+        identity_repository,
+        lambda patterns: availability_service.decorate_items(
+            load_items(patterns),
+            include_sources=False,
+        ),
+    )
+    collection_repository = SqliteCollectionRepository(config.instance_db)
     collection_repository.install_once(
         AKIRA_KUROSAWA_SEED_KEY,
         akira_kurosawa_collection(owner.id),
@@ -234,12 +279,26 @@ def create_app(config: ViewerConfig) -> FastAPI:
         collection_repository,
         parser=parse_import_content,
     )
+    library_scheduler = ManagedLibraryScheduler(
+        library_service,
+        poll_seconds=config.library_scheduler_poll_seconds,
+    )
     login_limiter = LoginAttemptLimiter()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        library_scheduler.start()
+        try:
+            yield
+        finally:
+            library_scheduler.stop()
+
     app = FastAPI(
         title="Movie Inbox",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
+        lifespan=lifespan,
     )
     app.state.viewer_config = config
     app.state.identity_repository = identity_repository
@@ -250,6 +309,10 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.collection_service = collection_service
     app.state.import_repository = import_repository
     app.state.import_service = import_service
+    app.state.library_repository = library_repository
+    app.state.library_service = library_service
+    app.state.availability_service = availability_service
+    app.state.library_scheduler = library_scheduler
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
 
     @app.middleware("http")
@@ -714,6 +777,171 @@ def create_app(config: ViewerConfig) -> FastAPI:
         except IdentityRepositoryError:
             return error_response("identity_store_unavailable", 503)
 
+    @app.get("/api/libraries", dependencies=[Depends(require_token)])
+    def managed_libraries(request: Request) -> JSONResponse:
+        require_owner(request)
+        try:
+            return JSONResponse(
+                {
+                    "configured": library_service.configured,
+                    "allowed_roots": [str(path) for path in library_service.allowed_roots],
+                    "libraries": library_service.list_libraries(),
+                    "queue_count": len(library_service.review_queue()),
+                }
+            )
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.post("/api/libraries")
+    def create_managed_library(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_owner(request)
+        try:
+            library = library_service.create_library(identity.user.id, body)
+            return JSONResponse(
+                {"ok": True, "reason": "library_created", "library": library_service.library_payload(library)},
+                status_code=201,
+            )
+        except (ValueError, LibraryValidationError, LibraryPathError) as error:
+            return error_response(str(error), 400)
+        except LibraryRepositoryError as error:
+            return error_response(str(error), 409 if "already" in str(error).casefold() else 503)
+
+    @app.get("/api/libraries/{library_id}", dependencies=[Depends(require_token)])
+    def managed_library_detail(library_id: str, request: Request) -> JSONResponse:
+        require_owner(request)
+        try:
+            return JSONResponse({"library": library_service.library_detail(library_id)})
+        except LibraryNotFound:
+            return error_response("library_not_found", 404)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.post("/api/libraries/{library_id}/update")
+    def update_managed_library(
+        library_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        require_owner(request)
+        try:
+            library = library_service.update_library(library_id, body)
+            return JSONResponse(
+                {"ok": True, "reason": "library_updated", "library": library_service.library_payload(library)}
+            )
+        except LibraryNotFound:
+            return error_response("library_not_found", 404)
+        except LibraryRunBusy:
+            return error_response("library_scan_busy", 409)
+        except (ValueError, LibraryValidationError) as error:
+            return error_response(str(error), 400)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.post("/api/libraries/{library_id}/status")
+    def update_managed_library_status(
+        library_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        require_owner(request)
+        if not isinstance(body.get("active"), bool):
+            return error_response("active_must_be_boolean", 400)
+        try:
+            library = library_service.set_active(library_id, body["active"])
+            return JSONResponse(
+                {"ok": True, "reason": "library_status_updated", "library": library_service.library_payload(library)}
+            )
+        except LibraryNotFound:
+            return error_response("library_not_found", 404)
+        except LibraryRunBusy:
+            return error_response("library_scan_busy", 409)
+        except LibraryValidationError as error:
+            return error_response(str(error), 409)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.post("/api/libraries/{library_id}/delete")
+    def delete_managed_library(
+        library_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        require_owner(request)
+        if body.get("confirmed") is not True:
+            return error_response("confirmation_required", 409)
+        try:
+            if not library_service.delete_library(library_id):
+                return error_response("library_not_found", 404)
+            return JSONResponse({"ok": True, "reason": "library_deleted"})
+        except LibraryRunBusy:
+            return error_response("library_scan_busy", 409)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.post("/api/libraries/{library_id}/runs")
+    def run_managed_library(
+        library_id: str,
+        background_tasks: BackgroundTasks,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        require_owner(request)
+        try:
+            run = library_service.queue_scan(library_id, str(body.get("mode") or "dry_run"))
+            background_tasks.add_task(library_service.execute_run, run.id)
+            return JSONResponse(
+                {"ok": True, "reason": "library_scan_queued", "run": library_service.run_payload(run)},
+                status_code=202,
+            )
+        except LibraryNotFound:
+            return error_response("library_not_found", 404)
+        except LibraryRunBusy:
+            return error_response("library_scan_busy", 409)
+        except (ValueError, LibraryValidationError, LibraryPathError) as error:
+            return error_response(str(error), 409)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.get("/api/library-runs/{run_id}", dependencies=[Depends(require_token)])
+    def managed_library_run(run_id: str, request: Request) -> JSONResponse:
+        require_owner(request)
+        try:
+            run = library_repository.get_run(run_id)
+            if run is None:
+                return error_response("library_run_not_found", 404)
+            return JSONResponse({"run": library_service.run_payload(run)})
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.get("/api/scanner/queue", dependencies=[Depends(require_token)])
+    def scanner_review_queue(request: Request) -> JSONResponse:
+        require_owner(request)
+        try:
+            queue = library_service.review_queue()
+            return JSONResponse({"items": queue, "count": len(queue)})
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
+    @app.post("/api/scanner/queue/{file_id}")
+    def review_scanner_item(
+        file_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        require_owner(request)
+        try:
+            item = library_service.review_file(file_id, body)
+            return JSONResponse({"ok": True, "reason": "scanner_item_reviewed", "item": item})
+        except LibraryNotFound:
+            return error_response("scanner_item_not_found", 404)
+        except ValueError as error:
+            return error_response(str(error), 400)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+
     @app.get("/api/privacy", dependencies=[Depends(require_token)])
     def privacy(request: Request) -> JSONResponse:
         identity = require_ready_identity(request)
@@ -785,6 +1013,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return JSONResponse({"catalogs": privacy_service.shared_catalogs(identity)})
         except CatalogRepositoryError as error:
             return repository_error_response(error)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
         except IdentityRepositoryError:
             return error_response("identity_store_unavailable", 503)
 
@@ -797,6 +1027,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return error_response("shared_catalog_not_found", 404)
         except CatalogRepositoryError as error:
             return repository_error_response(error)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
         except IdentityRepositoryError:
             return error_response("identity_store_unavailable", 503)
 
@@ -1011,7 +1243,10 @@ def create_app(config: ViewerConfig) -> FastAPI:
         try:
             identity = require_ready_identity(request)
             catalog = SessionCatalog.from_identity(config, identity)
-            rows = catalog.public_rows(load_items(catalog.config.patterns))
+            rows = availability_service.decorate_items(
+                catalog.public_rows(load_items(catalog.config.patterns)),
+                include_sources=identity.user.is_owner,
+            )
             preferences = privacy_service.preferences(identity)
             overrides = privacy_service.item_overrides(identity)
             for row in rows:
@@ -1021,10 +1256,18 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 ).to_dict()
         except CatalogRepositoryError as error:
             return repository_error_response(error)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
         except IdentityRepositoryError:
             return error_response("identity_store_unavailable", 503)
         with_link = sum(1 for item in rows if has_external_link(item))
         duplicate_items = sum(1 for item in rows if int(item.get("_duplicate_count") or 0) > 0)
+        scanner_pending = 0
+        if identity.user.is_owner:
+            try:
+                scanner_pending = len(library_service.review_queue())
+            except LibraryRepositoryError:
+                scanner_pending = 0
         print(
             f"[catalog-viewer] items loaded total={len(rows)} with_link={with_link} "
             f"without_link={len(rows) - with_link} duplicate_items={duplicate_items}",
@@ -1037,7 +1280,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 "write_json": catalog.write_name,
                 "schema_version": SCHEMA_VERSION,
                 "duplicate_items": duplicate_items,
-                "curation": {"counts": curation_counts(rows)},
+                "curation": {"counts": {**curation_counts(rows), "scanner": scanner_pending}},
                 "external": external_sources_snapshot(),
                 "privacy": preferences.to_dict(),
             }

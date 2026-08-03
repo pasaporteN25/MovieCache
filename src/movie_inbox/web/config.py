@@ -34,3 +34,5 @@ class ViewerConfig:
     forwarded_allow_ips: str = "127.0.0.1"
     image_cache_total_bytes: int = DEFAULT_IMAGE_CACHE_TOTAL_BYTES
     image_allowed_hosts: tuple[str, ...] = DEFAULT_IMAGE_ALLOWED_HOSTS
+    library_allowed_roots: tuple[str, ...] = ()
+    library_scheduler_poll_seconds: float = 15.0

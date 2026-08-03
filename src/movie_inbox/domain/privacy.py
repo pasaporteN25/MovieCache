@@ -34,6 +34,7 @@ SHARED_CATALOG_FIELDS = {
     "tmdb_id",
     "wikipedia_extract",
     "en_catalogo",
+    "_availability",
 }
 
 
@@ -118,6 +119,16 @@ def shared_catalog_item(
         for key, value in item.items()
         if key in SHARED_CATALOG_FIELDS
     }
+    availability = item.get("_availability")
+    if isinstance(availability, Mapping):
+        public["_availability"] = {
+            "effective": _bool(availability.get("effective")),
+            "manual": _bool(availability.get("manual")),
+            "server": _bool(availability.get("server")),
+            "verified": _bool(availability.get("verified")),
+            "file_count": _non_negative_int(availability.get("file_count")),
+            "library_count": _non_negative_int(availability.get("library_count")),
+        }
     if preferences.share_status:
         public["status"] = str(item.get("status") or "to_watch")
     if preferences.share_watched_at:
@@ -161,3 +172,10 @@ def _bool(value: Any) -> bool:
     if isinstance(value, int):
         return value != 0
     return str(value or "").strip().casefold() in {"1", "true", "yes", "si"}
+
+
+def _non_negative_int(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
