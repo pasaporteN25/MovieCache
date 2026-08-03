@@ -35,40 +35,7 @@ class SqliteCollectionRepository:
                     ).fetchone() is None:
                         connection.rollback()
                         raise CollectionRepositoryError("Collection seed owner is unavailable")
-                    connection.execute(
-                        """INSERT INTO curated_collections(
-                            id, slug, title, description, owner_user_id, visibility,
-                            source_kind, source_url, source_label, built_in, version,
-                            created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                        (
-                            collection.id,
-                            collection.slug,
-                            collection.title,
-                            collection.description,
-                            collection.owner_user_id,
-                            collection.visibility,
-                            collection.source_kind,
-                            collection.source_url,
-                            collection.source_label,
-                            int(collection.built_in),
-                            collection.version,
-                            collection.created_at,
-                            collection.updated_at,
-                        ),
-                    )
-                    for entry in collection.items:
-                        connection.execute(
-                            """INSERT INTO curated_collection_items(
-                                collection_id, item_id, position, payload_json
-                            ) VALUES (?, ?, ?, ?)""",
-                            (
-                                collection.id,
-                                entry.id,
-                                entry.position,
-                                _json_dump(normalize_collection_item(entry.item)),
-                            ),
-                        )
+                    self._insert_collection(connection, collection)
                     connection.execute(
                         "INSERT INTO collection_seed_records(seed_key, installed_at) VALUES (?, ?)",
                         (seed_key, collection.created_at),
@@ -79,6 +46,40 @@ class SqliteCollectionRepository:
                 raise
             except sqlite3.Error as error:
                 raise CollectionRepositoryError(f"Cannot install collection seed in: {self.path}") from error
+
+    def create_private(self, collection: CuratedCollection) -> bool:
+        if collection.visibility != "private" or collection.built_in or collection.source_kind != "import":
+            raise ValueError("Imported collections must be private, non-built-in collections")
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    existing = connection.execute(
+                        "SELECT owner_user_id, source_kind FROM curated_collections WHERE id = ?",
+                        (collection.id,),
+                    ).fetchone()
+                    if existing:
+                        connection.rollback()
+                        if (
+                            str(existing["owner_user_id"] or "") == collection.owner_user_id
+                            and str(existing["source_kind"]) == "import"
+                        ):
+                            return False
+                        raise CollectionRepositoryError("Collection id is already in use")
+                    active = connection.execute(
+                        "SELECT 1 FROM users WHERE id = ? AND active = 1",
+                        (collection.owner_user_id,),
+                    ).fetchone()
+                    if active is None:
+                        connection.rollback()
+                        raise CollectionRepositoryError("Collection owner is unavailable")
+                    self._insert_collection(connection, collection)
+                    connection.commit()
+                    return True
+            except CollectionRepositoryError:
+                raise
+            except sqlite3.Error as error:
+                raise CollectionRepositoryError(f"Cannot create collection in: {self.path}") from error
 
     def list_accessible(self, user_id: str) -> list[CuratedCollection]:
         with self._thread_lock:
@@ -154,6 +155,43 @@ class SqliteCollectionRepository:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(f"PRAGMA busy_timeout = {int(self.busy_timeout * 1000)}")
         return connection
+
+    @staticmethod
+    def _insert_collection(connection: sqlite3.Connection, collection: CuratedCollection) -> None:
+        connection.execute(
+            """INSERT INTO curated_collections(
+                id, slug, title, description, owner_user_id, visibility,
+                source_kind, source_url, source_label, built_in, version,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                collection.id,
+                collection.slug,
+                collection.title,
+                collection.description,
+                collection.owner_user_id,
+                collection.visibility,
+                collection.source_kind,
+                collection.source_url,
+                collection.source_label,
+                int(collection.built_in),
+                collection.version,
+                collection.created_at,
+                collection.updated_at,
+            ),
+        )
+        for entry in collection.items:
+            connection.execute(
+                """INSERT INTO curated_collection_items(
+                    collection_id, item_id, position, payload_json
+                ) VALUES (?, ?, ?, ?)""",
+                (
+                    collection.id,
+                    entry.id,
+                    entry.position,
+                    _json_dump(normalize_collection_item(entry.item)),
+                ),
+            )
 
     @staticmethod
     def _collection(connection: sqlite3.Connection, row: sqlite3.Row) -> CuratedCollection:

@@ -354,6 +354,31 @@ def possible_duplicate_candidates(items: list[Mapping[str, Any]], item: Mapping[
     return candidates
 
 
+def catalog_membership(item: Mapping[str, Any], items: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Classify exact identity separately from conservative title candidates."""
+    item_id = str(item.get("id") or "")
+    urls = external_urls(item)
+    for existing in items:
+        same_id = bool(item_id and item_id == str(existing.get("id") or ""))
+        same_url = bool(urls and urls & external_urls(existing))
+        if same_id or same_url:
+            return {
+                "state": "present",
+                "item_id": str(existing.get("id") or ""),
+                "candidate_count": 0,
+                "candidates": [],
+            }
+    candidates = possible_duplicate_candidates(items, item)
+    if candidates:
+        return {
+            "state": "review",
+            "item_id": "",
+            "candidate_count": len(candidates),
+            "candidates": candidates,
+        }
+    return {"state": "missing", "item_id": "", "candidate_count": 0, "candidates": []}
+
+
 def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
     if not items:
         return

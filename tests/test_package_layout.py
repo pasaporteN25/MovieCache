@@ -33,6 +33,8 @@ class PackageLayoutTests(unittest.TestCase):
         html = render_html("Catalog <Test>", "session-token")
         self.assertIn("Catalog &lt;Test&gt;", html)
         self.assertIn('content="session-token"', html)
+        self.assertIn('id="importInboxPanel"', html)
+        self.assertIn('id="importSourceForm"', html)
         login_html = render_login_html("Catalog <Test>", "session-token")
         self.assertIn("Catalog &lt;Test&gt;", login_html)
         self.assertIn('src="/static/login.js"', login_html)
@@ -40,7 +42,9 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIn("Catalog &lt;Test&gt;", password_html)
         self.assertIn('src="/static/password-change.js"', password_html)
         self.assertIsNotNone(static_asset("style.css"))
-        self.assertIsNotNone(static_asset("app.js"))
+        app_js = static_asset("app.js")
+        self.assertIsNotNone(app_js)
+        self.assertIn(b'apiFetch("/api/imports")', app_js[0])
         self.assertIsNotNone(static_asset("login.js"))
         self.assertIsNotNone(static_asset("password-change.js"))
         self.assertIsNone(static_asset("../pyproject.toml"))
@@ -81,6 +85,8 @@ class PackageLayoutTests(unittest.TestCase):
             self.assertIn("/password-change", paths)
             self.assertIn("/auth/change-password", paths)
             self.assertIn("/api/members", paths)
+            self.assertIn("/api/imports", paths)
+            self.assertIn("/api/imports/{draft_id}/apply", paths)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 - `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
 
-## Base de instancia v3
+## Base de instancia v4
 
 La base de instancia contiene:
 
@@ -31,6 +31,8 @@ La base de instancia contiene:
 - `collection_follows`: suscripciones de lectura por usuario dentro de la instancia.
 - `collection_seed_records`: instalaciones de colecciones iniciales que no deben
   reaparecer si el administrador las elimina mas adelante.
+- `import_drafts` e `import_draft_items`: borradores de importacion aislados por
+  usuario, filas normalizadas, clasificacion y resultado de la aplicacion.
 
 El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
 
@@ -40,7 +42,7 @@ El servidor resuelve las fuentes desde la sesion autenticada. Las rutas absoluta
 
 Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad, overrides, colecciones ni seguimientos. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
 
-Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
+Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos; la v4 agrega borradores de importacion acotados. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
 
 ## Esquema SQLite v3
 
@@ -75,13 +77,17 @@ py -m movie_inbox db export data/movie-inbox.db --json backups/catalog.json
 
 No se migra automaticamente ningun catalogo del usuario. El comando siempre recibe origen y destino explicitos.
 
-## Paquetes de catalogo (pendiente)
+## Borradores e importacion web
 
-La CLI puede importar y exportar un catalogo completo, pero la interfaz web todavia no ofrece paquetes compartibles ni una bandeja de importacion. Esta capacidad debe diseniarse por encima del documento canonico, sin convertir un archivo recibido en la fuente de verdad del usuario.
+La interfaz acepta TXT, CSV y JSON como contenido no confiable. El documento original no se persiste: `instance.db` guarda un hash SHA-256 del contenido, nombre sanitizado, formato, filas normalizadas y su clasificacion. Cada borrador pertenece a un usuario y expira a las 48 horas; abrir Importaciones purga los vencidos. Cada cuenta puede conservar hasta 20 borradores simultaneos. Un apply trabado conserva una gracia corta para no borrar una operacion activa y luego tambien se elimina.
 
-El formato futuro deberia incluir un manifiesto versionado y un catalogo JSON portable. Antes de escribir, la interfaz debe mostrar cantidad de obras, origen, diferencias y posibles duplicados. El usuario elegira entre copiar obras seleccionadas a su catalogo personal o crear una coleccion local; ninguna opcion debe reemplazar entradas ni propagar estados personales de forma silenciosa. Seguir ya existe para colecciones publicadas dentro de la misma instancia, no para servidores remotos.
+Los parsers aplican limites de 8 MiB, 10.000 filas, 100 columnas, 32.768 caracteres por campo y profundidad JSON 16. JSON rechaza claves duplicadas y constantes no finitas. La entrada no puede contener binarios o NUL. La API recibe solamente `application/json` autenticado y validado contra el mismo origen; no acepta multipart, rutas del cliente, ZIP ni instrucciones para abrir archivos del servidor.
 
-Las primeras versiones no necesitan incluir imagenes ni archivos de video dentro del paquete. Las portadas pueden resolverse desde sus URLs y los archivos locales deben permanecer vinculados solamente al servidor que los posee.
+Las filas persisten sin `local_path`, `local_name` ni `local_files`. `en_catalogo` puede sobrevivir como declaracion booleana, pero se considera no verificada y no enlaza archivos fisicos. El destino `catalog` puede conservar o neutralizar `status`, `watched_at`, `rating` y `review`; el destino `collection` normaliza cada obra al conjunto de campos compartibles y siempre crea una coleccion privada nueva del owner.
+
+La operacion vuelve a clasificar las filas contra el catalogo actual, reclama el borrador de forma transaccional y guarda su resultado para que los reintentos sean idempotentes. IDs o URLs externas iguales se tratan como presentes; coincidencias por titulo quedan para revision y no se escriben automaticamente.
+
+Todavia queda pendiente un paquete compartible con manifiesto versionado, imagenes opcionales o intercambio entre instancias. Tampoco forman parte de este flujo el scanner, el enriquecimiento de fuentes externas ni la importacion hacia una coleccion existente. JSON sigue siendo el formato portable para intercambio completo y las colecciones publicadas siguen limitadas a la instancia local.
 
 ## Historial de curaduria
 

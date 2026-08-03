@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
 
-INSTANCE_SCHEMA_VERSION = 3
+INSTANCE_SCHEMA_VERSION = 4
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -166,9 +166,46 @@ CREATE TABLE collection_seed_records (
 );
 """
 
+INSTANCE_SCHEMA_V4 = """
+CREATE TABLE import_drafts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source_name TEXT NOT NULL,
+    source_format TEXT NOT NULL CHECK (source_format IN ('txt', 'csv', 'json')),
+    source_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('ready', 'applying', 'applied', 'failed')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    applied_at INTEGER NOT NULL DEFAULT 0,
+    result_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX ix_import_drafts_user_updated
+ON import_drafts(user_id, updated_at DESC);
+CREATE INDEX ix_import_drafts_expiry
+ON import_drafts(expires_at);
+
+CREATE TABLE import_draft_items (
+    draft_id TEXT NOT NULL REFERENCES import_drafts(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL,
+    position INTEGER NOT NULL CHECK (position >= 0),
+    state TEXT NOT NULL CHECK (state IN ('new', 'present', 'review', 'invalid')),
+    reason TEXT NOT NULL DEFAULT '',
+    label TEXT NOT NULL,
+    item_json TEXT NOT NULL DEFAULT '{}',
+    candidates_json TEXT NOT NULL DEFAULT '[]',
+    collection_eligible INTEGER NOT NULL DEFAULT 0 CHECK (collection_eligible IN (0, 1)),
+    PRIMARY KEY (draft_id, item_id),
+    UNIQUE (draft_id, position)
+);
+CREATE INDEX ix_import_draft_items_state
+ON import_draft_items(draft_id, state, position);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
+    4: ("bounded user import drafts", INSTANCE_SCHEMA_V4),
 }
 
 
