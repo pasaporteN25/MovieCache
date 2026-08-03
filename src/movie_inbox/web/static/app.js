@@ -16,6 +16,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let clubCatalogs = [];
       let selectedClubUserId = "";
       let sharedCatalog = null;
+      let clubMode = storedClubMode();
+      let curatedCollections = [];
+      let selectedCollectionId = "";
+      let selectedCollection = null;
+      let selectedCollectionItems = new Set();
       let clubLoading = false;
       let clubVisibleCount = 24;
       let items = [];
@@ -130,10 +135,33 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         homeGrid: document.querySelector("#homeGrid"),
         homeEmpty: document.querySelector("#homeEmpty"),
         refreshClub: document.querySelector("#refreshClub"),
+        clubModeTabs: document.querySelector("#clubModeTabs"),
+        clubCollectionsMode: document.querySelector("#clubCollectionsMode"),
+        clubMembersMode: document.querySelector("#clubMembersMode"),
+        clubCollectionsCount: document.querySelector("#clubCollectionsCount"),
+        clubMembersCount: document.querySelector("#clubMembersCount"),
+        clubMembersPanel: document.querySelector("#clubMembersPanel"),
         clubMemberTabs: document.querySelector("#clubMemberTabs"),
         clubFeedback: document.querySelector("#clubFeedback"),
         clubCatalogPanel: document.querySelector("#clubCatalogPanel"),
         clubLoadMore: document.querySelector("#clubLoadMore"),
+        clubCollectionsPanel: document.querySelector("#clubCollectionsPanel"),
+        collectionDirectory: document.querySelector("#collectionDirectory"),
+        followedCollectionsSummary: document.querySelector("#followedCollectionsSummary"),
+        collectionList: document.querySelector("#collectionList"),
+        collectionDetailPanel: document.querySelector("#collectionDetailPanel"),
+        backToCollections: document.querySelector("#backToCollections"),
+        collectionDetailKicker: document.querySelector("#collectionDetailKicker"),
+        collectionDetailTitle: document.querySelector("#collectionDetailTitle"),
+        collectionDetailDescription: document.querySelector("#collectionDetailDescription"),
+        collectionDetailSource: document.querySelector("#collectionDetailSource"),
+        collectionFollowButton: document.querySelector("#collectionFollowButton"),
+        collectionStats: document.querySelector("#collectionStats"),
+        selectMissingCollectionItems: document.querySelector("#selectMissingCollectionItems"),
+        collectionSelectionSummary: document.querySelector("#collectionSelectionSummary"),
+        addCollectionSelection: document.querySelector("#addCollectionSelection"),
+        addMissingCollectionItems: document.querySelector("#addMissingCollectionItems"),
+        collectionItems: document.querySelector("#collectionItems"),
         refreshCuration: document.querySelector("#refreshCuration"),
         curationPendingCount: document.querySelector("#curationPendingCount"),
         curationDuplicateCount: document.querySelector("#curationDuplicateCount"),
@@ -336,8 +364,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         closeArchiveMemberDialog();
       });
       fields.refreshClub.addEventListener("click", () => loadClub({ announce: true }));
+      fields.clubModeTabs.addEventListener("click", changeClubMode);
       fields.clubMemberTabs.addEventListener("click", selectClubCatalog);
       fields.clubLoadMore.addEventListener("click", showMoreClubItems);
+      fields.backToCollections.addEventListener("click", closeCollectionDetail);
+      fields.collectionFollowButton.addEventListener("click", toggleCollectionFollow);
+      fields.selectMissingCollectionItems.addEventListener("change", toggleMissingCollectionSelection);
+      fields.collectionItems.addEventListener("change", changeCollectionSelection);
+      fields.addCollectionSelection.addEventListener("click", addSelectedCollectionItems);
+      fields.addMissingCollectionItems.addEventListener("click", addMissingCollectionItems);
       fields.closeSharedDetail.addEventListener("click", closeSharedDetail);
       fields.sharedDetailDialog.addEventListener("cancel", (event) => {
         event.preventDefault();
@@ -438,6 +473,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const actions = {
           "open-detail": () => openDetailFromTrigger(target, id),
           "open-shared-detail": () => openSharedDetail(id),
+          "open-collection": () => openCollection(id),
+          "toggle-collection-follow": () => toggleCollectionFollow(id),
+          "add-collection-item": () => addCollectionItems([id]),
           "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
           "focus-personal": editPersonalRecord,
           "edit-personal": editPersonalRecord,
@@ -1089,32 +1127,79 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.refreshClub.disabled = true;
         if (announce) setClubFeedback("Actualizando el Club…");
         try {
-          const response = await apiFetch("/api/community");
-          const payload = await response.json();
-          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
-          clubCatalogs = payload.catalogs || [];
+          const [communityResponse, collectionsResponse] = await Promise.all([
+            apiFetch("/api/community"),
+            apiFetch("/api/collections")
+          ]);
+          const communityPayload = await communityResponse.json();
+          const collectionsPayload = await collectionsResponse.json();
+          if (!communityResponse.ok) throw new Error(communityPayload.reason || `HTTP ${communityResponse.status}`);
+          if (!collectionsResponse.ok) throw new Error(collectionsPayload.reason || `HTTP ${collectionsResponse.status}`);
+          clubCatalogs = communityPayload.catalogs || [];
+          curatedCollections = collectionsPayload.collections || [];
           if (!clubCatalogs.some((entry) => entry.user?.id === selectedClubUserId)) {
             selectedClubUserId = clubCatalogs[0]?.user?.id || "";
           }
+          if (!curatedCollections.some((entry) => entry.id === selectedCollectionId)) {
+            selectedCollectionId = "";
+            selectedCollection = null;
+            selectedCollectionItems.clear();
+          }
+          renderClubMode();
           renderClubTabs();
-          if (selectedClubUserId) await loadSharedCatalog(selectedClubUserId);
-          else {
-            sharedCatalog = null;
-            renderSharedCatalog();
+          renderCollectionDirectory();
+          if (clubMode === "members") {
+            if (selectedClubUserId) await loadSharedCatalog(selectedClubUserId);
+            else {
+              sharedCatalog = null;
+              renderSharedCatalog();
+            }
+          } else if (selectedCollectionId) {
+            await loadCollectionDetail(selectedCollectionId);
           }
           if (announce) setClubFeedback("Club actualizado.");
         } catch (error) {
-          console.error("[catalog-viewer] shared catalogs load failed", error);
+          console.error("[catalog-viewer] club load failed", error);
           clubCatalogs = [];
+          curatedCollections = [];
           sharedCatalog = null;
+          selectedCollection = null;
+          renderClubMode();
           renderClubTabs();
           renderSharedCatalog();
-          setClubFeedback("No pudimos cargar los catálogos compartidos.", "error");
+          renderCollectionDirectory();
+          setClubFeedback("No pudimos cargar los estantes del Club.", "error");
         } finally {
           clubLoading = false;
           fields.clubView.setAttribute("aria-busy", "false");
           fields.refreshClub.disabled = false;
         }
+      }
+
+      async function changeClubMode(event) {
+        const button = event.target.closest("[data-club-mode]");
+        if (!button) return;
+        const mode = button.dataset.clubMode;
+        if (!["collections", "members"].includes(mode) || mode === clubMode) return;
+        clubMode = mode;
+        localStorage.setItem("movie-inbox-club-mode", clubMode);
+        renderClubMode();
+        setClubFeedback("");
+        if (clubMode === "members" && selectedClubUserId && !sharedCatalog) {
+          await loadSharedCatalog(selectedClubUserId);
+        }
+      }
+
+      function renderClubMode() {
+        const collectionsActive = clubMode === "collections";
+        fields.clubCollectionsPanel.hidden = !collectionsActive;
+        fields.clubMembersPanel.hidden = collectionsActive;
+        fields.clubCollectionsMode.classList.toggle("active", collectionsActive);
+        fields.clubCollectionsMode.setAttribute("aria-pressed", String(collectionsActive));
+        fields.clubMembersMode.classList.toggle("active", !collectionsActive);
+        fields.clubMembersMode.setAttribute("aria-pressed", String(!collectionsActive));
+        fields.clubCollectionsCount.textContent = curatedCollections.length;
+        fields.clubMembersCount.textContent = clubCatalogs.length;
       }
 
       async function selectClubCatalog(event) {
@@ -1217,6 +1302,279 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.clubFeedback.hidden = !message;
       }
 
+      function renderCollectionDirectory() {
+        const followedCount = curatedCollections.filter((collection) => collection.followed).length;
+        fields.followedCollectionsSummary.textContent = `${followedCount} siguiendo`;
+        fields.collectionDirectory.hidden = Boolean(selectedCollection);
+        fields.collectionDetailPanel.hidden = !selectedCollection;
+        if (!curatedCollections.length) {
+          fields.collectionList.innerHTML = `<div class="club-empty"><strong>Todavía no hay colecciones</strong><p>Las colecciones publicadas por el administrador aparecerán acá.</p></div>`;
+          return;
+        }
+        fields.collectionList.innerHTML = curatedCollections
+          .map((collection) => collectionDirectoryCard(collection))
+          .join("");
+      }
+
+      function collectionDirectoryCard(collection) {
+        const count = Number(collection.counts?.total || 0);
+        const owner = collection.owner?.username || "Movie Inbox";
+        const followed = Boolean(collection.followed);
+        return `<article class="collection-card${followed ? " is-followed" : ""}">
+          <div class="collection-mosaic" aria-hidden="true">${collectionMosaic(collection.preview || [])}</div>
+          <div class="collection-card-copy">
+            <div class="collection-card-heading">
+              <span>${collection.built_in ? "Colección inicial" : `Publicada por ${escapeHtml(owner)}`}</span>
+              <h4>${escapeHtml(collection.title || "Colección")}</h4>
+            </div>
+            <p>${escapeHtml(collection.description || "Una selección del Club.")}</p>
+            <div class="collection-card-meta"><strong>${count}</strong><span>obras</span>${followed ? '<span class="collection-followed-mark">Siguiendo</span>' : ""}</div>
+            <div class="collection-card-actions">
+              <button type="button" data-click="open-collection" data-id="${escapeAttr(collection.id || "")}">Ver colección</button>
+              <button class="quiet-action" type="button" data-click="toggle-collection-follow" data-id="${escapeAttr(collection.id || "")}">${followed ? "Dejar de seguir" : "Seguir"}</button>
+            </div>
+          </div>
+        </article>`;
+      }
+
+      function collectionMosaic(preview) {
+        const slots = preview.slice(0, 4);
+        while (slots.length < 4) slots.push({ title: "Movie Inbox" });
+        return slots.map((item) => `<div>${posterArtwork(item, displayTitle(item) || "Movie Inbox")}</div>`).join("");
+      }
+
+      async function openCollection(collectionId) {
+        selectedCollectionId = String(collectionId || "");
+        selectedCollection = null;
+        selectedCollectionItems.clear();
+        fields.collectionDirectory.hidden = true;
+        fields.collectionDetailPanel.hidden = false;
+        fields.collectionDetailPanel.setAttribute("aria-busy", "true");
+        fields.collectionDetailTitle.textContent = "Abriendo colección…";
+        await loadCollectionDetail(selectedCollectionId, { announce: true });
+      }
+
+      async function loadCollectionDetail(collectionId, { announce = false } = {}) {
+        if (!collectionId) return;
+        fields.collectionDetailPanel.setAttribute("aria-busy", "true");
+        if (announce) setClubFeedback("Preparando la colección…");
+        try {
+          const response = await apiFetch(`/api/collections/${encodeURIComponent(collectionId)}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          selectedCollectionId = collectionId;
+          selectedCollection = payload;
+          selectedCollectionItems = new Set(
+            [...selectedCollectionItems].filter((itemId) => payload.items?.some(
+              (item) => item.collection_item_id === itemId && item.catalog?.state === "missing"
+            ))
+          );
+          renderCollectionDetail();
+          renderCollectionDirectory();
+          setClubFeedback("");
+          if (announce) fields.collectionDetailTitle.focus({ preventScroll: true });
+        } catch (error) {
+          selectedCollectionId = "";
+          selectedCollection = null;
+          selectedCollectionItems.clear();
+          renderCollectionDirectory();
+          setClubFeedback(
+            error.message === "collection_not_found"
+              ? "Esa colección ya no está disponible."
+              : "No pudimos abrir la colección.",
+            "error"
+          );
+        } finally {
+          fields.collectionDetailPanel.setAttribute("aria-busy", "false");
+        }
+      }
+
+      function closeCollectionDetail() {
+        const previousId = selectedCollectionId;
+        selectedCollectionId = "";
+        selectedCollection = null;
+        selectedCollectionItems.clear();
+        renderCollectionDirectory();
+        setClubFeedback("");
+        requestAnimationFrame(() => {
+          fields.collectionList.querySelector(`[data-id="${CSS.escape(previousId)}"]`)?.focus();
+        });
+      }
+
+      function renderCollectionDetail() {
+        if (!selectedCollection) return;
+        const counts = selectedCollection.counts || {};
+        fields.collectionDetailKicker.textContent = selectedCollection.built_in ? "Colección inicial" : "Colección del Club";
+        fields.collectionDetailTitle.textContent = selectedCollection.title || "Colección";
+        fields.collectionDetailTitle.setAttribute("tabindex", "-1");
+        fields.collectionDetailDescription.textContent = selectedCollection.description || "";
+        fields.collectionFollowButton.textContent = selectedCollection.followed ? "Dejar de seguir" : "Seguir";
+        fields.collectionFollowButton.classList.toggle("is-following", Boolean(selectedCollection.followed));
+        const sourceUrl = String(selectedCollection.source_url || "");
+        fields.collectionDetailSource.hidden = !sourceUrl;
+        fields.collectionDetailSource.href = sourceUrl || "#";
+        fields.collectionDetailSource.textContent = selectedCollection.source_label || "Ver fuente";
+        fields.collectionStats.innerHTML = [
+          [counts.total || 0, "Obras"],
+          [counts.missing || 0, "Faltantes"],
+          [counts.present || 0, "En tu catálogo"],
+          [counts.review || 0, "Para revisar"]
+        ].map(([value, label]) => `<div><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("");
+        fields.collectionItems.innerHTML = (selectedCollection.items || [])
+          .map((item) => collectionItemCard(item))
+          .join("");
+        fields.addMissingCollectionItems.disabled = !(counts.missing > 0);
+        syncCollectionSelection();
+      }
+
+      function collectionItemCard(item) {
+        const title = displayTitle(item) || "Sin título";
+        const state = item.catalog?.state || "missing";
+        const missing = state === "missing";
+        const stateLabel = state === "present"
+          ? "En tu catálogo"
+          : state === "review"
+            ? "Posible coincidencia"
+            : "Disponible para agregar";
+        const actionLabel = state === "present" ? "Ya está" : state === "review" ? "Requiere revisión" : "Agregar";
+        const selected = selectedCollectionItems.has(item.collection_item_id);
+        return `<article class="club-card collection-item-card" data-catalog-state="${escapeAttr(state)}">
+          <div class="club-card-poster">${posterArtwork(item, title)}</div>
+          <div class="club-card-body">
+            <div><span>${escapeHtml([item.kind, item.year].filter(Boolean).join(" · ") || "Obra")}</span><h4 class="${titleSizeClass(title)}">${escapeHtml(title)}</h4></div>
+            <div class="club-card-signals"><span>${escapeHtml(stateLabel)}</span></div>
+            <div class="collection-item-actions">
+              <label class="collection-item-select${missing ? "" : " is-disabled"}">
+                <input type="checkbox" data-collection-select="${escapeAttr(item.collection_item_id || "")}" ${selected ? "checked" : ""} ${missing ? "" : "disabled"}>
+                <span class="sr-only">Seleccionar ${escapeHtml(title)}</span>
+              </label>
+              <button type="button" data-click="add-collection-item" data-id="${escapeAttr(item.collection_item_id || "")}" ${missing ? "" : "disabled"}>${actionLabel}</button>
+            </div>
+          </div>
+        </article>`;
+      }
+
+      async function toggleCollectionFollow(collectionId = "") {
+        const targetId = String(collectionId || selectedCollectionId || "");
+        const collection = selectedCollection?.id === targetId
+          ? selectedCollection
+          : curatedCollections.find((entry) => entry.id === targetId);
+        if (!collection) return;
+        const following = !collection.followed;
+        fields.collectionFollowButton.disabled = true;
+        try {
+          const response = await apiFetch(`/api/collections/${encodeURIComponent(targetId)}/follow`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ following })
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          curatedCollections = curatedCollections.map((entry) => (
+            entry.id === targetId ? { ...entry, ...payload.collection } : entry
+          ));
+          if (selectedCollection?.id === targetId) {
+            selectedCollection = {
+              ...selectedCollection,
+              ...payload.collection,
+              counts: selectedCollection.counts
+            };
+          }
+          renderCollectionDirectory();
+          if (selectedCollection) renderCollectionDetail();
+          setClubFeedback(
+            following ? "Colección agregada a tus seguidas." : "Dejaste de seguir la colección."
+          );
+        } catch (error) {
+          setClubFeedback("No pudimos cambiar el seguimiento. Volvé a intentar.", "error");
+        } finally {
+          fields.collectionFollowButton.disabled = false;
+        }
+      }
+
+      function changeCollectionSelection(event) {
+        const checkbox = event.target.closest("[data-collection-select]");
+        if (!checkbox) return;
+        const itemId = checkbox.dataset.collectionSelect || "";
+        if (checkbox.checked) selectedCollectionItems.add(itemId);
+        else selectedCollectionItems.delete(itemId);
+        syncCollectionSelection();
+      }
+
+      function toggleMissingCollectionSelection() {
+        const missingIds = (selectedCollection?.items || [])
+          .filter((item) => item.catalog?.state === "missing")
+          .map((item) => item.collection_item_id);
+        if (fields.selectMissingCollectionItems.checked) {
+          missingIds.forEach((itemId) => selectedCollectionItems.add(itemId));
+        } else {
+          missingIds.forEach((itemId) => selectedCollectionItems.delete(itemId));
+        }
+        fields.collectionItems.querySelectorAll("[data-collection-select]").forEach((checkbox) => {
+          checkbox.checked = selectedCollectionItems.has(checkbox.dataset.collectionSelect || "");
+        });
+        syncCollectionSelection();
+      }
+
+      function syncCollectionSelection() {
+        const missingIds = (selectedCollection?.items || [])
+          .filter((item) => item.catalog?.state === "missing")
+          .map((item) => item.collection_item_id);
+        const selectedMissing = missingIds.filter((itemId) => selectedCollectionItems.has(itemId));
+        fields.collectionSelectionSummary.textContent = `${selectedMissing.length} seleccionadas`;
+        fields.addCollectionSelection.disabled = !selectedMissing.length;
+        fields.selectMissingCollectionItems.checked = Boolean(missingIds.length)
+          && selectedMissing.length === missingIds.length;
+        fields.selectMissingCollectionItems.indeterminate = selectedMissing.length > 0
+          && selectedMissing.length < missingIds.length;
+        fields.selectMissingCollectionItems.disabled = !missingIds.length;
+      }
+
+      function addSelectedCollectionItems() {
+        addCollectionItems([...selectedCollectionItems]);
+      }
+
+      function addMissingCollectionItems() {
+        const missingIds = (selectedCollection?.items || [])
+          .filter((item) => item.catalog?.state === "missing")
+          .map((item) => item.collection_item_id);
+        addCollectionItems(missingIds);
+      }
+
+      async function addCollectionItems(itemIds) {
+        if (!selectedCollectionId || !itemIds.length) return;
+        fields.collectionDetailPanel.setAttribute("aria-busy", "true");
+        fields.addCollectionSelection.disabled = true;
+        fields.addMissingCollectionItems.disabled = true;
+        setClubFeedback(`Procesando ${itemIds.length} ${itemIds.length === 1 ? "obra" : "obras"}…`);
+        try {
+          const response = await apiFetch(`/api/collections/${encodeURIComponent(selectedCollectionId)}/add`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_ids: itemIds })
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          selectedCollectionItems.clear();
+          await loadCatalog();
+          await loadCollectionDetail(selectedCollectionId);
+          const summary = payload.summary || {};
+          const parts = [];
+          if (summary.added) parts.push(`${summary.added} agregadas`);
+          if (summary.present) parts.push(`${summary.present} ya estaban`);
+          if (summary.review) parts.push(`${summary.review} requieren revisión`);
+          setClubFeedback(parts.join(" · ") || "No hubo cambios.", summary.review ? "warning" : "");
+        } catch (error) {
+          setClubFeedback(
+            "No pudimos completar la operación. Actualizá la colección para comprobar qué obras se guardaron.",
+            "error"
+          );
+        } finally {
+          fields.collectionDetailPanel.setAttribute("aria-busy", "false");
+          syncCollectionSelection();
+        }
+      }
+
       function openSharedDetail(itemId) {
         const item = sharedCatalog?.items?.find((entry) => String(entry.id || "") === String(itemId || ""));
         if (!item) return;
@@ -1300,6 +1658,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           }
         } finally {
           curationHistoryLoading = false;
+        }
+      }
+
+      function storedClubMode() {
+        try {
+          const stored = localStorage.getItem("movie-inbox-club-mode");
+          return stored === "members" ? "members" : "collections";
+        } catch (_) {
+          return "collections";
         }
       }
 

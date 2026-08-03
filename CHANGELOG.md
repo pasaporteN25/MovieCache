@@ -66,7 +66,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Overrides por obra para compartir o mantener privados rating y review sin cambiar el default del usuario.
 - Vista `Club` de solo lectura con estantes por miembro, actividad opcional y fichas compartidas sin rutas, archivos locales, notas ni metadata operativa.
 - Edicion de username y nombre del catalogo, baja reversible de miembros y restauracion con nueva contrasena temporal.
-- Esquema de instancia v2 con preferencias de privacidad, overrides por item y catalogos de miembros archivados.
+- Colecciones locales persistentes, seguimiento independiente por usuario y copia selectiva al catalogo personal sin heredar disponibilidad, estado, rating o review.
+- `Club` dividido en `Colecciones` y `Miembros`, con seleccion masiva, conteo de faltantes, deteccion de obras presentes y bloqueo de coincidencias ambiguas.
+- Coleccion inicial versionada `Akira Kurosawa`, instalada una sola vez y disponible sin depender de una consulta de red durante el arranque.
+- Esquema de instancia v3 con preferencias de privacidad, overrides por item, catalogos de miembros archivados, colecciones curadas y seguimientos.
 
 ### Corregido
 

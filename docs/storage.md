@@ -12,7 +12,7 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 - `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
 
-## Base de instancia v2
+## Base de instancia v3
 
 La base de instancia contiene:
 
@@ -26,6 +26,11 @@ La base de instancia contiene:
   una obra; `inherit` se representa eliminando la excepcion.
 - `archived_members` y `archived_catalog_sources`: baja reversible de cuentas sin
   borrar los archivos de su catalogo.
+- `curated_collections` y `curated_collection_items`: definicion y obras de las
+  colecciones locales, separadas de cualquier estado personal.
+- `collection_follows`: suscripciones de lectura por usuario dentro de la instancia.
+- `collection_seed_records`: instalaciones de colecciones iniciales que no deben
+  reaparecer si el administrador las elimina mas adelante.
 
 El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
 
@@ -33,9 +38,9 @@ Los miembros nuevos reciben una base SQLite vacia en el directorio configurado c
 
 El servidor resuelve las fuentes desde la sesion autenticada. Las rutas absolutas permanecen en `instance.db`; el frontend recibe referencias opacas y no puede seleccionar otro catalogo enviando una ruta manual.
 
-Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad ni overrides. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
+Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad, overrides, colecciones ni seguimientos. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
 
-La migracion de instancia v1 a v2 se aplica al abrir la base y deja todas las cuentas existentes con catalogos privados. Una version superior se rechaza en lugar de reinterpretarse.
+Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
 
 ## Esquema SQLite v3
 
@@ -74,7 +79,7 @@ No se migra automaticamente ningun catalogo del usuario. El comando siempre reci
 
 La CLI puede importar y exportar un catalogo completo, pero la interfaz web todavia no ofrece paquetes compartibles ni una bandeja de importacion. Esta capacidad debe diseniarse por encima del documento canonico, sin convertir un archivo recibido en la fuente de verdad del usuario.
 
-El formato futuro deberia incluir un manifiesto versionado y un catalogo JSON portable. Antes de escribir, la interfaz debe mostrar cantidad de obras, origen, diferencias y posibles duplicados. El usuario elegira entre copiar obras seleccionadas a su catalogo personal o seguir la coleccion como referencia externa; ninguna opcion debe reemplazar entradas ni propagar estados personales de forma silenciosa.
+El formato futuro deberia incluir un manifiesto versionado y un catalogo JSON portable. Antes de escribir, la interfaz debe mostrar cantidad de obras, origen, diferencias y posibles duplicados. El usuario elegira entre copiar obras seleccionadas a su catalogo personal o crear una coleccion local; ninguna opcion debe reemplazar entradas ni propagar estados personales de forma silenciosa. Seguir ya existe para colecciones publicadas dentro de la misma instancia, no para servidores remotos.
 
 Las primeras versiones no necesitan incluir imagenes ni archivos de video dentro del paquete. Las portadas pueden resolverse desde sus URLs y los archivos locales deben permanecer vinculados solamente al servidor que los posee.
 

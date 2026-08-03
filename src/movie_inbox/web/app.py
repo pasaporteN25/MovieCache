@@ -19,6 +19,12 @@ from movie_inbox.application.auth_service import (
     PasswordPolicyError,
 )
 from movie_inbox.application.curation_history import CurationHistoryError
+from movie_inbox.application.collection_repository import CollectionRepositoryError
+from movie_inbox.application.collection_service import (
+    CollectionItemNotFound,
+    CollectionNotFound,
+    CollectionService,
+)
 from movie_inbox.application.curation_workflow import (
     CatalogPointer,
     CurationConflict,
@@ -47,9 +53,14 @@ from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
+from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION
+from movie_inbox.infrastructure.starter_collections import (
+    AKIRA_KUROSAWA_SEED_KEY,
+    akira_kurosawa_collection,
+)
 from movie_inbox.web.assets import (
     render_html,
     render_login_html,
@@ -60,6 +71,7 @@ from movie_inbox.web.catalog_api import (
     append_item,
     background_enrich_catalog_item,
     build_curation_payload,
+    catalog_service,
     curation_workflow,
     curation_counts,
     delete_item_anywhere,
@@ -189,6 +201,15 @@ def create_app(config: ViewerConfig) -> FastAPI:
         SqlitePersonalCatalogProvisioner(member_catalog_dir),
     )
     privacy_service = PrivacyService(identity_repository, load_items)
+    collection_repository = SqliteCollectionRepository(config.instance_db)
+    owner = identity_repository.owner()
+    if owner is None:
+        raise RuntimeError("Movie Inbox owner account is unavailable")
+    collection_repository.install_once(
+        AKIRA_KUROSAWA_SEED_KEY,
+        akira_kurosawa_collection(owner.id),
+    )
+    collection_service = CollectionService(collection_repository)
     login_limiter = LoginAttemptLimiter()
     app = FastAPI(
         title="Movie Inbox",
@@ -201,6 +222,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.auth_service = auth_service
     app.state.member_service = member_service
     app.state.privacy_service = privacy_service
+    app.state.collection_repository = collection_repository
+    app.state.collection_service = collection_service
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
 
     @app.middleware("http")
@@ -742,6 +765,83 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return repository_error_response(error)
         except IdentityRepositoryError:
             return error_response("identity_store_unavailable", 503)
+
+    @app.get("/api/collections", dependencies=[Depends(require_token)])
+    def collections(request: Request) -> JSONResponse:
+        identity = require_ready_identity(request)
+        try:
+            return JSONResponse({"collections": collection_service.list_collections(identity.user.id)})
+        except CollectionRepositoryError:
+            return error_response("collection_store_unavailable", 503)
+
+    @app.get("/api/collections/{collection_id}", dependencies=[Depends(require_token)])
+    def collection_detail(collection_id: str, request: Request) -> JSONResponse:
+        identity = require_ready_identity(request)
+        try:
+            catalog = SessionCatalog.from_identity(config, identity)
+            rows = load_items(catalog.config.patterns)
+            return JSONResponse(
+                collection_service.collection_detail(identity.user.id, collection_id, rows)
+            )
+        except CollectionNotFound:
+            return error_response("collection_not_found", 404)
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
+        except CollectionRepositoryError:
+            return error_response("collection_store_unavailable", 503)
+
+    @app.post("/api/collections/{collection_id}/follow")
+    def follow_collection(
+        collection_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_ready_identity(request)
+        if not isinstance(body.get("following"), bool):
+            return error_response("following_must_be_boolean", 400)
+        try:
+            return JSONResponse(
+                collection_service.set_following(
+                    identity.user.id,
+                    collection_id,
+                    bool(body["following"]),
+                )
+            )
+        except CollectionNotFound:
+            return error_response("collection_not_found", 404)
+        except CollectionRepositoryError:
+            return error_response("collection_store_unavailable", 503)
+
+    @app.post("/api/collections/{collection_id}/add")
+    def add_collection_items(
+        collection_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_ready_identity(request)
+        item_ids = body.get("item_ids")
+        if not isinstance(item_ids, list) or any(not isinstance(value, str) for value in item_ids):
+            return error_response("item_ids_must_be_an_array_of_strings", 400)
+        try:
+            catalog = SessionCatalog.from_identity(config, identity)
+            result = collection_service.add_to_catalog(
+                identity.user.id,
+                collection_id,
+                item_ids,
+                catalog_service(Path(catalog.config.write_json)),
+                load_items(catalog.config.patterns),
+            )
+            return JSONResponse(result)
+        except CollectionNotFound:
+            return error_response("collection_not_found", 404)
+        except CollectionItemNotFound:
+            return error_response("collection_item_not_found", 404)
+        except ValueError as error:
+            return error_response(str(error), 400)
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
+        except CollectionRepositoryError:
+            return error_response("collection_store_unavailable", 503)
 
     @app.get("/api/items", dependencies=[Depends(require_token)])
     def items(request: Request) -> JSONResponse:

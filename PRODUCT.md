@@ -70,11 +70,19 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   review tienen defaults independientes y overrides por obra.
 - Las vistas compartidas nunca publican rutas, archivos locales, notas ni estado
   operativo. El owner no obtiene una excepcion a estas reglas de privacidad.
-- Seguir catalogos externos, perfiles accesibles sin cuenta y registro abierto quedan
-  para fases posteriores.
+- Las colecciones curadas viven separadas de los catalogos personales. Seguir una
+  coleccion local no copia obras; cada copia es explicita, neutraliza los campos
+  personales y pasa por el matching conservador del catalogo de destino.
+- `Club` distingue catalogos compartidos por miembros de colecciones publicadas por
+  el administrador. La instancia incluye una coleccion inicial de Akira Kurosawa que
+  no se sigue automaticamente.
+- Compartir entre instalaciones, perfiles accesibles sin cuenta y registro abierto
+  quedan para fases posteriores. No existe federacion entre homeservers.
 - La interfaz todavia no importa paquetes de catalogo. Esa capacidad futura debe
-  permitir previsualizar, deduplicar y elegir entre copiar obras al catalogo personal
-  o seguir una coleccion externa sin mezclar automaticamente ambas fuentes.
+  permitir previsualizar, mapear formatos y elegir entre copiar obras al catalogo
+  personal o crear una coleccion local sin mezclar automaticamente ambas fuentes.
+- El scanner incremental ya puede ejecutarse por CLI, pero Administrar todavia no
+  permite registrar rutas, programar recorridos ni consultar su estado asincronico.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
 
-INSTANCE_SCHEMA_VERSION = 2
+INSTANCE_SCHEMA_VERSION = 3
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -121,8 +121,54 @@ CREATE TABLE archived_catalog_sources (
 );
 """
 
+INSTANCE_SCHEMA_V3 = """
+CREATE TABLE curated_collections (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'published')),
+    source_kind TEXT NOT NULL DEFAULT 'user' CHECK (source_kind IN ('builtin', 'import', 'user')),
+    source_url TEXT NOT NULL DEFAULT '',
+    source_label TEXT NOT NULL DEFAULT '',
+    built_in INTEGER NOT NULL DEFAULT 0 CHECK (built_in IN (0, 1)),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX ix_curated_collections_visibility
+ON curated_collections(visibility, title);
+
+CREATE TABLE curated_collection_items (
+    collection_id TEXT NOT NULL REFERENCES curated_collections(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL,
+    position INTEGER NOT NULL CHECK (position >= 0),
+    payload_json TEXT NOT NULL,
+    PRIMARY KEY (collection_id, item_id),
+    UNIQUE (collection_id, position)
+);
+CREATE INDEX ix_curated_collection_items_position
+ON curated_collection_items(collection_id, position);
+
+CREATE TABLE collection_follows (
+    collection_id TEXT NOT NULL REFERENCES curated_collections(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    followed_at TEXT NOT NULL,
+    PRIMARY KEY (collection_id, user_id)
+);
+CREATE INDEX ix_collection_follows_user
+ON collection_follows(user_id, followed_at);
+
+CREATE TABLE collection_seed_records (
+    seed_key TEXT PRIMARY KEY,
+    installed_at TEXT NOT NULL
+);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
+    3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
 }
 
 
