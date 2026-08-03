@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from movie_inbox.domain.identity import AuthenticatedIdentity, PersonalCatalog, UserAccount
+from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity, PersonalCatalog, UserAccount
+from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
 
 class IdentityRepositoryError(RuntimeError):
@@ -29,6 +30,10 @@ class IdentityNotFound(IdentityRepositoryError):
 
 class IdentityOwnerProtected(IdentityRepositoryError):
     """Raised when a member-only operation targets the owner."""
+
+
+class IdentityMemberActive(IdentityRepositoryError):
+    """Raised when an active member is targeted by an archival operation."""
 
 
 class IdentityRepository(Protocol):
@@ -62,6 +67,24 @@ class IdentityRepository(Protocol):
 
     def set_user_active(self, user_id: str, active: bool) -> UserAccount: ...
 
+    def update_member(
+        self,
+        user_id: str,
+        username: str,
+        catalog_name: str,
+    ) -> tuple[UserAccount, PersonalCatalog]: ...
+
+    def archive_member(self, user_id: str) -> ArchivedMember: ...
+
+    def list_archived_members(self) -> list[ArchivedMember]: ...
+
+    def restore_archived_member(
+        self,
+        archive_id: str,
+        username: str,
+        password_hash: str,
+    ) -> tuple[UserAccount, PersonalCatalog]: ...
+
     def replace_password(
         self,
         user_id: str,
@@ -73,6 +96,24 @@ class IdentityRepository(Protocol):
     def credentials_for(self, username: str) -> tuple[UserAccount, str] | None: ...
 
     def default_catalog_for(self, user_id: str) -> PersonalCatalog | None: ...
+
+    def privacy_for(self, user_id: str) -> PrivacyPreferences: ...
+
+    def update_privacy(self, user_id: str, preferences: PrivacyPreferences) -> PrivacyPreferences: ...
+
+    def item_privacy_overrides(
+        self,
+        user_id: str,
+        catalog_id: str,
+    ) -> dict[str, ItemPrivacyOverride]: ...
+
+    def set_item_privacy(
+        self,
+        user_id: str,
+        catalog_id: str,
+        item_id: str,
+        override: ItemPrivacyOverride,
+    ) -> ItemPrivacyOverride: ...
 
     def save_session(
         self,

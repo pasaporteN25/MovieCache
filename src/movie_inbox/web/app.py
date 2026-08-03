@@ -32,6 +32,7 @@ from movie_inbox.application.repository import (
 )
 from movie_inbox.application.identity_repository import (
     IdentityConflict,
+    IdentityMemberActive,
     IdentityNotFound,
     IdentityOwnerProtected,
     IdentityRepositoryError,
@@ -41,8 +42,10 @@ from movie_inbox.application.member_service import (
     MemberAuthorizationError,
     MemberService,
 )
-from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.application.privacy_service import PrivacyService, SharedCatalogUnavailable
+from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity
 from movie_inbox.domain.merge_review import MergeReviewError
+from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
@@ -185,6 +188,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         identity_repository,
         SqlitePersonalCatalogProvisioner(member_catalog_dir),
     )
+    privacy_service = PrivacyService(identity_repository, load_items)
     login_limiter = LoginAttemptLimiter()
     app = FastAPI(
         title="Movie Inbox",
@@ -196,6 +200,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.identity_repository = identity_repository
     app.state.auth_service = auth_service
     app.state.member_service = member_service
+    app.state.privacy_service = privacy_service
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
 
     @app.middleware("http")
@@ -456,8 +461,13 @@ def create_app(config: ViewerConfig) -> FastAPI:
     def members(request: Request) -> JSONResponse:
         identity = require_owner(request)
         try:
-            records = member_service.list_members(identity.user)
-            return JSONResponse({"members": [managed_member_payload(record) for record in records]})
+            directory = member_service.member_directory(identity.user)
+            return JSONResponse(
+                {
+                    "members": [managed_member_payload(record) for record in directory.members],
+                    "archived": [archived_member_payload(record) for record in directory.archived],
+                }
+            )
         except MemberAuthorizationError:
             return error_response("owner_required", 403)
         except IdentityRepositoryError:
@@ -551,13 +561,205 @@ def create_app(config: ViewerConfig) -> FastAPI:
         except IdentityRepositoryError:
             return error_response("identity_store_unavailable", 503)
 
+    @app.post("/api/members/{user_id}/profile")
+    def update_member_profile(
+        user_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_owner(request)
+        try:
+            member = member_service.update_member(
+                identity.user,
+                user_id,
+                username=str(body.get("username") or ""),
+                catalog_name=str(body.get("catalog_name") or ""),
+            )
+            return JSONResponse(
+                {"ok": True, "reason": "member_updated", "member": managed_member_payload(member)}
+            )
+        except IdentityConflict:
+            return error_response("username_unavailable", 409)
+        except IdentityNotFound:
+            return error_response("member_not_found", 404)
+        except ValueError as error:
+            return error_response(str(error), 400)
+        except IdentityOwnerProtected:
+            return error_response("owner_account_protected", 409)
+        except MemberAuthorizationError:
+            return error_response("owner_required", 403)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.post("/api/members/{user_id}/archive")
+    def archive_member(
+        user_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_owner(request)
+        try:
+            archived = member_service.archive_member(
+                identity.user,
+                user_id,
+                confirmed_username=str(body.get("confirmed_username") or ""),
+            )
+            return JSONResponse(
+                {"ok": True, "reason": "member_archived", "archived": archived_member_payload(archived)}
+            )
+        except IdentityMemberActive:
+            return error_response("member_must_be_inactive", 409)
+        except IdentityOwnerProtected:
+            return error_response("owner_account_protected", 409)
+        except IdentityNotFound:
+            return error_response("member_not_found", 404)
+        except ValueError:
+            return error_response("archive_confirmation_mismatch", 400)
+        except MemberAuthorizationError:
+            return error_response("owner_required", 403)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.post("/api/member-archives/{archive_id}/restore")
+    def restore_member(
+        archive_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_owner(request)
+        try:
+            result = member_service.restore_member(
+                identity.user,
+                archive_id,
+                username=str(body.get("username") or ""),
+                temporary_password=str(body.get("temporary_password") or ""),
+            )
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "reason": "member_restored",
+                    "member": managed_member_payload(result.member),
+                    "temporary_password": result.temporary_password,
+                }
+            )
+        except IdentityConflict:
+            return error_response("username_unavailable", 409)
+        except PasswordPolicyError as error:
+            return error_response(str(error), 400)
+        except IdentityNotFound:
+            return error_response("archive_not_found", 404)
+        except ValueError as error:
+            if "unavailable" in str(error).casefold():
+                return error_response("archived_catalog_unavailable", 409)
+            return error_response(str(error), 400)
+        except MemberAuthorizationError:
+            return error_response("owner_required", 403)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.get("/api/privacy", dependencies=[Depends(require_token)])
+    def privacy(request: Request) -> JSONResponse:
+        identity = require_ready_identity(request)
+        try:
+            preferences = privacy_service.preferences(identity)
+            overrides = privacy_service.item_overrides(identity)
+            return JSONResponse(
+                {
+                    "preferences": preferences.to_dict(),
+                    "overrides": {item_id: row.to_dict() for item_id, row in overrides.items()},
+                }
+            )
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.post("/api/privacy")
+    def update_privacy(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_ready_identity(request)
+        fields = {
+            "catalog_shared",
+            "share_status",
+            "share_watched_at",
+            "share_history",
+            "share_rating",
+            "share_review",
+        }
+        if any(not isinstance(body.get(field), bool) for field in fields):
+            return error_response("privacy_fields_must_be_boolean", 400)
+        try:
+            preferences = privacy_service.update_preferences(identity, body)
+            return JSONResponse(
+                {"ok": True, "reason": "privacy_updated", "preferences": preferences.to_dict()}
+            )
+        except IdentityNotFound:
+            return error_response("account_not_found", 404)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.post("/api/privacy/items/{item_id}")
+    def update_item_privacy(
+        item_id: str,
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_ready_identity(request)
+        try:
+            catalog = SessionCatalog.from_identity(config, identity)
+            rows = load_items(catalog.config.patterns)
+            if not any(str(row.get("id") or "") == item_id for row in rows):
+                return error_response("not_found", 404)
+            override = privacy_service.update_item_override(identity, item_id, body)
+            return JSONResponse(
+                {"ok": True, "reason": "item_privacy_updated", "privacy": override.to_dict()}
+            )
+        except ValueError as error:
+            return error_response(str(error), 400)
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.get("/api/community", dependencies=[Depends(require_token)])
+    def community(request: Request) -> JSONResponse:
+        try:
+            identity = require_ready_identity(request)
+            return JSONResponse({"catalogs": privacy_service.shared_catalogs(identity)})
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.get("/api/community/{user_id}", dependencies=[Depends(require_token)])
+    def shared_catalog(user_id: str, request: Request) -> JSONResponse:
+        try:
+            identity = require_ready_identity(request)
+            return JSONResponse(privacy_service.shared_catalog(identity, user_id))
+        except SharedCatalogUnavailable:
+            return error_response("shared_catalog_not_found", 404)
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
     @app.get("/api/items", dependencies=[Depends(require_token)])
     def items(request: Request) -> JSONResponse:
         try:
-            catalog = session_catalog(request)
+            identity = require_ready_identity(request)
+            catalog = SessionCatalog.from_identity(config, identity)
             rows = catalog.public_rows(load_items(catalog.config.patterns))
+            preferences = privacy_service.preferences(identity)
+            overrides = privacy_service.item_overrides(identity)
+            for row in rows:
+                row["_privacy"] = overrides.get(
+                    str(row.get("id") or ""),
+                    ItemPrivacyOverride(),
+                ).to_dict()
         except CatalogRepositoryError as error:
             return repository_error_response(error)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
         with_link = sum(1 for item in rows if has_external_link(item))
         duplicate_items = sum(1 for item in rows if int(item.get("_duplicate_count") or 0) > 0)
         print(
@@ -574,6 +776,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 "duplicate_items": duplicate_items,
                 "curation": {"counts": curation_counts(rows)},
                 "external": external_sources_snapshot(),
+                "privacy": preferences.to_dict(),
             }
         )
 
@@ -976,6 +1179,16 @@ def managed_member_payload(member: ManagedMember) -> dict[str, Any]:
             "id": member.catalog.id,
             "name": member.catalog.name,
         },
+    }
+
+
+def archived_member_payload(member: ArchivedMember) -> dict[str, Any]:
+    return {
+        "id": member.id,
+        "username": member.username,
+        "catalog": {"name": member.catalog_name},
+        "archived_at": member.archived_at,
+        "catalog_available": bool(member.sources) and all(Path(source.path).exists() for source in member.sources),
     }
 
 

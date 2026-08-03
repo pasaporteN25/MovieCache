@@ -51,6 +51,8 @@ python3 -m venv .venv
 
 El checkout puede pertenecer al usuario de despliegue y ser solamente legible para `movie-inbox`. La base y el cache si deben pertenecer al usuario del servicio.
 
+El backup debe incluir `instance.db`, el catalogo del owner y todo `--member-catalog-dir`, incluso los archivos que pertenezcan a cuentas archivadas. La base de instancia conserva la relacion necesaria para restaurarlos; una exportacion JSON aislada no incluye usuarios, privacidad ni archivo de miembros.
+
 Antes de activar `systemd`, crear el owner desde una terminal:
 
 ```bash

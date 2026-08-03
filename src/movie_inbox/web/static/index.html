@@ -22,6 +22,7 @@
             <button id="inboxButton" class="nav-action inbox-nav-action" type="button">
               Bandeja <span id="inboxBadge" class="nav-count" hidden>0</span>
             </button>
+            <button id="clubButton" class="nav-action" type="button">Club</button>
             <button id="randomButton" class="nav-action random-nav-action" type="button">Random</button>
             <label class="random-scope-control">
               <input id="randomCatalogOnly" type="checkbox" aria-label="Limitar Random a entradas en catálogo" checked>
@@ -44,6 +45,7 @@
                 <input id="mobileRandomCatalogOnly" type="checkbox" checked>
                 <span>Random solo en catálogo</span>
               </label>
+              <button id="privacyButton" class="system-menu-action" type="button">Privacidad</button>
               <button id="adminButton" class="system-menu-action" type="button">Administrar</button>
               <button id="logoutButton" class="system-menu-action logout-action" type="button">Cerrar sesión</button>
             </div>
@@ -77,6 +79,26 @@
           <div class="grid home-grid" id="homeGrid"></div>
           <p class="empty home-empty" id="homeEmpty" hidden>Tu selección aparecerá cuando haya obras disponibles en catálogo.</p>
         </section>
+      </section>
+
+      <section id="clubView" class="app-view club-view" hidden>
+        <header class="club-heading">
+          <div>
+            <span class="eyebrow">Cat&aacute;logos compartidos</span>
+            <h2 id="clubTitle" class="view-focus-target" tabindex="-1">El club</h2>
+            <p>Obras y registros que otros miembros eligieron mostrar dentro de esta instancia.</p>
+          </div>
+          <button id="refreshClub" class="quiet-action" type="button">Actualizar club</button>
+        </header>
+        <nav id="clubMemberTabs" class="club-member-tabs" aria-label="Cat&aacute;logos compartidos"></nav>
+        <p id="clubFeedback" class="club-feedback" role="status" aria-live="polite"></p>
+        <section id="clubCatalogPanel" class="club-catalog-panel" aria-live="polite">
+          <div class="club-empty">
+            <strong>El estante compartido est&aacute; vac&iacute;o</strong>
+            <p>Cuando alguien habilite su cat&aacute;logo aparecer&aacute; en este espacio.</p>
+          </div>
+        </section>
+        <button id="clubLoadMore" class="catalog-more" type="button" hidden>Cargar m&aacute;s</button>
       </section>
 
       <section id="inboxView" class="app-view curation-view" hidden>
@@ -288,6 +310,16 @@
           <div id="memberList" class="member-list" aria-live="polite">
             <p class="member-list-empty">Abr&iacute; Administrar para cargar las cuentas.</p>
           </div>
+          <div id="archivedMemberSection" class="archived-member-section" hidden>
+            <div class="archived-member-heading">
+              <div>
+                <h4>Cat&aacute;logos preservados</h4>
+                <p>Cuentas archivadas que pueden volver a habilitarse sin perder sus obras.</p>
+              </div>
+              <span id="archivedMemberCount">0 archivos</span>
+            </div>
+            <div id="archivedMemberList" class="member-list archived-member-list"></div>
+          </div>
         </section>
 
         <section id="adminDatabase" class="admin-section" aria-labelledby="adminDatabaseTitle">
@@ -384,6 +416,99 @@
           <button id="copyTemporaryPassword" type="button">Copiar contrase&ntilde;a</button>
           <button id="finishTemporaryPassword" class="quiet-action" type="button">Listo</button>
         </footer>
+      </div>
+    </dialog>
+
+    <dialog id="privacyDialog" class="member-dialog privacy-dialog" aria-labelledby="privacyDialogTitle">
+      <form id="privacyForm" class="member-dialog-surface privacy-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Tu se&ntilde;al al club</span>
+            <h2 id="privacyDialogTitle">Privacidad</h2>
+          </div>
+          <button id="closePrivacyDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="privacy-dialog-body">
+          <label class="privacy-master-control">
+            <input id="catalogShared" name="catalog_shared" type="checkbox">
+            <span>
+              <strong>Compartir mi cat&aacute;logo en el Club</strong>
+              <small>Solo pueden verlo otras cuentas activas de esta instancia.</small>
+            </span>
+          </label>
+          <fieldset id="privacyFields" class="privacy-fieldset">
+            <legend>Registro personal visible</legend>
+            <label><input id="shareStatus" name="share_status" type="checkbox"><span><strong>Estado</strong><small>Vista o pendiente</small></span></label>
+            <label><input id="shareWatchedAt" name="share_watched_at" type="checkbox"><span><strong>Fecha de vista</strong><small>Cu&aacute;ndo la marcaste como vista</small></span></label>
+            <label><input id="shareHistory" name="share_history" type="checkbox"><span><strong>Actividad de vistas</strong><small>&Uacute;ltimas obras vistas</small></span></label>
+            <label><input id="shareRating" name="share_rating" type="checkbox"><span><strong>Puntajes</strong><small>Preferencia por defecto, editable por obra</small></span></label>
+            <label><input id="shareReview" name="share_review" type="checkbox"><span><strong>Reviews</strong><small>Preferencia por defecto, editable por obra</small></span></label>
+          </fieldset>
+          <p class="privacy-boundary">Rutas, archivos locales, notas y datos operativos permanecen privados siempre.</p>
+          <p id="privacyFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelPrivacy" class="quiet-action" type="button">Cancelar</button>
+          <button id="savePrivacy" type="submit">Guardar privacidad</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="editMemberDialog" class="member-dialog" aria-labelledby="editMemberDialogTitle">
+      <form id="editMemberForm" class="member-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Ficha de miembro</span>
+            <h2 id="editMemberDialogTitle">Editar miembro</h2>
+          </div>
+          <button id="closeEditMemberDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields">
+          <label><span>Usuario</span><input id="editMemberUsername" minlength="3" maxlength="64" required></label>
+          <label><span>Nombre del cat&aacute;logo</span><input id="editMemberCatalogName" maxlength="120" required></label>
+          <p id="editMemberFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelEditMember" class="quiet-action" type="button">Cancelar</button>
+          <button id="saveMemberProfile" type="submit">Guardar cambios</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="archiveMemberDialog" class="member-dialog" aria-labelledby="archiveMemberDialogTitle">
+      <form id="archiveMemberForm" class="member-dialog-surface archive-member-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Baja reversible</span>
+            <h2 id="archiveMemberDialogTitle">Archivar miembro</h2>
+          </div>
+          <button id="closeArchiveMemberDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields">
+          <p>La cuenta y sus sesiones se retirar&aacute;n. El cat&aacute;logo quedar&aacute; preservado y podr&aacute; restaurarse.</p>
+          <label>
+            <span>Escrib&iacute; <strong id="archiveMemberUsernameLabel"></strong> para confirmar</span>
+            <input id="archiveMemberConfirmation" autocomplete="off" required>
+          </label>
+          <p id="archiveMemberFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelArchiveMember" class="quiet-action" type="button">Cancelar</button>
+          <button id="confirmArchiveMember" class="danger-action" type="submit">Archivar cuenta</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="sharedDetailDialog" class="detail-drawer shared-detail-dialog" aria-labelledby="sharedDetailTitle">
+      <div class="movie-dialog-surface shared-detail-surface">
+        <div class="drawer-top">
+          <div class="drawer-top-identity">
+            <strong id="sharedDetailTitle">Ficha compartida</strong>
+            <span id="sharedDetailOwner" class="drawer-feedback"></span>
+          </div>
+          <button id="closeSharedDetail" class="drawer-close" type="button">Cerrar</button>
+        </div>
+        <div id="sharedDetailBody" class="drawer-body"></div>
       </div>
     </dialog>
 
