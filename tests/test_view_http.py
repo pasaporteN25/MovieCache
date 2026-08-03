@@ -411,6 +411,55 @@ class ViewerHttpTests(unittest.TestCase):
             self.assertEqual(hidden.status_code, 200, hidden.content)
             self.assertEqual(unavailable.status_code, 404, unavailable.content)
 
+    def test_starter_collection_can_be_followed_and_copied_to_personal_catalog(self) -> None:
+        listed = self.client.get(
+            "/api/collections",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(listed.status_code, 200, listed.content)
+        collection = listed.json()["collections"][0]
+        self.assertEqual(collection["title"], "Akira Kurosawa")
+        self.assertEqual(collection["counts"]["total"], 31)
+        self.assertFalse(collection["followed"])
+
+        followed = self.client.post(
+            f"/api/collections/{collection['id']}/follow",
+            content=json.dumps({"following": True}),
+            headers=self.post_headers(),
+        )
+        detail = self.client.get(
+            f"/api/collections/{collection['id']}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(followed.status_code, 200, followed.content)
+        self.assertTrue(followed.json()["collection"]["followed"])
+        self.assertEqual(detail.status_code, 200, detail.content)
+        rashomon = next(item for item in detail.json()["items"] if item["title"] == "Rashomon")
+        self.assertEqual(rashomon["catalog"]["state"], "missing")
+
+        added = self.client.post(
+            f"/api/collections/{collection['id']}/add",
+            content=json.dumps({"item_ids": [rashomon["collection_item_id"]]}),
+            headers=self.post_headers(),
+        )
+        repeated = self.client.post(
+            f"/api/collections/{collection['id']}/add",
+            content=json.dumps({"item_ids": [rashomon["collection_item_id"]]}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(added.status_code, 200, added.content)
+        self.assertEqual(added.json()["summary"]["added"], 1)
+        self.assertEqual(repeated.status_code, 200, repeated.content)
+        self.assertEqual(repeated.json()["summary"]["present"], 1)
+
+        item = JsonCatalogRepository(self.catalog_path, normalize_item).get(rashomon["id"])
+        self.assertIsNotNone(item)
+        self.assertEqual(item.status, "to_watch")
+        self.assertEqual(item.rating, 0)
+        self.assertEqual(item.review, "")
+        self.assertFalse(item.en_catalogo)
+        self.assertEqual(item.extra["collection_sources"][0]["collection_id"], collection["id"])
+
     def test_login_requires_token_origin_and_json(self) -> None:
         body = json.dumps({"username": "lucas", "password": self.owner_password})
         with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:
@@ -507,6 +556,11 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="adminView"', body)
         self.assertIn(b'id="clubButton"', body)
         self.assertIn(b'id="clubView"', body)
+        self.assertIn(b'id="clubModeTabs"', body)
+        self.assertIn(b'id="clubCollectionsPanel"', body)
+        self.assertIn(b'id="collectionList"', body)
+        self.assertIn(b'id="collectionDetailPanel"', body)
+        self.assertIn(b'id="addCollectionSelection"', body)
         self.assertIn(b'id="privacyDialog"', body)
         self.assertIn(b'id="editMemberDialog"', body)
         self.assertIn(b'id="archiveMemberDialog"', body)
@@ -552,6 +606,11 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'.member-row', css)
         self.assertIn(b'.member-dialog', css)
         self.assertIn(b'.club-grid', css)
+        self.assertIn(b'.club-mode-tabs', css)
+        self.assertIn(b'.collection-card', css)
+        self.assertIn(b'.collection-mosaic', css)
+        self.assertIn(b'.collection-bulk-bar', css)
+        self.assertIn(b'.collection-item-actions', css)
         self.assertIn(b'.privacy-fieldset', css)
         self.assertIn(b'.personal-privacy-fields', css)
         self.assertIn(b'.system-menu-panel', css)
@@ -619,6 +678,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'function setCollectionSearchMode(', javascript)
         self.assertIn(b'function collectionSearchMessage()', javascript)
         self.assertIn(b'function renderHomeShelf()', javascript)
+        self.assertIn(b'function renderCollectionDirectory()', javascript)
+        self.assertIn(b'function loadCollectionDetail(', javascript)
+        self.assertIn(b'function toggleCollectionFollow(', javascript)
+        self.assertIn(b'function addCollectionItems(', javascript)
         self.assertIn(b'function loadCurationQueue(', javascript)
         self.assertIn(b'function renderCuration()', javascript)
         self.assertIn(b'function postCurationDecision(', javascript)

@@ -100,6 +100,10 @@ Cada catalogo es privado por defecto. Desde `Privacidad`, cualquier cuenta puede
 
 `Club` es de solo lectura y no mezcla obras entre usuarios. La respuesta compartida usa una lista explicita de metadata publica: nunca incluye rutas, archivos locales, notas, bloqueos, procedencia ni referencias operativas del servidor. Desactivar o archivar una cuenta retira inmediatamente su catalogo del Club. Una cuenta restaurada comienza otra vez con privacidad cerrada, aunque conserva sus obras y su registro personal.
 
+El Club tambien separa `Miembros` de `Colecciones`. Una coleccion es una lista curada de referencias y no contiene estado personal. Seguirla conserva el estante en lectura y recibe sus cambios dentro de la misma instancia; no copia nada al catalogo. `Agregar`, `Agregar seleccion` y `Agregar faltantes` copian solamente identidad, titulos, metadata y links, con `status: to_watch`, `en_catalogo: false`, rating 0 y review vacia. Duplicados exactos se omiten y las coincidencias dudosas quedan sin copiar.
+
+Cada instancia instala una sola vez la coleccion inicial `Akira Kurosawa`, basada en la tabla de obras como director de Wikipedia. Incluye 31 registros, entre ellos la obra codirigida `Those Who Make Tomorrow`, y no se sigue automaticamente. Colecciones, seguimientos y la marca de instalacion viven en `instance.db`; no forman parte del JSON personal.
+
 ## SQLite y backups JSON
 
 Para crear una base SQLite sin modificar el JSON original:
@@ -294,7 +298,7 @@ El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibi
 
 Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el usuario y el catalogo personal activos y permite cerrar todas las operaciones de esa sesion.
 
-La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Bandeja` reune la curaduria y `Club` muestra catalogos compartidos de solo lectura. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
+La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` esta orientado al descubrimiento y muestra un spotlight pausable junto con una seleccion breve de entradas disponibles. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Bandeja` reune la curaduria y `Club` alterna entre catalogos compartidos por miembros y colecciones locales que pueden seguirse o copiarse de forma selectiva. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
 
 El visor tiene una consola de busqueda unica. Cada consulta filtra directamente `La coleccion`, sin repetir las mismas obras en una segunda lista local. `Buscar tambien en fuentes externas` agrega resultados de Wikipedia, IMDb y FilmAffinity solamente despues de tocar `Buscar` o presionar Enter. La consulta, los filtros y el orden quedan representados en la URL para que Atras y Adelante restauren la estanteria correcta. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
 

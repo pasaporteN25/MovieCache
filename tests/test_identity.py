@@ -200,7 +200,7 @@ class IdentityTests(unittest.TestCase):
                 ["heat"],
             )
 
-    def test_v1_instance_is_migrated_to_privacy_and_archive_schema(self) -> None:
+    def test_v1_instance_is_migrated_to_current_instance_schema(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             database = Path(temporary) / "instance.db"
             with closing(sqlite3.connect(database)) as connection:
@@ -220,10 +220,13 @@ class IdentityTests(unittest.TestCase):
                 tables = {row[0] for row in connection.execute(
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 )}
-            self.assertEqual(versions, [1, 2])
+            self.assertEqual(versions, [1, 2, 3])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
+            self.assertIn("curated_collections", tables)
+            self.assertIn("curated_collection_items", tables)
+            self.assertIn("collection_follows", tables)
 
     def test_privacy_and_archival_are_reversible_without_losing_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
