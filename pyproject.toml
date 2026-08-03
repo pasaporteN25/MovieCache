@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["httpx>=0.27,<0.29"]
+test = ["httpx2>=2,<3"]
 
 [project.scripts]
 movie-inbox = "movie_inbox.cli.main:main"

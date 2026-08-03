@@ -170,6 +170,41 @@ Para otros sitios intenta extraer lo mas comun desde OpenGraph, `<title>` o meta
 
 ## Escanear una carpeta local de peliculas
 
+### Scanner administrado en el servidor
+
+Para una instancia self-hosted, el modo recomendado es habilitar explicitamente las
+raices que Movie Inbox puede leer al iniciar el visor. La aplicacion no ofrece un
+explorador remoto ni acepta rutas fuera de esta lista:
+
+```powershell
+movie-inbox serve data/movie-inbox.db `
+  --instance-db data/instance.db `
+  --library-root "D:\Peliculas" `
+  --library-root "E:\Series"
+```
+
+El owner registra despues cada ruta desde `Administrar > Bibliotecas`. Toda biblioteca
+nueva comienza inactiva y exige un recorrido `Probar` satisfactorio antes de permitir
+`Activar` o `Escanear`. Las frecuencias disponibles son manual, horaria y diaria. Los
+recorridos se ejecutan fuera del request HTTP y su estado persiste en `instance.db`.
+
+El inventario fisico pertenece a la instancia. Una coincidencia fuerte aporta
+disponibilidad verificada a los catalogos de todos los usuarios sin copiar obras ni
+cambiar `status`, `watched_at`, `rating` o `review`. La declaracion manual de
+`en_catalogo` se conserva por separado: retirar una senal no elimina la otra. Los
+miembros reciben solamente el estado agregado; rutas, nombres de archivo y huellas son
+exclusivos del owner.
+
+Archivos nuevos, titulos sin ano y coincidencias ambiguas aparecen en
+`Bandeja > Scanner`. Confirmar una identidad no agrega automaticamente la obra a ningun
+catalogo personal. Si un disco desaparece o la proporcion de bajas supera el limite
+configurado, se conserva el ultimo inventario valido.
+
+Las sugerencias se construyen con el catalogo del owner y con catalogos que sus
+miembros hayan compartido de forma explicita. Los catalogos privados nunca se usan como
+fuente de candidatos. El matching indexa titulos y terminos al comenzar cada recorrido,
+por lo que no necesita comparar cada archivo contra todas las obras de la instancia.
+
 ### Scanner Python incremental
 
 Para un servidor o una tarea programada conviene usar el scanner Python. `scanner.example.json` muestra la configuracion de una biblioteca; las rutas relativas se resuelven desde la carpeta donde esta ese archivo.
@@ -192,7 +227,7 @@ Para detectar cambios periodicamente en el mismo proceso:
 py scripts/scan_library.py --config scanner.json --apply --watch --interval 300 --report scanner-report.json
 ```
 
-El scanner recorre subcarpetas y guarda estado liviano en `.catalog-state`. Usa tamano, fecha de modificacion y una huella parcial para evitar leer de nuevo archivos que no cambiaron. Un movimiento dentro del disco conserva la entrada; una coincidencia unica por titulo, ano y tipo se asocia al item existente; una coincidencia ambigua no se aplica y queda en `needs_review`.
+La CLI legacy sigue disponible para reconciliar directamente un unico catalogo. Recorre subcarpetas y guarda estado liviano en `.catalog-state`. Usa el mismo parser y motor de huellas que el scanner administrado para evitar reglas divergentes. Un movimiento dentro del disco conserva la entrada; una coincidencia unica por titulo, ano y tipo se asocia al item existente; una coincidencia ambigua no se aplica y queda en `needs_review`.
 
 Si el disco no existe o no esta montado, el scanner aborta antes de modificar el catalogo. Tambien compara el recorrido con el ultimo estado y omite bajas cuando desaparece mas del porcentaje configurado en `max_missing_ratio` (50% por defecto), lo que cubre puntos de montaje que siguen existiendo pero aparecen vacios. Si hubo errores parciales de lectura, actualiza lo que pudo ver pero no marca archivos ausentes ni reemplaza el ultimo estado completo. El scanner solo administra `local_files` y la disponibilidad agregada `en_catalogo`: no modifica `status`, `watched_at`, `rating` ni `review`, y no consulta fuentes externas durante el recorrido.
 

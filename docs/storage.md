@@ -12,7 +12,7 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 - `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
 
-## Base de instancia v4
+## Base de instancia v5
 
 La base de instancia contiene:
 
@@ -33,6 +33,12 @@ La base de instancia contiene:
   reaparecer si el administrador las elimina mas adelante.
 - `import_drafts` e `import_draft_items`: borradores de importacion aislados por
   usuario, filas normalizadas, clasificacion y resultado de la aplicacion.
+- `media_libraries`: rutas permitidas, frecuencia, estado y proteccion ante bajas de
+  cada biblioteca fisica administrada por el owner.
+- `library_scan_runs`: cola e historial persistente de pruebas, aplicaciones manuales
+  y recorridos programados; conserva los 100 mas recientes por biblioteca.
+- `library_files`: inventario privado de rutas relativas, huellas, identidad confirmada
+  y disponibilidad observada; nunca se expone a miembros.
 
 El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
 
@@ -40,9 +46,27 @@ Los miembros nuevos reciben una base SQLite vacia en el directorio configurado c
 
 El servidor resuelve las fuentes desde la sesion autenticada. Las rutas absolutas permanecen en `instance.db`; el frontend recibe referencias opacas y no puede seleccionar otro catalogo enviando una ruta manual.
 
-Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad, overrides, colecciones ni seguimientos. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados, `instance.db` y la configuracion del scanner; para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
+Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad, overrides, colecciones, seguimientos ni inventario fisico. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados e `instance.db`; las raices permitidas se conservan en la configuracion del proceso. Para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
 
-Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos; la v4 agrega borradores de importacion acotados. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
+Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos; la v4 agrega borradores de importacion acotados; la v5 agrega bibliotecas administradas, recorridos e inventario compartido. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
+
+## Disponibilidad con procedencia
+
+`en_catalogo` continua siendo una declaracion portable del catalogo personal. El
+scanner no la reescribe: guarda su evidencia en `library_files` y la API calcula una
+disponibilidad efectiva como `declaracion manual OR archivo verificado`. Esto permite
+que un disco desmontado retire solamente su propia evidencia y evita borrar una copia
+fisica declarada por el usuario.
+
+Las decisiones de `Bandeja > Scanner` se guardan contra una identidad compartida de
+obra basada en IDs externos o en titulo exacto, ano y tipo. Esa identidad puede aportar
+disponibilidad a catalogos creados despues del recorrido. La API personal puede incluir
+nombre de biblioteca y cantidad de archivos para el owner; las vistas de miembros y
+Club reciben solamente conteos agregados, nunca rutas, nombres o fingerprints.
+La clasificacion puede consultar el catalogo del owner y catalogos de miembros con
+`catalog_shared` activo; un catalogo privado nunca aporta candidatos a la Bandeja del
+administrador. La serializacion compartida vuelve a retirar cualquier lista de fuentes
+como defensa adicional.
 
 ## Esquema SQLite v3
 
@@ -87,7 +111,7 @@ Las filas persisten sin `local_path`, `local_name` ni `local_files`. `en_catalog
 
 La operacion vuelve a clasificar las filas contra el catalogo actual, reclama el borrador de forma transaccional y guarda su resultado para que los reintentos sean idempotentes. IDs o URLs externas iguales se tratan como presentes; coincidencias por titulo quedan para revision y no se escriben automaticamente.
 
-Todavia queda pendiente un paquete compartible con manifiesto versionado, imagenes opcionales o intercambio entre instancias. Tampoco forman parte de este flujo el scanner, el enriquecimiento de fuentes externas ni la importacion hacia una coleccion existente. JSON sigue siendo el formato portable para intercambio completo y las colecciones publicadas siguen limitadas a la instancia local.
+Todavia queda pendiente un paquete compartible con manifiesto versionado, imagenes opcionales o intercambio entre instancias. El borrador de importacion no ejecuta el scanner ni enriquecimiento externo y todavia no puede incorporar filas a una coleccion existente. JSON sigue siendo el formato portable para intercambio completo y las colecciones publicadas siguen limitadas a la instancia local.
 
 ## Historial de curaduria
 

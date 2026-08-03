@@ -29,6 +29,8 @@ class ViewerHttpTests(unittest.TestCase):
         )
         self.owner_password = "a-long-local-password"
         self.instance_path = Path(self.temporary.name) / "instance.db"
+        self.media_path = Path(self.temporary.name) / "media"
+        self.media_path.mkdir()
         AuthService(SqliteIdentityRepository(self.instance_path)).bootstrap_owner(
             "lucas",
             self.owner_password,
@@ -47,6 +49,8 @@ class ViewerHttpTests(unittest.TestCase):
             api_token="test-token",
             instance_db=str(self.instance_path),
             member_catalog_dir=str(Path(self.temporary.name) / "member-catalogs"),
+            library_allowed_roots=(str(self.media_path),),
+            library_scheduler_poll_seconds=3600,
         )
         self.client_context = TestClient(create_app(self.config), base_url="http://127.0.0.1:8765")
         self.client = self.client_context.__enter__()
@@ -161,8 +165,18 @@ class ViewerHttpTests(unittest.TestCase):
                 "/api/members",
                 headers={"X-Movie-Inbox-Token": self.config.api_token},
             )
+            forbidden_libraries = member_client.get(
+                "/api/libraries",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+            forbidden_scanner_queue = member_client.get(
+                "/api/scanner/queue",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
             self.assertEqual(updated.status_code, 200, updated.content)
             self.assertEqual(forbidden_members.status_code, 403)
+            self.assertEqual(forbidden_libraries.status_code, 403)
+            self.assertEqual(forbidden_scanner_queue.status_code, 403)
 
         owner_item = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
         member_item = member_repository.get("heat")
@@ -1009,6 +1023,165 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(payload["background_enrichment"], "scheduled")
         background_enrichment.assert_called_once()
         self.assertEqual(len(JsonCatalogRepository(self.catalog_path, normalize_item).read()), 2)
+
+    def test_owner_can_test_apply_and_read_shared_scanner_availability(self) -> None:
+        (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps({
+                "name": "Peliculas principales",
+                "root_path": str(self.media_path),
+                "schedule": "manual",
+                "max_missing_ratio": 0.5,
+            }),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        library_id = created.json()["library"]["id"]
+
+        tested = self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(tested.status_code, 202, tested.content)
+        test_run = self.client.get(
+            f"/api/library-runs/{tested.json()['run']['id']}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(test_run.json()["run"]["status"], "completed")
+        self.assertEqual(test_run.json()["run"]["preview"][0]["relative_path"], "Heat.1995.1080p.mkv")
+        self.assertEqual(test_run.json()["run"]["preview"][0]["state"], "matched")
+
+        activated = self.client.post(
+            f"/api/libraries/{library_id}/status",
+            content=json.dumps({"active": True}),
+            headers=self.post_headers(),
+        )
+        applied = self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+        items = self.client.get(
+            "/api/items",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+
+        self.assertEqual(activated.status_code, 200, activated.content)
+        self.assertEqual(applied.status_code, 202, applied.content)
+        self.assertTrue(items.json()["items"][0]["en_catalogo"])
+        self.assertFalse(items.json()["items"][0]["_availability"]["manual"])
+        self.assertTrue(items.json()["items"][0]["_availability"]["server"])
+        self.assertNotIn(str(self.media_path), items.text)
+
+    def test_unknown_scanner_file_requires_an_owner_decision(self) -> None:
+        (self.media_path / "Arrival.2016.mkv").write_bytes(b"arrival-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps({
+                "name": "Peliculas principales",
+                "root_path": str(self.media_path),
+                "schedule": "manual",
+            }),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/status",
+            content=json.dumps({"active": True}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+
+        queue = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(queue.status_code, 200, queue.content)
+        self.assertEqual(queue.json()["count"], 1)
+        queue_item = queue.json()["items"][0]
+        self.assertEqual(queue_item["relative_path"], "Arrival.2016.mkv")
+
+        reviewed = self.client.post(
+            f"/api/scanner/queue/{queue_item['id']}",
+            content=json.dumps({
+                "action": "confirm",
+                "title": "Arrival",
+                "year": "2016",
+                "kind": "pelicula",
+            }),
+            headers=self.post_headers(),
+        )
+        empty = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(reviewed.status_code, 200, reviewed.content)
+        self.assertEqual(empty.json()["count"], 0)
+
+    def test_scanner_candidates_do_not_reveal_a_private_member_catalog(self) -> None:
+        created_member = self.client.post(
+            "/api/members",
+            content=json.dumps({
+                "username": "maria",
+                "temporary_password": "a-temporary-password",
+            }),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created_member.status_code, 201, created_member.content)
+        member_id = created_member.json()["member"]["id"]
+        identity_repository = SqliteIdentityRepository(self.instance_path)
+        member_catalog = identity_repository.default_catalog_for(member_id)
+        self.assertIsNotNone(member_catalog)
+        open_catalog_repository(Path(member_catalog.write_path), normalize_item).write([
+            normalize_item({
+                "id": "private-member-film",
+                "title": "Private Member Film",
+                "year": "2024",
+                "kind": "pelicula",
+            })
+        ])
+        (self.media_path / "Private.Member.Film.2024.mkv").write_bytes(b"private-video")
+
+        created_library = self.client.post(
+            "/api/libraries",
+            content=json.dumps({
+                "name": "Peliculas principales",
+                "root_path": str(self.media_path),
+                "schedule": "manual",
+            }),
+            headers=self.post_headers(),
+        )
+        library_id = created_library.json()["library"]["id"]
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+
+        queue = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(queue.status_code, 200, queue.content)
+        self.assertEqual(queue.json()["count"], 1)
+        self.assertEqual(queue.json()["items"][0]["state"], "new")
+        self.assertEqual(queue.json()["items"][0]["candidates"], [])
 
     def test_public_origin_is_accepted_for_proxy_deployment(self) -> None:
         proxy_config = replace(self.config, public_origin="https://movies.example.com")

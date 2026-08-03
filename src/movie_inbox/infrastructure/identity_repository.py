@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
 
-INSTANCE_SCHEMA_VERSION = 4
+INSTANCE_SCHEMA_VERSION = 5
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -202,10 +202,82 @@ CREATE INDEX ix_import_draft_items_state
 ON import_draft_items(draft_id, state, position);
 """
 
+INSTANCE_SCHEMA_V5 = """
+CREATE TABLE media_libraries (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    root_path TEXT NOT NULL,
+    root_key TEXT NOT NULL UNIQUE,
+    schedule TEXT NOT NULL DEFAULT 'manual' CHECK (schedule IN ('manual', 'hourly', 'daily')),
+    active INTEGER NOT NULL DEFAULT 0 CHECK (active IN (0, 1)),
+    status TEXT NOT NULL DEFAULT 'unverified'
+        CHECK (status IN ('unverified', 'ready', 'scanning', 'paused', 'offline', 'warning', 'error')),
+    max_missing_ratio REAL NOT NULL DEFAULT 0.5 CHECK (max_missing_ratio >= 0 AND max_missing_ratio <= 1),
+    verified_at INTEGER NOT NULL DEFAULT 0,
+    last_scan_at INTEGER NOT NULL DEFAULT 0,
+    next_scan_at INTEGER NOT NULL DEFAULT 0,
+    created_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+CREATE INDEX ix_media_libraries_due
+ON media_libraries(active, schedule, next_scan_at);
+
+CREATE TABLE library_scan_runs (
+    id TEXT PRIMARY KEY,
+    library_id TEXT NOT NULL REFERENCES media_libraries(id) ON DELETE CASCADE,
+    mode TEXT NOT NULL CHECK (mode IN ('dry_run', 'apply')),
+    trigger TEXT NOT NULL CHECK (trigger IN ('manual', 'scheduled')),
+    status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'partial', 'blocked', 'failed')),
+    created_at INTEGER NOT NULL,
+    started_at INTEGER NOT NULL DEFAULT 0,
+    finished_at INTEGER NOT NULL DEFAULT 0,
+    summary_json TEXT NOT NULL DEFAULT '{}',
+    errors_json TEXT NOT NULL DEFAULT '[]',
+    preview_json TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX ix_library_scan_runs_library
+ON library_scan_runs(library_id, created_at DESC);
+CREATE UNIQUE INDEX ux_library_active_run
+ON library_scan_runs(library_id) WHERE status IN ('queued', 'running');
+
+CREATE TABLE library_files (
+    id TEXT PRIMARY KEY,
+    library_id TEXT NOT NULL REFERENCES media_libraries(id) ON DELETE CASCADE,
+    relative_path TEXT NOT NULL,
+    relative_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    modified_ns INTEGER NOT NULL DEFAULT 0,
+    modified_at TEXT NOT NULL DEFAULT '',
+    fingerprint TEXT NOT NULL DEFAULT '',
+    detected_title TEXT NOT NULL DEFAULT '',
+    detected_year TEXT NOT NULL DEFAULT '',
+    detected_kind TEXT NOT NULL DEFAULT 'pelicula',
+    state TEXT NOT NULL DEFAULT 'new' CHECK (state IN ('new', 'matched', 'review', 'ignored')),
+    work_key TEXT NOT NULL DEFAULT '',
+    identity_json TEXT NOT NULL DEFAULT '{}',
+    candidates_json TEXT NOT NULL DEFAULT '[]',
+    available INTEGER NOT NULL DEFAULT 1 CHECK (available IN (0, 1)),
+    first_seen_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    last_run_id TEXT NOT NULL DEFAULT '',
+    UNIQUE (library_id, relative_key)
+);
+CREATE INDEX ix_library_files_fingerprint
+ON library_files(library_id, fingerprint);
+CREATE INDEX ix_library_files_review
+ON library_files(state, available, updated_at DESC);
+CREATE INDEX ix_library_files_availability
+ON library_files(available, state, work_key);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
     4: ("bounded user import drafts", INSTANCE_SCHEMA_V4),
+    5: ("managed media libraries and shared availability", INSTANCE_SCHEMA_V5),
 }
 
 

@@ -45,7 +45,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let detailFeedbackTimer = null;
       let pendingDetailTransition = null;
       let curationCases = [];
-      let curationCounts = { pending: 0, duplicates: 0, missing_link: 0, deferred: 0 };
+      let curationCounts = { pending: 0, duplicates: 0, missing_link: 0, deferred: 0, scanner: 0 };
       let curationFilter = "pending";
       let selectedCurationCaseId = "";
       let curationLoading = false;
@@ -61,6 +61,17 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let importInputMode = "file";
       let importLoading = false;
       let importVisibleCount = 200;
+      let managedLibraries = [];
+      let scannerConfigured = false;
+      let scannerAllowedRoots = [];
+      let selectedLibraryId = "";
+      let librariesLoading = false;
+      let editingLibraryId = "";
+      let activeLibraryRunId = "";
+      let libraryRunPollTimer = null;
+      let scannerQueue = [];
+      let selectedScannerItemId = "";
+      let scannerQueueLoading = false;
       let mergeReview = null;
       let mergeContext = null;
       let mergeChoices = {};
@@ -154,9 +165,16 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         inboxModeTabs: document.querySelector("#inboxModeTabs"),
         inboxCurationMode: document.querySelector("#inboxCurationMode"),
         inboxImportsMode: document.querySelector("#inboxImportsMode"),
+        inboxScannerMode: document.querySelector("#inboxScannerMode"),
         curationInboxPanel: document.querySelector("#curationInboxPanel"),
         importInboxPanel: document.querySelector("#importInboxPanel"),
+        scannerInboxPanel: document.querySelector("#scannerInboxPanel"),
         importDraftCount: document.querySelector("#importDraftCount"),
+        scannerQueueCount: document.querySelector("#scannerQueueCount"),
+        scannerQueueMeta: document.querySelector("#scannerQueueMeta"),
+        scannerQueue: document.querySelector("#scannerQueue"),
+        scannerQueueDetail: document.querySelector("#scannerQueueDetail"),
+        refreshScannerQueue: document.querySelector("#refreshScannerQueue"),
         collectionView: document.querySelector("#collectionView"),
         adminView: document.querySelector("#adminView"),
         homeCollectionButton: document.querySelector("#homeCollectionButton"),
@@ -288,6 +306,22 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogMergeResults: document.querySelector("#catalogMergeResults"),
         databaseCatalogPanel: document.querySelector("#databaseCatalogPanel"),
         databaseExternalPanel: document.querySelector("#databaseExternalPanel"),
+        createLibraryButton: document.querySelector("#createLibraryButton"),
+        libraryConfiguration: document.querySelector("#libraryConfiguration"),
+        libraryFeedback: document.querySelector("#libraryFeedback"),
+        libraryList: document.querySelector("#libraryList"),
+        libraryDialog: document.querySelector("#libraryDialog"),
+        libraryForm: document.querySelector("#libraryForm"),
+        libraryDialogTitle: document.querySelector("#libraryDialogTitle"),
+        libraryName: document.querySelector("#libraryName"),
+        libraryRootPath: document.querySelector("#libraryRootPath"),
+        libraryRootHint: document.querySelector("#libraryRootHint"),
+        librarySchedule: document.querySelector("#librarySchedule"),
+        libraryMissingRatio: document.querySelector("#libraryMissingRatio"),
+        libraryDialogFeedback: document.querySelector("#libraryDialogFeedback"),
+        closeLibraryDialog: document.querySelector("#closeLibraryDialog"),
+        cancelLibraryDialog: document.querySelector("#cancelLibraryDialog"),
+        submitLibrary: document.querySelector("#submitLibrary"),
         createMemberButton: document.querySelector("#createMemberButton"),
         memberCount: document.querySelector("#memberCount"),
         memberFeedback: document.querySelector("#memberFeedback"),
@@ -377,7 +411,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         empty: document.querySelector("#empty")
       };
 
-      document.querySelector("#refresh").addEventListener("click", load);
+      document.querySelector("#refresh").addEventListener("click", refreshAdminData);
       fields.searchButton.addEventListener("click", () => runSearch());
       fields.homeButton.addEventListener("click", goHome);
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
@@ -387,6 +421,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.privacyButton.addEventListener("click", openPrivacyDialog);
       fields.logoutButton.addEventListener("click", logout);
       fields.createMemberButton.addEventListener("click", openMemberDialog);
+      fields.createLibraryButton.addEventListener("click", () => openLibraryDialog());
+      fields.libraryForm.addEventListener("submit", saveManagedLibrary);
+      fields.libraryList.addEventListener("click", handleLibraryAction);
+      fields.closeLibraryDialog.addEventListener("click", closeLibraryDialog);
+      fields.cancelLibraryDialog.addEventListener("click", closeLibraryDialog);
+      fields.libraryDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeLibraryDialog();
+      });
       fields.memberForm.addEventListener("submit", createMember);
       fields.memberList.addEventListener("click", handleMemberAction);
       fields.archivedMemberList.addEventListener("click", handleArchivedMemberAction);
@@ -450,6 +493,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
       fields.inboxView.addEventListener("click", handleCurationClick);
       fields.inboxModeTabs.addEventListener("click", changeInboxMode);
+      fields.scannerQueue.addEventListener("click", selectScannerQueueItem);
+      fields.scannerQueueDetail.addEventListener("click", handleScannerReviewAction);
+      fields.refreshScannerQueue.addEventListener("click", () => loadScannerQueue({ announce: true }));
       fields.importInboxPanel.addEventListener("click", handleImportClick);
       fields.importSourceForm.addEventListener("submit", analyzeImportSource);
       fields.importApplyForm.addEventListener("submit", applySelectedImport);
@@ -623,6 +669,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.currentUserRole.textContent = user.role === "owner" ? "Administrador" : "Miembro";
         fields.adminButton.hidden = user.role !== "owner";
         fields.importCollectionDestination.hidden = user.role !== "owner";
+        fields.inboxScannerMode.hidden = user.role !== "owner";
+        if (user.role !== "owner" && inboxMode === "scanner") {
+          await setInboxMode("curation", { loadData: false });
+        }
       }
 
       async function logout() {
@@ -664,6 +714,356 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           fields.memberList.removeAttribute("aria-busy");
           fields.createMemberButton.disabled = false;
         }
+      }
+
+      async function loadLibraries({ announce = false } = {}) {
+        if (librariesLoading || currentIdentity?.user?.role !== "owner") return;
+        librariesLoading = true;
+        fields.libraryList.setAttribute("aria-busy", "true");
+        fields.createLibraryButton.disabled = true;
+        if (announce) setLibraryFeedback("Actualizando bibliotecas…");
+        try {
+          const response = await apiFetch("/api/libraries");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          scannerConfigured = Boolean(payload.configured);
+          scannerAllowedRoots = payload.allowed_roots || [];
+          managedLibraries = payload.libraries || [];
+          curationCounts.scanner = Number(payload.queue_count || 0);
+          if (!managedLibraries.some((entry) => entry.id === selectedLibraryId)) {
+            selectedLibraryId = managedLibraries[0]?.id || "";
+          }
+          if (selectedLibraryId) await loadLibraryDetail(selectedLibraryId, { renderAfter: false });
+          renderLibraryConfiguration();
+          renderLibraries();
+          syncCurationCounts();
+          if (announce) setLibraryFeedback("Bibliotecas actualizadas.");
+        } catch (error) {
+          setLibraryFeedback(libraryErrorMessage(error.message), "error");
+          fields.libraryList.innerHTML = `<div class="member-list-empty"><strong>Bibliotecas no disponibles</strong><span>Reintentá desde Actualizar datos.</span></div>`;
+        } finally {
+          librariesLoading = false;
+          fields.libraryList.removeAttribute("aria-busy");
+          fields.createLibraryButton.disabled = !scannerConfigured;
+        }
+      }
+
+      async function loadLibraryDetail(libraryId, { renderAfter = true } = {}) {
+        const response = await apiFetch(`/api/libraries/${encodeURIComponent(libraryId)}`);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+        const detail = payload.library;
+        managedLibraries = managedLibraries.map((entry) => entry.id === detail.id ? detail : entry);
+        if (renderAfter) renderLibraries();
+        return detail;
+      }
+
+      function renderLibraryConfiguration() {
+        if (!scannerConfigured) {
+          fields.libraryConfiguration.dataset.state = "disabled";
+          fields.libraryConfiguration.innerHTML = `<strong>Scanner administrado desactivado</strong><span>Reiniciá el servidor con al menos un <code>--library-root RUTA</code>.</span>`;
+          fields.createLibraryButton.disabled = true;
+          return;
+        }
+        fields.libraryConfiguration.dataset.state = "ready";
+        fields.libraryConfiguration.innerHTML = `<strong>${scannerAllowedRoots.length} ${scannerAllowedRoots.length === 1 ? "raíz habilitada" : "raíces habilitadas"}</strong><span>${scannerAllowedRoots.map((root) => `<code>${escapeHtml(root)}</code>`).join(" · ")}</span>`;
+      }
+
+      function renderLibraries() {
+        if (!managedLibraries.length) {
+          fields.libraryList.innerHTML = `<div class="member-list-empty"><strong>Todavía no hay rutas bajo seguimiento</strong><span>Agregá una biblioteca y ejecutá primero un recorrido de prueba.</span></div>`;
+          return;
+        }
+        fields.libraryList.innerHTML = managedLibraries.map((library) => {
+          const selected = library.id === selectedLibraryId;
+          const counts = library.counts || {};
+          const running = (library.runs || []).find((run) => ["queued", "running"].includes(run.status))
+            || (library.status === "scanning" ? { status: "running" } : null);
+          const canApply = Boolean(library.verified_at) && !running;
+          const status = libraryStatusLabel(library.status);
+          const activation = library.active
+            ? `<button class="quiet-action library-pause" type="button" data-library-action="toggle" data-library-id="${escapeAttr(library.id)}" ${running ? "disabled" : ""}>Pausar</button>`
+            : `<button class="quiet-action library-activate" type="button" data-library-action="toggle" data-library-id="${escapeAttr(library.id)}" ${library.verified_at && !running ? "" : "disabled"}>Activar</button>`;
+          return `<article class="library-record${selected ? " is-selected" : ""}" data-library-id="${escapeAttr(library.id)}">
+            <div class="library-record-main">
+              <button class="library-record-identity" type="button" data-library-action="select" data-library-id="${escapeAttr(library.id)}" aria-expanded="${selected}">
+                <span class="library-drive-mark" aria-hidden="true">${library.active ? "ON" : "OFF"}</span>
+                <span><strong>${escapeHtml(library.name || "Biblioteca")}</strong><code>${escapeHtml(library.root_path || "")}</code></span>
+              </button>
+              <div class="library-record-state">
+                <span class="member-state ${libraryStatusClass(library.status)}">${escapeHtml(status)}</span>
+                <span>${escapeHtml(scheduleLabel(library.schedule))}</span>
+              </div>
+              <dl class="library-record-metrics">
+                <div><dt>Archivos</dt><dd>${Number(counts.files || 0)}</dd></div>
+                <div><dt>Listos</dt><dd>${Number(counts.matched || 0)}</dd></div>
+                <div><dt>Revisar</dt><dd>${Number(counts.new || 0) + Number(counts.review || 0)}</dd></div>
+              </dl>
+              <div class="library-record-actions">
+                <button class="quiet-action" type="button" data-library-action="test" data-library-id="${escapeAttr(library.id)}" ${running ? "disabled" : ""}>Probar</button>
+                <button type="button" data-library-action="scan" data-library-id="${escapeAttr(library.id)}" ${canApply ? "" : "disabled"}>Escanear</button>
+                ${activation}
+                <button class="quiet-action" type="button" data-library-action="edit" data-library-id="${escapeAttr(library.id)}" ${running ? "disabled" : ""}>Editar</button>
+              </div>
+            </div>
+            ${selected ? libraryRunPanel(library, running) : ""}
+          </article>`;
+        }).join("");
+      }
+
+      function libraryRunPanel(library, running) {
+        const runs = (library.runs || []).slice(0, 5);
+        const lastRun = runs[0];
+        return `<div class="library-run-panel">
+          <div class="library-run-summary">
+            <div><span>Último recorrido</span><strong>${lastRun ? formatLibraryTime(lastRun.finished_at || lastRun.created_at) : "Sin recorridos"}</strong></div>
+            <div><span>Próxima ejecución</span><strong>${library.next_scan_at ? formatLibraryTime(library.next_scan_at) : "Manual"}</strong></div>
+            <div><span>Protección de bajas</span><strong>${Math.round(Number(library.max_missing_ratio || 0) * 100)}%</strong></div>
+          </div>
+          ${running ? `<div class="library-running" role="status"><span class="library-running-signal" aria-hidden="true"></span><strong>${running.status === "queued" ? "Recorrido en cola" : "Leyendo biblioteca"}</strong><span>Podés seguir usando Movie Inbox.</span></div>` : ""}
+          ${lastRun && !running ? libraryRunResult(lastRun) : ""}
+          ${runs.length ? `<details class="library-run-history"><summary>Historial de recorridos</summary><div>${runs.map((run) => `<div><span>${escapeHtml(runModeLabel(run))}</span><strong>${escapeHtml(runStatusLabel(run.status))}</strong><time>${formatLibraryTime(run.finished_at || run.created_at)}</time></div>`).join("")}</div></details>` : ""}
+          <div class="library-secondary-actions">
+            <button class="text-action" type="button" data-library-action="scanner" data-library-id="${escapeAttr(library.id)}">Abrir pendientes</button>
+            <button class="text-action danger-action" type="button" data-library-action="delete" data-library-id="${escapeAttr(library.id)}" ${running ? "disabled" : ""}>Quitar seguimiento</button>
+          </div>
+        </div>`;
+      }
+
+      function libraryRunResult(run) {
+        const summary = run.summary || {};
+        const preview = run.preview || [];
+        const parts = [
+          `${Number(summary.discovered || 0)} archivos`,
+          `${Number(summary.matched || 0)} vinculados`,
+          `${Number(summary.new || 0) + Number(summary.review || 0)} para revisar`
+        ];
+        const errors = run.errors || [];
+        return `<div class="library-run-result" data-state="${escapeAttr(run.status || "")}">
+          <strong>${escapeHtml(runStatusLabel(run.status))}</strong>
+          <span>${escapeHtml(parts.join(" · "))}</span>
+          ${errors.length ? `<details><summary>${errors.length} ${errors.length === 1 ? "advertencia" : "advertencias"}</summary><ul>${errors.slice(0, 8).map((error) => `<li>${escapeHtml(error)}</li>`).join("")}</ul></details>` : ""}
+          ${preview.length ? `<details class="library-run-preview"><summary>Revisar muestra (${preview.length})</summary><div class="library-run-preview-list">${preview.map((item) => `
+            <div class="library-run-preview-row">
+              <span class="scanner-queue-state">${escapeHtml(libraryPreviewStateLabel(item.state))}</span>
+              <strong>${escapeHtml(item.title || "Sin título detectado")}</strong>
+              <span>${escapeHtml([item.year, importKindLabel(item.kind)].filter(Boolean).join(" · "))}</span>
+              <code>${escapeHtml(item.relative_path || "")}</code>
+            </div>`).join("")}</div></details>` : ""}
+        </div>`;
+      }
+
+      function libraryPreviewStateLabel(value) {
+        return { matched: "Vinculada", new: "Nueva", review: "Comparar", ignored: "Ignorada" }[value] || "Detectada";
+      }
+
+      async function handleLibraryAction(event) {
+        const button = event.target.closest("[data-library-action]");
+        if (!button) return;
+        const library = managedLibraries.find((entry) => entry.id === button.dataset.libraryId);
+        if (!library) return;
+        const action = button.dataset.libraryAction;
+        if (action === "select") {
+          selectedLibraryId = selectedLibraryId === library.id ? "" : library.id;
+          if (selectedLibraryId) await loadLibraryDetail(library.id);
+          else renderLibraries();
+          return;
+        }
+        if (action === "edit") {
+          openLibraryDialog(library);
+          return;
+        }
+        if (action === "scanner") {
+          await goToInbox();
+          await setInboxMode("scanner");
+          return;
+        }
+        if (action === "delete") {
+          const confirmed = confirm(`¿Quitar el seguimiento de "${library.name}"? El inventario verificado de esta ruta dejará de aportar disponibilidad.`);
+          if (!confirmed) return;
+          await deleteManagedLibrary(library);
+          return;
+        }
+        button.disabled = true;
+        try {
+          if (action === "test" || action === "scan") {
+            await queueLibraryRun(library, action === "test" ? "dry_run" : "apply");
+          } else if (action === "toggle") {
+            const response = await apiFetch(`/api/libraries/${encodeURIComponent(library.id)}/status`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ active: !library.active })
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+            setLibraryFeedback(payload.library.active ? `${library.name} quedó activa.` : `${library.name} quedó pausada.`);
+            await loadLibraries();
+          }
+        } catch (error) {
+          setLibraryFeedback(libraryErrorMessage(error.message), "error");
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      async function queueLibraryRun(library, mode) {
+        setLibraryFeedback(mode === "dry_run" ? `Preparando prueba de ${library.name}…` : `Escaneando ${library.name}…`);
+        const response = await apiFetch(`/api/libraries/${encodeURIComponent(library.id)}/runs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+        activeLibraryRunId = payload.run?.id || "";
+        selectedLibraryId = library.id;
+        await loadLibraryDetail(library.id);
+        scheduleLibraryRunPoll(library.id);
+      }
+
+      function scheduleLibraryRunPoll(libraryId) {
+        clearTimeout(libraryRunPollTimer);
+        if (!activeLibraryRunId) return;
+        libraryRunPollTimer = setTimeout(() => pollLibraryRun(libraryId), 1200);
+      }
+
+      async function pollLibraryRun(libraryId) {
+        try {
+          const response = await apiFetch(`/api/library-runs/${encodeURIComponent(activeLibraryRunId)}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          const run = payload.run || {};
+          if (["queued", "running"].includes(run.status)) {
+            scheduleLibraryRunPoll(libraryId);
+            return;
+          }
+          activeLibraryRunId = "";
+          await Promise.all([loadLibraries(), loadScannerQueue(), loadCatalog()]);
+          const message = run.status === "completed" ? "Recorrido completado." : run.status === "blocked" ? "Recorrido bloqueado por la protección de bajas." : "Recorrido terminado con advertencias.";
+          setLibraryFeedback(message, run.status === "completed" ? "" : "error");
+        } catch (error) {
+          activeLibraryRunId = "";
+          setLibraryFeedback(libraryErrorMessage(error.message), "error");
+        }
+      }
+
+      function openLibraryDialog(library = null) {
+        editingLibraryId = library?.id || "";
+        fields.libraryForm.reset();
+        fields.libraryDialogTitle.textContent = library ? "Editar biblioteca" : "Agregar biblioteca";
+        fields.libraryName.value = library?.name || "";
+        fields.libraryRootPath.value = library?.root_path || "";
+        fields.libraryRootPath.disabled = Boolean(library);
+        fields.librarySchedule.value = library?.schedule || "manual";
+        fields.libraryMissingRatio.value = Math.round(Number(library?.max_missing_ratio ?? 0.5) * 100);
+        fields.libraryRootHint.textContent = library
+          ? "Para cambiar la ruta, quitá el seguimiento y registrala nuevamente."
+          : `Raíces habilitadas: ${scannerAllowedRoots.join(" · ")}`;
+        setInlineFeedback(fields.libraryDialogFeedback, "");
+        fields.libraryDialog.showModal();
+        fields.libraryName.focus();
+      }
+
+      function closeLibraryDialog() {
+        fields.libraryDialog.close();
+        fields.libraryForm.reset();
+        fields.libraryRootPath.disabled = false;
+        editingLibraryId = "";
+        setInlineFeedback(fields.libraryDialogFeedback, "");
+      }
+
+      async function saveManagedLibrary(event) {
+        event.preventDefault();
+        fields.submitLibrary.disabled = true;
+        setInlineFeedback(fields.libraryDialogFeedback, "Guardando…");
+        const body = {
+          name: fields.libraryName.value,
+          schedule: fields.librarySchedule.value,
+          max_missing_ratio: Number(fields.libraryMissingRatio.value || 50) / 100
+        };
+        if (!editingLibraryId) body.root_path = fields.libraryRootPath.value;
+        const endpoint = editingLibraryId
+          ? `/api/libraries/${encodeURIComponent(editingLibraryId)}/update`
+          : "/api/libraries";
+        try {
+          const response = await apiFetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          const name = payload.library?.name || body.name;
+          selectedLibraryId = payload.library?.id || editingLibraryId;
+          closeLibraryDialog();
+          setLibraryFeedback(`${name} quedó guardada. ${payload.reason === "library_created" ? "Ejecutá ahora el recorrido de prueba." : ""}`.trim());
+          await loadLibraries();
+        } catch (error) {
+          setInlineFeedback(fields.libraryDialogFeedback, libraryErrorMessage(error.message), "error");
+        } finally {
+          fields.submitLibrary.disabled = false;
+        }
+      }
+
+      async function deleteManagedLibrary(library) {
+        try {
+          const response = await apiFetch(`/api/libraries/${encodeURIComponent(library.id)}/delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ confirmed: true })
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          selectedLibraryId = "";
+          setLibraryFeedback(`${library.name} dejó de estar bajo seguimiento.`);
+          await Promise.all([loadLibraries(), loadCatalog()]);
+        } catch (error) {
+          setLibraryFeedback(libraryErrorMessage(error.message), "error");
+        }
+      }
+
+      function setLibraryFeedback(message, tone = "") {
+        setInlineFeedback(fields.libraryFeedback, message, tone);
+      }
+
+      function libraryErrorMessage(reason) {
+        const value = String(reason || "");
+        if (value === "library_scan_busy") return "Ya hay un recorrido en curso para esta biblioteca.";
+        if (value === "library_not_found") return "La biblioteca ya no está disponible.";
+        if (value.includes("allowlist") || value.includes("allowed roots")) return "La ruta está fuera de las raíces habilitadas en el servidor.";
+        if (value.includes("offline") || value.includes("directory")) return "La ruta no está montada o no es un directorio accesible.";
+        if (value.includes("test scan")) return "Primero ejecutá un recorrido de prueba satisfactorio.";
+        if (value.includes("already uses")) return "Esa ruta ya está registrada en otra biblioteca.";
+        if (value === "library_store_unavailable") return "El inventario no está disponible. Reintentá en unos segundos.";
+        return value && !value.startsWith("HTTP") ? value : "No pudimos completar la operación de biblioteca.";
+      }
+
+      function libraryStatusLabel(value) {
+        return { unverified: "Sin comprobar", ready: "Lista", scanning: "Escaneando", paused: "Pausada", offline: "Desconectada", warning: "Con advertencias", error: "Error" }[value] || "Sin comprobar";
+      }
+
+      function libraryStatusClass(value) {
+        if (["ready", "scanning"].includes(value)) return "member-state-active";
+        if (["warning", "offline", "error", "unverified"].includes(value)) return "member-state-attention";
+        return "member-state-disabled";
+      }
+
+      function scheduleLabel(value) {
+        return { manual: "Manual", hourly: "Cada hora", daily: "Diaria" }[value] || "Manual";
+      }
+
+      function runStatusLabel(value) {
+        return { queued: "En cola", running: "En curso", completed: "Completado", partial: "Parcial", blocked: "Bloqueado", failed: "Falló" }[value] || "Sin estado";
+      }
+
+      function runModeLabel(run) {
+        return `${run.mode === "dry_run" ? "Prueba" : "Aplicación"} · ${run.trigger === "scheduled" ? "Programada" : "Manual"}`;
+      }
+
+      function formatLibraryTime(value) {
+        const timestamp = Number(value || 0);
+        if (!timestamp) return "Sin registro";
+        return new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(timestamp * 1000));
       }
 
       function renderMembers() {
@@ -1142,7 +1542,17 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function goToAdmin(options = {}) {
         showView("admin", options);
-        loadMembers();
+        Promise.all([loadMembers(), loadLibraries()]);
+      }
+
+      async function refreshAdminData() {
+        await load();
+        if (currentView === "admin") {
+          await Promise.all([
+            loadMembers({ announce: true }),
+            loadLibraries({ announce: true })
+          ]);
+        }
       }
 
       function showView(view, options = {}) {
@@ -1694,7 +2104,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function storedInboxMode() {
         try {
-          return localStorage.getItem("movie-inbox-inbox-mode") === "imports" ? "imports" : "curation";
+          const stored = localStorage.getItem("movie-inbox-inbox-mode");
+          return ["curation", "imports", "scanner"].includes(stored) ? stored : "curation";
         } catch (_error) {
           return "curation";
         }
@@ -1707,28 +2118,178 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       async function setInboxMode(mode, { loadData = true } = {}) {
-        inboxMode = mode === "imports" ? "imports" : "curation";
+        const requested = ["curation", "imports", "scanner"].includes(mode) ? mode : "curation";
+        inboxMode = requested === "scanner" && currentIdentity?.user?.role !== "owner" ? "curation" : requested;
         try {
           localStorage.setItem("movie-inbox-inbox-mode", inboxMode);
         } catch (_error) {
           // The mode still works when browser storage is unavailable.
         }
         const importsActive = inboxMode === "imports";
+        const scannerActive = inboxMode === "scanner";
         fields.inboxView.dataset.inboxMode = inboxMode;
-        fields.curationInboxPanel.hidden = importsActive;
+        fields.curationInboxPanel.hidden = importsActive || scannerActive;
         fields.importInboxPanel.hidden = !importsActive;
-        fields.inboxCurationMode.classList.toggle("active", !importsActive);
-        fields.inboxCurationMode.setAttribute("aria-pressed", String(!importsActive));
+        fields.scannerInboxPanel.hidden = !scannerActive;
+        fields.inboxCurationMode.classList.toggle("active", !importsActive && !scannerActive);
+        fields.inboxCurationMode.setAttribute("aria-pressed", String(!importsActive && !scannerActive));
         fields.inboxImportsMode.classList.toggle("active", importsActive);
         fields.inboxImportsMode.setAttribute("aria-pressed", String(importsActive));
+        fields.inboxScannerMode.classList.toggle("active", scannerActive);
+        fields.inboxScannerMode.setAttribute("aria-pressed", String(scannerActive));
         if (!loadData || currentView !== "inbox") return;
-        if (importsActive) await loadImportDrafts();
+        if (scannerActive) await loadScannerQueue();
+        else if (importsActive) await loadImportDrafts();
         else await loadCurationQueue();
       }
 
       async function loadCurrentInbox(options = {}) {
-        if (inboxMode === "imports") await loadImportDrafts(options);
+        if (inboxMode === "scanner") await loadScannerQueue(options);
+        else if (inboxMode === "imports") await loadImportDrafts(options);
         else await loadCurationQueue(options);
+      }
+
+      async function loadScannerQueue({ announce = false } = {}) {
+        if (scannerQueueLoading || currentIdentity?.user?.role !== "owner") return;
+        scannerQueueLoading = true;
+        fields.scannerInboxPanel.setAttribute("aria-busy", "true");
+        fields.refreshScannerQueue.disabled = true;
+        try {
+          const response = await apiFetch("/api/scanner/queue");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          scannerQueue = payload.items || [];
+          curationCounts.scanner = Number(payload.count || scannerQueue.length);
+          if (!scannerQueue.some((item) => item.id === selectedScannerItemId)) {
+            selectedScannerItemId = scannerQueue[0]?.id || "";
+          }
+          renderScannerQueue();
+          syncCurationCounts();
+          if (announce) setCurationFeedback("Cola del scanner actualizada.", "success");
+        } catch (error) {
+          fields.scannerQueue.innerHTML = "";
+          fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Cola no disponible</strong><p>${escapeHtml(libraryErrorMessage(error.message))}</p></div>`;
+        } finally {
+          scannerQueueLoading = false;
+          fields.scannerInboxPanel.removeAttribute("aria-busy");
+          fields.refreshScannerQueue.disabled = false;
+        }
+      }
+
+      function renderScannerQueue() {
+        fields.scannerQueueMeta.textContent = `${scannerQueue.length} ${scannerQueue.length === 1 ? "archivo" : "archivos"}`;
+        if (!scannerQueue.length) {
+          fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Scanner al día</strong><p>No quedan identidades físicas por confirmar.</p></div>`;
+          fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Sin decisiones pendientes</strong><p>Los próximos casos aparecerán después de un recorrido aplicado.</p></div>`;
+          return;
+        }
+        fields.scannerQueue.innerHTML = scannerQueue.map((item) => {
+          const active = item.id === selectedScannerItemId;
+          const label = item.state === "review" ? "Comparar" : "Nueva";
+          return `<button class="scanner-queue-item${active ? " active" : ""}" type="button" data-scanner-item="${escapeAttr(item.id)}" aria-pressed="${active}">
+            <span class="scanner-queue-state">${label}</span>
+            <strong>${escapeHtml(item.detected_title || item.name || "Sin título")}</strong>
+            <span>${escapeHtml([item.detected_year, importKindLabel(item.detected_kind)].filter(Boolean).join(" · ") || "Identidad incompleta")}</span>
+            <small>${escapeHtml(item.library_name || "Biblioteca")}</small>
+          </button>`;
+        }).join("");
+        renderScannerQueueDetail();
+      }
+
+      function selectScannerQueueItem(event) {
+        const button = event.target.closest("[data-scanner-item]");
+        if (!button) return;
+        selectedScannerItemId = button.dataset.scannerItem || "";
+        renderScannerQueue();
+      }
+
+      function renderScannerQueueDetail() {
+        const item = scannerQueue.find((entry) => entry.id === selectedScannerItemId);
+        if (!item) return;
+        const candidates = item.candidates || [];
+        fields.scannerQueueDetail.innerHTML = `
+          <header class="scanner-case-heading">
+            <div>
+              <span class="section-kicker">${item.state === "review" ? "Coincidencia ambigua" : "Archivo nuevo"}</span>
+              <h3>${escapeHtml(item.detected_title || item.name || "Sin título")}</h3>
+              <p>${escapeHtml(item.relative_path || item.name || "")}</p>
+            </div>
+            <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} candidatas` : "Sin coincidencia"}</span>
+          </header>
+          <dl class="scanner-file-facts">
+            <div><dt>Biblioteca</dt><dd>${escapeHtml(item.library_name || "Biblioteca")}</dd></div>
+            <div><dt>Tipo detectado</dt><dd>${escapeHtml(importKindLabel(item.detected_kind) || "Película")}</dd></div>
+            <div><dt>Tamaño</dt><dd>${escapeHtml(formatImportBytes(item.size_bytes))}</dd></div>
+          </dl>
+          ${candidates.length ? `<section class="scanner-candidates"><h4>Coincidencias posibles</h4>${candidates.map((candidate) => scannerCandidate(candidate)).join("")}</section>` : ""}
+          <section class="scanner-confirm-detected">
+            <div><h4>${candidates.length ? "O confirmar otra identidad" : "Confirmar identidad detectada"}</h4><p>El año es obligatorio para compartir disponibilidad sin falsas coincidencias.</p></div>
+            <form data-scanner-confirm-form>
+              <label><span>Título</span><input name="title" value="${escapeAttr(item.detected_title || "")}" maxlength="240" required></label>
+              <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(19|20)[0-9]{2}" maxlength="4" required></label>
+              <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === item.detected_kind ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
+              <button type="submit" data-scanner-review="confirm-detected" data-file-id="${escapeAttr(item.id)}">Confirmar obra</button>
+            </form>
+          </section>
+          <footer class="scanner-case-actions">
+            <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Ignorar archivo</button>
+            <span id="scannerReviewFeedback" role="status" aria-live="polite"></span>
+          </footer>`;
+      }
+
+      function scannerCandidate(candidate) {
+        const title = candidate.spanish_title || candidate.title || candidate.original_title || "Obra sin título";
+        const evidence = [candidate.year, importKindLabel(candidate.kind), scannerCandidateReason(candidate.reason)].filter(Boolean);
+        return `<article class="scanner-candidate-row">
+          <div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(evidence.join(" · "))}</span></div>
+          <button class="quiet-action" type="button" data-scanner-review="confirm-candidate" data-candidate-key="${escapeAttr(candidate.key || "")}" data-file-id="${escapeAttr(selectedScannerItemId)}">Usar esta</button>
+        </article>`;
+      }
+
+      function scannerCandidateReason(reason) {
+        return {
+          exact_title_year: "Título y año exactos",
+          exact_title_missing_year: "Título exacto; falta año",
+          similar_title_requires_review: "Título similar"
+        }[reason] || "Coincidencia posible";
+      }
+
+      async function handleScannerReviewAction(event) {
+        const button = event.target.closest("[data-scanner-review]");
+        if (!button) return;
+        event.preventDefault();
+        const action = button.dataset.scannerReview;
+        const fileId = button.dataset.fileId || selectedScannerItemId;
+        const body = { action: action === "ignore" ? "ignore" : "confirm" };
+        if (action === "confirm-candidate") {
+          body.candidate_key = button.dataset.candidateKey || "";
+        } else if (action === "confirm-detected") {
+          const form = button.closest("form");
+          if (!form?.reportValidity()) return;
+          const data = new FormData(form);
+          body.title = data.get("title") || "";
+          body.year = data.get("year") || "";
+          body.kind = data.get("kind") || "pelicula";
+        }
+        button.disabled = true;
+        const feedback = fields.scannerQueueDetail.querySelector("#scannerReviewFeedback");
+        if (feedback) feedback.textContent = "Guardando decisión…";
+        try {
+          const response = await apiFetch(`/api/scanner/queue/${encodeURIComponent(fileId)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          const priorIndex = scannerQueue.findIndex((item) => item.id === fileId);
+          await Promise.all([loadScannerQueue(), loadCatalog(), loadLibraries()]);
+          selectedScannerItemId = scannerQueue[Math.min(priorIndex, scannerQueue.length - 1)]?.id || "";
+          renderScannerQueue();
+        } catch (error) {
+          if (feedback) feedback.textContent = libraryErrorMessage(error.message);
+          button.disabled = false;
+        }
       }
 
       async function loadImportDrafts({ selectId = "", announce = false, refreshSelected = true } = {}) {
@@ -2375,6 +2936,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             duplicates: 0,
             missing_link: 0,
             deferred: 0,
+            scanner: curationCounts.scanner || 0,
             ...(payload.counts || {})
           };
           const visible = visibleCurationCases();
@@ -2499,13 +3061,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.curationMissingCount.textContent = curationCounts.missing_link || 0;
         fields.curationDeferredCount.textContent = curationCounts.deferred || 0;
         fields.curationHistoryCount.textContent = curationHistory.length || 0;
-        fields.inboxBadge.textContent = curationCounts.pending || 0;
-        fields.inboxBadge.hidden = !(curationCounts.pending > 0);
+        fields.scannerQueueCount.textContent = curationCounts.scanner || 0;
+        const pendingTotal = Number(curationCounts.pending || 0) + Number(curationCounts.scanner || 0);
+        fields.inboxBadge.textContent = pendingTotal;
+        fields.inboxBadge.hidden = !(pendingTotal > 0);
         fields.inboxButton.setAttribute(
           "aria-label",
-          curationCounts.pending
-            ? `Bandeja, ${curationCounts.pending} ${
-                curationCounts.pending === 1 ? "decisión pendiente" : "decisiones pendientes"
+          pendingTotal
+            ? `Bandeja, ${pendingTotal} ${
+                pendingTotal === 1 ? "decisión pendiente" : "decisiones pendientes"
               }`
             : "Bandeja, sin decisiones pendientes"
         );
@@ -4187,10 +4751,19 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function availabilityPanel(item) {
         const localText = localFilesText(item);
         const duplicates = Number(item._duplicate_count || 0);
+        const availability = item._availability || {};
+        const manual = availability.manual ?? isInCatalog(item.en_catalogo);
+        const server = Boolean(availability.server);
+        const sourceText = (availability.sources || [])
+          .map((source) => `${source.library_name} (${source.file_count})`)
+          .join(" · ");
         return `<dl class="availability-list">
           <div><dt>En catálogo</dt><dd>${isInCatalog(item.en_catalogo) ? "Sí" : "No"}</dd></div>
-          <div><dt>Archivos</dt><dd>${escapeHtml(localText || "Sin archivo asociado")}</dd></div>
-          <div><dt>Fuente</dt><dd>${escapeHtml(item.source || "Sin fuente")}</dd></div>
+          <div><dt>Declaración personal</dt><dd>${manual ? "Sí" : "No"}</dd></div>
+          <div><dt>Servidor verificado</dt><dd>${server ? `${Number(availability.file_count || 0)} ${Number(availability.file_count || 0) === 1 ? "archivo" : "archivos"}` : "No"}</dd></div>
+          ${sourceText ? `<div><dt>Bibliotecas</dt><dd>${escapeHtml(sourceText)}</dd></div>` : ""}
+          ${localText ? `<div><dt>Archivos heredados</dt><dd>${escapeHtml(localText)}</dd></div>` : ""}
+          <div><dt>Fuente de metadata</dt><dd>${escapeHtml(item.source || "Sin fuente")}</dd></div>
           ${duplicates ? `<div><dt>Duplicados</dt><dd>${escapeHtml(`${duplicates} coincidencia(s): ${item._duplicate_reason || "misma obra"}`)}</dd></div>` : ""}
         </dl>`;
       }
@@ -4339,6 +4912,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const summary = item.wikipedia_extract || item.description || item.notes || "";
         const watched = item.status === "watched";
         const catalogued = isInCatalog(item.en_catalogo);
+        const manuallyCatalogued = item._availability?.manual ?? catalogued;
         const metadataSection = detailPersonalEditing ? "" : `
           <details class="drawer-accordion drawer-editor">
             <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>
@@ -4360,8 +4934,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <button class="drawer-state ${watched ? "active" : ""}" type="button" data-click="toggle-watched" data-id="${escapeAttr(item.id)}" data-status="${escapeAttr(item.status || "to_watch")}" aria-pressed="${watched}">
               <span>Estado</span><strong>${watched ? "Vista" : "Pendiente"}</strong><small>${item.watched_at ? escapeHtml(item.watched_at) : "Sin fecha"}</small>
             </button>
-            <button class="drawer-state ${catalogued ? "active" : ""}" type="button" data-click="toggle-catalog" data-id="${escapeAttr(item.id)}" aria-pressed="${catalogued}">
-              <span>Mi catálogo</span><strong>${catalogued ? "Incluida" : "No incluida"}</strong><small>Cambiar estado</small>
+            <button class="drawer-state ${manuallyCatalogued ? "active" : ""}" type="button" data-click="toggle-catalog" data-id="${escapeAttr(item.id)}" aria-pressed="${manuallyCatalogued}">
+              <span>Declaración personal</span><strong>${manuallyCatalogued ? "Incluida" : "No incluida"}</strong><small>${item._availability?.server ? "Servidor disponible" : "Cambiar estado"}</small>
             </button>
             <button class="drawer-state rating-state ${rating ? "active" : ""}" type="button" data-click="edit-personal" data-id="${escapeAttr(item.id)}">
               <span>Puntuación</span><strong>${rating ? `${rating}/10` : "Sin puntuar"}</strong><small>Editar registro</small>
@@ -5197,7 +5771,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         event.preventDefault();
         const item = items.find((entry) => entry.id === id);
         if (!item) return;
-        const nextValue = !isInCatalog(item.en_catalogo);
+        const manualValue = item._availability?.manual ?? isInCatalog(item.en_catalogo);
+        const nextValue = !manualValue;
         const detailAction = selectedDetailId === id;
         if (detailAction) setDetailFeedback("Guardando disponibilidad…", "working", 0);
         try {
@@ -5208,7 +5783,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           });
           const payload = await response.json();
           if (!payload.ok) throw new Error(payload.reason || "No se pudo cambiar el estado de catalogo");
-          if (detailAction) setDetailFeedback(nextValue ? "Disponible en catálogo" : "Fuera de catálogo", "success");
+          if (detailAction) {
+            const message = nextValue
+              ? "Disponibilidad personal declarada"
+              : item._availability?.server
+                ? "Declaración retirada; sigue disponible en el servidor"
+                : "Disponibilidad personal retirada";
+            setDetailFeedback(message, "success");
+          }
           await load();
         } catch (error) {
           console.error("[catalog-viewer] catalog update failed", error);

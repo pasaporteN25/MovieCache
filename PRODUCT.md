@@ -81,8 +81,14 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - La interfaz todavia no importa paquetes de catalogo. Esa capacidad futura debe
   permitir previsualizar, mapear formatos y elegir entre copiar obras al catalogo
   personal o crear una coleccion local sin mezclar automaticamente ambas fuentes.
-- El scanner incremental ya puede ejecutarse por CLI, pero Administrar todavia no
-  permite registrar rutas, programar recorridos ni consultar su estado asincronico.
+- El scanner incremental puede ejecutarse por CLI o administrarse desde la web. Las
+  rutas estan limitadas por configuracion del servidor; el owner prueba, activa y
+  programa recorridos, y resuelve identidades dudosas desde la Bandeja.
+- El inventario fisico pertenece a la instancia y aporta disponibilidad verificada a
+  todos los catalogos sin exponer rutas a miembros. La declaracion manual permanece
+  como una senal separada.
+- Docker es una prioridad cercana posterior a la estabilizacion del scanner, pero el
+  despliegue soportado actualmente es Uvicorn bajo systemd y Nginx.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

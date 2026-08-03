@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -19,20 +18,17 @@ from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION, atomic_write_json
 from movie_inbox.application.catalog_service import CatalogService
+from movie_inbox.infrastructure.library_scanner import (
+    DEFAULT_EXCLUDED_DIRS,
+    DEFAULT_EXTENSIONS,
+    FilesystemScanError,
+    normalize_excluded_dirs,
+    normalize_extensions,
+    scan_media_files,
+)
 
 
 STATE_SCHEMA_VERSION = 1
-DEFAULT_EXTENSIONS = {
-    ".3g2", ".3gp", ".asf", ".avi", ".divx", ".flv", ".m2ts", ".m4v",
-    ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".mts", ".ogm", ".ogv",
-    ".rmvb", ".ts", ".vob", ".webm", ".wmv",
-}
-DEFAULT_EXCLUDED_DIRS = {
-    "$recycle.bin", "system volume information", ".catalog-cache", ".catalog-state",
-}
-SAMPLE_BYTES = 128 * 1024
-
-
 class ScannerError(RuntimeError):
     pass
 
@@ -138,24 +134,6 @@ def resolve_config_path(value: str, base: Path) -> Path:
     return path.resolve() if path.is_absolute() else (base / path).resolve()
 
 
-def normalize_extensions(values: Any) -> set[str]:
-    if isinstance(values, str):
-        values = values.split(",")
-    rows = values if isinstance(values, (list, tuple, set)) else DEFAULT_EXTENSIONS
-    return {
-        extension if extension.startswith(".") else f".{extension}"
-        for value in rows
-        if (extension := str(value).strip().casefold())
-    }
-
-
-def normalize_excluded_dirs(values: Any) -> set[str]:
-    if isinstance(values, str):
-        values = values.split(",")
-    rows = values if isinstance(values, (list, tuple, set)) else DEFAULT_EXCLUDED_DIRS
-    return {str(value).strip().casefold() for value in rows if str(value).strip()}
-
-
 def normalize_ratio(value: Any) -> float:
     try:
         return max(0.0, min(1.0, float(value)))
@@ -250,100 +228,37 @@ def scan_files(
     previous_state: dict[str, dict[str, Any]],
     scanned_at: str,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], list[str]]:
+    scanned_epoch = int(datetime.fromisoformat(scanned_at).timestamp())
+    try:
+        scanned_rows, errors = scan_media_files(
+            config.root,
+            previous_state,
+            extensions=config.extensions,
+            excluded_dirs=config.excluded_dirs,
+            scanned_at=scanned_epoch,
+        )
+    except FilesystemScanError as error:
+        raise ScannerError(str(error)) from error
     rows: list[dict[str, Any]] = []
     state_files: dict[str, dict[str, Any]] = {}
-    errors: list[str] = []
-
-    def on_error(error: OSError) -> None:
-        errors.append(str(error))
-
-    for current, directories, files in os.walk(config.root, onerror=on_error, followlinks=False):
-        directories[:] = [name for name in directories if name.casefold() not in config.excluded_dirs]
-        current_path = Path(current)
-        for name in files:
-            path = current_path / name
-            if path.suffix.casefold() not in config.extensions:
-                continue
-            try:
-                stat = path.stat()
-                relative_path = path.relative_to(config.root).as_posix()
-                previous = previous_state.get(relative_path, {})
-                same_file = (
-                    int(previous.get("size_bytes") or -1) == stat.st_size
-                    and int(previous.get("modified_ns") or -1) == stat.st_mtime_ns
-                    and bool(previous.get("fingerprint"))
-                )
-                fingerprint = str(previous.get("fingerprint")) if same_file else sampled_fingerprint(path, stat.st_size)
-                title, year, kind = parse_release_name(name)
-                modified_at = datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
-                local_file = {
-                    "path": str(path.resolve()),
-                    "name": name,
-                    "size_bytes": stat.st_size,
-                    "modified_at": modified_at,
-                    "part": detect_part(name),
-                    "library_id": config.library_id,
-                    "relative_path": relative_path,
-                    "fingerprint": fingerprint,
-                    "last_seen_at": scanned_at,
-                    "available": True,
-                    "title": title,
-                    "year": year,
-                    "kind": kind,
-                }
-                rows.append(local_file)
-                state_files[relative_path] = {
-                    "size_bytes": stat.st_size,
-                    "modified_ns": stat.st_mtime_ns,
-                    "modified_at": modified_at,
-                    "fingerprint": fingerprint,
-                }
-            except OSError as error:
-                errors.append(f"{path}: {error}")
-
-    rows.sort(key=lambda row: str(row.get("relative_path") or "").casefold())
+    for scanned in scanned_rows:
+        relative_path = str(scanned.get("relative_path") or "")
+        rows.append(
+            {
+                **scanned,
+                "path": str((config.root / Path(relative_path)).resolve()),
+                "library_id": config.library_id,
+                "last_seen_at": scanned_at,
+                "available": True,
+            }
+        )
+        state_files[relative_path] = {
+            "size_bytes": int(scanned.get("size_bytes") or 0),
+            "modified_ns": int(scanned.get("modified_ns") or 0),
+            "modified_at": str(scanned.get("modified_at") or ""),
+            "fingerprint": str(scanned.get("fingerprint") or ""),
+        }
     return rows, state_files, errors
-
-
-def sampled_fingerprint(path: Path, size: int) -> str:
-    digest = hashlib.sha256()
-    digest.update(str(size).encode("ascii"))
-    with path.open("rb") as handle:
-        digest.update(handle.read(SAMPLE_BYTES))
-        if size > SAMPLE_BYTES:
-            handle.seek(max(0, size - SAMPLE_BYTES))
-            digest.update(handle.read(SAMPLE_BYTES))
-    return digest.hexdigest()
-
-
-def parse_release_name(name: str) -> tuple[str, str, str]:
-    value = Path(name).stem
-    kind = "serie" if re.search(r"\bS\d{1,2}(?:E\d{1,3})?\b", value, re.IGNORECASE) else "pelicula"
-    value = value.replace(".", " ").replace("_", " ").replace("-", " ")
-    value = re.sub(r"[\[\]{}]+", " ", value)
-    value = re.sub(r"\bS\d{1,2}(?:E\d{1,3}(?:E\d{1,3})*)?\b.*$", "", value, flags=re.IGNORECASE)
-    value = re.sub(
-        r"\b(480p|576p|720p|1080p|2160p|4k|8k|bluray|blu ray|brrip|bdrip|"
-        r"webrip|web dl|webdl|hdrip|dvdrip|hdtv|remux|x264|x265|h264|h265|"
-        r"hevc|avc|aac|dts|ac3|yify|rarbg)\b.*$",
-        "",
-        value,
-        flags=re.IGNORECASE,
-    )
-    value = re.sub(r"\s+", " ", value).strip()
-    year_matches = list(re.finditer(r"\b(19\d{2}|20\d{2})\b", value))
-    year = ""
-    if year_matches and value != year_matches[-1].group(1):
-        match = year_matches[-1]
-        year = match.group(1)
-        value = f"{value[:match.start()]} {value[match.end():]}".strip()
-    title = re.sub(r"\s+", " ", value).strip() or Path(name).stem
-    return title, year, kind
-
-
-def detect_part(name: str) -> str:
-    match = re.search(r"\b(?:cd|disc|disk|part)[ ._-]?(\d{1,2})\b", name, re.IGNORECASE)
-    return match.group(1) if match else ""
 
 
 def write_report(path: Path | None, report: dict[str, Any]) -> None:

@@ -75,6 +75,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Additional exact image hostname allowed by the proxy. Can be repeated.",
     )
+    parser.add_argument(
+        "--library-root",
+        action="append",
+        default=[],
+        type=Path,
+        help=(
+            "Absolute server directory under which the managed scanner may read. "
+            "Can be repeated; no managed paths are accepted when omitted."
+        ),
+    )
     parser.add_argument("--no-open", action="store_true", help="Do not open the browser automatically.")
     return parser
 
@@ -82,6 +92,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    relative_library_roots = [path for path in args.library_root if not path.is_absolute()]
+    if relative_library_roots:
+        parser.error("--library-root must be an absolute path")
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
     if args.image_cache_max_mb <= 0:
@@ -118,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         forwarded_allow_ips=args.forwarded_allow_ips,
         image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),
         image_allowed_hosts=tuple(dict.fromkeys([*DEFAULT_IMAGE_ALLOWED_HOSTS, *args.image_host])),
+        library_allowed_roots=tuple(str(path.resolve()) for path in args.library_root),
     )
     identity_repository = SqliteIdentityRepository(instance_db)
     identity_repository.initialize()
@@ -152,6 +166,10 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"Image cache: {config.image_cache_dir} (max {args.image_cache_total_mb:g} MB)"
         if config.image_cache else "Image cache: disabled"
+    )
+    print(
+        f"Managed scanner roots: {', '.join(config.library_allowed_roots)}"
+        if config.library_allowed_roots else "Managed scanner: disabled (no --library-root)"
     )
     print(f"Open {url}")
     print("Press Ctrl+C to stop.")

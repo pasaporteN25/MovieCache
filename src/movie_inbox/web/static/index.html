@@ -177,6 +177,9 @@
           <button id="inboxImportsMode" type="button" data-inbox-mode="imports" aria-pressed="false">
             Importaciones <span id="importDraftCount">0</span>
           </button>
+          <button id="inboxScannerMode" type="button" data-inbox-mode="scanner" aria-pressed="false" hidden>
+            Scanner <span id="scannerQueueCount">0</span>
+          </button>
         </nav>
 
         <section id="curationInboxPanel" class="inbox-mode-panel">
@@ -371,6 +374,27 @@
             </div>
           </div>
         </section>
+
+        <section id="scannerInboxPanel" class="inbox-mode-panel scanner-inbox-panel" hidden>
+          <div class="scanner-workbench">
+            <aside class="scanner-queue-panel" aria-label="Archivos pendientes del scanner">
+              <div class="scanner-queue-heading">
+                <div>
+                  <strong>Identidad pendiente</strong>
+                  <span id="scannerQueueMeta">0 archivos</span>
+                </div>
+                <button id="refreshScannerQueue" class="quiet-action" type="button">Actualizar</button>
+              </div>
+              <div id="scannerQueue" class="scanner-queue" aria-live="polite"></div>
+            </aside>
+            <section id="scannerQueueDetail" class="scanner-queue-detail" aria-live="polite">
+              <div class="curation-empty">
+                <strong>Seleccioná un archivo</strong>
+                <p>Confirmá la obra detectada, elegí una coincidencia o ignorá el archivo.</p>
+              </div>
+            </section>
+          </div>
+        </section>
       </section>
 
       <section id="collectionView" class="app-view collection-view" hidden>
@@ -484,6 +508,7 @@
 
         <nav class="admin-section-nav" aria-label="Secciones de administración">
           <a href="#adminSummary">Resumen</a>
+          <a href="#adminLibraries">Bibliotecas</a>
           <a href="#adminMembers">Miembros</a>
           <a href="#adminDatabase">Base de datos</a>
           <a href="#adminExternal">Fuentes externas</a>
@@ -510,6 +535,21 @@
             <div class="metric"><span>FilmAffinity</span><strong id="faLinks">0</strong></div>
             <div class="metric"><span>Duplicadas</span><strong id="duplicateCount">0</strong></div>
             <div class="metric"><span>Catálogos</span><strong id="sourceFiles">0</strong></div>
+          </div>
+        </section>
+
+        <section id="adminLibraries" class="admin-section" aria-labelledby="adminLibrariesTitle">
+          <div class="admin-section-heading library-section-heading">
+            <div>
+              <h3 id="adminLibrariesTitle">Bibliotecas</h3>
+              <p>Rutas del servidor, recorridos incrementales y disponibilidad física compartida.</p>
+            </div>
+            <button id="createLibraryButton" type="button">Agregar biblioteca</button>
+          </div>
+          <div id="libraryConfiguration" class="library-configuration" role="status"></div>
+          <p id="libraryFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+          <div id="libraryList" class="library-list" aria-live="polite">
+            <p class="member-list-empty">Abrí Administrar para comprobar las rutas configuradas.</p>
           </div>
         </section>
 
@@ -610,6 +650,49 @@
         <footer class="member-dialog-actions">
           <button id="cancelMemberDialog" class="quiet-action" type="button">Cancelar</button>
           <button id="submitMember" type="submit">Crear cuenta y cat&aacute;logo</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="libraryDialog" class="member-dialog library-dialog" aria-labelledby="libraryDialogTitle">
+      <form id="libraryForm" class="member-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Inventario del servidor</span>
+            <h2 id="libraryDialogTitle">Agregar biblioteca</h2>
+          </div>
+          <button id="closeLibraryDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields library-form-fields">
+          <label>
+            <span>Nombre</span>
+            <input id="libraryName" name="name" maxlength="120" placeholder="Películas principales" required>
+          </label>
+          <label>
+            <span>Ruta absoluta del servidor</span>
+            <input id="libraryRootPath" name="root_path" autocomplete="off" placeholder="/mnt/peliculas" required>
+            <small id="libraryRootHint">La ruta debe estar dentro de una raíz habilitada al iniciar Movie Inbox.</small>
+          </label>
+          <label>
+            <span>Frecuencia</span>
+            <select id="librarySchedule" name="schedule">
+              <option value="manual">Manual</option>
+              <option value="hourly">Cada hora</option>
+              <option value="daily">Diaria</option>
+            </select>
+          </label>
+          <label>
+            <span>Protección ante archivos ausentes</span>
+            <div class="library-ratio-control">
+              <input id="libraryMissingRatio" name="max_missing_ratio" type="number" min="0" max="100" step="5" value="50" inputmode="numeric">
+              <span>% máximo por recorrido</span>
+            </div>
+          </label>
+          <p id="libraryDialogFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelLibraryDialog" class="quiet-action" type="button">Cancelar</button>
+          <button id="submitLibrary" type="submit">Guardar biblioteca</button>
         </footer>
       </form>
     </dialog>

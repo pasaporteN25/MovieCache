@@ -220,11 +220,14 @@ class IdentityTests(unittest.TestCase):
                 tables = {row[0] for row in connection.execute(
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 )}
-            self.assertEqual(versions, [1, 2, 3, 4])
+            self.assertEqual(versions, [1, 2, 3, 4, 5])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
             self.assertIn("curated_collections", tables)
+            self.assertIn("media_libraries", tables)
+            self.assertIn("library_scan_runs", tables)
+            self.assertIn("library_files", tables)
             self.assertIn("curated_collection_items", tables)
             self.assertIn("collection_follows", tables)
             self.assertIn("import_drafts", tables)

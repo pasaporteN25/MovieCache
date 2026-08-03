@@ -34,6 +34,15 @@ class PrivacyTests(unittest.TestCase):
             "local_path": "D:/Movies/Heat.mkv",
             "local_files": [{"path": "D:/Movies/Heat.mkv"}],
             "_source_file": "C:/private/catalog.db",
+            "_availability": {
+                "effective": True,
+                "manual": False,
+                "server": True,
+                "verified": True,
+                "file_count": 1,
+                "library_count": 1,
+                "sources": [{"library_name": "Secret mount", "root_path": "D:/Movies"}],
+            },
         }
         preferences = PrivacyPreferences(
             catalog_shared=True,
@@ -54,6 +63,9 @@ class PrivacyTests(unittest.TestCase):
         self.assertNotIn("local_path", public)
         self.assertNotIn("local_files", public)
         self.assertNotIn("_source_file", public)
+        self.assertTrue(public["_availability"]["server"])
+        self.assertEqual(public["_availability"]["file_count"], 1)
+        self.assertNotIn("sources", public["_availability"])
 
     def test_shared_history_is_explicit_and_respects_date_visibility(self) -> None:
         items = [
