@@ -108,11 +108,16 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertGreater(detail["verified_at"], 0)
         self.assertEqual(detail["counts"]["files"], 0)
 
+    def test_apply_requires_a_successful_test_scan(self) -> None:
+        library = self.create_library()
+
+        with self.assertRaisesRegex(ValueError, "successful test scan"):
+            self.service.queue_scan(library.id, "apply")
+
     def test_apply_creates_shared_verified_availability_without_changing_manual_flag(self) -> None:
         (self.media / "Heat.1995.1080p.mkv").write_bytes(b"heat")
         library = self.create_library()
         self.execute(library.id, "dry_run")
-        self.service.set_active(library.id, True)
         self.execute(library.id, "apply")
 
         decorated = AvailabilityService(self.repository).decorate_items(
@@ -130,7 +135,6 @@ class ManagedLibraryTests(unittest.TestCase):
         (self.media / "Arrival.2016.1080p.mkv").write_bytes(b"arrival")
         library = self.create_library()
         self.execute(library.id, "dry_run")
-        self.service.set_active(library.id, True)
         self.execute(library.id, "apply")
 
         queue = self.service.review_queue()
@@ -155,7 +159,6 @@ class ManagedLibraryTests(unittest.TestCase):
         second.write_bytes(b"arrival")
         library = self.create_library(max_missing_ratio=0.4)
         self.execute(library.id, "dry_run")
-        self.service.set_active(library.id, True)
         self.execute(library.id, "apply")
         first.unlink()
         second.unlink()
@@ -171,6 +174,9 @@ class ManagedLibraryTests(unittest.TestCase):
         (self.media / "Heat.1995.mkv").write_bytes(b"heat")
         library = self.create_library(schedule="hourly")
         self.execute(library.id, "dry_run")
+        with self.assertRaisesRegex(ValueError, "Apply inventory"):
+            self.service.set_active(library.id, True)
+        self.execute(library.id, "apply")
         activated = self.service.set_active(library.id, True)
         self.assertEqual(activated.next_scan_at, self.now + 3600)
 
@@ -185,6 +191,7 @@ class ManagedLibraryTests(unittest.TestCase):
         (self.media / "Heat.1995.mkv").write_bytes(b"heat")
         library = self.create_library(schedule="hourly")
         self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
         self.service.set_active(library.id, True)
         self.now += 3600
         scanned = threading.Event()
@@ -229,6 +236,26 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(self.repository.get_library(library.id).status, "ready")
         updated = self.service.set_active(library.id, True)
         self.assertTrue(updated.active)
+
+    def test_manual_library_does_not_use_scheduled_activation(self) -> None:
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+
+        with self.assertRaisesRegex(ValueError, "Manual libraries"):
+            self.service.set_active(library.id, True)
+
+    def test_switching_to_manual_disables_automatic_scans(self) -> None:
+        library = self.create_library(schedule="hourly")
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        self.service.set_active(library.id, True)
+
+        updated = self.service.update_library(library.id, {"schedule": "manual"})
+
+        self.assertFalse(updated.active)
+        self.assertEqual(updated.status, "ready")
+        self.assertEqual(updated.next_scan_at, 0)
 
     def test_persistent_run_history_is_bounded_per_library(self) -> None:
         library = self.create_library()

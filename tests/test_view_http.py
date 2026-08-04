@@ -1053,11 +1053,6 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(test_run.json()["run"]["preview"][0]["relative_path"], "Heat.1995.1080p.mkv")
         self.assertEqual(test_run.json()["run"]["preview"][0]["state"], "matched")
 
-        activated = self.client.post(
-            f"/api/libraries/{library_id}/status",
-            content=json.dumps({"active": True}),
-            headers=self.post_headers(),
-        )
         applied = self.client.post(
             f"/api/libraries/{library_id}/runs",
             content=json.dumps({"mode": "apply"}),
@@ -1068,12 +1063,73 @@ class ViewerHttpTests(unittest.TestCase):
             headers={"X-Movie-Inbox-Token": self.config.api_token},
         )
 
-        self.assertEqual(activated.status_code, 200, activated.content)
         self.assertEqual(applied.status_code, 202, applied.content)
         self.assertTrue(items.json()["items"][0]["en_catalogo"])
         self.assertFalse(items.json()["items"][0]["_availability"]["manual"])
         self.assertTrue(items.json()["items"][0]["_availability"]["server"])
         self.assertNotIn(str(self.media_path), items.text)
+
+    def test_scheduled_scans_require_applied_inventory_and_manual_libraries_reject_activation(self) -> None:
+        (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps({
+                "name": "Peliculas programadas",
+                "root_path": str(self.media_path),
+                "schedule": "hourly",
+            }),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        apply_before_test = self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+
+        before_apply = self.client.post(
+            f"/api/libraries/{library_id}/status",
+            content=json.dumps({"active": True}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+        activated = self.client.post(
+            f"/api/libraries/{library_id}/status",
+            content=json.dumps({"active": True}),
+            headers=self.post_headers(),
+        )
+        switched_to_manual = self.client.post(
+            f"/api/libraries/{library_id}/update",
+            content=json.dumps({"schedule": "manual"}),
+            headers=self.post_headers(),
+        )
+        manual_activation = self.client.post(
+            f"/api/libraries/{library_id}/status",
+            content=json.dumps({"active": True}),
+            headers=self.post_headers(),
+        )
+
+        self.assertEqual(apply_before_test.status_code, 409, apply_before_test.content)
+        self.assertEqual(
+            apply_before_test.json()["reason"],
+            "Run a successful test scan before applying changes",
+        )
+        self.assertEqual(before_apply.status_code, 409, before_apply.content)
+        self.assertEqual(before_apply.json()["reason"], "Apply inventory before activating scheduled scans")
+        self.assertEqual(activated.status_code, 200, activated.content)
+        self.assertFalse(switched_to_manual.json()["library"]["active"])
+        self.assertEqual(switched_to_manual.json()["library"]["next_scan_at"], 0)
+        self.assertEqual(manual_activation.status_code, 409, manual_activation.content)
+        self.assertEqual(manual_activation.json()["reason"], "Manual libraries do not use scheduled activation")
 
     def test_unknown_scanner_file_requires_an_owner_decision(self) -> None:
         (self.media_path / "Arrival.2016.mkv").write_bytes(b"arrival-video")
@@ -1090,11 +1146,6 @@ class ViewerHttpTests(unittest.TestCase):
         self.client.post(
             f"/api/libraries/{library_id}/runs",
             content=json.dumps({"mode": "dry_run"}),
-            headers=self.post_headers(),
-        )
-        self.client.post(
-            f"/api/libraries/{library_id}/status",
-            content=json.dumps({"active": True}),
             headers=self.post_headers(),
         )
         self.client.post(

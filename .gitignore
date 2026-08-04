@@ -1,6 +1,7 @@
 .catalog-cache/
 .catalog-state/
 .movie-inbox/
+.venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
