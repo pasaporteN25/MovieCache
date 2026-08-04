@@ -119,17 +119,23 @@ class ManagedLibraryService:
     def update_library(self, library_id: str, payload: Mapping[str, Any]) -> ManagedLibrary:
         library = self._library(library_id)
         schedule = normalize_schedule(payload.get("schedule", library.schedule))
+        active = library.active and schedule != "manual"
+        status = library.status
+        if library.active and not active:
+            status = "ready" if library.verified_at else "unverified"
         updated = replace(
             library,
             name=normalize_library_name(payload.get("name", library.name)),
             schedule=schedule,
+            active=active,
+            status=status,
             max_missing_ratio=normalize_missing_ratio(
                 payload.get("max_missing_ratio", library.max_missing_ratio)
             ),
             next_scan_at=(
                 _next_scan(self._now(), schedule)
-                if library.active and schedule != library.schedule
-                else library.next_scan_at
+                if active and schedule != library.schedule
+                else library.next_scan_at if active else 0
             ),
             updated_at=self._now(),
         )
@@ -137,8 +143,14 @@ class ManagedLibraryService:
 
     def set_active(self, library_id: str, active: bool) -> ManagedLibrary:
         library = self._library(library_id)
+        if library.status == "scanning":
+            raise LibraryRunBusy("The library is currently being scanned")
+        if active and library.schedule == "manual":
+            raise LibraryValidationError("Manual libraries do not use scheduled activation")
         if active and not library.verified_at:
             raise LibraryValidationError("Run a successful test scan before activating this library")
+        if active and not library.last_scan_at:
+            raise LibraryValidationError("Apply inventory before activating scheduled scans")
         now = self._now()
         updated = replace(
             library,

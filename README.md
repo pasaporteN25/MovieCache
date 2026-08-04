@@ -184,9 +184,12 @@ movie-inbox serve data/movie-inbox.db `
 ```
 
 El owner registra despues cada ruta desde `Administrar > Bibliotecas`. Toda biblioteca
-nueva comienza inactiva y exige un recorrido `Probar` satisfactorio antes de permitir
-`Activar` o `Escanear`. Las frecuencias disponibles son manual, horaria y diaria. Los
-recorridos se ejecutan fuera del request HTTP y su estado persiste en `instance.db`.
+nueva sigue una secuencia explicita: `Probar recorrido` lee y clasifica sin persistir,
+`Aplicar inventario` vuelve a recorrer la ruta y guarda la disponibilidad, y solamente
+entonces puede habilitarse `Escaneo automatico` si la frecuencia es horaria o diaria.
+Una biblioteca manual nunca necesita activarse y conserva `Escanear ahora` como accion
+principal. Los recorridos se ejecutan fuera del request HTTP y su estado persiste en
+`instance.db`.
 
 El inventario fisico pertenece a la instancia. Una coincidencia fuerte aporta
 disponibilidad verificada a los catalogos de todos los usuarios sin copiar obras ni
@@ -197,8 +200,12 @@ exclusivos del owner.
 
 Archivos nuevos, titulos sin ano y coincidencias ambiguas aparecen en
 `Bandeja > Scanner`. Confirmar una identidad no agrega automaticamente la obra a ningun
-catalogo personal. Si un disco desaparece o la proporcion de bajas supera el limite
-configurado, se conserva el ultimo inventario valido.
+catalogo personal. El comparador muestra titulo, ano, tipo, aliases, similitud y las
+fuentes externas ya disponibles antes de vincular el archivo. `Omitir este archivo` no
+borra datos ni toca el disco: retira el caso mientras conserve la misma huella y exige
+confirmacion porque todavia no puede restaurarse desde la interfaz. Si un disco
+desaparece o la proporcion de bajas supera el limite configurado, se conserva el ultimo
+inventario valido.
 
 Las sugerencias se construyen con el catalogo del owner y con catalogos que sus
 miembros hayan compartido de forma explicita. Los catalogos privados nunca se usan como

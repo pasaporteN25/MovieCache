@@ -63,6 +63,10 @@ obra basada en IDs externos o en titulo exacto, ano y tipo. Esa identidad puede 
 disponibilidad a catalogos creados despues del recorrido. La API personal puede incluir
 nombre de biblioteca y cantidad de archivos para el owner; las vistas de miembros y
 Club reciben solamente conteos agregados, nunca rutas, nombres o fingerprints.
+Confirmar vincula el archivo al inventario de la instancia, pero no crea una entrada en
+ningun catalogo personal. Omitir conserva el archivo fisico y recuerda la decision
+mientras no cambie su huella; la interfaz exige confirmacion y todavia no ofrece una
+operacion para restaurarla.
 La clasificacion puede consultar el catalogo del owner y catalogos de miembros con
 `catalog_shared` activo; un catalogo privado nunca aporta candidatos a la Bandeja del
 administrador. La serializacion compartida vuelve a retirar cualquier lista de fuentes

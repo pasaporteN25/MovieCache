@@ -380,7 +380,7 @@
             <aside class="scanner-queue-panel" aria-label="Archivos pendientes del scanner">
               <div class="scanner-queue-heading">
                 <div>
-                  <strong>Identidad pendiente</strong>
+                  <strong>Vinculación física</strong>
                   <span id="scannerQueueMeta">0 archivos</span>
                 </div>
                 <button id="refreshScannerQueue" class="quiet-action" type="button">Actualizar</button>
@@ -390,7 +390,7 @@
             <section id="scannerQueueDetail" class="scanner-queue-detail" aria-live="polite">
               <div class="curation-empty">
                 <strong>Seleccioná un archivo</strong>
-                <p>Confirmá la obra detectada, elegí una coincidencia o ignorá el archivo.</p>
+                <p>Compará la evidencia y vinculá el archivo sin modificar ningún catálogo personal.</p>
               </div>
             </section>
           </div>
@@ -542,7 +542,7 @@
           <div class="admin-section-heading library-section-heading">
             <div>
               <h3 id="adminLibrariesTitle">Bibliotecas</h3>
-              <p>Rutas del servidor, recorridos incrementales y disponibilidad física compartida.</p>
+              <p>Probá cada ruta, aplicá su inventario y recién entonces decidí si querés automatizarla.</p>
             </div>
             <button id="createLibraryButton" type="button">Agregar biblioteca</button>
           </div>
@@ -674,20 +674,25 @@
             <small id="libraryRootHint">La ruta debe estar dentro de una raíz habilitada al iniciar Movie Inbox.</small>
           </label>
           <label>
-            <span>Frecuencia</span>
+            <span>Automatización después de aplicar</span>
             <select id="librarySchedule" name="schedule">
               <option value="manual">Manual</option>
               <option value="hourly">Cada hora</option>
               <option value="daily">Diaria</option>
             </select>
+            <small>La programación quedará apagada hasta completar la prueba y aplicar el primer inventario.</small>
           </label>
-          <label>
-            <span>Protección ante archivos ausentes</span>
-            <div class="library-ratio-control">
-              <input id="libraryMissingRatio" name="max_missing_ratio" type="number" min="0" max="100" step="5" value="50" inputmode="numeric">
-              <span>% máximo por recorrido</span>
-            </div>
-          </label>
+          <details class="library-advanced-options">
+            <summary>Opciones avanzadas</summary>
+            <label>
+              <span>Protección ante archivos ausentes</span>
+              <div class="library-ratio-control">
+                <input id="libraryMissingRatio" name="max_missing_ratio" type="number" min="0" max="100" step="5" value="50" inputmode="numeric">
+                <span>% máximo por recorrido</span>
+              </div>
+              <small>Si desaparece una proporción mayor, Movie Inbox conservará el último inventario válido.</small>
+            </label>
+          </details>
           <p id="libraryDialogFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
         </div>
         <footer class="member-dialog-actions">

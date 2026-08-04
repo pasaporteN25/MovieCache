@@ -494,7 +494,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.inboxView.addEventListener("click", handleCurationClick);
       fields.inboxModeTabs.addEventListener("click", changeInboxMode);
       fields.scannerQueue.addEventListener("click", selectScannerQueueItem);
+      fields.scannerQueue.addEventListener("keydown", moveScannerQueueSelection);
       fields.scannerQueueDetail.addEventListener("click", handleScannerReviewAction);
+      fields.scannerQueueDetail.addEventListener("submit", handleScannerReviewAction);
       fields.refreshScannerQueue.addEventListener("click", () => loadScannerQueue({ announce: true }));
       fields.importInboxPanel.addEventListener("click", handleImportClick);
       fields.importSourceForm.addEventListener("submit", analyzeImportSource);
@@ -779,20 +781,26 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           const counts = library.counts || {};
           const running = (library.runs || []).find((run) => ["queued", "running"].includes(run.status))
             || (library.status === "scanning" ? { status: "running" } : null);
-          const canApply = Boolean(library.verified_at) && !running;
-          const status = libraryStatusLabel(library.status);
-          const activation = library.active
-            ? `<button class="quiet-action library-pause" type="button" data-library-action="toggle" data-library-id="${escapeAttr(library.id)}" ${running ? "disabled" : ""}>Pausar</button>`
-            : `<button class="quiet-action library-activate" type="button" data-library-action="toggle" data-library-id="${escapeAttr(library.id)}" ${library.verified_at && !running ? "" : "disabled"}>Activar</button>`;
-          return `<article class="library-record${selected ? " is-selected" : ""}" data-library-id="${escapeAttr(library.id)}">
+          const workflow = libraryWorkflow(library, running);
+          const lastRun = (library.runs || [])[0];
+          const resultOwnsPrimary = Boolean(
+            selected
+            && workflow.key === "ready_apply"
+            && lastRun?.mode === "dry_run"
+            && lastRun?.status === "completed"
+          );
+          const testAgain = !running && workflow.key === "applied"
+            ? `<button class="quiet-action" type="button" data-library-action="test" data-library-id="${escapeAttr(library.id)}">Probar cambios</button>`
+            : "";
+          return `<article class="library-record${selected ? " is-selected" : ""}" data-library-id="${escapeAttr(library.id)}" data-workflow="${escapeAttr(workflow.key)}">
             <div class="library-record-main">
               <button class="library-record-identity" type="button" data-library-action="select" data-library-id="${escapeAttr(library.id)}" aria-expanded="${selected}">
-                <span class="library-drive-mark" aria-hidden="true">${library.active ? "ON" : "OFF"}</span>
+                <span class="library-drive-mark" aria-hidden="true">${escapeHtml(workflow.marker)}</span>
                 <span><strong>${escapeHtml(library.name || "Biblioteca")}</strong><code>${escapeHtml(library.root_path || "")}</code></span>
               </button>
               <div class="library-record-state">
-                <span class="member-state ${libraryStatusClass(library.status)}">${escapeHtml(status)}</span>
-                <span>${escapeHtml(scheduleLabel(library.schedule))}</span>
+                <span class="member-state ${libraryWorkflowClass(workflow.key)}">${escapeHtml(workflow.label)}</span>
+                <span>${escapeHtml(workflow.note)}</span>
               </div>
               <dl class="library-record-metrics">
                 <div><dt>Archivos</dt><dd>${Number(counts.files || 0)}</dd></div>
@@ -800,28 +808,129 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
                 <div><dt>Revisar</dt><dd>${Number(counts.new || 0) + Number(counts.review || 0)}</dd></div>
               </dl>
               <div class="library-record-actions">
-                <button class="quiet-action" type="button" data-library-action="test" data-library-id="${escapeAttr(library.id)}" ${running ? "disabled" : ""}>Probar</button>
-                <button type="button" data-library-action="scan" data-library-id="${escapeAttr(library.id)}" ${canApply ? "" : "disabled"}>Escanear</button>
-                ${activation}
+                ${libraryPrimaryAction(library, workflow, running)}
+                ${testAgain}
                 <button class="quiet-action" type="button" data-library-action="edit" data-library-id="${escapeAttr(library.id)}" ${running ? "disabled" : ""}>Editar</button>
+                ${libraryAutomationControl(library, running)}
               </div>
             </div>
-            ${selected ? libraryRunPanel(library, running) : ""}
+            ${selected ? libraryRunPanel(library, running, workflow, resultOwnsPrimary) : ""}
           </article>`;
         }).join("");
       }
 
-      function libraryRunPanel(library, running) {
+      function libraryWorkflow(library, running) {
+        const lastRun = (library.runs || [])[0];
+        const scheduled = library.schedule !== "manual";
+        const hasInventory = Number(library.last_scan_at || 0) > 0;
+        if (running) {
+          const knownMode = running.mode === "apply" || running.mode === "dry_run";
+          const applying = running.mode === "apply";
+          return {
+            key: "running",
+            marker: "RUN",
+            label: !knownMode ? "Recorrido en curso" : applying ? "Aplicación en curso" : "Prueba en curso",
+            note: !knownMode
+              ? "Procesando la biblioteca"
+              : applying
+                ? "Actualizando inventario físico"
+                : "Lectura sin cambios persistentes",
+            action: "",
+            actionLabel: !knownMode ? "Procesando recorrido…" : applying ? "Aplicando inventario…" : "Probando recorrido…"
+          };
+        }
+        if (!library.verified_at) {
+          return {
+            key: "unverified",
+            marker: "NEW",
+            label: "Sin verificar",
+            note: "Primero, una prueba de solo lectura",
+            action: "test",
+            actionLabel: "Probar recorrido"
+          };
+        }
+        if (lastRun?.mode === "dry_run" && lastRun.status !== "completed") {
+          return {
+            key: "attention",
+            marker: "!",
+            label: "Requiere atención",
+            note: "La última prueba no quedó lista para aplicar",
+            action: "test",
+            actionLabel: "Probar de nuevo"
+          };
+        }
+        const testedAfterInventory = lastRun?.mode === "dry_run"
+          && lastRun.status === "completed"
+          && Number(lastRun.finished_at || lastRun.created_at || 0) >= Number(library.last_scan_at || 0);
+        if (!hasInventory || testedAfterInventory) {
+          return {
+            key: "ready_apply",
+            marker: "TEST",
+            label: "Lista para aplicar",
+            note: scheduled ? `Aplicá antes de habilitar ${scheduleLabel(library.schedule).toLowerCase()}` : "La prueba no modificó el inventario",
+            action: "scan",
+            actionLabel: "Aplicar inventario"
+          };
+        }
+        if (["offline", "warning", "error"].includes(library.status)) {
+          return {
+            key: "attention",
+            marker: "!",
+            label: libraryStatusLabel(library.status),
+            note: "Revisá el último recorrido antes de continuar",
+            action: "test",
+            actionLabel: "Probar de nuevo"
+          };
+        }
+        const note = !scheduled
+          ? "Escaneo manual"
+          : library.active
+            ? `${scheduleLabel(library.schedule)} · automático activo`
+            : `${scheduleLabel(library.schedule)} · automático pausado`;
+        return {
+          key: "applied",
+          marker: scheduled && library.active ? "AUTO" : "OK",
+          label: "Inventario actualizado",
+          note,
+          action: "scan",
+          actionLabel: "Escanear ahora"
+        };
+      }
+
+      function libraryWorkflowClass(value) {
+        if (["applied", "running", "ready_apply"].includes(value)) return "member-state-active";
+        if (["unverified", "attention"].includes(value)) return "member-state-attention";
+        return "member-state-disabled";
+      }
+
+      function libraryPrimaryAction(library, workflow, running) {
+        if (running) {
+          return `<button class="action-primary library-primary-main" type="button" disabled aria-busy="true">${escapeHtml(workflow.actionLabel)}</button>`;
+        }
+        if (!workflow.action) return "";
+        return `<button class="action-primary library-primary-main" type="button" data-library-action="${escapeAttr(workflow.action)}" data-library-id="${escapeAttr(library.id)}">${escapeHtml(workflow.actionLabel)}</button>`;
+      }
+
+      function libraryAutomationControl(library, running) {
+        if (library.schedule === "manual" || !library.last_scan_at) return "";
+        return `<label class="library-automation-toggle${library.active ? " is-active" : ""}">
+          <input type="checkbox" data-library-action="toggle" data-library-id="${escapeAttr(library.id)}" aria-label="Escaneo automático de ${escapeAttr(library.name || "biblioteca")}" ${library.active ? "checked" : ""} ${running ? "disabled" : ""}>
+          <span class="library-toggle-track" aria-hidden="true"><span></span></span>
+          <span>Escaneo automático</span>
+        </label>`;
+      }
+
+      function libraryRunPanel(library, running, workflow, resultOwnsPrimary) {
         const runs = (library.runs || []).slice(0, 5);
         const lastRun = runs[0];
         return `<div class="library-run-panel">
           <div class="library-run-summary">
             <div><span>Último recorrido</span><strong>${lastRun ? formatLibraryTime(lastRun.finished_at || lastRun.created_at) : "Sin recorridos"}</strong></div>
-            <div><span>Próxima ejecución</span><strong>${library.next_scan_at ? formatLibraryTime(library.next_scan_at) : "Manual"}</strong></div>
+            <div><span>Próxima ejecución</span><strong>${escapeHtml(libraryNextRunLabel(library))}</strong></div>
             <div><span>Protección de bajas</span><strong>${Math.round(Number(library.max_missing_ratio || 0) * 100)}%</strong></div>
           </div>
           ${running ? `<div class="library-running" role="status"><span class="library-running-signal" aria-hidden="true"></span><strong>${running.status === "queued" ? "Recorrido en cola" : "Leyendo biblioteca"}</strong><span>Podés seguir usando Movie Inbox.</span></div>` : ""}
-          ${lastRun && !running ? libraryRunResult(lastRun) : ""}
+          ${lastRun && !running ? libraryRunResult(lastRun, library, workflow, resultOwnsPrimary) : ""}
           ${runs.length ? `<details class="library-run-history"><summary>Historial de recorridos</summary><div>${runs.map((run) => `<div><span>${escapeHtml(runModeLabel(run))}</span><strong>${escapeHtml(runStatusLabel(run.status))}</strong><time>${formatLibraryTime(run.finished_at || run.created_at)}</time></div>`).join("")}</div></details>` : ""}
           <div class="library-secondary-actions">
             <button class="text-action" type="button" data-library-action="scanner" data-library-id="${escapeAttr(library.id)}">Abrir pendientes</button>
@@ -830,7 +939,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         </div>`;
       }
 
-      function libraryRunResult(run) {
+      function libraryNextRunLabel(library) {
+        if (library.schedule === "manual") return "Sólo manual";
+        if (!library.last_scan_at) return "Después de aplicar";
+        if (!library.active) return "Automatización pausada";
+        return library.next_scan_at ? formatLibraryTime(library.next_scan_at) : "Al iniciar el planificador";
+      }
+
+      function libraryRunResult(run, library, workflow, resultOwnsPrimary) {
         const summary = run.summary || {};
         const preview = run.preview || [];
         const parts = [
@@ -839,6 +955,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           `${Number(summary.new || 0) + Number(summary.review || 0)} para revisar`
         ];
         const errors = run.errors || [];
+        const outcome = run.mode === "dry_run"
+          ? run.status === "completed"
+            ? "La prueba terminó sin modificar el inventario ni la disponibilidad."
+            : "La prueba no modificó el inventario. Corregí las advertencias y volvé a probar."
+          : run.status === "blocked"
+            ? "La protección de bajas conservó el último inventario válido."
+            : run.status === "completed"
+              ? "El inventario compartido y la disponibilidad quedaron actualizados."
+              : "Se aplicaron los resultados seguros y quedaron advertencias para revisar.";
         return `<div class="library-run-result" data-state="${escapeAttr(run.status || "")}">
           <strong>${escapeHtml(runStatusLabel(run.status))}</strong>
           <span>${escapeHtml(parts.join(" · "))}</span>
@@ -850,6 +975,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <span>${escapeHtml([item.year, importKindLabel(item.kind)].filter(Boolean).join(" · "))}</span>
               <code>${escapeHtml(item.relative_path || "")}</code>
             </div>`).join("")}</div></details>` : ""}
+          <div class="library-run-outcome">
+            <span>${escapeHtml(outcome)}</span>
+            ${resultOwnsPrimary ? `<button class="action-primary library-primary-result" type="button" data-library-action="scan" data-library-id="${escapeAttr(library.id)}">${escapeHtml(workflow.actionLabel)}</button>` : ""}
+          </div>
         </div>`;
       }
 
@@ -889,25 +1018,34 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           if (action === "test" || action === "scan") {
             await queueLibraryRun(library, action === "test" ? "dry_run" : "apply");
           } else if (action === "toggle") {
+            const active = button instanceof HTMLInputElement ? button.checked : !library.active;
             const response = await apiFetch(`/api/libraries/${encodeURIComponent(library.id)}/status`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ active: !library.active })
+              body: JSON.stringify({ active })
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
-            setLibraryFeedback(payload.library.active ? `${library.name} quedó activa.` : `${library.name} quedó pausada.`);
+            setLibraryFeedback(payload.library.active ? `Escaneo automático activado para ${library.name}.` : `Escaneo automático pausado para ${library.name}.`);
             await loadLibraries();
           }
         } catch (error) {
           setLibraryFeedback(libraryErrorMessage(error.message), "error");
+          renderLibraries();
         } finally {
           button.disabled = false;
         }
       }
 
       async function queueLibraryRun(library, mode) {
-        setLibraryFeedback(mode === "dry_run" ? `Preparando prueba de ${library.name}…` : `Escaneando ${library.name}…`);
+        const firstApply = mode === "apply" && !library.last_scan_at;
+        setLibraryFeedback(
+          mode === "dry_run"
+            ? `Preparando una prueba de solo lectura para ${library.name}…`
+            : firstApply
+              ? `Aplicando el primer inventario de ${library.name}…`
+              : `Actualizando el inventario de ${library.name}…`
+        );
         const response = await apiFetch(`/api/libraries/${encodeURIComponent(library.id)}/runs`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -939,7 +1077,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           }
           activeLibraryRunId = "";
           await Promise.all([loadLibraries(), loadScannerQueue(), loadCatalog()]);
-          const message = run.status === "completed" ? "Recorrido completado." : run.status === "blocked" ? "Recorrido bloqueado por la protección de bajas." : "Recorrido terminado con advertencias.";
+          const message = run.status === "completed"
+            ? run.mode === "dry_run"
+              ? "Prueba completada. El inventario no cambió."
+              : "Inventario y disponibilidad actualizados."
+            : run.status === "blocked"
+              ? "No se aplicaron bajas: se conservó el último inventario válido."
+              : run.mode === "dry_run"
+                ? "La prueba terminó con advertencias y no modificó el inventario."
+                : "El recorrido aplicado terminó con advertencias.";
           setLibraryFeedback(message, run.status === "completed" ? "" : "error");
         } catch (error) {
           activeLibraryRunId = "";
@@ -1032,6 +1178,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (value === "library_not_found") return "La biblioteca ya no está disponible.";
         if (value.includes("allowlist") || value.includes("allowed roots")) return "La ruta está fuera de las raíces habilitadas en el servidor.";
         if (value.includes("offline") || value.includes("directory")) return "La ruta no está montada o no es un directorio accesible.";
+        if (value.includes("Manual libraries")) return "Las bibliotecas manuales no usan automatización. Cambiá la frecuencia para programar recorridos.";
+        if (value.includes("Apply inventory")) return "Primero aplicá un inventario antes de activar recorridos automáticos.";
         if (value.includes("test scan")) return "Primero ejecutá un recorrido de prueba satisfactorio.";
         if (value.includes("already uses")) return "Esa ruta ya está registrada en otra biblioteca.";
         if (value === "library_store_unavailable") return "El inventario no está disponible. Reintentá en unos segundos.";
@@ -1040,12 +1188,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function libraryStatusLabel(value) {
         return { unverified: "Sin comprobar", ready: "Lista", scanning: "Escaneando", paused: "Pausada", offline: "Desconectada", warning: "Con advertencias", error: "Error" }[value] || "Sin comprobar";
-      }
-
-      function libraryStatusClass(value) {
-        if (["ready", "scanning"].includes(value)) return "member-state-active";
-        if (["warning", "offline", "error", "unverified"].includes(value)) return "member-state-attention";
-        return "member-state-disabled";
       }
 
       function scheduleLabel(value) {
@@ -2201,6 +2343,22 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (!button) return;
         selectedScannerItemId = button.dataset.scannerItem || "";
         renderScannerQueue();
+        focusSelectedScannerItem();
+      }
+
+      function moveScannerQueueSelection(event) {
+        if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(event.key) || !scannerQueue.length) return;
+        event.preventDefault();
+        const current = Math.max(0, scannerQueue.findIndex((item) => item.id === selectedScannerItemId));
+        const forwards = event.key === "ArrowDown" || event.key === "ArrowRight";
+        const next = (current + (forwards ? 1 : -1) + scannerQueue.length) % scannerQueue.length;
+        selectedScannerItemId = scannerQueue[next].id;
+        renderScannerQueue();
+        focusSelectedScannerItem();
+      }
+
+      function focusSelectedScannerItem() {
+        requestAnimationFrame(() => fields.scannerQueue.querySelector(".scanner-queue-item.active")?.focus({ preventScroll: true }));
       }
 
       function renderScannerQueueDetail() {
@@ -2214,52 +2372,139 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <h3>${escapeHtml(item.detected_title || item.name || "Sin título")}</h3>
               <p>${escapeHtml(item.relative_path || item.name || "")}</p>
             </div>
-            <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} candidatas` : "Sin coincidencia"}</span>
+            <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} ${candidates.length === 1 ? "candidata" : "candidatas"}` : "Completar identidad"}</span>
           </header>
+          <div class="scanner-scope-note" role="note">
+            <strong>Vínculo físico</strong>
+            <span>Confirmar identifica este archivo dentro del inventario compartido. No agrega la obra a tu catálogo personal ni cambia estados, puntuaciones o reviews.</span>
+          </div>
           <dl class="scanner-file-facts">
             <div><dt>Biblioteca</dt><dd>${escapeHtml(item.library_name || "Biblioteca")}</dd></div>
+            <div><dt>Año detectado</dt><dd>${escapeHtml(item.detected_year || "Sin año")}</dd></div>
             <div><dt>Tipo detectado</dt><dd>${escapeHtml(importKindLabel(item.detected_kind) || "Película")}</dd></div>
             <div><dt>Tamaño</dt><dd>${escapeHtml(formatImportBytes(item.size_bytes))}</dd></div>
           </dl>
-          ${candidates.length ? `<section class="scanner-candidates"><h4>Coincidencias posibles</h4>${candidates.map((candidate) => scannerCandidate(candidate)).join("")}</section>` : ""}
+          ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${candidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}</section>` : ""}
           <section class="scanner-confirm-detected">
-            <div><h4>${candidates.length ? "O confirmar otra identidad" : "Confirmar identidad detectada"}</h4><p>El año es obligatorio para compartir disponibilidad sin falsas coincidencias.</p></div>
+            <div><h4>${candidates.length ? "Vincular con otra identidad" : "Completar identidad detectada"}</h4><p>Usá esta opción cuando ninguna candidata corresponda. El año es obligatorio para evitar falsas coincidencias.</p></div>
             <form data-scanner-confirm-form>
               <label><span>Título</span><input name="title" value="${escapeAttr(item.detected_title || "")}" maxlength="240" required></label>
               <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(19|20)[0-9]{2}" maxlength="4" required></label>
               <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === item.detected_kind ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
-              <button type="submit" data-scanner-review="confirm-detected" data-file-id="${escapeAttr(item.id)}">Confirmar obra</button>
+              <button class="action-primary" type="submit" data-scanner-review="confirm-detected" data-file-id="${escapeAttr(item.id)}">Vincular identidad manual</button>
             </form>
           </section>
           <footer class="scanner-case-actions">
-            <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Ignorar archivo</button>
+            <div><strong>¿No pertenece al inventario?</strong><span>Omitir lo retira de esta cola mientras el archivo no cambie.</span></div>
+            <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Omitir este archivo</button>
             <span id="scannerReviewFeedback" role="status" aria-live="polite"></span>
           </footer>`;
       }
 
-      function scannerCandidate(candidate) {
+      function scannerCandidate(candidate, item, index) {
         const title = candidate.spanish_title || candidate.title || candidate.original_title || "Obra sin título";
-        const evidence = [candidate.year, importKindLabel(candidate.kind), scannerCandidateReason(candidate.reason)].filter(Boolean);
-        return `<article class="scanner-candidate-row">
-          <div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(evidence.join(" · "))}</span></div>
-          <button class="quiet-action" type="button" data-scanner-review="confirm-candidate" data-candidate-key="${escapeAttr(candidate.key || "")}" data-file-id="${escapeAttr(selectedScannerItemId)}">Usar esta</button>
+        const aliases = scannerCandidateAliases(candidate, title);
+        const links = scannerCandidateLinks(candidate);
+        return `<article class="scanner-candidate-card">
+          <header class="scanner-candidate-header">
+            <div>
+              <span class="scanner-candidate-index">Candidata ${index + 1}</span>
+              <strong>${escapeHtml(title)}</strong>
+              <span>${escapeHtml(scannerCandidateReason(candidate.reason))} · ${escapeHtml(formatScannerScore(candidate.score))}</span>
+            </div>
+            <button class="action-primary" type="button" data-scanner-review="confirm-candidate" data-candidate-key="${escapeAttr(candidate.key || "")}" data-file-id="${escapeAttr(selectedScannerItemId)}">Vincular archivo</button>
+          </header>
+          <div class="scanner-field-comparison" role="table" aria-label="Comparación con ${escapeAttr(title)}">
+            <div class="scanner-comparison-head" role="row"><span role="columnheader">Campo</span><span role="columnheader">Archivo</span><span role="columnheader">Obra candidata</span></div>
+            ${scannerComparisonRow("Título", item.detected_title || item.name || "Sin título", title)}
+            ${scannerComparisonRow("Año", item.detected_year || "Sin año", candidate.year || "Sin año")}
+            ${scannerComparisonRow("Tipo", importKindLabel(item.detected_kind) || "Película", importKindLabel(candidate.kind) || "Película")}
+          </div>
+          ${aliases.length ? `<div class="scanner-candidate-aliases"><span>Otros nombres</span><div>${aliases.map((alias) => `<span>${escapeHtml(alias)}</span>`).join("")}</div></div>` : ""}
+          ${links ? `<nav class="scanner-candidate-links" aria-label="Fuentes de ${escapeAttr(title)}">${links}</nav>` : `<span class="scanner-candidate-no-links">Sin fuentes externas asociadas</span>`}
         </article>`;
+      }
+
+      function scannerComparisonRow(label, detected, candidate) {
+        const same = normalizeText(detected) === normalizeText(candidate);
+        return `<div class="scanner-comparison-row${same ? " is-match" : ""}" role="row">
+          <span role="rowheader">${escapeHtml(label)}</span>
+          <span role="cell">${escapeHtml(detected)}</span>
+          <span role="cell">${escapeHtml(candidate)}</span>
+        </div>`;
+      }
+
+      function scannerCandidateAliases(candidate, selectedTitle) {
+        const values = [
+          candidate.title,
+          candidate.original_title,
+          candidate.spanish_title,
+          candidate.english_title,
+          ...(Array.isArray(candidate.alternative_titles) ? candidate.alternative_titles : [])
+        ].map((value) => String(value || "").trim()).filter(Boolean);
+        const seen = new Set([normalizeText(selectedTitle)]);
+        return values.filter((value) => {
+          const key = normalizeText(value);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).slice(0, 8);
+      }
+
+      function scannerCandidateLinks(candidate) {
+        const sources = [
+          ["Wikipedia", candidate.wikipedia_url, "wikipedia.org"],
+          ["IMDb", candidate.imdb_url, "imdb.com"],
+          ["FilmAffinity", candidate.filmaffinity_url, "filmaffinity.com"]
+        ];
+        if (candidate.url) {
+          if (hasHost(candidate.url, "wikipedia.org")) sources.push(["Wikipedia", candidate.url, "wikipedia.org"]);
+          else if (hasHost(candidate.url, "imdb.com")) sources.push(["IMDb", candidate.url, "imdb.com"]);
+          else if (hasHost(candidate.url, "filmaffinity.com")) sources.push(["FilmAffinity", candidate.url, "filmaffinity.com"]);
+        }
+        if (/^Q[0-9]+$/i.test(String(candidate.wikidata_id || ""))) {
+          sources.push(["Wikidata", `https://www.wikidata.org/wiki/${candidate.wikidata_id}`, "wikidata.org"]);
+        }
+        const seen = new Set();
+        return sources.filter(([, url, host]) => url && hasHost(url, host) && !seen.has(url) && seen.add(url)).map(([label, url]) =>
+          `<a href="${escapeAttr(url)}" target="_blank" rel="noreferrer noopener">${escapeHtml(label)}</a>`
+        ).join("");
+      }
+
+      function formatScannerScore(value) {
+        const score = Number(value);
+        if (!Number.isFinite(score)) return "similitud sin puntaje";
+        return `similitud ${Math.round((score <= 1 ? score * 100 : score))}%`;
       }
 
       function scannerCandidateReason(reason) {
         return {
+          shared_external_url: "Misma fuente externa",
+          shared_wikidata_id: "Mismo ID de Wikidata",
           exact_title_year: "Título y año exactos",
           exact_title_missing_year: "Título exacto; falta año",
+          exact_title_year_mismatch: "Título exacto; año diferente",
+          exact_title_kind_mismatch: "Título exacto; tipo diferente",
           similar_title_requires_review: "Título similar"
         }[reason] || "Coincidencia posible";
       }
 
       async function handleScannerReviewAction(event) {
-        const button = event.target.closest("[data-scanner-review]");
+        const button = event.submitter?.closest?.("[data-scanner-review]")
+          || event.target.closest?.("[data-scanner-review]")
+          || event.target.querySelector?.("[data-scanner-review='confirm-detected']");
         if (!button) return;
         event.preventDefault();
         const action = button.dataset.scannerReview;
         const fileId = button.dataset.fileId || selectedScannerItemId;
+        if (action === "ignore") {
+          const item = scannerQueue.find((entry) => entry.id === fileId);
+          const confirmed = confirm(
+            `¿Omitir "${item?.name || item?.detected_title || "este archivo"}"?\n\n`
+            + "Dejará de aparecer en la cola mientras no cambie. No se eliminará del disco ni del catálogo. Esta decisión todavía no puede restaurarse desde la interfaz."
+          );
+          if (!confirmed) return;
+        }
         const body = { action: action === "ignore" ? "ignore" : "confirm" };
         if (action === "confirm-candidate") {
           body.candidate_key = button.dataset.candidateKey || "";
@@ -2273,7 +2518,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         button.disabled = true;
         const feedback = fields.scannerQueueDetail.querySelector("#scannerReviewFeedback");
-        if (feedback) feedback.textContent = "Guardando decisión…";
+        if (feedback) feedback.textContent = action === "ignore" ? "Omitiendo archivo…" : "Guardando vínculo…";
         try {
           const response = await apiFetch(`/api/scanner/queue/${encodeURIComponent(fileId)}`, {
             method: "POST",
@@ -2286,6 +2531,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           await Promise.all([loadScannerQueue(), loadCatalog(), loadLibraries()]);
           selectedScannerItemId = scannerQueue[Math.min(priorIndex, scannerQueue.length - 1)]?.id || "";
           renderScannerQueue();
+          setCurationFeedback(action === "ignore" ? "Archivo omitido. No se eliminó del disco." : "Archivo vinculado al inventario compartido.", "success");
+          if (selectedScannerItemId) focusSelectedScannerItem();
+          else fields.refreshScannerQueue.focus({ preventScroll: true });
         } catch (error) {
           if (feedback) feedback.textContent = libraryErrorMessage(error.message);
           button.disabled = false;
