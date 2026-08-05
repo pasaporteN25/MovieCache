@@ -1080,16 +1080,21 @@ class ViewerHttpTests(unittest.TestCase):
             }),
             headers=self.post_headers(),
         )
+        self.assertEqual(created.status_code, 201, created.content)
         library_id = created.json()["library"]["id"]
         apply_before_test = self.client.post(
             f"/api/libraries/{library_id}/runs",
             content=json.dumps({"mode": "apply"}),
             headers=self.post_headers(),
         )
-        self.client.post(
+        tested = self.client.post(
             f"/api/libraries/{library_id}/runs",
             content=json.dumps({"mode": "dry_run"}),
             headers=self.post_headers(),
+        )
+        after_test = self.client.get(
+            f"/api/libraries/{library_id}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
         )
 
         before_apply = self.client.post(
@@ -1097,10 +1102,14 @@ class ViewerHttpTests(unittest.TestCase):
             content=json.dumps({"active": True}),
             headers=self.post_headers(),
         )
-        self.client.post(
+        applied = self.client.post(
             f"/api/libraries/{library_id}/runs",
             content=json.dumps({"mode": "apply"}),
             headers=self.post_headers(),
+        )
+        after_apply = self.client.get(
+            f"/api/libraries/{library_id}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
         )
         activated = self.client.post(
             f"/api/libraries/{library_id}/status",
@@ -1123,13 +1132,68 @@ class ViewerHttpTests(unittest.TestCase):
             apply_before_test.json()["reason"],
             "Run a successful test scan before applying changes",
         )
+        self.assertEqual(tested.status_code, 202, tested.content)
+        self.assertGreater(after_test.json()["library"]["verified_at"], 0)
+        self.assertEqual(after_test.json()["library"]["counts"]["files"], 0)
         self.assertEqual(before_apply.status_code, 409, before_apply.content)
         self.assertEqual(before_apply.json()["reason"], "Apply inventory before activating scheduled scans")
+        self.assertEqual(applied.status_code, 202, applied.content)
+        self.assertEqual(after_apply.json()["library"]["counts"]["files"], 1)
         self.assertEqual(activated.status_code, 200, activated.content)
+        self.assertTrue(activated.json()["library"]["active"])
+        self.assertGreater(activated.json()["library"]["next_scan_at"], 0)
         self.assertFalse(switched_to_manual.json()["library"]["active"])
         self.assertEqual(switched_to_manual.json()["library"]["next_scan_at"], 0)
         self.assertEqual(manual_activation.status_code, 409, manual_activation.content)
         self.assertEqual(manual_activation.json()["reason"], "Manual libraries do not use scheduled activation")
+
+    def test_offline_library_run_keeps_previous_availability_over_http(self) -> None:
+        (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps({
+                "name": "Disco removible",
+                "root_path": str(self.media_path),
+                "schedule": "manual",
+            }),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+        self.media_path.rename(Path(self.temporary.name) / "detached-media")
+
+        failed = self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+        run = self.client.get(
+            f"/api/library-runs/{failed.json()['run']['id']}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        library = self.client.get(
+            f"/api/libraries/{library_id}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        items = self.client.get(
+            "/api/items",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+
+        self.assertEqual(failed.status_code, 202, failed.content)
+        self.assertEqual(run.json()["run"]["status"], "failed")
+        self.assertEqual(library.json()["library"]["status"], "offline")
+        self.assertEqual(library.json()["library"]["counts"]["files"], 1)
+        self.assertTrue(items.json()["items"][0]["_availability"]["server"])
 
     def test_unknown_scanner_file_requires_an_owner_decision(self) -> None:
         (self.media_path / "Arrival.2016.mkv").write_bytes(b"arrival-video")

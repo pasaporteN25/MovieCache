@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import threading
 import time
@@ -520,7 +521,12 @@ class ManagedLibraryService:
         error: Exception,
     ) -> None:
         finished_at = self._now()
-        offline = isinstance(error, (LibraryPathError, OSError)) or "offline" in str(error).casefold()
+        offline_errnos = {errno.ENOENT, errno.ENODEV, errno.ENXIO, errno.ENOTDIR}
+        offline = (
+            isinstance(error, LibraryPathError)
+            or (isinstance(error, OSError) and error.errno in offline_errnos)
+            or "offline" in str(error).casefold()
+        )
         failed_library = replace(
             library,
             status="offline" if offline else "error",

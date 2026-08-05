@@ -131,6 +131,42 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(decorated["_availability"]["file_count"], 1)
         self.assertNotIn("sources", decorated["_availability"])
 
+    def test_complete_scheduled_library_acceptance_flow(self) -> None:
+        (self.media / "Heat.1995.1080p.mkv").write_bytes(b"heat")
+        library = self.create_library(schedule="hourly")
+
+        with self.assertRaisesRegex(ValueError, "successful test scan"):
+            self.service.queue_scan(library.id, "apply")
+
+        tested = self.execute(library.id, "dry_run")
+        tested_detail = self.service.library_detail(library.id)
+        self.assertEqual(tested.status, "completed")
+        self.assertGreater(tested_detail["verified_at"], 0)
+        self.assertEqual(tested_detail["counts"]["files"], 0)
+        with self.assertRaisesRegex(ValueError, "Apply inventory"):
+            self.service.set_active(library.id, True)
+
+        applied = self.execute(library.id, "apply")
+        activated = self.service.set_active(library.id, True)
+        self.assertEqual(applied.status, "completed")
+        self.assertEqual(self.service.library_detail(library.id)["counts"]["files"], 1)
+        self.assertTrue(activated.active)
+        self.assertEqual(activated.next_scan_at, self.now + 3600)
+
+        (self.media / "Arrival.2016.1080p.mkv").write_bytes(b"arrival")
+        self.now += 3600
+        scheduled = self.service.queue_due_scans()
+        self.assertEqual(len(scheduled), 1)
+        self.assertEqual(scheduled[0].trigger, "scheduled")
+        self.service.execute_run(scheduled[0].id)
+
+        completed = self.repository.get_run(scheduled[0].id)
+        final_detail = self.service.library_detail(library.id)
+        self.assertEqual(completed.status, "completed")
+        self.assertEqual(final_detail["counts"]["files"], 2)
+        self.assertTrue(final_detail["active"])
+        self.assertEqual(final_detail["next_scan_at"], self.now + 3600)
+
     def test_unknown_file_stays_in_owner_queue_until_confirmed(self) -> None:
         (self.media / "Arrival.2016.1080p.mkv").write_bytes(b"arrival")
         library = self.create_library()
@@ -169,6 +205,124 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(blocked.status, "blocked")
         self.assertTrue(blocked.summary["removals_skipped"])
         self.assertEqual(detail["counts"]["files"], 2)
+
+    def test_offline_library_preserves_inventory_and_reschedules(self) -> None:
+        (self.media / "Heat.1995.mkv").write_bytes(b"heat")
+        library = self.create_library(schedule="hourly")
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        self.service.set_active(library.id, True)
+        last_scan_at = self.repository.get_library(library.id).last_scan_at
+        self.media.rename(self.root / "detached-media")
+
+        failed = self.execute(library.id, "apply")
+        detail = self.service.library_detail(library.id)
+        inventory = self.repository.previous_files(library.id)
+
+        self.assertEqual(failed.status, "failed")
+        self.assertEqual(detail["status"], "offline")
+        self.assertEqual(detail["last_scan_at"], last_scan_at)
+        self.assertEqual(detail["next_scan_at"], self.now + 3600)
+        self.assertEqual(detail["counts"]["files"], 1)
+        self.assertTrue(inventory[0].available)
+
+    def test_partial_read_error_keeps_unseen_inventory_available(self) -> None:
+        (self.media / "Arrival.2016.mkv").write_bytes(b"arrival")
+        (self.media / "Heat.1995.mkv").write_bytes(b"heat")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+
+        def partial_scan(*args, **kwargs):  # type: ignore[no-untyped-def]
+            rows, _ = scan_media_files(*args, **kwargs)
+            return rows[:1], ["Permission denied while reading a subdirectory"]
+
+        partial_service = ManagedLibraryService(
+            self.repository,
+            allowed_roots=(str(self.media),),
+            catalog_universe=lambda: list(self.catalog_items),
+            scanner=partial_scan,
+            clock=lambda: self.now,
+        )
+        run = partial_service.queue_scan(library.id, "apply")
+        partial_service.execute_run(run.id)
+
+        completed = self.repository.get_run(run.id)
+        inventory = self.repository.previous_files(library.id)
+        self.assertEqual(completed.status, "partial")
+        self.assertTrue(completed.summary["removals_skipped"])
+        self.assertEqual(self.repository.get_library(library.id).status, "warning")
+        self.assertEqual(len(inventory), 2)
+        self.assertTrue(all(item.available for item in inventory))
+
+    def test_permission_error_does_not_replace_verified_inventory(self) -> None:
+        (self.media / "Heat.1995.mkv").write_bytes(b"heat")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+
+        def denied_scan(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+            raise PermissionError("Permission denied while opening the library")
+
+        denied_service = ManagedLibraryService(
+            self.repository,
+            allowed_roots=(str(self.media),),
+            catalog_universe=lambda: list(self.catalog_items),
+            scanner=denied_scan,
+            clock=lambda: self.now,
+        )
+        run = denied_service.queue_scan(library.id, "apply")
+        denied_service.execute_run(run.id)
+
+        failed = self.repository.get_run(run.id)
+        inventory = self.repository.previous_files(library.id)
+        self.assertEqual(failed.status, "failed")
+        self.assertEqual(self.repository.get_library(library.id).status, "error")
+        self.assertEqual(len(inventory), 1)
+        self.assertTrue(inventory[0].available)
+
+    def test_permission_warning_does_not_verify_an_unreadable_library(self) -> None:
+        library = self.create_library()
+
+        def warning_scan(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return [], ["Permission denied while traversing the library"]
+
+        warning_service = ManagedLibraryService(
+            self.repository,
+            allowed_roots=(str(self.media),),
+            catalog_universe=lambda: list(self.catalog_items),
+            scanner=warning_scan,
+            clock=lambda: self.now,
+        )
+        run = warning_service.queue_scan(library.id, "dry_run")
+        warning_service.execute_run(run.id)
+
+        completed = self.repository.get_run(run.id)
+        detail = warning_service.library_detail(library.id)
+        self.assertEqual(completed.status, "partial")
+        self.assertEqual(detail["status"], "warning")
+        self.assertEqual(detail["verified_at"], 0)
+        with self.assertRaisesRegex(ValueError, "successful test scan"):
+            warning_service.queue_scan(library.id, "apply")
+
+    def test_interrupted_run_is_failed_without_touching_inventory(self) -> None:
+        (self.media / "Heat.1995.mkv").write_bytes(b"heat")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        interrupted = self.service.queue_scan(library.id, "apply")
+        self.assertIsNotNone(self.repository.claim_run(interrupted.id, self.now))
+
+        recovered = self.repository.recover_interrupted_runs(self.now + 1)
+
+        failed = self.repository.get_run(interrupted.id)
+        inventory = self.repository.previous_files(library.id)
+        self.assertEqual(recovered, 1)
+        self.assertEqual(failed.status, "failed")
+        self.assertIn("Server restarted", failed.errors[0])
+        self.assertEqual(self.repository.get_library(library.id).status, "warning")
+        self.assertEqual(len(inventory), 1)
+        self.assertTrue(inventory[0].available)
 
     def test_hourly_library_becomes_due_and_queues_a_scheduled_run(self) -> None:
         (self.media / "Heat.1995.mkv").write_bytes(b"heat")

@@ -39,6 +39,11 @@ El primer despliegue puede ser manual y auditable:
 
 Una automatizacion posterior puede hacer esos pasos al publicar una version. No es necesario instalar un runner de CI en el servidor.
 
+Antes de promover una candidata, ejecutar tambien el gate de comportamiento de
+[release-checklist.md](release-checklist.md). Ese recorrido valida el scanner contra una
+ruta descartable y confirma que una unidad ausente o ilegible no retire disponibilidad
+ya verificada.
+
 Una preparacion minima del host seria:
 
 ```bash

@@ -4,9 +4,11 @@ Pequena base para convertir una lista desordenada de links de peliculas/series e
 
 ## Estado del proyecto
 
-La version de desarrollo actual es **v0.2.0**. Movie Inbox funciona como un gestor local de catalogo con almacenamiento JSON o SQLite: importa listas y archivos, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews desde una interfaz web con autenticacion local.
+La version candidata actual es **v0.2.0-rc1**. Movie Inbox funciona como un gestor local de catalogo con almacenamiento JSON o SQLite: importa listas y archivos, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews desde una interfaz web con autenticacion local.
 
 El catalogo usa esquemas versionados. JSON sigue siendo el formato legible y portable de intercambio y backup; SQLite puede usarse como fuente de verdad transaccional. Los catalogos personales, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
+
+El gate reproducible de pruebas y aceptacion en un servidor real esta documentado en [docs/release-checklist.md](docs/release-checklist.md).
 
 El codigo principal vive en el paquete instalable `src/movie_inbox`. Los archivos de `scripts/` son lanzadores compatibles con los comandos usados en v0.1.
 
