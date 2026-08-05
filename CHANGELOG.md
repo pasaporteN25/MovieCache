@@ -4,6 +4,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Agregado
+
+- Imagen Docker multi-stage sin privilegios, Compose con estado persistente, secret para el owner, biblioteca de solo lectura, healthcheck y configuracion local mediante `.env`.
+- Guia de importacion inicial, operacion, backup y actualizacion de una instancia Docker nueva.
+
 ## [0.2.0-rc1] - 2026-08-04
 
 ### Agregado

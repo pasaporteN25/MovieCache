@@ -26,6 +26,10 @@ __pycache__/
 /scripts/*.txt
 /catalog-view.html
 /data/
+/.env
+/imports/
+/media/
+/secrets/
 
 # Local scanner configuration can contain machine-specific paths.
 /scanner.json

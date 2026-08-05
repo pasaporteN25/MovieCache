@@ -4,6 +4,9 @@ Este gate prepara `v0.2.0-rc1` sin agregar capacidades. Combina pruebas automati
 con una aceptacion manual sobre una biblioteca descartable. Nunca se ejecuta por primera
 vez contra la unica copia de un catalogo o un disco sin backup.
 
+Para el despliegue Docker, ejecutar esta aceptacion dentro del contenedor siguiendo
+`docker.md`; la ruta visible por la aplicacion sera `/media/library`.
+
 ## 1. Validacion automatica
 
 Desde la raiz del checkout:

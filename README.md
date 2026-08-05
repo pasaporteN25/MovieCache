@@ -472,7 +472,7 @@ En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/w
 
 El checkout contiene codigo, no datos. En un servidor, el catalogo y `instance.db` deben vivir fuera del repo, por ejemplo en `/var/lib/movie-inbox/`, y los backups en otra ruta persistente. Nginx apunta al proceso web que escucha en loopback; nunca apunta al directorio Git ni sirve ninguna base directamente.
 
-El flujo completo, los flags de proxy y las plantillas de `systemd`/Nginx estan documentados en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). Uvicorn debe permanecer en loopback; Nginx o una VPN controlan el acceso externo.
+El despliegue reproducible con una instancia nueva, importacion inicial y medios de solo lectura esta documentado en [docs/docker.md](docs/docker.md). El despliegue nativo, los flags de proxy y las plantillas de `systemd`/Nginx estan en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). En Docker el proceso escucha dentro del contenedor, pero el puerto del host permanece publicado en loopback; Nginx o una VPN controlan el acceso externo.
 
 ## Limpiar titulos y linkear con Wikipedia
 

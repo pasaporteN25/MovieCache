@@ -88,8 +88,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - El inventario fisico pertenece a la instancia y aporta disponibilidad verificada a
   todos los catalogos sin exponer rutas a miembros. La declaracion manual permanece
   como una senal separada.
-- Docker es una prioridad cercana posterior a la estabilizacion del scanner, pero el
-  despliegue soportado actualmente es Uvicorn bajo systemd y Nginx.
+- Docker Compose soporta una instancia nueva con estado persistente y bibliotecas de
+  solo lectura. La relocalizacion de un `instance.db` existente y multiples raices
+  fisicas quedan para incrementos posteriores; systemd y Nginx siguen soportados.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas
