@@ -60,3 +60,52 @@ jobs:
         run: |
           "$RUNNER_TEMP/movie-inbox-wheel/bin/movie-inbox" --help
           "$RUNNER_TEMP/movie-inbox-wheel/bin/python" "$GITHUB_WORKSPACE/scripts/wheel_smoke.py"
+
+  docker-smoke:
+    name: Docker Compose / persistent state
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare isolated Docker inputs
+        shell: bash
+        run: |
+          mkdir -p imports media secrets
+          printf '%s' 'a-long-docker-smoke-password' > secrets/owner-password.txt
+          printf '%s\n' '{"schema_version":5,"items":[{"id":"heat","title":"Heat","year":"1995","kind":"pelicula"}]}' > imports/catalog.json
+          printf '%s' 'video' > media/Heat.1995.mkv
+      - name: Build image and import catalog
+        shell: bash
+        run: |
+          docker compose build
+          docker compose run --rm movie-inbox db import /imports/catalog.json --db /var/lib/movie-inbox/movie-inbox.db
+      - name: Start and verify container
+        shell: bash
+        run: |
+          docker compose up --detach
+          container_id="$(docker compose ps --quiet movie-inbox)"
+          for attempt in $(seq 1 60); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' "$container_id")"
+            if [ "$status" = "healthy" ]; then break; fi
+            sleep 1
+          done
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" = "healthy"
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container_id")" = "true"
+          docker inspect --format '{{json .HostConfig.CapDrop}}' "$container_id" | grep -q 'ALL'
+          curl --fail --silent http://127.0.0.1:8765/healthz | grep -q '"status":"ok"'
+          docker compose exec -T movie-inbox sh -c 'test ! -w /media/library'
+          docker compose exec -T movie-inbox movie-inbox db info /var/lib/movie-inbox/movie-inbox.db | grep -q -- '- Items: 1'
+          docker compose restart movie-inbox
+          for attempt in $(seq 1 60); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' "$container_id")"
+            if [ "$status" = "healthy" ]; then break; fi
+            sleep 1
+          done
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" = "healthy"
+          docker compose exec -T movie-inbox movie-inbox db info /var/lib/movie-inbox/movie-inbox.db | grep -q -- '- Items: 1'
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Remove smoke environment
+        if: always()
+        run: docker compose down --volumes --remove-orphans

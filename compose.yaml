@@ -1,0 +1,72 @@
+name: movie-inbox
+
+services:
+  movie-inbox:
+    build:
+      context: .
+      args:
+        PYTHON_VERSION: ${MOVIE_INBOX_PYTHON_VERSION:-3.11}
+    image: ${MOVIE_INBOX_IMAGE:-movie-inbox:local}
+    command:
+      - serve
+      - /var/lib/movie-inbox/movie-inbox.db
+      - --instance-db
+      - /var/lib/movie-inbox/instance.db
+      - --member-catalog-dir
+      - /var/lib/movie-inbox/catalogs
+      - --image-cache-dir
+      - /var/lib/movie-inbox/image-cache
+      - --image-cache-total-mb
+      - ${MOVIE_INBOX_IMAGE_CACHE_MB:-512}
+      - --owner-username
+      - ${MOVIE_INBOX_OWNER_USERNAME:-owner}
+      - --owner-password-file
+      - /run/secrets/owner_password
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+      - --public-origin
+      - ${MOVIE_INBOX_PUBLIC_ORIGIN:-http://localhost:8765}
+      - --forwarded-allow-ips
+      - ${MOVIE_INBOX_FORWARDED_ALLOW_IPS:-127.0.0.1}
+      - --session-days
+      - ${MOVIE_INBOX_SESSION_DAYS:-30}
+      - --library-root
+      - /media/library
+      - --no-open
+    ports:
+      - "${MOVIE_INBOX_BIND_ADDRESS:-127.0.0.1}:${MOVIE_INBOX_PORT:-8765}:8765"
+    volumes:
+      - movie-inbox-data:/var/lib/movie-inbox
+      - type: bind
+        source: ${MOVIE_INBOX_MEDIA_PATH:-./media}
+        target: /media/library
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MOVIE_INBOX_IMPORT_PATH:-./imports}
+        target: /imports
+        read_only: true
+        bind:
+          create_host_path: false
+    secrets:
+      - owner_password
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+secrets:
+  owner_password:
+    file: ${MOVIE_INBOX_OWNER_PASSWORD_FILE:-./secrets/owner-password.txt}
+
+volumes:
+  movie-inbox-data:

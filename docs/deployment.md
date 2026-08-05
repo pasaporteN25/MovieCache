@@ -144,6 +144,8 @@ Movie Inbox autentica la cuenta antes de entregar el visor. La cookie de sesion 
 
 La automatizacion de deploy sigue fuera del workflow de CI por ahora: primero conviene hacer un despliegue manual completo y verificar backup/restauracion.
 
-El repositorio todavia no publica `Dockerfile` ni `compose.yaml`. El empaquetado Docker
-queda planificado despues de estabilizar el scanner en un servidor real; debera montar
-datos y backups como volumenes persistentes y cada biblioteca en modo de solo lectura.
+El repositorio tambien publica una imagen reproducible y `compose.yaml` para instancias
+nuevas. La guia [docker.md](docker.md) cubre importacion inicial, volumen persistente,
+secret del owner y una biblioteca montada en modo de solo lectura. La relocalizacion de
+un `instance.db` existente sigue pendiente porque sus catalogos conservan rutas
+absolutas.
