@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import unittest
 import tempfile
+import tomllib
 from pathlib import Path
 
+from movie_inbox import __version__
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.cli.main import COMMANDS
 from movie_inbox.external.registry import ExternalSourceService
@@ -19,6 +21,12 @@ from movie_inbox.web.config import ViewerConfig
 
 
 class PackageLayoutTests(unittest.TestCase):
+    def test_runtime_version_matches_package_metadata(self) -> None:
+        project = tomllib.loads(
+            (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+        )
+        self.assertEqual(__version__, project["project"]["version"])
+
     def test_installed_command_surface_is_complete(self) -> None:
         self.assertEqual(
             set(COMMANDS),

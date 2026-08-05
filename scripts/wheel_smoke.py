@@ -8,10 +8,12 @@ import subprocess
 import sys
 import tempfile
 import time
+from importlib.metadata import version
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from movie_inbox import __version__
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.web.assets import (
@@ -23,6 +25,7 @@ from movie_inbox.web.assets import (
 
 
 def main() -> int:
+    assert version("movie-inbox") == __version__
     assert "Movie Inbox wheel smoke" in render_html("Movie Inbox wheel smoke", "token")
     assert "Movie Inbox wheel smoke" in render_login_html("Movie Inbox wheel smoke", "token")
     assert "Movie Inbox wheel smoke" in render_password_change_html("Movie Inbox wheel smoke", "token")

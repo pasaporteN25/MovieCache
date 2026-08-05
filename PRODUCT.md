@@ -82,8 +82,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   permitir previsualizar, mapear formatos y elegir entre copiar obras al catalogo
   personal o crear una coleccion local sin mezclar automaticamente ambas fuentes.
 - El scanner incremental puede ejecutarse por CLI o administrarse desde la web. Las
-  rutas estan limitadas por configuracion del servidor; el owner prueba, activa y
-  programa recorridos, y resuelve identidades dudosas desde la Bandeja.
+  rutas estan limitadas por configuracion del servidor; el owner prueba sin escribir,
+  aplica el inventario y recien entonces puede automatizar recorridos horarios o
+  diarios. Las identidades dudosas se resuelven desde la Bandeja.
 - El inventario fisico pertenece a la instancia y aporta disponibilidad verificada a
   todos los catalogos sin exponer rutas a miembros. La declaracion manual permanece
   como una senal separada.
