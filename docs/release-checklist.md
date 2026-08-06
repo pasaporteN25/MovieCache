@@ -5,7 +5,7 @@ con una aceptacion manual sobre una biblioteca descartable. Nunca se ejecuta por
 vez contra la unica copia de un catalogo o un disco sin backup.
 
 Para el despliegue Docker, ejecutar esta aceptacion dentro del contenedor siguiendo
-`docker.md`; la ruta visible por la aplicacion sera `/media/library`.
+`docker.md`; la primera ruta visible por la aplicacion sera `/media/library/disco1`.
 
 ## 1. Validacion automatica
 

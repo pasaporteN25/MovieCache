@@ -1,0 +1,22 @@
+services:
+  movie-inbox:
+    volumes:
+      # disco1 replaces MOVIE_INBOX_MEDIA_PATH from compose.yaml.
+      - type: bind
+        source: /srv/dev-disk-by-uuid-DISCO1/Media
+        target: /media/library/disco1
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/dev-disk-by-uuid-DISCO2/Media
+        target: /media/library/disco2
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/dev-disk-by-uuid-DISCO3/Media
+        target: /media/library/disco3
+        read_only: true
+        bind:
+          create_host_path: false

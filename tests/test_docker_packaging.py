@@ -15,6 +15,7 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn(" AS builder", dockerfile)
         self.assertIn(" AS runtime", dockerfile)
         self.assertIn("USER movie-inbox:movie-inbox", dockerfile)
+        self.assertIn('install -d "/media/library/disco${slot}"', dockerfile)
         self.assertIn("HEALTHCHECK ", dockerfile)
         self.assertIn("ENTRYPOINT [\"movie-inbox\"]", dockerfile)
 
@@ -22,13 +23,20 @@ class DockerPackagingTests(unittest.TestCase):
         compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
 
         self.assertIn("movie-inbox-data:/var/lib/movie-inbox", compose)
-        self.assertIn("target: /media/library", compose)
+        self.assertIn("target: /media/library/disco1", compose)
         self.assertIn("read_only: true", compose)
         self.assertIn("create_host_path: false", compose)
         self.assertIn("/run/secrets/owner_password", compose)
         self.assertIn("cap_drop:\n      - ALL", compose)
         self.assertIn("no-new-privileges:true", compose)
         self.assertIn("127.0.0.1}", compose)
+
+    def test_omv_example_uses_precreated_read_only_mount_slots(self) -> None:
+        compose = (ROOT / "compose.omv.example.yaml").read_text(encoding="utf-8")
+
+        for slot in range(1, 4):
+            self.assertIn(f"target: /media/library/disco{slot}", compose)
+        self.assertEqual(compose.count("read_only: true"), 3)
 
     def test_example_environment_contains_no_password(self) -> None:
         environment = (ROOT / ".env.example").read_text(encoding="utf-8")
