@@ -41,7 +41,7 @@ services:
       - movie-inbox-data:/var/lib/movie-inbox
       - type: bind
         source: ${MOVIE_INBOX_MEDIA_PATH:-./media}
-        target: /media/library
+        target: /media/library/disco1
         read_only: true
         bind:
           create_host_path: false

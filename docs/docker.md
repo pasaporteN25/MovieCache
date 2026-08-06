@@ -12,8 +12,8 @@ contenedor porque esa base guarda rutas absolutas de catalogos personales.
   seguridad.
 - El secret `owner_password` entrega la credencial inicial como archivo, nunca como
   variable de entorno.
-- La interfaz administra nombres, subrutas y frecuencias solamente dentro de
-  `/media/library`.
+- La interfaz administra nombres, subrutas y frecuencias solamente dentro de los
+  slots `/media/library/disco1` a `/media/library/disco8`.
 
 El proceso corre sin privilegios, no recibe capabilities Linux, usa un filesystem raiz
 de solo lectura y monta la biblioteca fisica como `read_only`. Solamente
@@ -35,6 +35,7 @@ Editar `.env` y configurar al menos:
 
 ```dotenv
 MOVIE_INBOX_PUBLIC_ORIGIN=http://localhost:8765
+# Primera unidad o arbol multimedia.
 MOVIE_INBOX_MEDIA_PATH=D:/Peliculas
 MOVIE_INBOX_IMPORT_PATH=./imports
 MOVIE_INBOX_OWNER_USERNAME=lucas
@@ -85,8 +86,37 @@ docker compose logs -f movie-inbox
 La aplicacion queda disponible en `http://localhost:8765`. El inicio cotidiano se reduce
 a `docker compose up -d`; las rutas y opciones permanecen en `.env` y Compose.
 
-En `Administrar > Bibliotecas`, registrar `/media/library`, no la ruta `D:/Peliculas`
-del host. Compose es la unica capa que conoce la ruta fisica externa.
+En `Administrar > Bibliotecas`, registrar `/media/library/disco1`, no la ruta
+`D:/Peliculas` del host. Compose es la unica capa que conoce la ruta fisica externa.
+
+## Varias unidades en OMV o Debian
+
+La imagen contiene ocho slots de montaje precreados. Esto permite conservar el
+filesystem raiz de solo lectura: Docker no necesita crear directorios al iniciar el
+contenedor. Copiar el ejemplo local, que queda ignorado por Git:
+
+```bash
+cp compose.omv.example.yaml compose.override.yaml
+nano compose.override.yaml
+docker compose config
+```
+
+Cada `source` debe ser una ruta real del host y cada `target` debe usar un slot distinto
+entre `/media/library/disco1` y `/media/library/disco8`. La entrada `disco1` del override
+reemplaza el mount configurado por `MOVIE_INBOX_MEDIA_PATH`; las restantes se agregan.
+Compose carga el override automaticamente.
+
+No usar symlinks como raices administradas. El scanner no sigue symlinks y rechaza una
+raiz que lo sea. En OMV se recomienda usar la ruta estable del shared folder o resolverla
+antes de configurar el source:
+
+```bash
+realpath /data/videos
+findmnt /data/videos
+```
+
+Los nombres amigables se asignan en `Administrar > Bibliotecas`; no es necesario cambiar
+el nombre interno del slot.
 
 Para detener sin perder datos:
 
@@ -154,7 +184,8 @@ imagen.
 
 ## Limites de este incremento
 
-- Configura una raiz fisica. Se agregaran varias raices sin ampliar permisos globales.
+- Admite hasta ocho unidades mediante slots de solo lectura; agregar mas requiere crear
+  nuevos mountpoints en la imagen.
 - No migra usuarios ni paths absolutos desde un `instance.db` de Windows.
 - No incluye Nginx dentro de Compose; puede usarse el proxy del host documentado en
   `deployment.md`.

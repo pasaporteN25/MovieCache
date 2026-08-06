@@ -34,7 +34,11 @@ COPY --from=builder /wheels/ /wheels/
 RUN python -m pip install --no-index --find-links=/wheels movie-inbox \
     && rm -rf /wheels \
     && install -d -o movie-inbox -g movie-inbox \
-        /var/lib/movie-inbox /var/lib/movie-inbox/catalogs /var/lib/movie-inbox/image-cache
+        /var/lib/movie-inbox /var/lib/movie-inbox/catalogs /var/lib/movie-inbox/image-cache \
+    && install -d /media/library \
+    && for slot in 1 2 3 4 5 6 7 8; do \
+        install -d "/media/library/disco${slot}"; \
+    done
 
 USER movie-inbox:movie-inbox
 WORKDIR /var/lib/movie-inbox
