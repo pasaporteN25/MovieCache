@@ -406,7 +406,9 @@ La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por
 
 `Random` abre una ficha al azar sin modificar el JSON. Su casilla permite limitar la eleccion a obras disponibles en catalogo. Dentro de `Coleccion`, `Mezclar vista` cambia solamente el orden visual de los resultados actuales y `Restablecer orden` recupera el orden elegido.
 
-Las imagenes del visor se sirven con un cache local. La primera vez que una tarjeta necesita `page_image`, el servidor la descarga y la guarda de forma atomica en `.catalog-cache/images` junto al catalogo editable; despues se sirve desde esa carpeta. El limite predeterminado es 5 MB por imagen y 512 MB en total. Cuando se alcanza el limite global se eliminan primero los archivos menos usados recientemente.
+Las imagenes del visor se sirven con un cache local bajo demanda. La primera vez que una tarjeta visible necesita `page_image`, el servidor la descarga y la guarda de forma atomica en `.catalog-cache/images` junto al catalogo editable; despues se sirve desde esa carpeta. El limite predeterminado es 5 MB por imagen y 512 MB en total. Cuando se alcanza el limite global se eliminan primero los archivos menos usados recientemente.
+
+En Docker el cache vive en `/var/lib/movie-inbox/image-cache`, dentro del volumen nombrado `movie-inbox-data`. Sobrevive a reinicios, `docker compose down` y recreaciones por actualizacion. Se elimina solamente al borrar ese volumen, por ejemplo con `docker compose down --volumes`, por lo que ese flag no debe usarse durante una actualizacion normal. El limite puede cambiarse con `MOVIE_INBOX_IMAGE_CACHE_MB` en `.env`; aumentar el limite no descarga imagenes por adelantado, solamente evita expulsarlas demasiado pronto.
 
 ```powershell
 movie-inbox cache info --dir .catalog-cache/images

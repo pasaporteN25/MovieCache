@@ -47,8 +47,10 @@ def import_json(source_path: Path, database_path: Path, replace: bool = False) -
         raise ValueError("Database destination must use .db, .sqlite or .sqlite3")
     if source_path.resolve() == database_path.resolve():
         raise ValueError("Source and destination must be different files")
+    if not source_path.is_file():
+        raise FileNotFoundError(f"Catalog does not exist: {source_path}")
 
-    source = JsonCatalogRepository(source_path, normalize_item)
+    source = JsonCatalogRepository(source_path, normalize_item, read_only=True)
     destination = SqliteCatalogRepository(database_path, normalize_item)
     items = source.read()
     existing = destination.read() if database_path.exists() else []

@@ -13,6 +13,7 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 ### Corregido
 
 - Los mounts multi-disco ya no intentan crear sus destinos sobre el filesystem raiz de solo lectura.
+- La importacion Docker puede leer catalogos desde `/imports` sin intentar crear un lock en ese mount de solo lectura.
 
 ## [0.2.0-rc1] - 2026-08-04
 

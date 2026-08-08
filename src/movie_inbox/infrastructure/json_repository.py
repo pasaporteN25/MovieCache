@@ -35,11 +35,14 @@ class JsonCatalogRepository:
         normalizer: CatalogNormalizer,
         lock_timeout: float = 10.0,
         stale_lock_seconds: float = 300.0,
+        *,
+        read_only: bool = False,
     ) -> None:
         self.path = Path(path)
         self.normalizer = normalizer
         self.lock_timeout = max(0.1, lock_timeout)
         self.stale_lock_seconds = max(30.0, stale_lock_seconds)
+        self.read_only = bool(read_only)
         self._thread_lock = threading.RLock()
         self._local = threading.local()
 
@@ -56,10 +59,12 @@ class JsonCatalogRepository:
             return next((item for item in self._read_unlocked() if item.id == item_id), None)
 
     def write(self, items: list[CatalogItem]) -> None:
+        self._require_writable()
         with self.locked():
             self._write_unlocked(items)
 
     def mutate(self, mutation: CatalogMutation[T]) -> T:
+        self._require_writable()
         with self.locked():
             items = self._read_unlocked()
             changed, result = mutation(items)
@@ -117,6 +122,9 @@ class JsonCatalogRepository:
     @contextmanager
     def locked(self) -> Iterator[None]:
         with self._thread_lock:
+            if self.read_only:
+                yield
+                return
             depth = int(getattr(self._local, "depth", 0))
             if depth:
                 self._local.depth = depth + 1
@@ -134,6 +142,10 @@ class JsonCatalogRepository:
             finally:
                 self._local.depth = 0
                 self._release_file_lock(token)
+
+    def _require_writable(self) -> None:
+        if self.read_only:
+            raise CatalogRepositoryError(f"Catalog is read-only: {self.path}")
 
     def _read_unlocked(self) -> list[CatalogItem]:
         if not self.path.exists():
