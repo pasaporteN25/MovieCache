@@ -78,9 +78,10 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   no se sigue automaticamente.
 - Compartir entre instalaciones, perfiles accesibles sin cuenta y registro abierto
   quedan para fases posteriores. No existe federacion entre homeservers.
-- La interfaz todavia no importa paquetes de catalogo. Esa capacidad futura debe
-  permitir previsualizar, mapear formatos y elegir entre copiar obras al catalogo
-  personal o crear una coleccion local sin mezclar automaticamente ambas fuentes.
+- La interfaz importa TXT, CSV y JSON no confiables mediante borradores privados de
+  48 horas. Antes de escribir permite previsualizar y clasificar filas, copiar obras
+  al catalogo personal o crear una coleccion local privada. Todavia no incorpora filas
+  a colecciones existentes ni ejecuta enriquecimiento externo durante la importacion.
 - El scanner incremental puede ejecutarse por CLI o administrarse desde la web. Las
   rutas estan limitadas por configuracion del servidor; el owner prueba sin escribir,
   aplica el inventario y recien entonces puede automatizar recorridos horarios o
@@ -88,9 +89,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - El inventario fisico pertenece a la instancia y aporta disponibilidad verificada a
   todos los catalogos sin exponer rutas a miembros. La declaracion manual permanece
   como una senal separada.
-- Docker Compose soporta una instancia nueva con estado persistente y bibliotecas de
-  solo lectura. La relocalizacion de un `instance.db` existente y multiples raices
-  fisicas quedan para incrementos posteriores; systemd y Nginx siguen soportados.
+- Docker Compose soporta una instancia nueva con estado persistente y hasta ocho
+  raices fisicas de solo lectura. La relocalizacion de un `instance.db` existente
+  queda para un incremento posterior; systemd y Nginx siguen soportados.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

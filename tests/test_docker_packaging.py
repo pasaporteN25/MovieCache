@@ -52,6 +52,7 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("docker compose run --rm movie-inbox db import", workflow)
         self.assertIn("docker compose restart movie-inbox", workflow)
         self.assertIn("ReadonlyRootfs", workflow)
+        self.assertIn("test ! -w /imports", workflow)
 
 
 if __name__ == "__main__":

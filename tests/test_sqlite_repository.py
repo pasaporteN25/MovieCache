@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
 from contextlib import closing, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 
 from movie_inbox.application.catalog_service import CatalogService
@@ -280,6 +282,38 @@ class SqliteRepositoryTests(unittest.TestCase):
             payload = json.loads(exported.read_text(encoding="utf-8"))
             self.assertEqual(payload["schema_version"], 5)
             self.assertEqual(payload["items"][0]["id"], "heat-1995")
+
+    def test_json_import_reads_source_without_creating_a_sidecar_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "catalog.json"
+            database = root / "catalog.db"
+            JsonCatalogRepository(source, normalize_item).write([sample_item()])
+            lock_path = root / ".catalog.json.lock"
+
+            original_open = os.open
+
+            def reject_source_lock(path, flags, mode=0o777):  # type: ignore[no-untyped-def]
+                if Path(path) == lock_path:
+                    raise OSError(30, "Read-only file system", str(path))
+                return original_open(path, flags, mode)
+
+            with patch("movie_inbox.infrastructure.json_repository.os.open", side_effect=reject_source_lock):
+                with redirect_stdout(StringIO()):
+                    self.assertEqual(import_json(source, database), 0)
+
+            self.assertFalse(lock_path.exists())
+            self.assertEqual(SqliteCatalogRepository(database, normalize_item).read()[0].id, "heat-1995")
+
+    def test_read_only_json_repository_rejects_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "catalog.json"
+            JsonCatalogRepository(source, normalize_item).write([sample_item()])
+            repository = JsonCatalogRepository(source, normalize_item, read_only=True)
+
+            self.assertEqual(repository.read()[0].id, "heat-1995")
+            with self.assertRaisesRegex(CatalogRepositoryError, "read-only"):
+                repository.write([])
 
     def test_round_trip_verification_compares_complete_documents(self) -> None:
         expected = sample_item()
