@@ -3640,6 +3640,26 @@
       }
       .admin-metric-grid .metric strong { color: var(--ink); font-size: 22px; }
       .admin-db-panel { max-width: 960px; }
+      .catalog-export-tool {
+        align-items: center;
+        border-top: 1px solid var(--line);
+        display: flex;
+        gap: 24px;
+        justify-content: space-between;
+        max-width: 960px;
+        padding-top: 15px;
+      }
+      .catalog-export-copy {
+        display: grid;
+        gap: 4px;
+        max-width: 620px;
+      }
+      .catalog-export-copy strong { color: var(--ink); font-size: 14px; }
+      .catalog-export-copy span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+      .catalog-export-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+      .catalog-export-actions button { width: auto; }
+      .catalog-export-actions[aria-busy="true"] { opacity: 0.62; }
+      .catalog-export-feedback { max-width: 960px; }
       .admin-tool-grid {
         grid-template-columns: repeat(2, minmax(180px, 320px));
         max-width: 660px;
@@ -4689,6 +4709,9 @@
         .scanner-confirm-detected button { grid-column: 1 / -1; justify-self: start; }
       }
       @media (max-width: 700px) {
+        .catalog-export-tool { align-items: stretch; display: grid; gap: 12px; }
+        .catalog-export-actions { display: grid; grid-template-columns: 1fr 1fr; }
+        .catalog-export-actions button { min-height: 44px; width: 100%; }
         .library-section-heading { align-items: stretch; display: grid; }
         .library-section-heading button { width: 100%; }
         .library-configuration { align-items: stretch; display: grid; }

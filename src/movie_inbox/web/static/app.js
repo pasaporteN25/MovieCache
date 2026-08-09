@@ -306,6 +306,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogMergeResults: document.querySelector("#catalogMergeResults"),
         databaseCatalogPanel: document.querySelector("#databaseCatalogPanel"),
         databaseExternalPanel: document.querySelector("#databaseExternalPanel"),
+        catalogExportActions: document.querySelector("#catalogExportActions"),
+        catalogExportFeedback: document.querySelector("#catalogExportFeedback"),
         createLibraryButton: document.querySelector("#createLibraryButton"),
         libraryConfiguration: document.querySelector("#libraryConfiguration"),
         libraryFeedback: document.querySelector("#libraryFeedback"),
@@ -422,6 +424,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.logoutButton.addEventListener("click", logout);
       fields.createMemberButton.addEventListener("click", openMemberDialog);
       fields.createLibraryButton.addEventListener("click", () => openLibraryDialog());
+      fields.catalogExportActions.addEventListener("click", downloadCatalogExport);
       fields.libraryForm.addEventListener("submit", saveManagedLibrary);
       fields.libraryList.addEventListener("click", handleLibraryAction);
       fields.closeLibraryDialog.addEventListener("click", closeLibraryDialog);
@@ -4455,6 +4458,47 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             ${externalCacheItem()}
           </div>
         `;
+      }
+
+      async function downloadCatalogExport(event) {
+        const button = event.target.closest("[data-catalog-export]");
+        if (!button) return;
+        const format = String(button.dataset.catalogExport || "").toLowerCase();
+        if (!["json", "csv"].includes(format)) return;
+        const buttons = [...fields.catalogExportActions.querySelectorAll("button")];
+        buttons.forEach((control) => { control.disabled = true; });
+        fields.catalogExportActions.setAttribute("aria-busy", "true");
+        setInlineFeedback(fields.catalogExportFeedback, "Preparando la copia portable...", "working");
+        try {
+          const response = await apiFetch(`/api/catalog/export?format=${encodeURIComponent(format)}`);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.reason || `http_${response.status}`);
+          }
+          const blob = await response.blob();
+          const disposition = response.headers.get("Content-Disposition") || "";
+          const named = disposition.match(/filename="([^"]+)"/i);
+          const filename = named?.[1] || `movie-inbox-catalog.${format}`;
+          const href = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = href;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(href), 0);
+          setInlineFeedback(fields.catalogExportFeedback, `${filename} descargado.`, "success");
+        } catch (error) {
+          console.error(error);
+          setInlineFeedback(
+            fields.catalogExportFeedback,
+            "No pudimos preparar la descarga. Actualizá los datos e intentá nuevamente.",
+            "error"
+          );
+        } finally {
+          buttons.forEach((control) => { control.disabled = false; });
+          fields.catalogExportActions.removeAttribute("aria-busy");
+        }
       }
 
       function externalDatabaseItem(label, source) {

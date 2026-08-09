@@ -6,11 +6,12 @@ import json
 import secrets
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -75,6 +76,7 @@ from movie_inbox.domain.libraries import LibraryValidationError
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
+from movie_inbox.infrastructure.export import catalog_csv_text
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import (
@@ -86,7 +88,7 @@ from movie_inbox.infrastructure.import_repository import SqliteImportDraftReposi
 from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
 from movie_inbox.infrastructure.library_scanner import scan_media_files
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
-from movie_inbox.infrastructure.schema import SCHEMA_VERSION
+from movie_inbox.infrastructure.schema import SCHEMA_VERSION, catalog_document
 from movie_inbox.infrastructure.starter_collections import (
     AKIRA_KUROSAWA_SEED_KEY,
     akira_kurosawa_collection,
@@ -1284,6 +1286,45 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 "external": external_sources_snapshot(),
                 "privacy": preferences.to_dict(),
             }
+        )
+
+    @app.get("/api/catalog/export", dependencies=[Depends(require_token)])
+    def export_catalog(
+        request: Request,
+        export_format: str = Query(default="json", alias="format"),
+    ) -> Response:
+        export_format = export_format.strip().casefold()
+        if export_format not in {"json", "csv"}:
+            return error_response("unsupported_export_format", 400)
+        try:
+            identity = require_ready_identity(request)
+            catalog = SessionCatalog.from_identity(config, identity)
+            rows = [
+                item
+                for source_path in resolved_files(catalog.config.patterns)
+                for item in catalog_service(Path(source_path)).list_items()
+            ]
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
+
+        stamp = datetime.now(timezone.utc).date().isoformat()
+        filename = f"movie-inbox-{identity.user.username.casefold()}-{stamp}.{export_format}"
+        headers = {
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        }
+        if export_format == "csv":
+            # The BOM keeps accented titles readable in spreadsheet apps on Windows.
+            return Response(
+                content="\ufeff" + catalog_csv_text(rows),
+                media_type="text/csv",
+                headers=headers,
+            )
+        document = catalog_document([item.to_dict() for item in rows])
+        return Response(
+            content=json.dumps(document, ensure_ascii=False, indent=2) + "\n",
+            media_type="application/json",
+            headers=headers,
         )
 
     @app.get("/api/curation", dependencies=[Depends(require_token)])

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import tempfile
 import unittest
@@ -78,7 +80,36 @@ class ViewerHttpTests(unittest.TestCase):
 
     def test_api_requires_token(self) -> None:
         status, _ = self.request("GET", "/api/items")
+        export_status, _ = self.request("GET", "/api/catalog/export?format=json")
         self.assertEqual(status, 403)
+        self.assertEqual(export_status, 403)
+
+    def test_personal_catalog_can_be_downloaded_as_json_or_csv(self) -> None:
+        headers = {"X-Movie-Inbox-Token": self.config.api_token}
+        json_export = self.client.get("/api/catalog/export?format=json", headers=headers)
+        csv_export = self.client.get("/api/catalog/export?format=csv", headers=headers)
+        invalid = self.client.get("/api/catalog/export?format=xml", headers=headers)
+
+        self.assertEqual(json_export.status_code, 200, json_export.content)
+        self.assertEqual(json_export.headers["cache-control"], "no-store")
+        self.assertRegex(
+            json_export.headers["content-disposition"],
+            r'attachment; filename="movie-inbox-lucas-\d{4}-\d{2}-\d{2}\.json"',
+        )
+        document = json_export.json()
+        self.assertEqual(document["schema_version"], 5)
+        self.assertEqual([item["id"] for item in document["items"]], ["heat"])
+        self.assertNotIn("_source_file", document["items"][0])
+        self.assertNotIn(str(self.temporary.name), json_export.text)
+
+        self.assertEqual(csv_export.status_code, 200, csv_export.content)
+        self.assertIn("text/csv", csv_export.headers["content-type"])
+        rows = list(csv.DictReader(io.StringIO(csv_export.text.lstrip("\ufeff"))))
+        self.assertEqual([row["id"] for row in rows], ["heat"])
+        self.assertEqual(rows[0]["title"], "Heat")
+        self.assertNotIn(str(self.temporary.name), csv_export.text)
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["reason"], "unsupported_export_format")
 
     def test_catalog_and_api_require_an_authenticated_session(self) -> None:
         with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as client:
@@ -147,10 +178,18 @@ class ViewerHttpTests(unittest.TestCase):
                 "/api/items",
                 headers={"X-Movie-Inbox-Token": self.config.api_token},
             )
+            member_export = member_client.get(
+                "/api/catalog/export?format=json",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
             self.assertEqual(member_items.status_code, 200, member_items.content)
             self.assertEqual([item["id"] for item in member_items.json()["items"]], ["heat"])
             self.assertEqual(member_items.json()["items"][0]["_source_file"], "source-1")
             self.assertNotIn(str(member_catalog.write_path), member_items.text)
+            self.assertEqual(member_export.status_code, 200, member_export.content)
+            self.assertEqual(member_export.json()["items"][0]["status"], "to_watch")
+            self.assertIn("movie-inbox-maria-", member_export.headers["content-disposition"])
+            self.assertNotIn(str(member_catalog.write_path), member_export.text)
 
             updated = member_client.post(
                 "/api/status",
