@@ -9,6 +9,7 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Imagen Docker multi-stage sin privilegios, Compose con estado persistente, secret para el owner, biblioteca de solo lectura, healthcheck y configuracion local mediante `.env`.
 - Guia de importacion inicial, operacion, backup y actualizacion de una instancia Docker nueva.
 - Perfil de ejemplo para montar hasta ocho unidades de OMV/Debian en slots de solo lectura.
+- Descarga autenticada del catalogo personal en JSON portable o CSV desde Administrar.
 
 ### Corregido
 

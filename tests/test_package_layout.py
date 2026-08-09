@@ -58,6 +58,7 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIn(b'apiFetch("/api/imports")', app_js[0])
         self.assertIn(b'apiFetch("/api/libraries")', app_js[0])
         self.assertIn(b'apiFetch("/api/scanner/queue")', app_js[0])
+        self.assertIn(b'/api/catalog/export?format=', app_js[0])
         self.assertIn(b'"Probar recorrido"', app_js[0])
         self.assertIn(b'"Aplicar inventario"', app_js[0])
         self.assertIn(b">Vincular archivo</button>", app_js[0])

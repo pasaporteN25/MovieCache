@@ -127,6 +127,8 @@ Para generar un backup legible y versionado:
 py -m movie_inbox db export data/movie-inbox.db --json backups/catalog-2026-07-15.json
 ```
 
+Cada usuario tambien puede abrir `Administrar > Base de datos` y descargar su catalogo personal. `Descargar JSON` conserva el documento versionado completo y es la opcion indicada para restaurar o migrar las obras; `Descargar CSV` ofrece una copia comoda para planillas. Ninguna de las dos descargas incluye cuentas, sesiones, privacidad, colecciones, seguimientos ni inventario compartido: para recuperar toda una instancia Docker se respalda el volumen completo como indica [docs/docker.md](docs/docker.md).
+
 SQLite normaliza obras, aliases, IDs externos, archivos locales, tags y procedencia. Las actualizaciones frecuentes son granulares: estado y fecha se actualizan directamente, mientras que metadata y relaciones reconstruyen solamente la parte modificada del item. Las operaciones batch conservan una transaccion unica pero sincronizan diferencias en vez de reescribir todas las relaciones. Tambien reserva tablas para temporadas y episodios, aunque esa funcionalidad todavia no forma parte del dominio ni de la interfaz. Los archivos `.db`, `.sqlite`, sus journals y `data/` se ignoran en Git.
 
 ## Uso del script

@@ -166,6 +166,23 @@ docker compose cp movie-inbox:/var/lib/movie-inbox/. .\instance-backup
 docker compose start movie-inbox
 ```
 
+En OMV o Debian puede conservarse cada snapshot fuera del volumen de Docker:
+
+```bash
+cd /opt/movie-inbox
+backup_dir="/srv/backups/movie-inbox/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup_dir"
+docker compose stop movie-inbox
+docker compose cp movie-inbox:/var/lib/movie-inbox/. "$backup_dir/"
+docker compose start movie-inbox
+echo "Backup completo: $backup_dir"
+```
+
+Este snapshot contiene `movie-inbox.db`, `instance.db`, los catalogos de miembros,
+colecciones, privacidad, configuracion del scanner y cache. La descarga JSON disponible
+en `Administrar > Base de datos` es complementaria: permite restaurar las obras del
+usuario que la genera, pero no reemplaza este respaldo completo de la instancia.
+
 La copia completa debe guardarse fuera del host o volumen principal. Una restauracion se
 ensaya primero sobre un proyecto Compose separado.
 
@@ -180,7 +197,9 @@ docker compose ps
 
 Compose recrea el contenedor y reutiliza el volumen. Las migraciones de SQLite se
 ejecutan al abrir las bases; nunca se debe reemplazar el volumen por el filesystem de la
-imagen.
+imagen. Una actualizacion normal no borra datos, pero antes de cambiar de version se
+recomienda crear el snapshot completo anterior y comprobar que el directorio contiene
+al menos `movie-inbox.db` e `instance.db`. No usar `docker compose down --volumes`.
 
 ## Limites de este incremento
 

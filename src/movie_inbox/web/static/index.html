@@ -589,6 +589,17 @@
             </div>
           </div>
           <div id="databaseCatalogPanel" class="db-panel admin-db-panel"></div>
+          <div class="catalog-export-tool">
+            <div class="catalog-export-copy">
+              <strong>Copia portable del cat&aacute;logo</strong>
+              <span>JSON conserva la estructura para restaurar. CSV sirve para revisar los datos en una planilla.</span>
+            </div>
+            <div id="catalogExportActions" class="catalog-export-actions">
+              <button id="exportCatalogJson" type="button" data-catalog-export="json">Descargar JSON</button>
+              <button id="exportCatalogCsv" class="quiet-action" type="button" data-catalog-export="csv">Descargar CSV</button>
+            </div>
+          </div>
+          <p id="catalogExportFeedback" class="admin-inline-feedback catalog-export-feedback" role="status" aria-live="polite" hidden></p>
         </section>
 
         <section id="adminExternal" class="admin-section" aria-labelledby="adminExternalTitle">
