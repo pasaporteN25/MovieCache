@@ -46,11 +46,11 @@ class ImageCacheInfo:
 def cached_image(config: ViewerConfig, image_url: str) -> tuple[bytes, str]:
     image_url = validate_http_url(image_url, config.image_allowed_hosts)
     cache_dir = Path(config.image_cache_dir)
-    key = hashlib.sha256(image_url.encode("utf-8")).hexdigest()
+    key = image_cache_key(image_url)
     with _CACHE_LOCK:
         cached = _cached_path(cache_dir, key)
         if cached is None:
-            legacy_key = hashlib.sha1(image_url.encode("utf-8"), usedforsecurity=False).hexdigest()
+            legacy_key = image_cache_legacy_key(image_url)
             legacy = _cached_path(cache_dir, legacy_key)
             if legacy:
                 migrated = cache_dir / f"{key}{legacy.suffix.casefold()}"
@@ -77,6 +77,37 @@ def cached_image(config: ViewerConfig, image_url: str) -> tuple[bytes, str]:
         _atomic_write(cache_path, body)
         prune_image_cache(cache_dir, config.image_cache_total_bytes, protected={cache_path})
     return body, content_type
+
+
+def image_cache_key(image_url: str) -> str:
+    return hashlib.sha256(str(image_url).encode("utf-8")).hexdigest()
+
+
+def image_cache_legacy_key(image_url: str) -> str:
+    return hashlib.sha1(str(image_url).encode("utf-8"), usedforsecurity=False).hexdigest()
+
+
+def image_cache_url_keys(image_url: str) -> tuple[str, str]:
+    return image_cache_key(image_url), image_cache_legacy_key(image_url)
+
+
+def image_is_cached(config: ViewerConfig, image_url: str) -> bool:
+    validated = validate_http_url(image_url, config.image_allowed_hosts)
+    cache_dir = Path(config.image_cache_dir)
+    with _CACHE_LOCK:
+        return any(_cached_path(cache_dir, key) is not None for key in image_cache_url_keys(validated))
+
+
+def cached_image_keys(cache_dir: Path) -> set[str]:
+    cache_dir = Path(cache_dir)
+    with _CACHE_LOCK:
+        if not cache_dir.is_dir():
+            return set()
+        return {
+            path.stem
+            for path in cache_dir.iterdir()
+            if path.is_file() and path.suffix.casefold() in IMAGE_EXTENSIONS
+        }
 
 
 def download_image(

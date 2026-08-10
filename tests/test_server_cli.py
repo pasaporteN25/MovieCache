@@ -32,6 +32,8 @@ class ServerCliTests(unittest.TestCase):
                     str(password_file),
                     "--library-root",
                     str(media),
+                    "--image-cache-warm-interval-seconds",
+                    "4",
                     "--no-open",
                 ])
 
@@ -44,6 +46,8 @@ class ServerCliTests(unittest.TestCase):
             self.assertFalse(run.call_args.kwargs["access_log"])
             self.assertTrue((Path(temporary) / ".movie-inbox" / "instance.db").is_file())
             self.assertEqual(app.state.viewer_config.library_allowed_roots, (str(media.resolve()),))
+            self.assertTrue(app.state.viewer_config.image_cache_warm)
+            self.assertEqual(app.state.viewer_config.image_cache_warm_interval_seconds, 4)
 
     def test_non_loopback_bind_requires_public_origin(self) -> None:
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
@@ -53,6 +57,16 @@ class ServerCliTests(unittest.TestCase):
     def test_managed_scanner_root_must_be_absolute(self) -> None:
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
             server.main(["catalog.json", "--library-root", "relative-media", "--no-open"])
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_image_cache_warm_interval_is_bounded(self) -> None:
+        with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
+            server.main([
+                "catalog.json",
+                "--image-cache-warm-interval-seconds",
+                "0.1",
+                "--no-open",
+            ])
         self.assertEqual(raised.exception.code, 2)
 
 

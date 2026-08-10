@@ -30,6 +30,8 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("cap_drop:\n      - ALL", compose)
         self.assertIn("no-new-privileges:true", compose)
         self.assertIn("127.0.0.1}", compose)
+        self.assertIn("MOVIE_INBOX_IMAGE_WARM_MODE:-after-access", compose)
+        self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS:-3", compose)
 
     def test_omv_example_uses_precreated_read_only_mount_slots(self) -> None:
         compose = (ROOT / "compose.omv.example.yaml").read_text(encoding="utf-8")
@@ -42,6 +44,8 @@ class DockerPackagingTests(unittest.TestCase):
         environment = (ROOT / ".env.example").read_text(encoding="utf-8")
 
         self.assertIn("MOVIE_INBOX_OWNER_PASSWORD_FILE", environment)
+        self.assertIn("MOVIE_INBOX_IMAGE_WARM_MODE=after-access", environment)
+        self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS=3", environment)
         self.assertNotIn("MOVIE_INBOX_OWNER_PASSWORD=", environment)
 
     def test_ci_builds_imports_and_restarts_the_container(self) -> None:

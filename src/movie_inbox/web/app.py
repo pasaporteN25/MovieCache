@@ -123,6 +123,7 @@ from movie_inbox.web.catalog_api import (
 )
 from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.image_proxy import cached_image
+from movie_inbox.web.image_warmer import ImageCacheWarmer
 from movie_inbox.web.security import (
     LoginAttemptLimiter,
     UnsafeRemoteUrl,
@@ -286,6 +287,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         poll_seconds=config.library_scheduler_poll_seconds,
     )
     login_limiter = LoginAttemptLimiter()
+    image_warmer = ImageCacheWarmer(config)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -294,6 +296,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
             yield
         finally:
             library_scheduler.stop()
+            image_warmer.stop()
 
     app = FastAPI(
         title="Movie Inbox",
@@ -315,6 +318,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.library_service = library_service
     app.state.availability_service = availability_service
     app.state.library_scheduler = library_scheduler
+    app.state.image_warmer = image_warmer
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
 
     @app.middleware("http")
@@ -1024,7 +1028,12 @@ def create_app(config: ViewerConfig) -> FastAPI:
     def shared_catalog(user_id: str, request: Request) -> JSONResponse:
         try:
             identity = require_ready_identity(request)
-            return JSONResponse(privacy_service.shared_catalog(identity, user_id))
+            payload = privacy_service.shared_catalog(identity, user_id)
+            image_warmer.register_items(
+                f"shared:{payload.get('catalog', {}).get('id', user_id)}",
+                payload.get("items", []),
+            )
+            return JSONResponse(payload)
         except SharedCatalogUnavailable:
             return error_response("shared_catalog_not_found", 404)
         except CatalogRepositoryError as error:
@@ -1177,9 +1186,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
         try:
             catalog = SessionCatalog.from_identity(config, identity)
             rows = load_items(catalog.config.patterns)
-            return JSONResponse(
-                collection_service.collection_detail(identity.user.id, collection_id, rows)
-            )
+            payload = collection_service.collection_detail(identity.user.id, collection_id, rows)
+            image_warmer.register_items(f"collection:{collection_id}", payload.get("items", []))
+            return JSONResponse(payload)
         except CollectionNotFound:
             return error_response("collection_not_found", 404)
         except CatalogRepositoryError as error:
@@ -1245,8 +1254,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
         try:
             identity = require_ready_identity(request)
             catalog = SessionCatalog.from_identity(config, identity)
+            catalog_rows = load_items(catalog.config.patterns)
             rows = availability_service.decorate_items(
-                catalog.public_rows(load_items(catalog.config.patterns)),
+                catalog.public_rows(catalog_rows),
                 include_sources=identity.user.is_owner,
             )
             preferences = privacy_service.preferences(identity)
@@ -1270,6 +1280,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 scanner_pending = len(library_service.review_queue())
             except LibraryRepositoryError:
                 scanner_pending = 0
+        image_warmer.register_items(f"catalog:{identity.catalog.id}", catalog_rows)
         print(
             f"[catalog-viewer] items loaded total={len(rows)} with_link={with_link} "
             f"without_link={len(rows) - with_link} duplicate_items={duplicate_items}",
@@ -1286,6 +1297,16 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 "external": external_sources_snapshot(),
                 "privacy": preferences.to_dict(),
             }
+        )
+
+    @app.get("/api/image-cache/status", dependencies=[Depends(require_token)])
+    def image_cache_status(request: Request) -> JSONResponse:
+        identity = require_ready_identity(request)
+        return JSONResponse(
+            image_warmer.status(
+                f"catalog:{identity.catalog.id}",
+                include_global=identity.user.is_owner,
+            )
         )
 
     @app.get("/api/catalog/export", dependencies=[Depends(require_token)])
@@ -1456,7 +1477,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 return error_response("invalid_image_url", 400)
             return RedirectResponse(validated_url, status_code=302)
         try:
-            body, content_type = cached_image(config, url)
+            with image_warmer.foreground(url):
+                body, content_type = cached_image(config, url)
         except UnsafeRemoteUrl:
             return error_response("invalid_image_url", 400)
         except (ValueError, HTTPError, URLError, TimeoutError, OSError):

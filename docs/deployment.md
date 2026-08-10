@@ -84,11 +84,13 @@ El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public
   --forwarded-allow-ips 127.0.0.1 \
   --image-cache-dir /var/lib/movie-inbox/image-cache \
   --image-cache-total-mb 512 \
+  --image-cache-warm-mode after-access \
+  --image-cache-warm-interval-seconds 3 \
   --library-root /srv/media/peliculas \
   --no-open
 ```
 
-La app usa un solo worker. SQLite serializa escrituras y el cache de busquedas vive en memoria; agregar workers antes de medir carga sumaria contencion y estados duplicados sin aportar valor para un catalogo personal.
+La app usa un solo worker de Uvicorn. SQLite serializa escrituras, el cache de busquedas vive en memoria y la cola progresiva de portadas se coordina dentro de ese proceso; agregar workers antes de medir carga sumaria contencion, descargas duplicadas y estados divergentes sin aportar valor para un catalogo personal.
 
 Cada `--library-root` habilita unicamente ese arbol para el scanner administrado. El
 usuario `movie-inbox` necesita lectura y traversal sobre esas carpetas, pero no

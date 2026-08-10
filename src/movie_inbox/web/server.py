@@ -17,7 +17,12 @@ from movie_inbox.infrastructure.identity_repository import SqliteIdentityReposit
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.web.app import create_app
 from movie_inbox.web.catalog_api import first_catalog_file, resolved_files
-from movie_inbox.web.config import DEFAULT_IMAGE_ALLOWED_HOSTS, DEFAULT_SESSION_TTL_SECONDS, ViewerConfig
+from movie_inbox.web.config import (
+    DEFAULT_IMAGE_ALLOWED_HOSTS,
+    DEFAULT_IMAGE_CACHE_WARM_INTERVAL_SECONDS,
+    DEFAULT_SESSION_TTL_SECONDS,
+    ViewerConfig,
+)
 from movie_inbox.web.security import InvalidPublicOrigin, normalize_public_origin
 
 
@@ -70,6 +75,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum total image cache size. Least-recently-used files are removed first.",
     )
     parser.add_argument(
+        "--image-cache-warm-mode",
+        choices=("after-access", "off"),
+        default="after-access",
+        help="Warm images gradually after an authenticated catalog is opened, or disable background warming.",
+    )
+    parser.add_argument(
+        "--image-cache-warm-interval-seconds",
+        type=float,
+        default=DEFAULT_IMAGE_CACHE_WARM_INTERVAL_SECONDS,
+        help="Delay between background image downloads.",
+    )
+    parser.add_argument(
         "--image-host",
         action="append",
         default=[],
@@ -101,6 +118,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--image-cache-max-mb must be greater than zero")
     if args.image_cache_total_mb < args.image_cache_max_mb:
         parser.error("--image-cache-total-mb must be at least --image-cache-max-mb")
+    if not 0.25 <= args.image_cache_warm_interval_seconds <= 3600:
+        parser.error("--image-cache-warm-interval-seconds must be between 0.25 and 3600")
     if not 1 <= args.session_days <= 365:
         parser.error("--session-days must be between 1 and 365")
     try:
@@ -130,6 +149,8 @@ def main(argv: list[str] | None = None) -> int:
         public_origin=public_origin,
         forwarded_allow_ips=args.forwarded_allow_ips,
         image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),
+        image_cache_warm=args.image_cache_warm_mode == "after-access",
+        image_cache_warm_interval_seconds=args.image_cache_warm_interval_seconds,
         image_allowed_hosts=tuple(dict.fromkeys([*DEFAULT_IMAGE_ALLOWED_HOSTS, *args.image_host])),
         library_allowed_roots=tuple(str(path.resolve()) for path in args.library_root),
     )
@@ -167,6 +188,11 @@ def main(argv: list[str] | None = None) -> int:
         f"Image cache: {config.image_cache_dir} (max {args.image_cache_total_mb:g} MB)"
         if config.image_cache else "Image cache: disabled"
     )
+    if config.image_cache:
+        print(
+            f"Image cache warming: after access, every {config.image_cache_warm_interval_seconds:g}s"
+            if config.image_cache_warm else "Image cache warming: disabled"
+        )
     print(
         f"Managed scanner roots: {', '.join(config.library_allowed_roots)}"
         if config.library_allowed_roots else "Managed scanner: disabled (no --library-root)"

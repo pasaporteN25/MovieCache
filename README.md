@@ -408,9 +408,11 @@ La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por
 
 `Random` abre una ficha al azar sin modificar el JSON. Su casilla permite limitar la eleccion a obras disponibles en catalogo. Dentro de `Coleccion`, `Mezclar vista` cambia solamente el orden visual de los resultados actuales y `Restablecer orden` recupera el orden elegido.
 
-Las imagenes del visor se sirven con un cache local bajo demanda. La primera vez que una tarjeta visible necesita `page_image`, el servidor la descarga y la guarda de forma atomica en `.catalog-cache/images` junto al catalogo editable; despues se sirve desde esa carpeta. El limite predeterminado es 5 MB por imagen y 512 MB en total. Cuando se alcanza el limite global se eliminan primero los archivos menos usados recientemente.
+Las imagenes del visor se sirven desde un cache local persistente. Una portada visible conserva su placeholder hasta que el navegador confirma la carga y entonces aparece con una transicion breve; las primeras cards de la vista y la ficha abierta tienen prioridad sobre el trabajo de fondo. La primera peticion autenticada a un catalogo registra sus portadas y activa un unico worker global que descarga de a una cada 3 segundos. El worker tambien incorpora solamente las colecciones o catalogos compartidos que alguien abre, deduplica URLs entre usuarios y continua mientras el proceso del servidor siga activo. No bloquea `/api/items` ni realiza enriquecimiento de metadata.
 
-En Docker el cache vive en `/var/lib/movie-inbox/image-cache`, dentro del volumen nombrado `movie-inbox-data`. Sobrevive a reinicios, `docker compose down` y recreaciones por actualizacion. Se elimina solamente al borrar ese volumen, por ejemplo con `docker compose down --volumes`, por lo que ese flag no debe usarse durante una actualizacion normal. El limite puede cambiarse con `MOVIE_INBOX_IMAGE_CACHE_MB` en `.env`; aumentar el limite no descarga imagenes por adelantado, solamente evita expulsarlas demasiado pronto.
+Cada descarga se valida con la misma allowlist y proteccion SSRF del proxy, se escribe de forma atomica y se reintenta con espera creciente ante errores temporales. El limite predeterminado es 5 MB por imagen y 512 MB en total; al alcanzarlo se eliminan primero los archivos menos usados recientemente. `Administrar > Base de datos` muestra el avance del catalogo personal y, para el owner, un resumen agregado sin revelar datos privados de otros usuarios.
+
+En Docker el cache vive en `/var/lib/movie-inbox/image-cache`, dentro del volumen nombrado `movie-inbox-data`. Sobrevive a reinicios, `docker compose down` y recreaciones por actualizacion. Se elimina solamente al borrar ese volumen, por ejemplo con `docker compose down --volumes`, por lo que ese flag no debe usarse durante una actualizacion normal. El limite puede cambiarse con `MOVIE_INBOX_IMAGE_CACHE_MB`, la precarga con `MOVIE_INBOX_IMAGE_WARM_MODE=after-access|off` y la pausa con `MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS` en `.env`.
 
 ```powershell
 movie-inbox cache info --dir .catalog-cache/images
@@ -418,7 +420,7 @@ movie-inbox cache prune --dir .catalog-cache/images --max-total-mb 512
 movie-inbox cache clear --dir .catalog-cache/images
 ```
 
-Se puede desactivar con `--no-image-cache`, cambiar la carpeta con `--image-cache-dir`, limitar cada imagen con `--image-cache-max-mb` o el total con `--image-cache-total-mb`. El proxy acepta JPEG, PNG, WebP, GIF y AVIF provenientes de los hosts conocidos de Wikimedia, IMDb y FilmAffinity. Un proveedor adicional debe habilitarse de forma explicita repitiendo `--image-host nombre.example`.
+Se puede desactivar todo el cache con `--no-image-cache`, desactivar solamente la precarga con `--image-cache-warm-mode off`, ajustar su ritmo con `--image-cache-warm-interval-seconds`, cambiar la carpeta con `--image-cache-dir`, limitar cada imagen con `--image-cache-max-mb` o el total con `--image-cache-total-mb`. El proxy acepta JPEG, PNG, WebP, GIF y AVIF provenientes de los hosts conocidos de Wikimedia, IMDb y FilmAffinity. Un proveedor adicional debe habilitarse de forma explicita repitiendo `--image-host nombre.example`.
 
 Para intentar completar links automaticamente desde la terminal:
 
