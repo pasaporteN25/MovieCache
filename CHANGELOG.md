@@ -10,6 +10,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Guia de importacion inicial, operacion, backup y actualizacion de una instancia Docker nueva.
 - Perfil de ejemplo para montar hasta ocho unidades de OMV/Debian en slots de solo lectura.
 - Descarga autenticada del catalogo personal en JSON portable o CSV desde Administrar.
+- Precarga progresiva y deduplicada de portadas despues del primer acceso autenticado, con prioridad para imagenes visibles, reintentos con backoff y estado compacto en Administrar.
+- Placeholders estables y carga diferida de portadas con prioridad para el primer viewport, ficha y spotlight.
 
 ### Corregido
 

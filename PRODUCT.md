@@ -92,6 +92,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - Docker Compose soporta una instancia nueva con estado persistente y hasta ocho
   raices fisicas de solo lectura. La relocalizacion de un `instance.db` existente
   queda para un incremento posterior; systemd y Nginx siguen soportados.
+- Las portadas se cargan progresivamente despues del primer acceso a cada catalogo o
+  coleccion y quedan en el almacenamiento persistente de la instancia. La navegacion
+  visible tiene prioridad y nunca espera a que termine la cola global.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

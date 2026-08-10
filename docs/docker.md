@@ -39,6 +39,9 @@ MOVIE_INBOX_PUBLIC_ORIGIN=http://localhost:8765
 MOVIE_INBOX_MEDIA_PATH=D:/Peliculas
 MOVIE_INBOX_IMPORT_PATH=./imports
 MOVIE_INBOX_OWNER_USERNAME=lucas
+MOVIE_INBOX_IMAGE_CACHE_MB=512
+MOVIE_INBOX_IMAGE_WARM_MODE=after-access
+MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS=3
 ```
 
 Crear `secrets/owner-password.txt` con una contrasena inicial larga. El archivo queda
@@ -54,6 +57,26 @@ sudo chmod 600 secrets/owner-password.txt
 ```
 
 No se debe guardar la contrasena real dentro de `.env` ni de `compose.yaml`.
+
+## Cache progresivo de portadas
+
+El volumen `movie-inbox-data` conserva `/var/lib/movie-inbox/image-cache` al reiniciar o
+recrear el contenedor. Despues de que un usuario abre su catalogo, un unico worker del
+servidor descarga una portada cada tres segundos. Las portadas que la pantalla solicita
+en ese momento tienen prioridad; la respuesta del catalogo no espera a la cola. Las
+colecciones y catalogos compartidos se incorporan solamente cuando alguien los abre y
+las URLs repetidas se descargan una sola vez para toda la instancia.
+
+El owner puede consultar el estado en `Administrar > Base de datos`. Para detener el
+trabajo de fondo sin perder ni deshabilitar el cache existente:
+
+```dotenv
+MOVIE_INBOX_IMAGE_WARM_MODE=off
+```
+
+Cambiar estas variables requiere recrear el contenedor con `docker compose up -d`. No
+usar `docker compose down --volumes`: ese comando elimina tambien bases, catalogos y
+portadas persistentes.
 
 ## Importacion inicial
 

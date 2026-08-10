@@ -81,8 +81,24 @@ class ViewerHttpTests(unittest.TestCase):
     def test_api_requires_token(self) -> None:
         status, _ = self.request("GET", "/api/items")
         export_status, _ = self.request("GET", "/api/catalog/export?format=json")
+        cache_status, _ = self.request("GET", "/api/image-cache/status")
         self.assertEqual(status, 403)
         self.assertEqual(export_status, 403)
+        self.assertEqual(cache_status, 403)
+
+    def test_image_cache_status_is_scoped_to_the_authenticated_catalog(self) -> None:
+        headers = {"X-Movie-Inbox-Token": self.config.api_token}
+        items = self.client.get("/api/items", headers=headers)
+        response = self.client.get("/api/image-cache/status", headers=headers)
+
+        self.assertEqual(items.status_code, 200, items.content)
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertFalse(payload["enabled"])
+        self.assertEqual(payload["personal"]["state"], "disabled")
+        self.assertEqual(payload["personal"]["eligible"], 0)
+        self.assertEqual(payload["personal"]["without_url"], 1)
+        self.assertEqual(payload["global"]["registered_scopes"], 1)
 
     def test_personal_catalog_can_be_downloaded_as_json_or_csv(self) -> None:
         headers = {"X-Movie-Inbox-Token": self.config.api_token}
@@ -182,12 +198,19 @@ class ViewerHttpTests(unittest.TestCase):
                 "/api/catalog/export?format=json",
                 headers={"X-Movie-Inbox-Token": self.config.api_token},
             )
+            member_cache_status = member_client.get(
+                "/api/image-cache/status",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
             self.assertEqual(member_items.status_code, 200, member_items.content)
             self.assertEqual([item["id"] for item in member_items.json()["items"]], ["heat"])
             self.assertEqual(member_items.json()["items"][0]["_source_file"], "source-1")
             self.assertNotIn(str(member_catalog.write_path), member_items.text)
             self.assertEqual(member_export.status_code, 200, member_export.content)
             self.assertEqual(member_export.json()["items"][0]["status"], "to_watch")
+            self.assertEqual(member_cache_status.status_code, 200, member_cache_status.content)
+            self.assertEqual(member_cache_status.json()["personal"]["without_url"], 1)
+            self.assertNotIn("global", member_cache_status.json())
             self.assertIn("movie-inbox-maria-", member_export.headers["content-disposition"])
             self.assertNotIn(str(member_catalog.write_path), member_export.text)
 

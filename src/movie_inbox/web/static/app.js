@@ -97,12 +97,16 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let spotlightPaused = false;
       let spotlightDetailPaused = false;
       let spotlightViewPaused = false;
+      let imageCacheStatus = null;
+      let imageCacheStatusLoading = false;
+      let imageCacheStatusTimer = null;
       let routeRestored = false;
       const SEARCH_PAGE_SIZE = 6;
       const CATALOG_PAGE_SIZE = 36;
       const CLUB_PAGE_SIZE = 24;
       const SEARCH_TIMEOUT_MS = 10000;
       const SPOTLIGHT_INTERVAL_MS = 8000;
+      const IMAGE_CACHE_STATUS_INTERVAL_MS = 5000;
       const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
       const IMPORT_PREVIEW_PAGE_SIZE = 200;
       const IMPORT_COLUMN_FIELDS = [
@@ -306,6 +310,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogMergeResults: document.querySelector("#catalogMergeResults"),
         databaseCatalogPanel: document.querySelector("#databaseCatalogPanel"),
         databaseExternalPanel: document.querySelector("#databaseExternalPanel"),
+        imageCacheStatus: document.querySelector("#imageCacheStatus"),
         catalogExportActions: document.querySelector("#catalogExportActions"),
         catalogExportFeedback: document.querySelector("#catalogExportFeedback"),
         createLibraryButton: document.querySelector("#createLibraryButton"),
@@ -578,6 +583,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       document.addEventListener("pointerdown", handlePointerModality, true);
       window.addEventListener("beforeunload", handleBeforeUnload);
       window.addEventListener("popstate", restoreRoute);
+      document.addEventListener("load", handlePosterLoad, true);
       document.addEventListener("error", handlePosterError, true);
       document.addEventListener("click", handleDelegatedClick);
       [fields.status, fields.kind, fields.source, fields.sort].forEach((field) => field.addEventListener("input", () => {
@@ -1687,7 +1693,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function goToAdmin(options = {}) {
         showView("admin", options);
-        Promise.all([loadMembers(), loadLibraries()]);
+        Promise.all([loadMembers(), loadLibraries(), loadImageCacheStatus()]);
       }
 
       async function refreshAdminData() {
@@ -1695,7 +1701,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (currentView === "admin") {
           await Promise.all([
             loadMembers({ announce: true }),
-            loadLibraries({ announce: true })
+            loadLibraries({ announce: true }),
+            loadImageCacheStatus({ announce: true })
           ]);
         }
       }
@@ -1714,6 +1721,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         spotlightViewPaused = currentView !== "home";
         if (spotlightViewPaused) stopSpotlight();
         else startSpotlight();
+        syncImageCacheStatusPolling();
         setActiveNavigation(currentView);
         if (fields.systemMenu.open) fields.systemMenu.open = false;
         if (updateHistory) syncRoute(routeValuesForView(currentView), "push");
@@ -1903,11 +1911,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <div class="club-catalog-count"><strong>${catalogItems.length}</strong><span>obras visibles</span></div>
           </header>
           ${historySection}
-          <div class="club-grid">${visibleItems.map((item) => sharedCard(item, username)).join("")}</div>`;
+          <div class="club-grid">${visibleItems.map((item, index) => sharedCard(item, username, index < 6)).join("")}</div>`;
         fields.clubLoadMore.hidden = visibleItems.length >= catalogItems.length;
       }
 
-      function sharedCard(item, username) {
+      function sharedCard(item, username, priority = false) {
         const title = displayTitle(item) || "Sin título";
         const hasStatus = Object.prototype.hasOwnProperty.call(item, "status");
         const hasRating = Object.prototype.hasOwnProperty.call(item, "rating");
@@ -1918,7 +1926,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           hasReview && String(item.review || "").trim() ? "<span>Con review</span>" : ""
         ].filter(Boolean).join("");
         return `<article class="club-card">
-          <div class="club-card-poster">${posterArtwork(item, title)}</div>
+          <div class="club-card-poster">${posterArtwork(item, title, priority)}</div>
           <div class="club-card-body">
             <div><span>${escapeHtml([item.kind, item.year].filter(Boolean).join(" · ") || "Obra")}</span><h4 class="${titleSizeClass(title)}">${escapeHtml(title)}</h4></div>
             <div class="club-card-signals">${signals || "<span>Registro privado</span>"}</div>
@@ -2066,13 +2074,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           [counts.review || 0, "Para revisar"]
         ].map(([value, label]) => `<div><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("");
         fields.collectionItems.innerHTML = (selectedCollection.items || [])
-          .map((item) => collectionItemCard(item))
+          .map((item, index) => collectionItemCard(item, index < 6))
           .join("");
         fields.addMissingCollectionItems.disabled = !(counts.missing > 0);
         syncCollectionSelection();
       }
 
-      function collectionItemCard(item) {
+      function collectionItemCard(item, priority = false) {
         const title = displayTitle(item) || "Sin título";
         const state = item.catalog?.state || "missing";
         const missing = state === "missing";
@@ -2084,7 +2092,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const actionLabel = state === "present" ? "Ya está" : state === "review" ? "Requiere revisión" : "Agregar";
         const selected = selectedCollectionItems.has(item.collection_item_id);
         return `<article class="club-card collection-item-card" data-catalog-state="${escapeAttr(state)}">
-          <div class="club-card-poster">${posterArtwork(item, title)}</div>
+          <div class="club-card-poster">${posterArtwork(item, title, priority)}</div>
           <div class="club-card-body">
             <div><span>${escapeHtml([item.kind, item.year].filter(Boolean).join(" · ") || "Obra")}</span><h4 class="${titleSizeClass(title)}">${escapeHtml(title)}</h4></div>
             <div class="club-card-signals"><span>${escapeHtml(stateLabel)}</span></div>
@@ -3598,11 +3606,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function curationThumb(item, large = false) {
         const className = large ? "curation-thumb large" : "curation-thumb";
         const title = item?.title || "Sin imagen";
-        const fallback = `<span class="${className} curation-thumb-placeholder">${escapeHtml(title.slice(0, 18))}</span>`;
+        const fallback = `<span class="${className} curation-thumb-placeholder" aria-hidden="true">${escapeHtml(title.slice(0, 18))}</span>`;
         if (!item?.page_image) return fallback;
         return `<span class="curation-thumb-frame ${large ? "large" : ""}">
           <img class="${className}" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="" loading="lazy" decoding="async">
-          ${fallback.replace('class="', 'hidden class="')}
+          ${fallback}
         </span>`;
       }
 
@@ -4346,10 +4354,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const poster = String(item.page_image || "").trim();
         const imageUrl = realBackdrop || poster;
         const image = imageUrl
-          ? `<img class="spotlight-image ${realBackdrop ? "is-backdrop" : "is-poster-fallback"}" data-spotlight-image src="${escapeAttr(cachedImageSrc(imageUrl))}" alt="" decoding="async">`
+          ? `<img class="spotlight-image ${realBackdrop ? "is-backdrop" : "is-poster-fallback"}" data-spotlight-image src="${escapeAttr(cachedImageSrc(imageUrl))}" alt="" loading="lazy" fetchpriority="high" decoding="async">`
           : "";
         const cover = !realBackdrop && poster
-          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(poster))}" alt="" decoding="async">`
+          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(poster))}" alt="" loading="lazy" fetchpriority="high" decoding="async">`
           : "";
         fields.spotlightStage.innerHTML = `<article class="spotlight-slide poster-${posterVariant(item.id || title)}">
           ${image}${cover}
@@ -4408,6 +4416,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function handleVisibilityChange() {
         if (document.hidden) stopSpotlight();
         else startSpotlight();
+        syncImageCacheStatusPolling();
       }
 
       function setupSelect(select, label, values) {
@@ -4458,6 +4467,93 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             ${externalCacheItem()}
           </div>
         `;
+      }
+
+      async function loadImageCacheStatus({ announce = false } = {}) {
+        if (
+          !fields.imageCacheStatus
+          || currentIdentity?.user?.role !== "owner"
+          || imageCacheStatusLoading
+        ) return;
+        imageCacheStatusLoading = true;
+        if (announce) fields.imageCacheStatus.setAttribute("aria-busy", "true");
+        try {
+          const response = await apiFetch("/api/image-cache/status");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          imageCacheStatus = payload;
+          renderImageCacheStatus();
+        } catch (error) {
+          console.error("[catalog-viewer] image cache status failed", error);
+          fields.imageCacheStatus.innerHTML = `
+            <div class="image-cache-status-copy">
+              <strong>Portadas en este cat&aacute;logo</strong>
+              <span>No pudimos consultar el cach&eacute;. Volveremos a intentarlo mientras Administrar siga abierto.</span>
+            </div>
+            <span class="image-cache-state is-error">Sin conexi&oacute;n</span>
+          `;
+          fields.imageCacheStatus.dataset.state = "error";
+        } finally {
+          imageCacheStatusLoading = false;
+          fields.imageCacheStatus.removeAttribute("aria-busy");
+        }
+      }
+
+      function renderImageCacheStatus() {
+        if (!fields.imageCacheStatus || !imageCacheStatus) return;
+        const personal = imageCacheStatus.personal || {};
+        const cache = imageCacheStatus.cache || {};
+        const global = imageCacheStatus.global || null;
+        const labels = {
+          inactive: ["Esperando", "Abr&iacute; un cat&aacute;logo o colecci&oacute;n para iniciar la carga gradual."],
+          working: ["Cargando", "Las portadas se guardan de a una, sin bloquear la navegaci&oacute;n."],
+          retrying: ["Reintentando", "Algunas fuentes est&aacute;n demoradas; el proceso continuar&aacute; en segundo plano."],
+          complete: ["Al d&iacute;a", "Las portadas disponibles de este cat&aacute;logo ya est&aacute;n guardadas."],
+          error: ["Con pendientes", "Algunas portadas agotaron sus reintentos o fueron bloqueadas por seguridad."],
+          limit_reached: ["L&iacute;mite alcanzado", "El cach&eacute; aplicar&aacute; su limpieza por uso antes de incorporar nuevas portadas."],
+          disabled: ["Deshabilitado", "La carga progresiva est&aacute; desactivada en la configuraci&oacute;n del servidor."],
+          idle: ["En espera", "Hay portadas pendientes y el worker continuar&aacute; cuando pueda."]
+        };
+        let [stateLabel, stateCopy] = labels[personal.state] || labels.idle;
+        if (imageCacheStatus.worker?.cache_error) {
+          stateLabel = "No disponible";
+          stateCopy = "El servidor no puede leer el directorio persistente de portadas.";
+        }
+        const cacheLimit = Number(cache.max_bytes || 0);
+        const cacheUsage = cacheLimit
+          ? `${formatImportBytes(cache.total_bytes)} de ${formatImportBytes(cacheLimit)}`
+          : formatImportBytes(cache.total_bytes);
+        const aggregate = global
+          ? `<span>${escapeHtml(String(global.available || 0))} recursos disponibles en ${escapeHtml(String(global.registered_scopes || 0))} espacios abiertos</span>`
+          : "";
+        fields.imageCacheStatus.dataset.state = personal.state || "idle";
+        fields.imageCacheStatus.innerHTML = `
+          <div class="image-cache-status-copy">
+            <strong>Portadas en este cat&aacute;logo</strong>
+            <span>${stateCopy}</span>
+          </div>
+          <div class="image-cache-status-metrics" aria-label="Estado de portadas">
+            <span><strong>${escapeHtml(String(personal.available || 0))}</strong> disponibles</span>
+            <span><strong>${escapeHtml(String(personal.pending || 0))}</strong> pendientes</span>
+            <span><strong>${escapeHtml(String(personal.without_url || 0))}</strong> sin imagen</span>
+            ${personal.failed ? `<span><strong>${escapeHtml(String(personal.failed))}</strong> con error</span>` : ""}
+            ${personal.rejected ? `<span><strong>${escapeHtml(String(personal.rejected))}</strong> bloqueadas</span>` : ""}
+          </div>
+          <div class="image-cache-status-meta">
+            <span>${escapeHtml(String(cache.files || 0))} archivos &middot; ${escapeHtml(cacheUsage)}</span>
+            ${aggregate}
+          </div>
+          <span class="image-cache-state is-${escapeAttr(personal.state || "idle")}">${stateLabel}</span>
+        `;
+        fields.imageCacheStatus.removeAttribute("aria-busy");
+      }
+
+      function syncImageCacheStatusPolling() {
+        window.clearInterval(imageCacheStatusTimer);
+        imageCacheStatusTimer = null;
+        if (currentView !== "admin" || currentIdentity?.user?.role !== "owner" || document.hidden) return;
+        if (!imageCacheStatus) loadImageCacheStatus();
+        imageCacheStatusTimer = window.setInterval(loadImageCacheStatus, IMAGE_CACHE_STATUS_INTERVAL_MS);
       }
 
       async function downloadCatalogExport(event) {
@@ -4744,7 +4840,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.empty.textContent = activeQuery
           ? `No encontramos obras para “${activeQuery}” con los filtros actuales.`
           : "No hay obras que coincidan con los filtros actuales.";
-        fields.grid.innerHTML = shown.map(card).join("");
+        fields.grid.innerHTML = shown
+          .map((item, index) => card(item, index, currentView === "catalog"))
+          .join("");
         fields.catalogLoadMore.hidden = shown.length >= filtered.length;
         fields.catalogLoadMore.textContent = `Cargar más (${filtered.length - shown.length})`;
         renderHomeShelf();
@@ -4771,7 +4869,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function renderHomeShelf() {
         const selection = spotlightItems.slice(0, 6);
-        fields.homeGrid.innerHTML = selection.map(card).join("");
+        fields.homeGrid.innerHTML = selection
+          .map((item, index) => card(item, index, currentView === "home"))
+          .join("");
         fields.homeEmpty.hidden = selection.length > 0;
       }
 
@@ -4812,7 +4912,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return shuffled;
       }
 
-      function card(item) {
+      function card(item, index = 0, prioritize = false) {
         const shownTitle = displayTitle(item);
         const title = shownTitle || "Sin título";
         const titleClass = titleSizeClass(title);
@@ -4830,7 +4930,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <div class="dvd-case">
                 <span class="dvd-spine"></span>
                 <div class="dvd-cover">
-                  ${posterArtwork(item, title)}
+                  ${posterArtwork(item, title, prioritize && index < 6)}
                   <span class="dvd-gloss"></span>
                   ${duplicate}
                   <div class="dvd-title-block">
@@ -4881,20 +4981,33 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return summary.length > 190 ? `${summary.slice(0, 187).trimEnd()}…` : summary;
       }
 
-      function posterArtwork(item, title) {
+      function posterArtwork(item, title, priority = false) {
         const variant = posterVariant(item.id || title);
-        const placeholder = `<div class="dvd-placeholder poster-${variant}"${item.page_image ? " hidden" : ""}>
+        const placeholder = `<div class="dvd-placeholder poster-${variant}" aria-hidden="true">
           <span>Movie Inbox presenta</span>
           <strong class="${titleSizeClass(title)}">${escapeHtml(title)}</strong>
           <small>Edición videoclub</small>
         </div>`;
         if (!item.page_image) return placeholder;
-        return `<img class="dvd-cover-image" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">${placeholder}`;
+        const fetchPriority = priority ? "high" : "auto";
+        return `<img class="dvd-cover-image" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" fetchpriority="${fetchPriority}" decoding="async">${placeholder}`;
       }
 
       function posterVariant(seed) {
         const value = [...String(seed || "")].reduce((total, character) => total + character.codePointAt(0), 0);
         return (value % 4) + 1;
+      }
+
+      function handlePosterLoad(event) {
+        const spotlightImage = event.target.closest?.("[data-spotlight-image]");
+        if (spotlightImage) {
+          spotlightImage.classList.add("is-loaded");
+          return;
+        }
+        const image = event.target.closest?.("[data-poster-image]");
+        if (!image) return;
+        image.hidden = false;
+        image.classList.add("is-loaded");
       }
 
       function handlePosterError(event) {
@@ -4906,6 +5019,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         const image = event.target.closest?.("[data-poster-image]");
         if (!image) return;
+        image.classList.remove("is-loaded");
         image.hidden = true;
         const fallback = image.nextElementSibling;
         if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder")) {
@@ -5266,9 +5380,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function drawerPoster(item, title) {
-        const placeholder = `<div class="drawer-poster drawer-poster-placeholder poster-${posterVariant(item.id || title)}"${item.page_image ? " hidden" : ""}><span>Movie Inbox</span><strong>${escapeHtml(title)}</strong></div>`;
+        const placeholder = `<div class="drawer-poster drawer-poster-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Movie Inbox</span><strong>${escapeHtml(title)}</strong></div>`;
         const image = item.page_image
-          ? `<img class="drawer-poster" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" decoding="async">`
+          ? `<img class="drawer-poster" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" loading="eager" fetchpriority="high" decoding="async">`
           : "";
         return `<div class="drawer-poster-frame">${image}${placeholder}</div>`;
       }
@@ -5716,13 +5830,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         await findLinkForItem(item);
       }
 
-      function catalogMergeResult(item) {
+      function catalogMergeResult(item, index) {
         const incoming = selectedManualIndex === null ? null : manualResults[selectedManualIndex];
         const summary = item.wikipedia_extract || item.description || item.notes || item.review || item.local_name || "";
         const shownTitle = displayTitle(item);
         const subtitle = titleSubtitle(item);
         return `<article class="search-result compact-result">
-          ${resultMedia(shownTitle || item.local_name, item.page_image)}
+          ${resultMedia(shownTitle || item.local_name, item.page_image, index < 6)}
           <div class="result-body">
             <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
@@ -5750,7 +5864,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const shownTitle = displayTitle(result);
         const subtitle = titleSubtitle(result);
         return `<article class="search-result compact-result">
-          ${resultMedia(shownTitle, result.page_image)}
+          ${resultMedia(shownTitle, result.page_image, index < 6)}
           <div class="result-body">
             <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
@@ -5771,10 +5885,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         </article>`;
       }
 
-      function resultMedia(title, imageUrl) {
-        return imageUrl
-          ? `<img class="result-media" src="${escapeAttr(cachedImageSrc(imageUrl))}" alt="" loading="lazy" decoding="async">`
-          : `<div class="result-placeholder">${escapeHtml((title || "Sin imagen").slice(0, 24))}</div>`;
+      function resultMedia(title, imageUrl, priority = false) {
+        const placeholder = `<div class="result-placeholder" aria-hidden="true">${escapeHtml((title || "Sin imagen").slice(0, 24))}</div>`;
+        if (!imageUrl) return `<div class="result-media-frame">${placeholder}</div>`;
+        return `<div class="result-media-frame">
+          <img class="result-media" data-poster-image src="${escapeAttr(cachedImageSrc(imageUrl))}" alt="" loading="lazy" fetchpriority="${priority ? "high" : "auto"}" decoding="async">
+          ${placeholder}
+        </div>`;
       }
 
       function searchDescription(description, collection, key) {

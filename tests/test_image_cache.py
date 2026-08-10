@@ -10,9 +10,12 @@ from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.image_proxy import (
     IMAGE_CONTENT_EXTENSIONS,
     cached_image,
+    cached_image_keys,
     clear_image_cache,
     download_image,
+    image_cache_key,
     image_cache_info,
+    image_is_cached,
     prune_image_cache,
 )
 
@@ -43,6 +46,9 @@ class ImageCacheTests(unittest.TestCase):
             self.assertEqual(download.call_count, 1)
             self.assertEqual(len(list(cache_dir.glob("*.png"))), 1)
             self.assertEqual(list(cache_dir.glob("*.tmp")), [])
+            self.assertIn(image_cache_key("https://images.example.com/a.png"), cached_image_keys(cache_dir))
+            with patch("movie_inbox.web.image_proxy.validate_http_url", side_effect=lambda url, *_: url):
+                self.assertTrue(image_is_cached(config, "https://images.example.com/a.png"))
 
     def test_lru_prune_removes_oldest_files_first(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

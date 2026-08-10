@@ -18,6 +18,10 @@ services:
       - /var/lib/movie-inbox/image-cache
       - --image-cache-total-mb
       - ${MOVIE_INBOX_IMAGE_CACHE_MB:-512}
+      - --image-cache-warm-mode
+      - ${MOVIE_INBOX_IMAGE_WARM_MODE:-after-access}
+      - --image-cache-warm-interval-seconds
+      - ${MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS:-3}
       - --owner-username
       - ${MOVIE_INBOX_OWNER_USERNAME:-owner}
       - --owner-password-file
