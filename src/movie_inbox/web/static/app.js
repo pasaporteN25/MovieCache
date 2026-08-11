@@ -92,9 +92,22 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let externalSearchController = null;
       let externalSearchTimedOut = false;
       let duplicatesOnly = false;
+      let collectionFilters = {
+        status: new Set(),
+        availability: new Set(),
+        kind: new Set(),
+        source: new Set(),
+        decade: new Set(),
+        genre: new Set(),
+        director: new Set(),
+        record: new Set(),
+        release_day: new Set()
+      };
+      let collectionYearRange = { from: "", to: "" };
       let catalogVisibleCount = 36;
       let externalHealth = { sources: {}, cache: {} };
-      let editorialHome = { generated_for: "", hero: null, sections: [], warnings: [] };
+      let editorialHome = { generated_for: "", featured: [], hero: null, sections: [], warnings: [] };
+      let spotlightIndex = 0;
       let imageCacheStatus = null;
       let imageCacheStatusLoading = false;
       let imageCacheStatusTimer = null;
@@ -117,7 +130,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         ["review", "Review"],
         ["en_catalogo", "En catálogo"]
       ];
-      const COLLECTION_ROUTE_KEYS = ["q", "status", "kind", "source", "sort", "duplicates", "external"];
+      const COLLECTION_MULTI_FILTER_KEYS = [
+        "status", "availability", "kind", "source", "decade", "genre", "director", "record", "release_day"
+      ];
+      const COLLECTION_ROUTE_KEYS = [
+        "q", ...COLLECTION_MULTI_FILTER_KEYS, "year_from", "year_to", "sort", "duplicates", "external"
+      ];
 
       async function apiFetch(url, options = {}) {
         const headers = new Headers(options.headers || {});
@@ -269,9 +287,18 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         reviewPrevious: document.querySelector("#reviewPrevious"),
         reviewNext: document.querySelector("#reviewNext"),
         backToCollection: document.querySelector("#backToCollection"),
-        status: document.querySelector("#status"),
-        kind: document.querySelector("#kind"),
-        source: document.querySelector("#source"),
+        statusQuickFilters: document.querySelector("#statusQuickFilters"),
+        availabilityQuickFilters: document.querySelector("#availabilityQuickFilters"),
+        kindQuickFilters: document.querySelector("#kindQuickFilters"),
+        advancedFiltersMenu: document.querySelector("#advancedFiltersMenu"),
+        advancedFilterCount: document.querySelector("#advancedFilterCount"),
+        decadeFilter: document.querySelector("#decadeFilter"),
+        genreFilter: document.querySelector("#genreFilter"),
+        directorFilter: document.querySelector("#directorFilter"),
+        sourceFilter: document.querySelector("#sourceFilter"),
+        yearFromFilter: document.querySelector("#yearFromFilter"),
+        yearToFilter: document.querySelector("#yearToFilter"),
+        applyYearRange: document.querySelector("#applyYearRange"),
         sort: document.querySelector("#sort"),
         activeFilters: document.querySelector("#activeFilters"),
         clearFilters: document.querySelector("#clearFilters"),
@@ -542,6 +569,21 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       });
       fields.externalSource.addEventListener("change", renderDatabaseMenu);
       fields.clearFilters.addEventListener("click", clearFilters);
+      [
+        [fields.decadeFilter, "decade"],
+        [fields.genreFilter, "genre"],
+        [fields.directorFilter, "director"],
+        [fields.sourceFilter, "source"]
+      ].forEach(([field, filter]) => field.addEventListener("change", () => {
+        if (!field.value) return;
+        setCollectionFilterValue(filter, field.value, true);
+        field.value = "";
+        collectionFiltersChanged();
+      }));
+      fields.applyYearRange.addEventListener("click", applyCollectionYearRange);
+      [fields.yearFromFilter, fields.yearToFilter].forEach((field) => field.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") applyCollectionYearRange();
+      }));
       fields.clearManualSearch.addEventListener("click", () => clearManualSearch());
       fields.startWikiReview.addEventListener("click", () => goToInbox("missing_link"));
       fields.previousWikiReview.addEventListener("click", previousWikiReview);
@@ -596,12 +638,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       document.addEventListener("load", handlePosterLoad, true);
       document.addEventListener("error", handlePosterError, true);
       document.addEventListener("click", handleDelegatedClick);
-      [fields.status, fields.kind, fields.source, fields.sort].forEach((field) => field.addEventListener("input", () => {
+      fields.sort.addEventListener("input", () => {
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         render();
         syncCollectionRoute("push");
-      }));
+      });
       setInboxMode(inboxMode, { loadData: false });
       load();
 
@@ -621,7 +663,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "add-collection-item": () => addCollectionItems([id]),
           "add-home-collection-item": () => addHomeCollectionItem(target.dataset.collectionId || "", id, target),
           "open-home-collection": () => goToHomeCollection(target.dataset.collectionId || id),
-          "home-section-action": () => activateHomeSection(target.dataset.kind || "", target.dataset.status || ""),
+          "home-section-action": () => activateHomeSection(target.dataset.sectionId || ""),
+          "spotlight-previous": () => moveSpotlight(-1, "spotlight-previous"),
+          "spotlight-next": () => moveSpotlight(1, "spotlight-next"),
+          "spotlight-select": () => selectSpotlight(Number(target.dataset.index || 0), true),
           "home-empty-catalog": goToCollectionRoot,
           "home-empty-import": goToImports,
           "home-empty-club": goToClub,
@@ -646,7 +691,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "prepare-merge": () => prepareManualMerge(index),
           "show-description": () => openSearchDescription(target.dataset.collection || "", target.dataset.key || ""),
           "force-add": () => forceAddSearchResult(index),
-          "clear-filter": () => clearFilter(target.dataset.filter || ""),
+          "clear-filter": () => clearFilter(target.dataset.filter || "", target.dataset.value || ""),
+          "toggle-collection-filter": () => toggleCollectionFilter(target.dataset.filter || "", target.dataset.value || ""),
           "run-search": runSearch
         };
         actions[target.dataset.click]?.();
@@ -1749,9 +1795,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         };
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
-        setupSelect(fields.status, "Estado", items.map((item) => item.status));
-        setupSelect(fields.kind, "Tipo", items.map((item) => item.kind));
-        setupSelect(fields.source, "Fuente", items.map((item) => item.source));
+        setupCollectionFilterOptions();
         render();
         fields.homeView.setAttribute("aria-busy", "false");
         renderDatabaseMenu();
@@ -1818,16 +1862,16 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (collectionId) await openCollection(collectionId);
       }
 
-      function activateHomeSection(kind, status = "") {
-        if (kind === "club") {
+      function activateHomeSection(sectionId) {
+        const section = editorialHome.sections.find((entry) => entry.id === sectionId);
+        const action = section?.action || {};
+        if (action.kind === "club") {
           goToClub();
           return;
         }
         resetCollectionFilters();
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
-        if (status && [...fields.status.options].some((option) => option.value === status)) {
-          fields.status.value = status;
-        }
+        applyCollectionFilterDescriptor(action.filters || {});
         render();
         showView("catalog", { updateHistory: false, focus: true });
         syncRoute(routeValuesForView("catalog"), "push");
@@ -2368,7 +2412,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function editorialEntryByKey(key) {
-        if (editorialHome.hero?.key === key) return editorialHome.hero;
+        const featured = editorialHome.featured.find((candidate) => candidate.key === key);
+        if (featured) return featured;
         for (const section of editorialHome.sections) {
           const entry = (section.items || []).find((candidate) => candidate.key === key);
           if (entry) return entry;
@@ -4476,23 +4521,30 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function syncRoute(values = {}, method = "replace") {
         const url = new URL(window.location.href);
         for (const [key, value] of Object.entries(values)) {
-          if (value) url.searchParams.set(key, value);
-          else url.searchParams.delete(key);
+          url.searchParams.delete(key);
+          if (Array.isArray(value)) {
+            value.filter(Boolean).forEach((entry) => url.searchParams.append(key, entry));
+          } else if (value) {
+            url.searchParams.set(key, value);
+          }
         }
         if (Object.prototype.hasOwnProperty.call(values, "view")) url.hash = "";
         history[method === "push" ? "pushState" : "replaceState"]({}, "", url);
       }
 
       function collectionRouteValues() {
-        return {
+        const values = {
           q: activeQuery,
-          status: fields.status.value,
-          kind: fields.kind.value,
-          source: fields.source.value,
+          year_from: collectionYearRange.from,
+          year_to: collectionYearRange.to,
           sort: fields.sort.value && fields.sort.value !== "original" ? fields.sort.value : "",
           duplicates: duplicatesOnly ? "1" : "",
           external: activeQuery && fields.externalSource.checked ? "1" : ""
         };
+        for (const key of COLLECTION_MULTI_FILTER_KEYS) {
+          values[key] = [...collectionFilters[key]].sort((left, right) => left.localeCompare(right, "es"));
+        }
+        return values;
       }
 
       function routeValuesForView(view) {
@@ -4506,20 +4558,26 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         syncRoute(routeValuesForView("catalog"), method);
       }
 
-      function selectRouteValue(select, value, fallback = "") {
-        const available = [...select.options].some((option) => option.value === value);
-        select.value = available ? value : fallback;
-      }
-
       function applyCollectionRoute(params) {
-        selectRouteValue(fields.status, params.get("status") || "");
-        selectRouteValue(fields.kind, params.get("kind") || "");
-        selectRouteValue(fields.source, params.get("source") || "");
-        selectRouteValue(fields.sort, params.get("sort") || "original", "original");
+        collectionFilters = emptyCollectionFilters();
+        for (const key of COLLECTION_MULTI_FILTER_KEYS) {
+          for (const value of params.getAll(key).map((entry) => entry.trim()).filter(Boolean)) {
+            collectionFilters[key].add(value);
+          }
+        }
+        collectionYearRange = {
+          from: validCollectionYear(params.get("year_from")),
+          to: validCollectionYear(params.get("year_to"))
+        };
+        const requestedSort = params.get("sort") || "original";
+        fields.sort.value = [...fields.sort.options].some((option) => option.value === requestedSort)
+          ? requestedSort
+          : "original";
         duplicatesOnly = params.get("duplicates") === "1";
         fields.externalSource.checked = params.get("external") === "1";
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
+        syncCollectionFilterControls();
       }
 
       function restoreRoute() {
@@ -4527,9 +4585,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const params = new URLSearchParams(window.location.search);
         const rawQuery = params.get("q") || "";
         const movieId = params.get("movie") || "";
+        const hasCollectionRoute = COLLECTION_ROUTE_KEYS.some((key) => params.has(key));
         const requestedView = ["home", "catalog", "inbox", "club", "admin"].includes(params.get("view"))
           ? params.get("view")
-          : rawQuery ? "catalog" : "home";
+          : hasCollectionRoute ? "catalog" : "home";
         const query = requestedView === "catalog" ? rawQuery : "";
         if (requestedView === "catalog") {
           selectedManualIndex = null;
@@ -4571,11 +4630,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function normalizeEditorialHome(payload) {
         if (!payload || typeof payload !== "object") {
-          return { generated_for: todayLocalDate(), hero: null, sections: [], warnings: [] };
+          return { generated_for: todayLocalDate(), featured: [], hero: null, sections: [], warnings: [] };
         }
+        const featured = Array.isArray(payload.featured)
+          ? payload.featured.filter((entry) => entry && typeof entry === "object").slice(0, 4)
+          : payload.hero && typeof payload.hero === "object" ? [payload.hero] : [];
         return {
           generated_for: String(payload.generated_for || todayLocalDate()),
-          hero: payload.hero && typeof payload.hero === "object" ? payload.hero : null,
+          featured,
+          hero: featured[0] || null,
           sections: Array.isArray(payload.sections) ? payload.sections : [],
           warnings: Array.isArray(payload.warnings) ? payload.warnings : []
         };
@@ -4585,7 +4648,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         renderEditorialHero();
         renderEditorialSections();
         const hasSections = editorialHome.sections.some((section) => section.items?.length);
-        fields.homeEmpty.hidden = Boolean(editorialHome.hero || hasSections);
+        fields.homeEmpty.hidden = Boolean(editorialHome.featured.length || hasSections);
         fields.homeSections.hidden = !hasSections;
         fields.homeDate.dateTime = editorialHome.generated_for || "";
         fields.homeDate.textContent = homeDateLabel(editorialHome.generated_for);
@@ -4597,7 +4660,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function renderEditorialHero() {
-        const entry = editorialHome.hero;
+        const featured = editorialHome.featured;
+        if (spotlightIndex >= featured.length) spotlightIndex = 0;
+        const entry = featured[spotlightIndex];
         const item = entry?.item;
         if (!item) {
           fields.spotlightStage.innerHTML = `<div class="spotlight-empty">
@@ -4608,6 +4673,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         const title = displayTitle(item) || "Sin título";
         const reason = entry.reason || {};
+        const summary = String(item.description || item.wikipedia_extract || reason.detail || "").trim();
+        const metadata = [item.year, firstListValue(item.genres), firstListValue(item.directors)].filter(Boolean);
         const realBackdrop = String(item.backdrop_image || "").trim();
         const poster = String(item.page_image || "").trim();
         const imageUrl = realBackdrop || poster;
@@ -4617,15 +4684,56 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const cover = !realBackdrop && poster
           ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="eager" fetchpriority="high" decoding="async">`
           : "";
-        fields.spotlightStage.innerHTML = `<article class="spotlight-slide poster-${posterVariant(item.id || title)}">
-          ${image}${cover}
-          <div class="spotlight-copy">
-            <span class="spotlight-reason">${escapeHtml(reason.label || "Selección del día")}</span>
-            <strong>${escapeHtml(title)}</strong>
-            <p>${escapeHtml(reason.detail || [item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Una obra de tu archivo personal.")}</p>
-            <button class="spotlight-cta" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Ver ficha</button>
-          </div>
-        </article>`;
+        const navigation = featured.length > 1
+          ? `<div class="spotlight-navigation" aria-label="Navegar recomendaciones">
+              <button class="spotlight-step" type="button" data-click="spotlight-previous" aria-label="Recomendación anterior">&#8249;</button>
+              <span>${spotlightIndex + 1} / ${featured.length}</span>
+              <button class="spotlight-step" type="button" data-click="spotlight-next" aria-label="Recomendación siguiente">&#8250;</button>
+            </div>`
+          : "";
+        const program = featured.length > 1
+          ? `<div class="spotlight-program" aria-label="Recomendaciones del día">
+              ${featured.map((candidate, index) => {
+                const candidateTitle = displayTitle(candidate.item || {}) || `Recomendación ${index + 1}`;
+                return `<button type="button" aria-pressed="${index === spotlightIndex ? "true" : "false"}" data-click="spotlight-select" data-index="${index}">
+                  <span>${String(index + 1).padStart(2, "0")}</span>
+                  <strong>${escapeHtml(candidateTitle)}</strong>
+                </button>`;
+              }).join("")}
+            </div>`
+          : "";
+        fields.spotlightStage.innerHTML = `<div class="spotlight-viewport">
+          <article class="spotlight-slide poster-${posterVariant(item.id || title)}">
+            ${image}${cover}
+            <div class="spotlight-copy">
+              <span class="spotlight-reason">${escapeHtml(reason.label || "Selección del día")}</span>
+              <strong>${escapeHtml(title)}</strong>
+              ${metadata.length ? `<span class="spotlight-metadata">${metadata.map(escapeHtml).join(" · ")}</span>` : ""}
+              <p>${escapeHtml(summary || "Una obra disponible de tu archivo personal para considerar esta noche.")}</p>
+              <button class="spotlight-cta" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Ver ficha</button>
+            </div>
+          </article>
+          ${navigation}
+        </div>${program}`;
+      }
+
+      function selectSpotlight(index, restoreFocus = false) {
+        if (!editorialHome.featured.length) return;
+        spotlightIndex = Math.max(0, Math.min(editorialHome.featured.length - 1, index));
+        renderEditorialHero();
+        if (restoreFocus && document.body.dataset.inputMethod === "keyboard") {
+          fields.spotlightStage.querySelector(`[data-click="spotlight-select"][data-index="${spotlightIndex}"]`)?.focus();
+        }
+      }
+
+      function moveSpotlight(offset, action = "") {
+        const count = editorialHome.featured.length;
+        if (count < 2) return;
+        spotlightIndex = (spotlightIndex + offset + count) % count;
+        renderEditorialHero();
+        if (action && document.body.dataset.inputMethod === "keyboard") {
+          fields.spotlightStage.querySelector(`[data-click="${action}"]`)?.focus();
+        }
       }
 
       function renderEditorialSections() {
@@ -4638,7 +4746,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function editorialSection(section, sectionIndex) {
         const action = section.action || {};
         const actionButton = action.kind
-          ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-kind="${escapeAttr(action.kind)}" data-status="${escapeAttr(action.status || "")}">${escapeHtml(action.label || "Explorar")}</button>`
+          ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(section.id || "")}">${escapeHtml(action.label || "Explorar")}</button>`
           : "";
         return `<section class="home-program" data-home-section="${escapeAttr(section.id || "editorial")}" aria-labelledby="home-section-${escapeAttr(section.id || sectionIndex)}">
           <header class="home-program-heading">
@@ -4671,15 +4779,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ${card(item, index, prioritize, options)}
           <div class="home-entry-reason" data-reason="${escapeAttr(reason.code || "editorial")}">
             <strong>${escapeHtml(reason.label || "En tu programación")}</strong>
-            <span>${escapeHtml(reason.detail || "Seleccionada desde tu archivo personal.")}</span>
           </div>
         </div>`;
       }
 
       function editorialPersonalIds() {
         const ids = [];
-        if (editorialHome.hero?.origin?.kind === "catalog" && editorialHome.hero.item?.id) {
-          ids.push(editorialHome.hero.item.id);
+        for (const entry of editorialHome.featured) {
+          if (entry.origin?.kind === "catalog" && entry.item?.id) ids.push(entry.item.id);
         }
         for (const section of editorialHome.sections) {
           for (const entry of section.items || []) {
@@ -4722,13 +4829,57 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         syncImageCacheStatusPolling();
       }
 
-      function setupSelect(select, label, values) {
-        const selected = select.value;
-        const unique = [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
-        select.innerHTML = `<option value="">${label}</option>` + unique.map((value) => (
-          `<option value="${escapeAttr(value)}">${escapeHtml(filterValueLabel(label, value))}</option>`
+      function setupCollectionFilterOptions() {
+        const statuses = uniqueFilterValues(items.map((item) => item.status));
+        const kinds = uniqueFilterValues(items.map((item) => item.kind));
+        renderQuickFilterGroup(fields.statusQuickFilters, "status", statuses);
+        renderQuickFilterGroup(fields.availabilityQuickFilters, "availability", ["available", "unavailable"]);
+        renderQuickFilterGroup(fields.kindQuickFilters, "kind", kinds);
+
+        const decades = uniqueFilterValues(
+          items.map((item) => numericYear(item.year)).filter(Boolean).map((year) => String(Math.floor(year / 10) * 10)),
+          { numeric: true }
+        );
+        setupFilterAddSelect(fields.decadeFilter, "Agregar década", decades, (value) => `Años ${value}`);
+        setupFilterAddSelect(
+          fields.genreFilter,
+          "Agregar género",
+          items.flatMap((item) => asList(item.genres))
+        );
+        setupFilterAddSelect(
+          fields.directorFilter,
+          "Agregar dirección",
+          items.flatMap((item) => asList(item.directors))
+        );
+        setupFilterAddSelect(fields.sourceFilter, "Agregar fuente", items.map((item) => item.source), (value) => (
+          filterValueLabel("Fuente", value)
+        ));
+        syncCollectionFilterControls();
+      }
+
+      function uniqueFilterValues(values, options = {}) {
+        const byKey = new Map();
+        for (const rawValue of values) {
+          const value = String(rawValue || "").trim();
+          const key = normalizeText(value);
+          if (value && key && !byKey.has(key)) byKey.set(key, value);
+        }
+        const collator = new Intl.Collator("es", { sensitivity: "base", numeric: Boolean(options.numeric) });
+        return [...byKey.values()].sort(collator.compare);
+      }
+
+      function setupFilterAddSelect(select, placeholder, values, label = (value) => value) {
+        const unique = uniqueFilterValues(values, { numeric: select === fields.decadeFilter });
+        select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>` + unique.map((value) => (
+          `<option value="${escapeAttr(value)}">${escapeHtml(label(value))}</option>`
         )).join("");
-        select.value = unique.includes(selected) ? selected : "";
+        select.value = "";
+      }
+
+      function renderQuickFilterGroup(container, filter, values) {
+        container.innerHTML = values.map((value) => (
+          `<button type="button" data-click="toggle-collection-filter" data-filter="${escapeAttr(filter)}" data-value="${escapeAttr(value)}" aria-pressed="false">${escapeHtml(filterValueLabel(filter, value))}</button>`
+        )).join("");
       }
 
       function filterValueLabel(label, value) {
@@ -4736,6 +4887,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const labels = {
           watched: "Vista",
           to_watch: "Por ver",
+          available: "Disponible",
+          unavailable: "Sin disponibilidad",
+          unrated: "Sin puntaje",
+          unreviewed: "Sin review",
           pelicula: "Película",
           serie: "Serie",
           anime: "Anime",
@@ -4997,6 +5152,130 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return `Elegí la entrada local que corresponde a “${displayTitle(incoming) || activeQuery}”.`;
       }
 
+      function emptyCollectionFilters() {
+        return Object.fromEntries(COLLECTION_MULTI_FILTER_KEYS.map((key) => [key, new Set()]));
+      }
+
+      function validCollectionYear(value) {
+        const year = String(value || "").trim();
+        return /^(18|19|20|21)\d{2}$/.test(year) ? year : "";
+      }
+
+      function matchingFilterValue(values, value) {
+        const key = normalizeText(value);
+        return [...values].find((candidate) => normalizeText(candidate) === key) || "";
+      }
+
+      function setCollectionFilterValue(filter, value, selected) {
+        if (!COLLECTION_MULTI_FILTER_KEYS.includes(filter) || !String(value || "").trim()) return;
+        const values = collectionFilters[filter];
+        const existing = matchingFilterValue(values, value);
+        if (selected && !existing) values.add(String(value).trim());
+        if (!selected && existing) values.delete(existing);
+      }
+
+      function toggleCollectionFilter(filter, value) {
+        if (!COLLECTION_MULTI_FILTER_KEYS.includes(filter) || !value) return;
+        setCollectionFilterValue(filter, value, !matchingFilterValue(collectionFilters[filter], value));
+        collectionFiltersChanged();
+      }
+
+      function collectionFiltersChanged() {
+        randomOrder = [];
+        catalogVisibleCount = CATALOG_PAGE_SIZE;
+        syncCollectionFilterControls();
+        render();
+        syncCollectionRoute("push");
+      }
+
+      function applyCollectionFilterDescriptor(descriptor) {
+        if (!descriptor || typeof descriptor !== "object") return;
+        for (const key of COLLECTION_MULTI_FILTER_KEYS) {
+          const values = Array.isArray(descriptor[key]) ? descriptor[key] : [descriptor[key]];
+          values.filter(Boolean).forEach((value) => setCollectionFilterValue(key, String(value), true));
+        }
+        collectionYearRange = {
+          from: validCollectionYear(descriptor.year_from),
+          to: validCollectionYear(descriptor.year_to)
+        };
+        if (descriptor.sort && [...fields.sort.options].some((option) => option.value === descriptor.sort)) {
+          fields.sort.value = descriptor.sort;
+        }
+        syncCollectionFilterControls();
+      }
+
+      function applyCollectionYearRange() {
+        const from = validCollectionYear(fields.yearFromFilter.value);
+        const to = validCollectionYear(fields.yearToFilter.value);
+        const invalidFrom = Boolean(fields.yearFromFilter.value && !from);
+        const invalidTo = Boolean(fields.yearToFilter.value && !to);
+        fields.yearFromFilter.setCustomValidity(invalidFrom ? "Ingresá un año entre 1800 y 2199." : "");
+        fields.yearToFilter.setCustomValidity(invalidTo ? "Ingresá un año entre 1800 y 2199." : "");
+        if (invalidFrom || invalidTo) {
+          (invalidFrom ? fields.yearFromFilter : fields.yearToFilter).reportValidity();
+          return;
+        }
+        collectionYearRange = from && to && Number(from) > Number(to)
+          ? { from: to, to: from }
+          : { from, to };
+        collectionFiltersChanged();
+      }
+
+      function syncCollectionFilterControls() {
+        document.querySelectorAll('[data-click="toggle-collection-filter"]').forEach((button) => {
+          const values = collectionFilters[button.dataset.filter];
+          const selected = values instanceof Set && Boolean(matchingFilterValue(values, button.dataset.value || ""));
+          button.setAttribute("aria-pressed", String(selected));
+        });
+        fields.yearFromFilter.value = collectionYearRange.from;
+        fields.yearToFilter.value = collectionYearRange.to;
+        const advancedKeys = ["source", "decade", "genre", "director", "record", "release_day"];
+        const count = advancedKeys.reduce((total, key) => total + collectionFilters[key].size, 0)
+          + (collectionYearRange.from || collectionYearRange.to ? 1 : 0);
+        fields.advancedFilterCount.hidden = count === 0;
+        fields.advancedFilterCount.textContent = String(count);
+        fields.advancedFiltersMenu.classList.toggle("has-active-filters", count > 0);
+      }
+
+      function filterSetMatchesValue(values, value) {
+        return !values.size || Boolean(matchingFilterValue(values, value));
+      }
+
+      function filterSetMatchesList(values, candidates) {
+        if (!values.size) return true;
+        return asList(candidates).some((candidate) => matchingFilterValue(values, candidate));
+      }
+
+      function matchesYearFilters(item) {
+        const decades = collectionFilters.decade;
+        const hasRange = Boolean(collectionYearRange.from || collectionYearRange.to);
+        if (!decades.size && !hasRange) return true;
+        const year = numericYear(item.year);
+        if (!year) return false;
+        const decadeMatch = decades.size && matchingFilterValue(decades, String(Math.floor(year / 10) * 10));
+        const rangeMatch = hasRange
+          && (!collectionYearRange.from || year >= Number(collectionYearRange.from))
+          && (!collectionYearRange.to || year <= Number(collectionYearRange.to));
+        return Boolean(decadeMatch || rangeMatch);
+      }
+
+      function matchesReleaseDay(item) {
+        const days = collectionFilters.release_day;
+        if (!days.size) return true;
+        return (Array.isArray(item.release_dates) ? item.release_dates : []).some((release) => {
+          if (release?.precision !== "day") return false;
+          const value = String(release.date || "");
+          return value.length >= 10 && matchingFilterValue(days, value.slice(5, 10));
+        });
+      }
+
+      function matchesPersonalRecord(item) {
+        const records = collectionFilters.record;
+        if (!records.size) return true;
+        return (records.has("unrated") && normalizeRating(item.rating) === 0)
+          || (records.has("unreviewed") && !String(item.review || "").trim());
+      }
+
       function filteredItems() {
         const query = activeQuery.trim();
         return items.filter((item) => {
@@ -5025,9 +5304,18 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ].join(" ");
           return (!query || matchesSearchText(haystack, query))
             && (!duplicatesOnly || Number(item._duplicate_count || 0) > 0)
-            && (!fields.status.value || item.status === fields.status.value)
-            && (!fields.kind.value || item.kind === fields.kind.value)
-            && (!fields.source.value || item.source === fields.source.value);
+            && filterSetMatchesValue(collectionFilters.status, item.status)
+            && filterSetMatchesValue(
+              collectionFilters.availability,
+              isInCatalog(item.en_catalogo) ? "available" : "unavailable"
+            )
+            && filterSetMatchesValue(collectionFilters.kind, item.kind)
+            && filterSetMatchesValue(collectionFilters.source, item.source)
+            && filterSetMatchesList(collectionFilters.genre, item.genres)
+            && filterSetMatchesList(collectionFilters.director, item.directors)
+            && matchesYearFilters(item)
+            && matchesReleaseDay(item)
+            && matchesPersonalRecord(item);
         });
       }
 
@@ -5051,6 +5339,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (mode === "rating-desc") {
           return sorted.sort((left, right) => normalizeRating(right.rating) - normalizeRating(left.rating));
         }
+        if (mode === "added-desc") {
+          return sorted.sort((left, right) => String(right.added_at || "").localeCompare(String(left.added_at || "")));
+        }
         return sorted;
       }
 
@@ -5060,13 +5351,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function resetCollectionFilters() {
-        fields.status.value = "";
-        fields.kind.value = "";
-        fields.source.value = "";
+        collectionFilters = emptyCollectionFilters();
+        collectionYearRange = { from: "", to: "" };
         fields.sort.value = "original";
         duplicatesOnly = false;
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
+        syncCollectionFilterControls();
       }
 
       function clearFilters() {
@@ -5075,13 +5366,16 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         syncCollectionRoute("push");
       }
 
-      function clearFilter(filter) {
+      function clearFilter(filter, value = "") {
         if (filter === "query") {
           clearManualSearch({ focus: false });
           return;
         }
-        if (filter === "status" || filter === "kind" || filter === "source") {
-          fields[filter].value = "";
+        if (COLLECTION_MULTI_FILTER_KEYS.includes(filter)) {
+          if (value) setCollectionFilterValue(filter, value, false);
+          else collectionFilters[filter].clear();
+        } else if (filter === "year") {
+          collectionYearRange = { from: "", to: "" };
         } else if (filter === "sort") {
           fields.sort.value = "original";
         } else if (filter === "duplicates") {
@@ -5090,27 +5384,63 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           randomOrder = [];
         }
         catalogVisibleCount = CATALOG_PAGE_SIZE;
+        syncCollectionFilterControls();
         render();
         syncCollectionRoute("push");
       }
 
       function renderActiveFilters() {
         const filters = [];
-        if (activeQuery) filters.push(["query", `Búsqueda: ${activeQuery}`]);
-        if (fields.status.value) filters.push(["status", filterValueLabel("Estado", fields.status.value)]);
-        if (fields.kind.value) filters.push(["kind", filterValueLabel("Tipo", fields.kind.value)]);
-        if (fields.source.value) filters.push(["source", filterValueLabel("Fuente", fields.source.value)]);
-        if (fields.sort.value && fields.sort.value !== "original") {
-          filters.push(["sort", fields.sort.selectedOptions[0]?.textContent || "Orden personalizado"]);
+        if (activeQuery) filters.push(["query", "", `Búsqueda: ${activeQuery}`]);
+        const labels = {
+          status: "Estado",
+          availability: "Disponibilidad",
+          kind: "Tipo",
+          source: "Fuente",
+          decade: "Década",
+          genre: "Género",
+          director: "Dirección",
+          record: "Memoria"
+        };
+        for (const key of COLLECTION_MULTI_FILTER_KEYS) {
+          for (const value of collectionFilters[key]) {
+            let label = `${labels[key] || key}: ${filterValueLabel(key, value)}`;
+            if (key === "decade") label = `Años ${value}`;
+            if (key === "release_day") label = releaseDayFilterLabel(value);
+            filters.push([key, value, label]);
+          }
         }
-        if (duplicatesOnly) filters.push(["duplicates", "Sólo duplicadas"]);
-        if (randomOrder.length) filters.push(["random", "Vista mezclada"]);
+        if (collectionYearRange.from || collectionYearRange.to) {
+          const range = collectionYearRange.from && collectionYearRange.to
+            ? `${collectionYearRange.from}–${collectionYearRange.to}`
+            : collectionYearRange.from ? `Desde ${collectionYearRange.from}` : `Hasta ${collectionYearRange.to}`;
+          filters.push(["year", "", range]);
+        }
+        if (fields.sort.value && fields.sort.value !== "original") {
+          filters.push(["sort", "", fields.sort.selectedOptions[0]?.textContent || "Orden personalizado"]);
+        }
+        if (duplicatesOnly) filters.push(["duplicates", "", "Sólo duplicadas"]);
+        if (randomOrder.length) filters.push(["random", "", "Vista mezclada"]);
         fields.activeFilters.hidden = filters.length === 0;
         fields.activeFilters.innerHTML = filters.length
-          ? `<span>Activos</span>${filters.map(([filter, label]) => (
-              `<button type="button" data-click="clear-filter" data-filter="${escapeAttr(filter)}">${escapeHtml(label)} <span aria-hidden="true">×</span></button>`
+          ? `<span>Activos</span>${filters.map(([filter, value, label]) => (
+              `<button type="button" data-click="clear-filter" data-filter="${escapeAttr(filter)}" data-value="${escapeAttr(value)}" aria-label="Quitar ${escapeAttr(label)}">${escapeHtml(label)} <span aria-hidden="true">×</span></button>`
             )).join("")}`
           : "";
+      }
+
+      function releaseDayFilterLabel(value) {
+        const [month, day] = String(value || "").split("-").map(Number);
+        const parsed = new Date(2024, month - 1, day);
+        if (!month || !day || Number.isNaN(parsed.getTime())) return "Fecha de estreno";
+        const label = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long" }).format(parsed);
+        return `Estrenadas un ${label}`;
+      }
+
+      function hasActiveCollectionFilters() {
+        return COLLECTION_MULTI_FILTER_KEYS.some((key) => collectionFilters[key].size)
+          || Boolean(collectionYearRange.from || collectionYearRange.to)
+          || duplicatesOnly;
       }
 
       function applyRandomOrder(list) {
@@ -5166,8 +5496,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const count = filtered.length;
         const noun = count === 1 ? "título" : "títulos";
         if (activeQuery) return `${count} ${noun} para “${activeQuery}”`;
-        const hasFilters = fields.status.value || fields.kind.value || fields.source.value || duplicatesOnly;
-        if (hasFilters) return `${count} ${noun} con los filtros actuales`;
+        if (hasActiveCollectionFilters()) return `${count} ${noun} con los filtros actuales`;
         if (randomOrder.length) return `${count} ${noun} en orden aleatorio`;
         return `${count} ${noun} en la estantería`;
       }

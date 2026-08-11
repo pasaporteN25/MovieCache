@@ -419,32 +419,100 @@
               <span class="desktop-control-label">Limpiar</span>
               <span class="mobile-control-label" aria-hidden="true">×</span>
             </button>
-            <details class="utility-menu">
+          </div>
+          <div class="collection-filter-toolbar" aria-label="Filtros rápidos de la colección">
+            <div class="quick-filter-strip">
+              <fieldset class="quick-filter-group">
+                <legend>Estado</legend>
+                <div id="statusQuickFilters" class="filter-segments"></div>
+              </fieldset>
+              <fieldset class="quick-filter-group">
+                <legend>Disponibilidad</legend>
+                <div id="availabilityQuickFilters" class="filter-segments"></div>
+              </fieldset>
+              <fieldset class="quick-filter-group kind-filter-group">
+                <legend>Tipo</legend>
+                <div id="kindQuickFilters" class="filter-segments"></div>
+              </fieldset>
+            </div>
+            <details id="advancedFiltersMenu" class="utility-menu advanced-filter-menu">
               <summary>
-                <span class="desktop-control-label">Filtros y orden</span>
-                <span class="mobile-control-label">Filtros</span>
+                Más filtros
+                <span id="advancedFilterCount" class="filter-count" hidden></span>
               </summary>
               <div class="utility-panel collection-filter-panel">
                 <section class="utility-section">
                   <div class="utility-section-heading">
-                    <h2>Filtrar estantería</h2>
-                    <button id="clearFilters" class="text-action" type="button">Limpiar</button>
+                    <div>
+                      <span class="section-kicker">Afinar estantería</span>
+                      <h2>Filtros avanzados</h2>
+                    </div>
+                    <button id="clearFilters" class="text-action" type="button">Limpiar todo</button>
                   </div>
-                  <div class="filter-row">
-                    <select id="status" aria-label="Filtrar por estado"></select>
-                    <select id="kind" aria-label="Filtrar por tipo"></select>
-                    <select id="source" aria-label="Filtrar por fuente"></select>
-                    <select id="sort" aria-label="Ordenar colección">
-                      <option value="original">Orden original</option>
-                      <option value="title-asc">Título A-Z</option>
-                      <option value="year-desc">Año, más nuevas</option>
-                      <option value="year-asc">Año, más antiguas</option>
-                      <option value="rating-desc">Mejor puntuadas</option>
-                    </select>
+                  <div class="advanced-filter-grid">
+                    <label>
+                      <span>Década</span>
+                      <select id="decadeFilter" aria-label="Agregar una década">
+                        <option value="">Agregar década</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Género</span>
+                      <select id="genreFilter" aria-label="Agregar un género">
+                        <option value="">Agregar género</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Dirección</span>
+                      <select id="directorFilter" aria-label="Agregar una persona en dirección">
+                        <option value="">Agregar dirección</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Fuente</span>
+                      <select id="sourceFilter" aria-label="Agregar una fuente">
+                        <option value="">Agregar fuente</option>
+                      </select>
+                    </label>
                   </div>
-                  <div class="collection-order-actions">
-                    <button id="randomizeView" type="button">Mezclar vista</button>
-                    <button id="resetOrder" class="quiet-action" type="button">Restablecer orden</button>
+                  <fieldset class="advanced-choice-group">
+                    <legend>Memoria personal</legend>
+                    <div class="filter-segments">
+                      <button type="button" data-click="toggle-collection-filter" data-filter="record" data-value="unrated" aria-pressed="false">Sin puntaje</button>
+                      <button type="button" data-click="toggle-collection-filter" data-filter="record" data-value="unreviewed" aria-pressed="false">Sin review</button>
+                    </div>
+                  </fieldset>
+                  <div class="year-filter-block">
+                    <span>Rango de estreno</span>
+                    <div class="year-filter-controls">
+                      <label>
+                        <span class="sr-only">Año desde</span>
+                        <input id="yearFromFilter" type="number" min="1800" max="2199" inputmode="numeric" placeholder="Desde">
+                      </label>
+                      <span aria-hidden="true">a</span>
+                      <label>
+                        <span class="sr-only">Año hasta</span>
+                        <input id="yearToFilter" type="number" min="1800" max="2199" inputmode="numeric" placeholder="Hasta">
+                      </label>
+                      <button id="applyYearRange" class="quiet-action" type="button">Aplicar</button>
+                    </div>
+                  </div>
+                  <div class="collection-sort-row">
+                    <label>
+                      <span>Orden</span>
+                      <select id="sort" aria-label="Ordenar colección">
+                        <option value="original">Orden original</option>
+                        <option value="title-asc">Título A-Z</option>
+                        <option value="year-desc">Año, más nuevas</option>
+                        <option value="year-asc">Año, más antiguas</option>
+                        <option value="rating-desc">Mejor puntuadas</option>
+                        <option value="added-desc">Agregadas recientemente</option>
+                      </select>
+                    </label>
+                    <div class="collection-order-actions">
+                      <button id="randomizeView" type="button">Mezclar vista</button>
+                      <button id="resetOrder" class="quiet-action" type="button">Restablecer orden</button>
+                    </div>
                   </div>
                 </section>
               </div>

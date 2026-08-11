@@ -106,10 +106,14 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   colecciones e inventario. La programacion pertenece al host y detiene brevemente la
   aplicacion para obtener un estado coherente de SQLite.
 - `Inicio` ofrece una programacion editorial diaria, estable y explicable. Su cartelera
-  principal solamente usa obras disponibles; las secciones pueden reunir pendientes
+  principal propone entre una y cuatro obras disponibles con sinopsis y seleccion
+  manual; las secciones pueden reunir pendientes
   disponibles, obras faltantes de colecciones seguidas, recuerdos personales por
   completar y rutas por director, genero o decada. La seleccion usa exclusivamente
   datos locales, evita repetir obras y no reemplaza la accion separada `Random`.
+- Los accesos editoriales hacia `Coleccion` conservan su criterio mediante filtros
+  enlazables. Distintas facetas se combinan por interseccion y varios valores de una
+  misma faceta por union; la URL, los chips y Atras/Adelante representan el mismo estado.
 - Las fechas de estreno se conservan con precision, pais, tipo y fuente. Una fecha
   completa puede alimentar efemerides; un dato anual o mensual nunca se presenta como
   si conocieramos el dia exacto.

@@ -28,13 +28,23 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Precarga progresiva y deduplicada de portadas despues del primer acceso autenticado, con prioridad para imagenes visibles, reintentos con backoff y estado compacto en Administrar.
 - Placeholders estables y carga diferida de portadas con prioridad para el primer viewport, ficha y spotlight.
 - Inicio editorial diario y estable con una cartelera disponible, recomendaciones explicables desde el catalogo personal y obras pendientes de colecciones seguidas.
+- Cartelera diaria con hasta cuatro recomendaciones disponibles, sinopsis, selector
+  manual y compatibilidad temporal con el campo `hero` anterior de `/api/home`.
+- Filtros rapidos y avanzados acumulables en `Coleccion`, con facetas para
+  disponibilidad, estado, tipo, fuente, director, genero, decada, rango de anos y
+  memoria personal.
+- Acciones editoriales que trasladan su criterio real a `Coleccion` mediante URLs
+  restaurables y chips removibles por valor.
 - Endpoint autenticado `/api/home` con seleccion determinista, limites estrictos, deduplicacion entre secciones y degradacion parcial cuando las colecciones no estan disponibles.
 - Backups completos de instancia en archivos `.tar.gz` atomicos, con checksum SHA-256, verificacion de bases requeridas, exclusion del cache y retencion configurable.
 - Servicio de mantenimiento de Compose, wrapper con bloqueo/reinicio/healthcheck y timer systemd diario para automatizar backups en OMV o Debian.
 
 ### Cambiado
 
-- El antiguo carrusel automatico fue reemplazado por una cartelera quieta; `Random` conserva la exploracion impredecible como una accion independiente.
+- El antiguo carrusel automatico fue reemplazado por una cartelera de seleccion manual;
+  `Random` conserva la exploracion impredecible como una accion independiente.
+- Las cards secundarias de Inicio conservan una etiqueta contextual breve y dejan la
+  explicacion extensa en el encabezado de seccion o la ficha.
 
 ### Corregido
 
