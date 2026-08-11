@@ -95,6 +95,11 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - Las portadas se cargan progresivamente despues del primer acceso a cada catalogo o
   coleccion y quedan en el almacenamiento persistente de la instancia. La navegacion
   visible tiene prioridad y nunca espera a que termine la cola global.
+- `Inicio` ofrece una programacion editorial diaria, estable y explicable. Su cartelera
+  principal solamente usa obras disponibles; las secciones pueden reunir pendientes
+  disponibles, obras faltantes de colecciones seguidas, recuerdos personales por
+  completar y rutas por director, genero o decada. La seleccion usa exclusivamente
+  datos locales, evita repetir obras y no reemplaza la accion separada `Random`.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

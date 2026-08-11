@@ -80,9 +80,11 @@ class ViewerHttpTests(unittest.TestCase):
 
     def test_api_requires_token(self) -> None:
         status, _ = self.request("GET", "/api/items")
+        home_status, _ = self.request("GET", "/api/home?date=2026-08-10")
         export_status, _ = self.request("GET", "/api/catalog/export?format=json")
         cache_status, _ = self.request("GET", "/api/image-cache/status")
         self.assertEqual(status, 403)
+        self.assertEqual(home_status, 403)
         self.assertEqual(export_status, 403)
         self.assertEqual(cache_status, 403)
 
@@ -98,7 +100,68 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(payload["personal"]["state"], "disabled")
         self.assertEqual(payload["personal"]["eligible"], 0)
         self.assertEqual(payload["personal"]["without_url"], 1)
-        self.assertEqual(payload["global"]["registered_scopes"], 1)
+        self.assertEqual(payload["global"]["registered_scopes"], 2)
+
+    def test_editorial_home_is_explainable_stable_and_includes_followed_collections(self) -> None:
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item({
+                    "id": "heat",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                    "status": "to_watch",
+                    "en_catalogo": True,
+                    "page_image": "https://upload.wikimedia.org/heat.jpg",
+                }),
+                normalize_item({
+                    "id": "memories",
+                    "title": "Memories of Murder",
+                    "year": "2003",
+                    "kind": "pelicula",
+                    "status": "watched",
+                    "rating": 0,
+                    "review": "",
+                }),
+            ]
+        )
+        headers = {"X-Movie-Inbox-Token": self.config.api_token}
+        listed = self.client.get("/api/collections", headers=headers)
+        collection_id = listed.json()["collections"][0]["id"]
+        followed = self.client.post(
+            f"/api/collections/{collection_id}/follow",
+            content=json.dumps({"following": True}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(followed.status_code, 200, followed.content)
+
+        first = self.client.get("/api/home?date=2026-08-10", headers=headers)
+        second = self.client.get("/api/home?date=2026-08-10", headers=headers)
+        items_response = self.client.get("/api/items?home_date=2026-08-10", headers=headers)
+        invalid = self.client.get("/api/home?date=2026-02-30", headers=headers)
+
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(first.json(), second.json())
+        payload = first.json()
+        self.assertEqual(payload["generated_for"], "2026-08-10")
+        self.assertEqual(payload["hero"]["item"]["id"], "heat")
+        self.assertEqual(payload["hero"]["reason"]["code"], "available_pending")
+        section_ids = {section["id"] for section in payload["sections"]}
+        self.assertIn("followed", section_ids)
+        self.assertIn("memory", section_ids)
+        self.assertEqual(payload["warnings"], [])
+        keys = [payload["hero"]["key"]] + [
+            entry["key"]
+            for section in payload["sections"]
+            for entry in section["items"]
+        ]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertNotIn(str(self.temporary.name), first.text)
+
+        self.assertEqual(items_response.status_code, 200, items_response.content)
+        self.assertEqual(items_response.json()["home"], payload)
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["reason"], "invalid_home_date")
 
     def test_personal_catalog_can_be_downloaded_as_json_or_csv(self) -> None:
         headers = {"X-Movie-Inbox-Token": self.config.api_token}
@@ -752,7 +815,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="memberList"', body)
         self.assertIn(b'id="memberDialog"', body)
         self.assertIn(b'id="temporaryPasswordDialog"', body)
-        self.assertIn(b'id="homeGrid"', body)
+        self.assertIn(b'id="homeDate"', body)
+        self.assertIn(b'id="homeSections"', body)
+        self.assertIn(b'id="homeFeedback"', body)
         self.assertIn(b'id="activeFilters"', body)
         self.assertIn(b'id="catalogSummary"', body)
         self.assertIn(b'id="catalogMergeTitle"', body)
@@ -773,7 +838,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'.search-console', css)
         self.assertIn(b'.dvd-case', css)
         self.assertIn(b'.dvd-front-statuses', css)
-        self.assertIn(b'.home-grid', css)
+        self.assertIn(b'.home-program-grid', css)
+        self.assertIn(b'.home-entry-reason', css)
+        self.assertIn(b'.home-empty-state', css)
         self.assertIn(b'.curation-workbench', css)
         self.assertIn(b'.curation-queue-item', css)
         self.assertIn(b'.curation-pair', css)
@@ -819,7 +886,7 @@ class ViewerHttpTests(unittest.TestCase):
         status, javascript = self.request("GET", "/static/app.js")
         self.assertEqual(status, 200)
         self.assertIn(b'const API_TOKEN', javascript)
-        self.assertIn(b'class="card dvd-card"', javascript)
+        self.assertIn(b'<article class="card dvd-card${', javascript)
         self.assertIn(b'class="dvd-back-statuses"', javascript)
         self.assertIn(b'class="dvd-front-statuses"', javascript)
         self.assertIn(b'class="dvd-open-surface"', javascript)
@@ -828,7 +895,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'SEARCH_TIMEOUT_MS', javascript)
         self.assertIn(b'backdrop_image', javascript)
         self.assertIn(b'spotlight-cta', javascript)
-        self.assertIn(b'spotlightDetailPaused', javascript)
+        self.assertIn(b'function renderEditorialHome()', javascript)
+        self.assertIn(b'function openHomeCollectionDetail(', javascript)
+        self.assertIn(b'function refreshEditorialHome()', javascript)
         self.assertIn(b'function openRandomDetail()', javascript)
         self.assertIn(b'function randomCandidates()', javascript)
         self.assertIn(b'function changeRandomScope(source)', javascript)
@@ -855,7 +924,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'function collectionRouteValues()', javascript)
         self.assertIn(b'function setCollectionSearchMode(', javascript)
         self.assertIn(b'function collectionSearchMessage()', javascript)
-        self.assertIn(b'function renderHomeShelf()', javascript)
+        self.assertIn(b'function editorialPersonalIds()', javascript)
         self.assertIn(b'function renderCollectionDirectory()', javascript)
         self.assertIn(b'function loadCollectionDetail(', javascript)
         self.assertIn(b'function toggleCollectionFollow(', javascript)
@@ -869,7 +938,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'function changeCurationHistoryMode()', javascript)
         self.assertIn(b'function renderActiveFilters()', javascript)
         self.assertIn(b'function sortItems(list)', javascript)
-        self.assertIn(b'const catalogItems = items.filter((item) => isInCatalog(item.en_catalogo))', javascript)
+        self.assertIn(b'editorialHome = normalizeEditorialHome(payload.home);', javascript)
+        self.assertNotIn(b'SPOTLIGHT_INTERVAL_MS', javascript)
         self.assertNotIn(b'searchCatalogForMerge(activeQuery);', javascript)
         self.assertNotIn(b'data-click="toggle-flip"', javascript)
         self.assertNotIn(b'onclick=', javascript)

@@ -1,0 +1,498 @@
+"""Deterministic, explainable programming for the authenticated home view."""
+
+from __future__ import annotations
+
+import hashlib
+import re
+from collections import defaultdict
+from datetime import date
+from typing import Any, Callable, Iterable, Mapping, Sequence
+
+from movie_inbox.domain.catalog import catalog_membership, external_urls, title_match_key
+from movie_inbox.domain.collections import CuratedCollection
+from movie_inbox.domain.normalization import normalize_bool, normalize_rating
+
+
+HOME_SECTION_LIMIT = 6
+HOME_SECTION_COUNT = 4
+_DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+class EditorialHomeService:
+    """Build a stable daily home payload without persisting recommendation state."""
+
+    def build(
+        self,
+        user_id: str,
+        local_date: str,
+        catalog_items: Sequence[Mapping[str, Any]],
+        followed_collections: Sequence[CuratedCollection] = (),
+        *,
+        warnings: Sequence[str] = (),
+    ) -> dict[str, Any]:
+        day = self.validate_date(local_date)
+        catalog = [dict(item) for item in catalog_items]
+        seed = f"{user_id}|{day}"
+        used_ids: set[str] = set()
+
+        hero = self._hero(catalog, seed, used_ids)
+        sections: list[dict[str, Any]] = []
+
+        available = self._available_section(catalog, seed, used_ids)
+        if available:
+            sections.append(available)
+
+        followed = self._followed_section(followed_collections, catalog, seed)
+        if followed:
+            sections.append(followed)
+
+        memory = self._memory_section(catalog, seed, used_ids)
+        if memory:
+            sections.append(memory)
+
+        route = self._route_section(catalog, seed, used_ids)
+        if route:
+            sections.append(route)
+
+        if len(sections) < HOME_SECTION_COUNT and not route:
+            recent = self._recent_section(catalog, used_ids)
+            if recent:
+                sections.append(recent)
+
+        return {
+            "generated_for": day,
+            "hero": hero,
+            "sections": sections[:HOME_SECTION_COUNT],
+            "warnings": list(dict.fromkeys(str(value) for value in warnings if str(value))),
+            "limits": {
+                "section_items": HOME_SECTION_LIMIT,
+                "sections": HOME_SECTION_COUNT,
+            },
+        }
+
+    @staticmethod
+    def validate_date(value: str) -> str:
+        requested = str(value or "").strip()
+        if not _DATE_PATTERN.fullmatch(requested):
+            raise ValueError("invalid_home_date")
+        try:
+            parsed = date.fromisoformat(requested)
+        except ValueError as error:
+            raise ValueError("invalid_home_date") from error
+        if parsed.isoformat() != requested:
+            raise ValueError("invalid_home_date")
+        return requested
+
+    def _hero(
+        self,
+        catalog: list[dict[str, Any]],
+        seed: str,
+        used_ids: set[str],
+    ) -> dict[str, Any] | None:
+        available = [item for item in catalog if normalize_bool(item.get("en_catalogo"))]
+        pending = [item for item in available if str(item.get("status") or "") != "watched"]
+        pool = pending or available
+        if not pool:
+            return None
+        illustrated = [item for item in pool if item.get("backdrop_image") or item.get("page_image")]
+        selected = self._stable_order(illustrated or pool, f"{seed}|hero", _catalog_key)[0]
+        used_ids.add(_catalog_key(selected))
+        if selected in pending:
+            reason = _reason(
+                "available_pending",
+                "Disponible y pendiente",
+                "Esta en tu biblioteca fisica y todavia no la marcaste como vista.",
+            )
+        else:
+            reason = _reason(
+                "available_revisit",
+                "Disponible en tu archivo",
+                "Esta obra sigue disponible para volver a encontrarla esta noche.",
+            )
+        return _catalog_entry(selected, reason)
+
+    def _available_section(
+        self,
+        catalog: list[dict[str, Any]],
+        seed: str,
+        used_ids: set[str],
+    ) -> dict[str, Any] | None:
+        candidates = [
+            item
+            for item in catalog
+            if normalize_bool(item.get("en_catalogo"))
+            and str(item.get("status") or "") != "watched"
+            and _catalog_key(item) not in used_ids
+        ]
+        selected = self._take(candidates, f"{seed}|available", _catalog_key)
+        if not selected:
+            return None
+        entries = []
+        for item in selected:
+            used_ids.add(_catalog_key(item))
+            entries.append(
+                _catalog_entry(
+                    item,
+                    _reason(
+                        "available_pending",
+                        "Lista para ver",
+                        "El inventario confirma que esta disponible y sigue pendiente.",
+                    ),
+                )
+            )
+        return _section(
+            "available",
+            "Para ver ahora",
+            "Disponible esta noche",
+            "Pendientes que tu biblioteca fisica confirma como disponibles.",
+            {"kind": "catalog", "label": "Ver coleccion", "status": "to_watch"},
+            entries,
+        )
+
+    def _followed_section(
+        self,
+        collections: Sequence[CuratedCollection],
+        catalog: list[dict[str, Any]],
+        seed: str,
+    ) -> dict[str, Any] | None:
+        candidates: list[tuple[CuratedCollection, Any]] = []
+        work_keys: set[str] = set()
+        for collection in collections:
+            if not collection.followed:
+                continue
+            for entry in collection.items:
+                if catalog_membership(entry.item, catalog)["state"] != "missing":
+                    continue
+                work_key = _work_key(entry.item)
+                if work_key in work_keys:
+                    continue
+                work_keys.add(work_key)
+                candidates.append((collection, entry))
+        selected = self._take(
+            candidates,
+            f"{seed}|followed",
+            lambda row: f"{row[0].id}:{row[1].id}",
+        )
+        if not selected:
+            return None
+        entries = [
+            {
+                "key": f"collection:{collection.id}:{entry.id}",
+                "origin": {
+                    "kind": "collection",
+                    "collection_id": collection.id,
+                    "collection_item_id": entry.id,
+                    "collection_title": collection.title,
+                },
+                "item": dict(entry.item),
+                "reason": _reason(
+                    "followed_collection",
+                    f"En {collection.title}",
+                    "Seguis esta coleccion y la obra todavia no esta en tu catalogo personal.",
+                ),
+            }
+            for collection, entry in selected
+        ]
+        return _section(
+            "followed",
+            "Desde el Club",
+            "De tus colecciones",
+            "Obras que esperan en estantes que elegiste seguir.",
+            {"kind": "club", "label": "Abrir Club"},
+            entries,
+        )
+
+    def _memory_section(
+        self,
+        catalog: list[dict[str, Any]],
+        seed: str,
+        used_ids: set[str],
+    ) -> dict[str, Any] | None:
+        candidates = [
+            item
+            for item in catalog
+            if str(item.get("status") or "") == "watched"
+            and (normalize_rating(item.get("rating")) == 0 or not str(item.get("review") or "").strip())
+            and _catalog_key(item) not in used_ids
+        ]
+        selected = self._take(candidates, f"{seed}|memory", _catalog_key)
+        if not selected:
+            return None
+        entries = []
+        for item in selected:
+            used_ids.add(_catalog_key(item))
+            missing_rating = normalize_rating(item.get("rating")) == 0
+            missing_review = not str(item.get("review") or "").strip()
+            if missing_rating and missing_review:
+                reason = _reason(
+                    "watched_without_record",
+                    "Vista, sin registro",
+                    "La marcaste como vista pero todavia no tiene puntaje ni review.",
+                )
+            elif missing_rating:
+                reason = _reason(
+                    "watched_without_rating",
+                    "Vista, sin puntuar",
+                    "Tu review esta guardada; falta sumar un puntaje.",
+                )
+            else:
+                reason = _reason(
+                    "watched_without_review",
+                    "Vista, sin review",
+                    "Ya tiene puntaje; falta registrar que te dejo.",
+                )
+            entries.append(_catalog_entry(item, reason))
+        return _section(
+            "memory",
+            "Memoria personal",
+            "Tu archivo pide memoria",
+            "Obras vistas cuyo recuerdo todavia puede completarse.",
+            {"kind": "catalog", "label": "Ver fichas", "status": "watched"},
+            entries,
+        )
+
+    def _route_section(
+        self,
+        catalog: list[dict[str, Any]],
+        seed: str,
+        used_ids: set[str],
+    ) -> dict[str, Any] | None:
+        available = [item for item in catalog if _catalog_key(item) not in used_ids]
+        routes = _routes(available)
+        if not routes:
+            return None
+        route = self._stable_order(routes, f"{seed}|route", lambda row: row["key"])[0]
+        selected = self._take(route["items"], f"{seed}|route:{route['key']}", _catalog_key)
+        if len(selected) < 3:
+            return None
+        entries = []
+        for item in selected:
+            used_ids.add(_catalog_key(item))
+            entries.append(
+                _catalog_entry(
+                    item,
+                    _reason(route["reason_code"], route["reason_label"], route["reason_detail"]),
+                )
+            )
+        return _section(
+            "route",
+            route["eyebrow"],
+            route["title"],
+            route["description"],
+            {"kind": "catalog", "label": "Explorar coleccion"},
+            entries,
+        )
+
+    @staticmethod
+    def _recent_section(
+        catalog: list[dict[str, Any]],
+        used_ids: set[str],
+    ) -> dict[str, Any] | None:
+        remaining = [item for item in catalog if _catalog_key(item) not in used_ids]
+        selected = sorted(
+            remaining,
+            key=lambda item: (str(item.get("added_at") or ""), _catalog_key(item)),
+            reverse=True,
+        )[:HOME_SECTION_LIMIT]
+        if not selected:
+            return None
+        entries = [
+            _catalog_entry(
+                item,
+                _reason(
+                    "recently_added",
+                    "Agregada recientemente",
+                    "Es una de las incorporaciones mas nuevas de tu catalogo personal.",
+                ),
+            )
+            for item in selected
+        ]
+        return _section(
+            "recent",
+            "Nuevos ingresos",
+            "Recien llegadas",
+            "Las incorporaciones mas recientes de tu archivo.",
+            {"kind": "catalog", "label": "Ver coleccion"},
+            entries,
+        )
+
+    def _take(
+        self,
+        values: Iterable[Any],
+        seed: str,
+        identity: Callable[[Any], str],
+    ) -> list[Any]:
+        return self._stable_order(values, seed, identity)[:HOME_SECTION_LIMIT]
+
+    @staticmethod
+    def _stable_order(
+        values: Iterable[Any],
+        seed: str,
+        identity: Callable[[Any], str],
+    ) -> list[Any]:
+        return sorted(
+            values,
+            key=lambda value: (
+                hashlib.sha256(f"{seed}|{identity(value)}".encode("utf-8")).hexdigest(),
+                identity(value),
+            ),
+        )
+
+
+def home_image_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Flatten only the works shown by the home payload for image warming."""
+    rows: list[dict[str, Any]] = []
+    hero = payload.get("hero")
+    if isinstance(hero, Mapping) and isinstance(hero.get("item"), Mapping):
+        rows.append(dict(hero["item"]))
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        return rows
+    for section in sections:
+        if not isinstance(section, Mapping) or not isinstance(section.get("items"), list):
+            continue
+        for entry in section["items"]:
+            if isinstance(entry, Mapping) and isinstance(entry.get("item"), Mapping):
+                rows.append(dict(entry["item"]))
+    return rows
+
+
+def _catalog_entry(item: Mapping[str, Any], reason: Mapping[str, str]) -> dict[str, Any]:
+    key = _catalog_key(item)
+    return {
+        "key": f"catalog:{key}",
+        "origin": {"kind": "catalog", "item_id": str(item.get("id") or "")},
+        "item": dict(item),
+        "reason": dict(reason),
+    }
+
+
+def _section(
+    section_id: str,
+    eyebrow: str,
+    title: str,
+    description: str,
+    action: Mapping[str, str],
+    items: list[dict[str, Any]],
+) -> dict[str, Any]:
+    return {
+        "id": section_id,
+        "eyebrow": eyebrow,
+        "title": title,
+        "description": description,
+        "action": dict(action),
+        "items": items,
+    }
+
+
+def _reason(code: str, label: str, detail: str) -> dict[str, str]:
+    return {"code": code, "label": label, "detail": detail}
+
+
+def _catalog_key(item: Mapping[str, Any]) -> str:
+    return str(item.get("id") or _work_key(item))
+
+
+def _work_key(item: Mapping[str, Any]) -> str:
+    wikidata = str(item.get("wikidata_id") or "").strip().casefold()
+    if wikidata:
+        return f"wikidata:{wikidata}"
+    urls = sorted(external_urls(item))
+    if urls:
+        return f"url:{urls[0]}"
+    item_id = str(item.get("id") or "").strip().casefold()
+    if item_id:
+        return f"id:{item_id}"
+    title = title_match_key(str(item.get("title") or item.get("original_title") or ""))
+    return ":".join(
+        (
+            "title",
+            title,
+            str(item.get("year") or "").strip(),
+            str(item.get("kind") or "").strip().casefold(),
+        )
+    )
+
+
+def _routes(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    directors: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    genres: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    decades: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    labels: dict[str, str] = {}
+    for item in items:
+        for director in _list_values(item.get("directors")):
+            key = director.casefold()
+            labels.setdefault(f"director:{key}", director)
+            directors[key].append(item)
+        for genre in _list_values(item.get("genres")):
+            key = genre.casefold()
+            labels.setdefault(f"genre:{key}", genre)
+            genres[key].append(item)
+        year = _year(item.get("year"))
+        if year:
+            decades[(year // 10) * 10].append(item)
+
+    routes: list[dict[str, Any]] = []
+    for key, grouped in directors.items():
+        if len(grouped) < 3:
+            continue
+        label = labels[f"director:{key}"]
+        routes.append(
+            {
+                "key": f"director:{key}",
+                "eyebrow": "Programa de autor",
+                "title": f"Una ruta por {label}",
+                "description": f"Una linea de {label} dentro de tu propio archivo.",
+                "reason_code": "shared_director",
+                "reason_label": f"Direccion: {label}",
+                "reason_detail": f"Forma parte de una ruta de obras dirigidas por {label}.",
+                "items": grouped,
+            }
+        )
+    for key, grouped in genres.items():
+        if len(grouped) < 3:
+            continue
+        label = labels[f"genre:{key}"]
+        routes.append(
+            {
+                "key": f"genre:{key}",
+                "eyebrow": "Afinidad de genero",
+                "title": f"Una ruta por {label}",
+                "description": f"Una seleccion de {label} que ya vive en tu catalogo.",
+                "reason_code": "shared_genre",
+                "reason_label": f"Genero: {label}",
+                "reason_detail": f"Comparte el genero {label} con el resto de esta ruta.",
+                "items": grouped,
+            }
+        )
+    for decade, grouped in decades.items():
+        if len(grouped) < 3:
+            continue
+        routes.append(
+            {
+                "key": f"decade:{decade}",
+                "eyebrow": "Sesion de epoca",
+                "title": f"Una ruta por los anos {decade}",
+                "description": f"Obras de los anos {decade} conservadas en tu archivo.",
+                "reason_code": "shared_decade",
+                "reason_label": f"De los anos {decade}",
+                "reason_detail": f"Fue estrenada durante la decada de {decade}.",
+                "items": grouped,
+            }
+        )
+    return routes
+
+
+def _list_values(value: Any) -> list[str]:
+    if isinstance(value, str):
+        values = [part.strip() for part in value.split(",")]
+    elif isinstance(value, (list, tuple, set)):
+        values = [str(part).strip() for part in value]
+    else:
+        values = []
+    return list(dict.fromkeys(part for part in values if part))
+
+
+def _year(value: Any) -> int:
+    match = re.search(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b", str(value or ""))
+    return int(match.group(1)) if match else 0

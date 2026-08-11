@@ -91,12 +91,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let duplicatesOnly = false;
       let catalogVisibleCount = 36;
       let externalHealth = { sources: {}, cache: {} };
-      let spotlightItems = [];
-      let spotlightIndex = 0;
-      let spotlightTimer = null;
-      let spotlightPaused = false;
-      let spotlightDetailPaused = false;
-      let spotlightViewPaused = false;
+      let editorialHome = { generated_for: "", hero: null, sections: [], warnings: [] };
       let imageCacheStatus = null;
       let imageCacheStatusLoading = false;
       let imageCacheStatusTimer = null;
@@ -105,7 +100,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       const CATALOG_PAGE_SIZE = 36;
       const CLUB_PAGE_SIZE = 24;
       const SEARCH_TIMEOUT_MS = 10000;
-      const SPOTLIGHT_INTERVAL_MS = 8000;
       const IMAGE_CACHE_STATUS_INTERVAL_MS = 5000;
       const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
       const IMPORT_PREVIEW_PAGE_SIZE = 200;
@@ -181,8 +175,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         refreshScannerQueue: document.querySelector("#refreshScannerQueue"),
         collectionView: document.querySelector("#collectionView"),
         adminView: document.querySelector("#adminView"),
-        homeCollectionButton: document.querySelector("#homeCollectionButton"),
-        homeGrid: document.querySelector("#homeGrid"),
+        homeDate: document.querySelector("#homeDate"),
+        homeSections: document.querySelector("#homeSections"),
+        homeFeedback: document.querySelector("#homeFeedback"),
         homeEmpty: document.querySelector("#homeEmpty"),
         refreshClub: document.querySelector("#refreshClub"),
         clubModeTabs: document.querySelector("#clubModeTabs"),
@@ -265,7 +260,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogSection: document.querySelector("#catalogSection"),
         spotlight: document.querySelector("#spotlight"),
         spotlightStage: document.querySelector("#spotlightStage"),
-        spotlightToggle: document.querySelector("#spotlightToggle"),
         searchContext: document.querySelector("#searchContext"),
         searchContextText: document.querySelector("#searchContextText"),
         cancelSearch: document.querySelector("#cancelSearch"),
@@ -497,7 +491,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.sharedDetailDialog.addEventListener("click", (event) => {
         if (event.target === fields.sharedDetailDialog) closeSharedDetail();
       });
-      fields.homeCollectionButton.addEventListener("click", goToCollectionRoot);
       fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
       fields.inboxView.addEventListener("click", handleCurationClick);
       fields.inboxModeTabs.addEventListener("click", changeInboxMode);
@@ -523,7 +516,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.randomButton.addEventListener("click", openRandomDetail);
       fields.randomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.randomCatalogOnly));
       fields.mobileRandomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.mobileRandomCatalogOnly));
-      fields.spotlightToggle.addEventListener("click", toggleSpotlight);
       fields.cancelSearch.addEventListener("click", cancelExternalSearch);
       fields.reviewPrevious.addEventListener("click", previousWikiReview);
       fields.reviewNext.addEventListener("click", nextWikiReview);
@@ -605,9 +597,17 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const actions = {
           "open-detail": () => openDetailFromTrigger(target, id),
           "open-shared-detail": () => openSharedDetail(id),
+          "open-home-collection-detail": () => openHomeCollectionDetail(target.dataset.key || ""),
           "open-collection": () => openCollection(id),
           "toggle-collection-follow": () => toggleCollectionFollow(id),
           "add-collection-item": () => addCollectionItems([id]),
+          "add-home-collection-item": () => addHomeCollectionItem(target.dataset.collectionId || "", id, target),
+          "open-home-collection": () => goToHomeCollection(target.dataset.collectionId || id),
+          "home-section-action": () => activateHomeSection(target.dataset.kind || "", target.dataset.status || ""),
+          "home-empty-catalog": goToCollectionRoot,
+          "home-empty-import": goToImports,
+          "home-empty-club": goToClub,
+          "refresh-home": refreshEditorialHome,
           "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
           "focus-personal": editPersonalRecord,
           "edit-personal": editPersonalRecord,
@@ -656,6 +656,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           await loadCatalog();
         } catch (error) {
           console.error("[catalog-viewer] catalog load failed", error);
+          fields.homeView.setAttribute("aria-busy", "false");
           fields.empty.textContent = `No se pudo cargar el catalogo: ${error.message || error}`;
           fields.empty.hidden = false;
         }
@@ -1621,10 +1622,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       async function loadCatalog() {
-        const response = await apiFetch("/api/items");
+        fields.homeView.setAttribute("aria-busy", "true");
+        const response = await apiFetch(`/api/items?home_date=${encodeURIComponent(todayLocalDate())}`);
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
         items = payload.items || [];
+        editorialHome = normalizeEditorialHome(payload.home);
         sourceFiles = payload.sources || [];
         writeJsonPath = payload.write_json || "";
         privacyPreferences = { ...privacyPreferences, ...(payload.privacy || {}) };
@@ -1639,10 +1642,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         setupSelect(fields.status, "Estado", items.map((item) => item.status));
         setupSelect(fields.kind, "Tipo", items.map((item) => item.kind));
         setupSelect(fields.source, "Fuente", items.map((item) => item.source));
-        seedSpotlight();
         render();
-        renderSpotlight();
-        startSpotlight();
+        fields.homeView.setAttribute("aria-busy", "false");
         renderDatabaseMenu();
         syncCurationCounts();
         if (currentView === "inbox") await loadCurrentInbox();
@@ -1655,8 +1656,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function goHome() {
         closeDetail({ restoreFocus: false, updateHistory: false });
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
-        seedSpotlight();
-        renderSpotlight();
         render();
         showView("home", { updateHistory: false, focus: true });
         syncRoute(routeValuesForView("home"), "push");
@@ -1684,11 +1683,44 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         await loadCurrentInbox();
       }
 
+      async function goToImports() {
+        await setInboxMode("imports", { loadData: false });
+        showView("inbox");
+        await loadCurrentInbox();
+      }
+
       async function goToClub() {
         closeDetail({ restoreFocus: false, updateHistory: false });
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
         showView("club");
         await loadClub();
+      }
+
+      async function goToHomeCollection(collectionId) {
+        clubMode = "collections";
+        try {
+          localStorage.setItem("movie-inbox-club-mode", clubMode);
+        } catch (_error) {
+          // Navigation still works when browser storage is unavailable.
+        }
+        closeSharedDetail();
+        await goToClub();
+        if (collectionId) await openCollection(collectionId);
+      }
+
+      function activateHomeSection(kind, status = "") {
+        if (kind === "club") {
+          goToClub();
+          return;
+        }
+        resetCollectionFilters();
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
+        if (status && [...fields.status.options].some((option) => option.value === status)) {
+          fields.status.value = status;
+        }
+        render();
+        showView("catalog", { updateHistory: false, focus: true });
+        syncRoute(routeValuesForView("catalog"), "push");
       }
 
       function goToAdmin(options = {}) {
@@ -1718,9 +1750,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.collectionView.hidden = currentView !== "catalog";
         fields.inboxView.hidden = currentView !== "inbox";
         fields.adminView.hidden = currentView !== "admin";
-        spotlightViewPaused = currentView !== "home";
-        if (spotlightViewPaused) stopSpotlight();
-        else startSpotlight();
         syncImageCacheStatusPolling();
         setActiveNavigation(currentView);
         if (fields.systemMenu.open) fields.systemMenu.open = false;
@@ -2225,6 +2254,71 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         } finally {
           fields.collectionDetailPanel.setAttribute("aria-busy", "false");
           syncCollectionSelection();
+        }
+      }
+
+      function editorialEntryByKey(key) {
+        if (editorialHome.hero?.key === key) return editorialHome.hero;
+        for (const section of editorialHome.sections) {
+          const entry = (section.items || []).find((candidate) => candidate.key === key);
+          if (entry) return entry;
+        }
+        return null;
+      }
+
+      function openHomeCollectionDetail(key) {
+        const entry = editorialEntryByKey(key);
+        if (!entry || entry.origin?.kind !== "collection") return;
+        const item = entry.item || {};
+        const origin = entry.origin || {};
+        const title = displayTitle(item) || "Sin título";
+        const summary = item.wikipedia_extract || item.description || "";
+        fields.sharedDetailOwner.textContent = `De ${origin.collection_title || "una colección seguida"}`;
+        fields.sharedDetailBody.innerHTML = `
+          <section class="drawer-hero">${drawerPoster(item, title)}<div class="drawer-intro"><span class="drawer-kicker">Ficha del Club</span><h2>${escapeHtml(title)}</h2><div class="drawer-byline">${[item.year, firstListValue(item.directors), listText(item.genres, 2)].filter(Boolean).map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</div></div></section>
+          <section class="home-collection-origin"><span>${escapeHtml(entry.reason?.label || "Desde una colección seguida")}</span><p>${escapeHtml(entry.reason?.detail || "Todavía no forma parte de tu catálogo personal.")}</p></section>
+          <section class="drawer-synopsis"><h3>Sinopsis</h3><p>${escapeHtml(summary || "No hay una sinopsis disponible.")}</p></section>
+          <details class="drawer-accordion"><summary><span>Ficha técnica</span><small>Dirección, reparto y títulos</small></summary><div class="drawer-accordion-body">${factsPanel(item) || '<span class="status-line">Sin ficha enriquecida.</span>'}</div></details>
+          <div class="links shared-detail-links">${detailLinks(item)}</div>
+          <div class="home-collection-detail-actions">
+            <button type="button" data-click="add-home-collection-item" data-collection-id="${escapeAttr(origin.collection_id || "")}" data-id="${escapeAttr(origin.collection_item_id || "")}">Agregar a mi catálogo</button>
+            <button class="quiet-action" type="button" data-click="open-home-collection" data-collection-id="${escapeAttr(origin.collection_id || "")}">Ver colección completa</button>
+            <span data-home-collection-feedback role="status" aria-live="polite"></span>
+          </div>`;
+        fields.sharedDetailDialog.showModal();
+        fields.closeSharedDetail.focus();
+      }
+
+      async function addHomeCollectionItem(collectionId, itemId, button) {
+        if (!collectionId || !itemId || button.disabled) return;
+        const feedback = fields.sharedDetailBody.querySelector("[data-home-collection-feedback]");
+        button.disabled = true;
+        button.textContent = "Agregando…";
+        if (feedback) feedback.textContent = "Comprobando coincidencias antes de guardar.";
+        try {
+          const response = await apiFetch(`/api/collections/${encodeURIComponent(collectionId)}/add`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_ids: [itemId] })
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          const summary = payload.summary || {};
+          if (summary.added) {
+            button.textContent = "Agregada";
+            if (feedback) feedback.textContent = "La obra ya forma parte de tu catálogo personal.";
+            await loadCatalog();
+          } else if (summary.present) {
+            button.textContent = "Ya estaba agregada";
+            if (feedback) feedback.textContent = "Encontramos esta obra en tu catálogo.";
+          } else {
+            button.textContent = "Requiere revisión";
+            if (feedback) feedback.textContent = "Hay una posible coincidencia. Abrí la colección para compararla antes de agregar.";
+          }
+        } catch (error) {
+          button.disabled = false;
+          button.textContent = "Reintentar agregado";
+          if (feedback) feedback.textContent = "No pudimos completar la comprobación. Volvé a intentar.";
         }
       }
 
@@ -4209,11 +4303,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function detailContextForTrigger(target) {
-        if (target.closest("#homeGrid, #spotlightStage")) {
+        if (target.closest("#homeView")) {
           return {
             mode: "home",
             label: "Inicio",
-            ids: spotlightItems.map((item) => item.id)
+            ids: editorialPersonalIds()
           };
         }
         if (target.closest("#catalogMergeResults")) {
@@ -4330,92 +4424,156 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (requestedView === "admin") loadMembers();
       }
 
-      function seedSpotlight() {
-        const catalogItems = items.filter((item) => isInCatalog(item.en_catalogo));
-        const candidates = catalogItems.filter((item) => item.backdrop_image || item.page_image);
-        spotlightItems = shuffle(candidates.length ? candidates : catalogItems).slice(0, 8);
-        spotlightIndex = 0;
+      function normalizeEditorialHome(payload) {
+        if (!payload || typeof payload !== "object") {
+          return { generated_for: todayLocalDate(), hero: null, sections: [], warnings: [] };
+        }
+        return {
+          generated_for: String(payload.generated_for || todayLocalDate()),
+          hero: payload.hero && typeof payload.hero === "object" ? payload.hero : null,
+          sections: Array.isArray(payload.sections) ? payload.sections : [],
+          warnings: Array.isArray(payload.warnings) ? payload.warnings : []
+        };
       }
 
-      function renderSpotlight() {
-        const item = spotlightItems[spotlightIndex];
+      function renderEditorialHome() {
+        renderEditorialHero();
+        renderEditorialSections();
+        const hasSections = editorialHome.sections.some((section) => section.items?.length);
+        fields.homeEmpty.hidden = Boolean(editorialHome.hero || hasSections);
+        fields.homeSections.hidden = !hasSections;
+        fields.homeDate.dateTime = editorialHome.generated_for || "";
+        fields.homeDate.textContent = homeDateLabel(editorialHome.generated_for);
+        const collectionsUnavailable = editorialHome.warnings.includes("collections_unavailable");
+        fields.homeFeedback.hidden = !collectionsUnavailable;
+        fields.homeFeedback.innerHTML = collectionsUnavailable
+          ? `Las colecciones seguidas no respondieron. Tu programación personal sigue disponible. <button type="button" data-click="refresh-home">Reintentar</button>`
+          : "";
+      }
+
+      function renderEditorialHero() {
+        const entry = editorialHome.hero;
+        const item = entry?.item;
         if (!item) {
-          fields.spotlight.hidden = false;
           fields.spotlightStage.innerHTML = `<div class="spotlight-empty">
-            <strong>Tu pantalla está lista</strong>
-            <span>Marcá una película como “en catálogo” para sumarla al carrusel.</span>
+            <strong>La pantalla espera una obra disponible</strong>
+            <span>Marcá una entrada como “en catálogo” para encabezar la cartelera del día.</span>
           </div>`;
-          syncSpotlightControl();
           return;
         }
-        fields.spotlight.hidden = false;
         const title = displayTitle(item) || "Sin título";
+        const reason = entry.reason || {};
         const realBackdrop = String(item.backdrop_image || "").trim();
         const poster = String(item.page_image || "").trim();
         const imageUrl = realBackdrop || poster;
         const image = imageUrl
-          ? `<img class="spotlight-image ${realBackdrop ? "is-backdrop" : "is-poster-fallback"}" data-spotlight-image src="${escapeAttr(cachedImageSrc(imageUrl))}" alt="" loading="lazy" fetchpriority="high" decoding="async">`
+          ? `<img class="spotlight-image ${realBackdrop ? "is-backdrop" : "is-poster-fallback"}" data-spotlight-image src="${escapeAttr(cachedImageSrc(imageUrl))}" alt="" loading="eager" fetchpriority="high" decoding="async">`
           : "";
         const cover = !realBackdrop && poster
-          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(poster))}" alt="" loading="lazy" fetchpriority="high" decoding="async">`
+          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="eager" fetchpriority="high" decoding="async">`
           : "";
         fields.spotlightStage.innerHTML = `<article class="spotlight-slide poster-${posterVariant(item.id || title)}">
           ${image}${cover}
           <div class="spotlight-copy">
-            <span>${escapeHtml([item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Archivo nocturno")}</span>
+            <span class="spotlight-reason">${escapeHtml(reason.label || "Selección del día")}</span>
             <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(reason.detail || [item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Una obra de tu archivo personal.")}</p>
             <button class="spotlight-cta" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Ver ficha</button>
           </div>
-          <div class="spotlight-counter" aria-hidden="true">${String(spotlightIndex + 1).padStart(2, "0")} / ${String(spotlightItems.length).padStart(2, "0")}</div>
         </article>`;
       }
 
-      function advanceSpotlight() {
-        if (spotlightPaused || spotlightDetailPaused || spotlightItems.length < 2) return;
-        spotlightIndex = (spotlightIndex + 1) % spotlightItems.length;
-        renderSpotlight();
+      function renderEditorialSections() {
+        fields.homeSections.innerHTML = editorialHome.sections
+          .filter((section) => Array.isArray(section.items) && section.items.length)
+          .map((section, sectionIndex) => editorialSection(section, sectionIndex))
+          .join("");
       }
 
-      function startSpotlight() {
-        stopSpotlight();
-        if (
-          spotlightItems.length > 1
-          && !spotlightPaused
-          && !spotlightDetailPaused
-          && !spotlightViewPaused
-          && !document.hidden
-          && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ) {
-          spotlightTimer = window.setInterval(advanceSpotlight, SPOTLIGHT_INTERVAL_MS);
+      function editorialSection(section, sectionIndex) {
+        const action = section.action || {};
+        const actionButton = action.kind
+          ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-kind="${escapeAttr(action.kind)}" data-status="${escapeAttr(action.status || "")}">${escapeHtml(action.label || "Explorar")}</button>`
+          : "";
+        return `<section class="home-program" data-home-section="${escapeAttr(section.id || "editorial")}" aria-labelledby="home-section-${escapeAttr(section.id || sectionIndex)}">
+          <header class="home-program-heading">
+            <div>
+              <span class="section-kicker">${escapeHtml(section.eyebrow || "Programación personal")}</span>
+              <h2 id="home-section-${escapeAttr(section.id || sectionIndex)}">${escapeHtml(section.title || "Selección")}</h2>
+              <p>${escapeHtml(section.description || "")}</p>
+            </div>
+            ${actionButton}
+          </header>
+          <div class="home-program-grid">
+            ${section.items.map((entry, index) => editorialEntry(entry, index, sectionIndex === 0)).join("")}
+          </div>
+        </section>`;
+      }
+
+      function editorialEntry(entry, index, prioritize) {
+        const item = entry?.item || {};
+        const origin = entry?.origin || {};
+        const reason = entry?.reason || {};
+        const options = origin.kind === "collection"
+          ? {
+              action: "open-home-collection-detail",
+              actionId: origin.collection_item_id || item.id || "",
+              entryKey: entry.key || "",
+              collectionTitle: origin.collection_title || "Colección"
+            }
+          : {};
+        return `<div class="home-editorial-item">
+          ${card(item, index, prioritize, options)}
+          <div class="home-entry-reason" data-reason="${escapeAttr(reason.code || "editorial")}">
+            <strong>${escapeHtml(reason.label || "En tu programación")}</strong>
+            <span>${escapeHtml(reason.detail || "Seleccionada desde tu archivo personal.")}</span>
+          </div>
+        </div>`;
+      }
+
+      function editorialPersonalIds() {
+        const ids = [];
+        if (editorialHome.hero?.origin?.kind === "catalog" && editorialHome.hero.item?.id) {
+          ids.push(editorialHome.hero.item.id);
+        }
+        for (const section of editorialHome.sections) {
+          for (const entry of section.items || []) {
+            if (entry.origin?.kind === "catalog" && entry.item?.id) ids.push(entry.item.id);
+          }
+        }
+        return [...new Set(ids)];
+      }
+
+      function homeDateLabel(value) {
+        const parsed = new Date(`${value || todayLocalDate()}T12:00:00`);
+        if (Number.isNaN(parsed.getTime())) return "Hoy";
+        const label = new Intl.DateTimeFormat("es-AR", {
+          weekday: "long",
+          day: "numeric",
+          month: "long"
+        }).format(parsed);
+        return `Hoy · ${label}`;
+      }
+
+      async function refreshEditorialHome() {
+        fields.homeView.setAttribute("aria-busy", "true");
+        fields.homeFeedback.hidden = false;
+        fields.homeFeedback.textContent = "Actualizando la programación…";
+        try {
+          const response = await apiFetch(`/api/home?date=${encodeURIComponent(todayLocalDate())}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          editorialHome = normalizeEditorialHome(payload);
+          renderEditorialHome();
+        } catch (error) {
+          fields.homeFeedback.hidden = false;
+          fields.homeFeedback.innerHTML = `No pudimos actualizar la programación. <button type="button" data-click="refresh-home">Reintentar</button>`;
+        } finally {
+          fields.homeView.setAttribute("aria-busy", "false");
         }
       }
 
-      function stopSpotlight() {
-        window.clearInterval(spotlightTimer);
-        spotlightTimer = null;
-      }
-
-      function syncSpotlightControl() {
-        const hasItems = spotlightItems.length > 0;
-        fields.spotlightToggle.disabled = spotlightDetailPaused || !hasItems;
-        fields.spotlightToggle.textContent = !hasItems
-          ? "Sin títulos"
-          : spotlightDetailPaused
-          ? "Ficha abierta"
-          : spotlightPaused ? "Reanudar" : "Pausar";
-        fields.spotlightToggle.setAttribute("aria-pressed", String(spotlightPaused));
-      }
-
-      function toggleSpotlight() {
-        spotlightPaused = !spotlightPaused;
-        syncSpotlightControl();
-        if (spotlightPaused) stopSpotlight();
-        else startSpotlight();
-      }
-
       function handleVisibilityChange() {
-        if (document.hidden) stopSpotlight();
-        else startSpotlight();
         syncImageCacheStatusPolling();
       }
 
@@ -4845,7 +5003,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           .join("");
         fields.catalogLoadMore.hidden = shown.length >= filtered.length;
         fields.catalogLoadMore.textContent = `Cargar más (${filtered.length - shown.length})`;
-        renderHomeShelf();
+        renderEditorialHome();
         renderActiveFilters();
         syncRandomControl();
         renderDetail();
@@ -4865,14 +5023,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (hasFilters) return `${count} ${noun} con los filtros actuales`;
         if (randomOrder.length) return `${count} ${noun} en orden aleatorio`;
         return `${count} ${noun} en la estantería`;
-      }
-
-      function renderHomeShelf() {
-        const selection = spotlightItems.slice(0, 6);
-        fields.homeGrid.innerHTML = selection
-          .map((item, index) => card(item, index, currentView === "home"))
-          .join("");
-        fields.homeEmpty.hidden = selection.length > 0;
       }
 
       function showMoreCatalogItems() {
@@ -4912,19 +5062,26 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return shuffled;
       }
 
-      function card(item, index = 0, prioritize = false) {
+      function card(item, index = 0, prioritize = false, options = {}) {
         const shownTitle = displayTitle(item);
         const title = shownTitle || "Sin título";
         const titleClass = titleSizeClass(title);
         const rating = normalizeRating(item.rating);
         const watched = item.status === "watched";
         const catalogued = isInCatalog(item.en_catalogo);
+        const fromCollection = options.action === "open-home-collection-detail";
+        const collectionTitle = String(options.collectionTitle || "Colección");
+        const action = options.action || "open-detail";
+        const actionId = options.actionId || item.id || "";
+        const entryKey = options.entryKey || "";
         const duplicate = Number(item._duplicate_count || 0) > 0
           ? `<span class="dvd-sticker">Duplicada +${escapeHtml(item._duplicate_count)}</span>`
           : "";
-        const accessibleStatus = `${watched ? "vista" : "pendiente"}, ${catalogued ? "en catálogo" : "fuera de catálogo"}, ${rating} puntos`;
+        const accessibleStatus = fromCollection
+          ? `en la colección ${collectionTitle}, disponible para agregar`
+          : `${watched ? "vista" : "pendiente"}, ${catalogued ? "en catálogo" : "fuera de catálogo"}, ${rating} puntos`;
         const backMeta = [item.year, firstListValue(item.directors)].filter(Boolean).join(" · ") || "Ficha sin completar";
-        return `<article class="card dvd-card" data-click="open-detail" data-id="${escapeAttr(item.id)}">
+        return `<article class="card dvd-card${fromCollection ? " is-collection-entry" : ""}" data-click="${escapeAttr(action)}" data-id="${escapeAttr(actionId)}" data-key="${escapeAttr(entryKey)}">
           <div class="dvd-flipper" aria-hidden="true">
             <div class="dvd-face dvd-front">
               <div class="dvd-case">
@@ -4940,8 +5097,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
                     </div>
                     <h2 class="${titleClass}">${escapeHtml(title)}</h2>
                     <div class="dvd-front-statuses">
-                      <span class="dvd-front-status ${catalogued ? "catalogued" : "muted"}">${catalogued ? "Catálogo" : "No catálogo"}</span>
-                      <span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>
+                      ${fromCollection
+                        ? `<span class="dvd-front-status collection">Colección</span><span class="dvd-front-status pending">Por agregar</span>`
+                        : `<span class="dvd-front-status ${catalogued ? "catalogued" : "muted"}">${catalogued ? "Catálogo" : "No catálogo"}</span><span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>`}
                     </div>
                   </div>
                 </div>
@@ -4958,9 +5116,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
                   <p class="dvd-back-summary">${escapeHtml(dvdBackSummary(item))}</p>
                   <p class="dvd-back-meta">${escapeHtml(backMeta)}</p>
                   <div class="dvd-back-statuses">
-                    <span class="${watched ? "active" : ""}">${watched ? "✓ Vista" : "Pendiente"}</span>
-                    <span class="${catalogued ? "active" : ""}">${catalogued ? "En catálogo" : "Fuera"}</span>
-                    <strong>${rating ? `${rating} pts` : "0 pts · Sin puntuar"}</strong>
+                    ${fromCollection
+                      ? `<span class="active">En ${escapeHtml(collectionTitle)}</span><span>Fuera de tu catálogo</span><strong>Lista para revisar</strong>`
+                      : `<span class="${watched ? "active" : ""}">${watched ? "✓ Vista" : "Pendiente"}</span><span class="${catalogued ? "active" : ""}">${catalogued ? "En catálogo" : "Fuera"}</span><strong>${rating ? `${rating} pts` : "0 pts · Sin puntuar"}</strong>`}
                   </div>
                   <span class="dvd-back-hint">Click para abrir la ficha →</span>
                   <div class="dvd-barcode"><span></span><small>${escapeHtml(String(item.id || "movie-inbox").slice(0, 18))}</small></div>
@@ -4968,12 +5126,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               </div>
             </div>
           </div>
-          ${openCardButton(item, title, accessibleStatus)}
+          ${openCardButton(item, title, accessibleStatus, { action, actionId, entryKey })}
         </article>`;
       }
 
-      function openCardButton(item, title, accessibleStatus) {
-        return `<button class="dvd-open-surface" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}" aria-haspopup="dialog" aria-label="Abrir ficha de ${escapeAttr(title)}: ${escapeAttr(accessibleStatus)}"></button>`;
+      function openCardButton(item, title, accessibleStatus, options = {}) {
+        const action = options.action || "open-detail";
+        const actionId = options.actionId || item.id || "";
+        return `<button class="dvd-open-surface" type="button" data-click="${escapeAttr(action)}" data-id="${escapeAttr(actionId)}" data-key="${escapeAttr(options.entryKey || "")}" aria-haspopup="dialog" aria-label="Abrir ficha de ${escapeAttr(title)}: ${escapeAttr(accessibleStatus)}"></button>`;
       }
 
       function dvdBackSummary(item) {
@@ -5189,9 +5349,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         selectedDetailId = id;
         detailPersonalEditing = false;
         detailDirtyScopes.clear();
-        spotlightDetailPaused = true;
-        stopSpotlight();
-        syncSpotlightControl();
         clearDetailFeedback();
         renderDetail({ force: true });
         fields.detailBody.scrollTop = 0;
@@ -5216,9 +5373,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         detailDirtyScopes.clear();
         pendingDetailTransition = null;
         clearDetailFeedback();
-        spotlightDetailPaused = false;
-        syncSpotlightControl();
-        startSpotlight();
         if (updateHistory) syncRoute({ movie: "" }, "replace");
         const currentCard = [...document.querySelectorAll(".dvd-card")]
           .find((card) => card.dataset.id === detailReturnCardId);
