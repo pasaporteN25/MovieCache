@@ -318,6 +318,7 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "watched_at": normalize_date(result.get("watched_at")),
         "rating": normalize_rating(result.get("rating")),
         "year": str(result.get("year") or ""),
+        "release_dates": result.get("release_dates") if isinstance(result.get("release_dates"), list) else [],
         "description": str(result.get("description") or ""),
         **source_links,
         "wikipedia_title": str(result.get("wikipedia_title") or (title if source == "wikipedia" else "")),

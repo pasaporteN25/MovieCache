@@ -1,0 +1,234 @@
+"""Catalog search and comparison ranking shared by HTTP clients."""
+
+from __future__ import annotations
+
+import re
+import unicodedata
+from difflib import SequenceMatcher
+from typing import Any, Mapping, Sequence
+
+from movie_inbox.domain.catalog import normalize_local_files, normalize_tags
+from movie_inbox.domain.matching import decide_match
+
+
+SEARCH_RESULT_LIMIT = 60
+_YEAR_PATTERN = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b")
+
+
+def search_catalog_items(
+    items: Sequence[Mapping[str, Any]],
+    query: str,
+    limit: int = SEARCH_RESULT_LIMIT,
+) -> list[dict[str, Any]]:
+    """Rank a personal catalog without applying the viewer's active filters."""
+    normalized_query = _search_key(query)
+    if len(normalized_query) < 2:
+        return []
+    query_terms = normalized_query.split()
+    requested_year = _query_year(query)
+    ranked: list[tuple[float, str, dict[str, Any]]] = []
+    for item in items:
+        score, matched_field, matched_value = _catalog_search_score(
+            item,
+            normalized_query,
+            query_terms,
+            requested_year,
+        )
+        if score < 28:
+            continue
+        payload = dict(item)
+        payload["_search"] = {
+            "score": round(score, 1),
+            "matched_field": matched_field,
+            "matched_value": matched_value,
+            "reason": _search_reason(score, matched_field),
+        }
+        ranked.append((score, str(item.get("id") or ""), payload))
+    ranked.sort(key=lambda row: (-row[0], row[1]))
+    return [row[2] for row in ranked[: max(1, limit)]]
+
+
+def rank_catalog_candidates(
+    items: Sequence[Mapping[str, Any]],
+    candidate: Mapping[str, Any],
+    limit: int = SEARCH_RESULT_LIMIT,
+) -> list[dict[str, Any]]:
+    """Rank local candidates using the same conservative merge evidence."""
+    query = _candidate_query(candidate)
+    broad_candidates = search_catalog_items(items, query, limit=max(limit * 3, limit))
+    by_id = {str(row.get("id") or ""): row for row in broad_candidates}
+    for item in items:
+        decision = decide_match(item, candidate)
+        if decision.score <= 0:
+            continue
+        item_id = str(item.get("id") or "")
+        payload = by_id.setdefault(item_id, dict(item))
+        payload["_match"] = decision.to_dict()
+
+    ranked: list[tuple[int, float, float, str, dict[str, Any]]] = []
+    for item_id, payload in by_id.items():
+        decision = payload.get("_match")
+        if not isinstance(decision, dict):
+            decision = decide_match(payload, candidate).to_dict()
+            payload["_match"] = decision
+        search_score = float((payload.get("_search") or {}).get("score") or 0)
+        match_score = float(decision.get("score") or 0)
+        if search_score < 28 and match_score <= 0:
+            continue
+        payload["_search"] = {
+            **(payload.get("_search") if isinstance(payload.get("_search"), dict) else {}),
+            "score": round(max(search_score, match_score * 100), 1),
+            "reason": str(decision.get("reason") or "insufficient_evidence"),
+            "accepted": bool(decision.get("accepted")),
+            "evidence": decision.get("evidence") if isinstance(decision.get("evidence"), dict) else {},
+        }
+        ranked.append(
+            (
+                1 if decision.get("accepted") else 0,
+                match_score,
+                search_score,
+                item_id,
+                payload,
+            )
+        )
+    ranked.sort(key=lambda row: (-row[0], -row[1], -row[2], row[3]))
+    return [row[4] for row in ranked[: max(1, limit)]]
+
+
+def group_external_results(results: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    groups = {"wikipedia": [], "imdb": [], "filmaffinity": []}
+    for result in results:
+        source = str(result.get("source") or "").casefold()
+        if source in groups:
+            groups[source].append(dict(result))
+    return groups
+
+
+def _catalog_search_score(
+    item: Mapping[str, Any],
+    query: str,
+    query_terms: list[str],
+    requested_year: str,
+) -> tuple[float, str, str]:
+    best_score = 0.0
+    best_field = ""
+    best_value = ""
+    for field, value, weight in _search_values(item):
+        normalized_value = _search_key(value)
+        if not normalized_value:
+            continue
+        score = _value_score(normalized_value, query, query_terms) * weight
+        if score > best_score:
+            best_score, best_field, best_value = score, field, value
+
+    item_year = str(item.get("year") or "").strip()
+    if requested_year:
+        if item_year == requested_year:
+            best_score += 12
+        elif item_year:
+            best_score -= 18
+    return max(0.0, min(best_score, 100.0)), best_field, best_value
+
+
+def _search_values(item: Mapping[str, Any]) -> list[tuple[str, str, float]]:
+    local_values = [
+        str(value or "").strip()
+        for local_file in normalize_local_files(item.get("local_files"))
+        for value in (local_file.get("name"), local_file.get("path"), local_file.get("relative_path"))
+        if str(value or "").strip()
+    ]
+    local_values.extend(
+        str(item.get(field) or "").strip()
+        for field in ("local_name", "local_path")
+        if str(item.get(field) or "").strip()
+    )
+    fields = (
+        ("title", item.get("title"), 1.0),
+        ("original_title", item.get("original_title"), 1.0),
+        ("spanish_title", item.get("spanish_title"), 1.0),
+        ("english_title", item.get("english_title"), 1.0),
+        ("wikipedia_title", item.get("wikipedia_title"), 0.98),
+        ("alternative_titles", item.get("alternative_titles"), 0.96),
+        ("local_file", local_values, 0.9),
+        ("external_id", item.get("wikidata_id"), 1.0),
+        ("external_id", item.get("tmdb_id"), 1.0),
+        ("external_link", item.get("url"), 0.92),
+        ("external_link", item.get("wikipedia_url"), 0.92),
+        ("external_link", item.get("imdb_url"), 0.92),
+        ("external_link", item.get("filmaffinity_url"), 0.92),
+        ("director", item.get("directors"), 0.72),
+        ("genre", item.get("genres"), 0.68),
+        ("writer", item.get("writers"), 0.65),
+        ("cast", item.get("cast"), 0.62),
+        ("tag", item.get("tags"), 0.62),
+        ("description", item.get("description"), 0.45),
+        ("notes", item.get("notes"), 0.45),
+        ("review", item.get("review"), 0.4),
+    )
+    values: list[tuple[str, str, float]] = []
+    seen: set[tuple[str, str]] = set()
+    for field, raw_value, weight in fields:
+        if isinstance(raw_value, (list, tuple, set)):
+            rows = [str(value).strip() for value in raw_value]
+        else:
+            rows = [str(raw_value or "").strip()]
+        for value in rows:
+            key = (field, value.casefold())
+            if value and key not in seen:
+                seen.add(key)
+                values.append((field, value, weight))
+    return values
+
+
+def _value_score(value: str, query: str, query_terms: list[str]) -> float:
+    if value == query:
+        return 100.0
+    if value.startswith(query):
+        return 88.0
+    if query in value:
+        return 82.0
+    value_terms = value.split()
+    covered = sum(1 for term in query_terms if _term_matches(term, value_terms))
+    coverage = covered / max(1, len(query_terms))
+    if coverage == 1:
+        return 70.0 + (12.0 * min(1.0, len(query) / max(1, len(value))))
+    ratio = SequenceMatcher(None, query, value).ratio()
+    return max(coverage * 62.0, ratio * 58.0)
+
+
+def _term_matches(term: str, values: list[str]) -> bool:
+    return any(
+        term in value
+        or value in term
+        or (len(term) >= 5 and SequenceMatcher(None, term, value).ratio() >= 0.82)
+        for value in values
+    )
+
+
+def _candidate_query(candidate: Mapping[str, Any]) -> str:
+    titles = [
+        str(candidate.get(field) or "").strip()
+        for field in ("title", "original_title", "spanish_title", "english_title")
+    ]
+    titles.extend(normalize_tags(candidate.get("alternative_titles")))
+    title = next((value for value in titles if value), "")
+    return " ".join(value for value in (title, str(candidate.get("year") or "").strip()) if value)
+
+
+def _query_year(value: str) -> str:
+    match = _YEAR_PATTERN.search(str(value or ""))
+    return match.group(1) if match else ""
+
+
+def _search_key(value: Any) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "").casefold())
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
+
+
+def _search_reason(score: float, field: str) -> str:
+    if score >= 95:
+        return f"exact_{field or 'text'}"
+    if score >= 70:
+        return f"strong_{field or 'text'}"
+    return f"similar_{field or 'text'}"

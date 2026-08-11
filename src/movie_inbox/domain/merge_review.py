@@ -17,6 +17,7 @@ from movie_inbox.domain.catalog import (
 )
 from movie_inbox.domain.curation import curation_timestamp, normalize_duplicate_decisions
 from movie_inbox.domain.metadata import merge_local_files, normalize_locked_fields, normalize_local_files
+from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ MERGE_FIELDS = (
     MergeField("alternative_titles", "Titulos alternativos", "identity", "list"),
     MergeField("kind", "Tipo de obra", "identity"),
     MergeField("year", "Ano", "identity"),
+    MergeField("release_dates", "Fechas de estreno", "metadata", "release_dates"),
     MergeField("description", "Descripcion", "metadata"),
     MergeField("wikipedia_extract", "Extracto de Wikipedia", "metadata"),
     MergeField("genres", "Generos", "metadata", "list"),
@@ -226,7 +228,7 @@ def apply_reviewed_merge(
 def _allowed_choices(definition: MergeField) -> list[str]:
     if definition.strategy in FORCED_COMBINE_STRATEGIES:
         return ["combine"]
-    if definition.strategy == "list":
+    if definition.strategy in {"list", "release_dates"}:
         return ["left", "combine", "right"]
     return ["left", "right"]
 
@@ -260,7 +262,7 @@ def _default_choice(
         return "right"
     if protected:
         return ""
-    if definition.strategy == "list":
+    if definition.strategy in {"list", "release_dates"}:
         return "combine"
     return survivor_side
 
@@ -276,6 +278,8 @@ def _selected_value(strategy: str, choice: str, left: Any, right: Any) -> Any:
         return merge_lists(_string_list(left), _string_list(right))
     if strategy == "local_files":
         return merge_local_files(normalize_local_files(left), normalize_local_files(right))
+    if strategy == "release_dates":
+        return merge_release_dates(left, right)
     if strategy == "boolean_or":
         return bool(left or right)
     raise MergeReviewError("Field cannot be combined")
@@ -288,6 +292,8 @@ def _equivalent(definition: MergeField, left: Any, right: Any) -> bool:
         }
     if definition.strategy == "local_files":
         return _local_file_keys(left) == _local_file_keys(right)
+    if definition.strategy == "release_dates":
+        return normalize_release_dates(left) == normalize_release_dates(right)
     return left == right
 
 

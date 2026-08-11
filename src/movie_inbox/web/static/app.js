@@ -67,6 +67,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let selectedLibraryId = "";
       let librariesLoading = false;
       let editingLibraryId = "";
+      let browsedLibraryPath = "";
+      let parentLibraryPath = "";
       let activeLibraryRunId = "";
       let libraryRunPollTimer = null;
       let scannerQueue = [];
@@ -83,6 +85,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let writeJsonPath = "";
       let currentView = "home";
       let manualVisibleCount = 6;
+      let manualSourceVisibleCounts = {};
       let catalogMergeVisibleCount = 6;
       let externalSourcesLastUsed = [];
       let externalSourcesAttempted = [];
@@ -299,6 +302,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         manualSearchResults: document.querySelector("#manualSearchResults"),
         externalSearchSection: document.querySelector("#externalSearchSection"),
         catalogMergeSection: document.querySelector("#catalogMergeSection"),
+        catalogMergeKicker: document.querySelector("#catalogMergeKicker"),
         catalogMergeTitle: document.querySelector("#catalogMergeTitle"),
         catalogMergeStatus: document.querySelector("#catalogMergeStatus"),
         catalogMergeResults: document.querySelector("#catalogMergeResults"),
@@ -317,6 +321,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         libraryName: document.querySelector("#libraryName"),
         libraryRootPath: document.querySelector("#libraryRootPath"),
         libraryRootHint: document.querySelector("#libraryRootHint"),
+        browseLibraryPath: document.querySelector("#browseLibraryPath"),
+        checkLibraryPath: document.querySelector("#checkLibraryPath"),
+        libraryPathFeedback: document.querySelector("#libraryPathFeedback"),
+        libraryPathBrowser: document.querySelector("#libraryPathBrowser"),
+        libraryPathBrowserTitle: document.querySelector("#libraryPathBrowserTitle"),
+        libraryPathBrowserCurrent: document.querySelector("#libraryPathBrowserCurrent"),
+        libraryPathParent: document.querySelector("#libraryPathParent"),
+        useLibraryPath: document.querySelector("#useLibraryPath"),
+        libraryPathDirectories: document.querySelector("#libraryPathDirectories"),
         librarySchedule: document.querySelector("#librarySchedule"),
         libraryMissingRatio: document.querySelector("#libraryMissingRatio"),
         libraryDialogFeedback: document.querySelector("#libraryDialogFeedback"),
@@ -426,6 +439,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.catalogExportActions.addEventListener("click", downloadCatalogExport);
       fields.libraryForm.addEventListener("submit", saveManagedLibrary);
       fields.libraryList.addEventListener("click", handleLibraryAction);
+      fields.browseLibraryPath.addEventListener("click", () => browseManagedLibraryPath(fields.libraryRootPath.value));
+      fields.checkLibraryPath.addEventListener("click", checkManagedLibraryPath);
+      fields.libraryPathParent.addEventListener("click", () => browseManagedLibraryPath(parentLibraryPath));
+      fields.useLibraryPath.addEventListener("click", useBrowsedLibraryPath);
+      fields.libraryPathDirectories.addEventListener("click", handleLibraryPathDirectory);
       fields.closeLibraryDialog.addEventListener("click", closeLibraryDialog);
       fields.cancelLibraryDialog.addEventListener("click", closeLibraryDialog);
       fields.libraryDialog.addEventListener("cancel", (event) => {
@@ -621,7 +639,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "detail-next": () => navigateDetail(1),
           "detail-random": openAnotherRandomDetail,
           "retry-merge-comparison": retryMergeComparison,
-          "show-more-manual": showMoreManualResults,
+          "show-more-manual": () => showMoreManualResults(target.dataset.source || ""),
           "show-more-catalog": showMoreCatalogResults,
           "merge-result": () => mergeSearchResult(index, id),
           "add-result": () => addSearchResult(index),
@@ -1105,11 +1123,18 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function openLibraryDialog(library = null) {
         editingLibraryId = library?.id || "";
+        browsedLibraryPath = "";
+        parentLibraryPath = "";
         fields.libraryForm.reset();
         fields.libraryDialogTitle.textContent = library ? "Editar biblioteca" : "Agregar biblioteca";
         fields.libraryName.value = library?.name || "";
         fields.libraryRootPath.value = library?.root_path || "";
         fields.libraryRootPath.disabled = Boolean(library);
+        fields.browseLibraryPath.disabled = Boolean(library);
+        fields.checkLibraryPath.disabled = Boolean(library);
+        fields.libraryPathBrowser.hidden = true;
+        fields.libraryPathDirectories.innerHTML = "";
+        setLibraryPathFeedback("");
         fields.librarySchedule.value = library?.schedule || "manual";
         fields.libraryMissingRatio.value = Math.round(Number(library?.max_missing_ratio ?? 0.5) * 100);
         fields.libraryRootHint.textContent = library
@@ -1124,8 +1149,93 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.libraryDialog.close();
         fields.libraryForm.reset();
         fields.libraryRootPath.disabled = false;
+        fields.browseLibraryPath.disabled = false;
+        fields.checkLibraryPath.disabled = false;
+        fields.libraryPathBrowser.hidden = true;
+        fields.libraryPathDirectories.innerHTML = "";
+        browsedLibraryPath = "";
+        parentLibraryPath = "";
         editingLibraryId = "";
+        setLibraryPathFeedback("");
         setInlineFeedback(fields.libraryDialogFeedback, "");
+      }
+
+      async function browseManagedLibraryPath(path = "") {
+        fields.browseLibraryPath.disabled = true;
+        fields.libraryPathBrowser.hidden = false;
+        fields.libraryPathDirectories.innerHTML = `<div class="library-path-empty">Leyendo carpetas permitidas…</div>`;
+        setLibraryPathFeedback("");
+        try {
+          const response = await apiFetch(`/api/library-paths?path=${encodeURIComponent(String(path || "").trim())}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          browsedLibraryPath = payload.path || "";
+          parentLibraryPath = payload.parent || "";
+          fields.libraryPathBrowserTitle.textContent = browsedLibraryPath ? "Carpetas disponibles" : "Raíces permitidas";
+          fields.libraryPathBrowserCurrent.textContent = browsedLibraryPath || "Elegí un disco o volumen configurado";
+          fields.libraryPathParent.hidden = !parentLibraryPath;
+          fields.useLibraryPath.hidden = !browsedLibraryPath;
+          const directories = payload.directories || [];
+          fields.libraryPathDirectories.innerHTML = directories.length
+            ? directories.map((directory) => `<button class="library-path-directory" type="button" data-library-path="${escapeAttr(directory.path || "")}" ${directory.readable === false ? "disabled" : ""}>
+                <span aria-hidden="true">▸</span>
+                <strong>${escapeHtml(directory.name || directory.path || "Carpeta")}</strong>
+                <small>${directory.readable === false ? "No disponible" : escapeHtml(directory.path || "")}</small>
+              </button>`).join("")
+            : `<div class="library-path-empty">Esta carpeta no contiene otras carpetas visibles. Podés usarla tal como está.</div>`;
+        } catch (error) {
+          browsedLibraryPath = "";
+          parentLibraryPath = "";
+          fields.libraryPathParent.hidden = true;
+          fields.useLibraryPath.hidden = true;
+          fields.libraryPathDirectories.innerHTML = `<div class="library-path-empty is-error">${escapeHtml(libraryErrorMessage(error.message))}</div>`;
+        } finally {
+          fields.browseLibraryPath.disabled = false;
+        }
+      }
+
+      function handleLibraryPathDirectory(event) {
+        const button = event.target.closest("[data-library-path]");
+        if (!button || button.disabled) return;
+        browseManagedLibraryPath(button.dataset.libraryPath || "");
+      }
+
+      function useBrowsedLibraryPath() {
+        if (!browsedLibraryPath) return;
+        fields.libraryRootPath.value = browsedLibraryPath;
+        setLibraryPathFeedback("Ruta seleccionada. Comprobala antes de guardar.");
+        fields.libraryRootPath.focus();
+      }
+
+      async function checkManagedLibraryPath() {
+        const path = fields.libraryRootPath.value.trim();
+        if (!path) {
+          setLibraryPathFeedback("Elegí o escribí una ruta antes de comprobarla.", "error");
+          fields.libraryRootPath.focus();
+          return;
+        }
+        fields.checkLibraryPath.disabled = true;
+        setLibraryPathFeedback("Comprobando acceso de lectura…");
+        try {
+          const response = await apiFetch("/api/library-paths/check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path })
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          fields.libraryRootPath.value = payload.path || path;
+          setLibraryPathFeedback(`Ruta disponible. Se encontraron ${payload.directory_count || 0} carpetas dentro.`, "success");
+        } catch (error) {
+          setLibraryPathFeedback(libraryErrorMessage(error.message), "error");
+        } finally {
+          fields.checkLibraryPath.disabled = false;
+        }
+      }
+
+      function setLibraryPathFeedback(message, state = "") {
+        fields.libraryPathFeedback.textContent = message;
+        fields.libraryPathFeedback.dataset.state = state;
       }
 
       async function saveManagedLibrary(event) {
@@ -2424,7 +2534,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function renderScannerQueue() {
-        fields.scannerQueueMeta.textContent = `${scannerQueue.length} ${scannerQueue.length === 1 ? "archivo" : "archivos"}`;
+        fields.scannerQueueMeta.textContent = `${scannerQueue.length} ${scannerQueue.length === 1 ? "caso" : "casos"}`;
         if (!scannerQueue.length) {
           fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Scanner al día</strong><p>No quedan identidades físicas por confirmar.</p></div>`;
           fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Sin decisiones pendientes</strong><p>Los próximos casos aparecerán después de un recorrido aplicado.</p></div>`;
@@ -2433,11 +2543,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.scannerQueue.innerHTML = scannerQueue.map((item) => {
           const active = item.id === selectedScannerItemId;
           const label = item.state === "review" ? "Comparar" : "Nueva";
+          const partLabel = Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "";
           return `<button class="scanner-queue-item${active ? " active" : ""}" type="button" data-scanner-item="${escapeAttr(item.id)}" aria-pressed="${active}">
             <span class="scanner-queue-state">${label}</span>
             <strong>${escapeHtml(item.detected_title || item.name || "Sin título")}</strong>
             <span>${escapeHtml([item.detected_year, importKindLabel(item.detected_kind)].filter(Boolean).join(" · ") || "Identidad incompleta")}</span>
-            <small>${escapeHtml(item.library_name || "Biblioteca")}</small>
+            <small>${escapeHtml([item.library_name || "Biblioteca", partLabel].filter(Boolean).join(" · "))}</small>
           </button>`;
         }).join("");
         renderScannerQueueDetail();
@@ -2470,25 +2581,35 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const item = scannerQueue.find((entry) => entry.id === selectedScannerItemId);
         if (!item) return;
         const candidates = item.candidates || [];
+        const parts = Array.isArray(item.parts) && item.parts.length ? item.parts : [{
+          name: item.name,
+          relative_path: item.relative_path,
+          size_bytes: item.size_bytes,
+          part: ""
+        }];
+        const multipart = parts.length > 1;
+        const totalSize = parts.reduce((total, part) => total + Number(part.size_bytes || 0), 0);
+        const actionObject = multipart ? `${parts.length} partes` : "archivo";
         fields.scannerQueueDetail.innerHTML = `
           <header class="scanner-case-heading">
             <div>
-              <span class="section-kicker">${item.state === "review" ? "Coincidencia ambigua" : "Archivo nuevo"}</span>
+              <span class="section-kicker">${multipart ? "Obra multiparte" : item.state === "review" ? "Coincidencia ambigua" : "Archivo nuevo"}</span>
               <h3>${escapeHtml(item.detected_title || item.name || "Sin título")}</h3>
-              <p>${escapeHtml(item.relative_path || item.name || "")}</p>
+              <p>${multipart ? `${parts.length} archivos serán tratados como una sola obra.` : escapeHtml(item.relative_path || item.name || "")}</p>
             </div>
             <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} ${candidates.length === 1 ? "candidata" : "candidatas"}` : "Completar identidad"}</span>
           </header>
           <div class="scanner-scope-note" role="note">
             <strong>Vínculo físico</strong>
-            <span>Confirmar identifica este archivo dentro del inventario compartido. No agrega la obra a tu catálogo personal ni cambia estados, puntuaciones o reviews.</span>
+            <span>Confirmar identifica ${multipart ? "estas partes" : "este archivo"} dentro del inventario compartido. No agrega la obra a tu catálogo personal ni cambia estados, puntuaciones o reviews.</span>
           </div>
           <dl class="scanner-file-facts">
             <div><dt>Biblioteca</dt><dd>${escapeHtml(item.library_name || "Biblioteca")}</dd></div>
             <div><dt>Año detectado</dt><dd>${escapeHtml(item.detected_year || "Sin año")}</dd></div>
             <div><dt>Tipo detectado</dt><dd>${escapeHtml(importKindLabel(item.detected_kind) || "Película")}</dd></div>
-            <div><dt>Tamaño</dt><dd>${escapeHtml(formatImportBytes(item.size_bytes))}</dd></div>
+            <div><dt>${multipart ? "Archivos y tamaño" : "Tamaño"}</dt><dd>${multipart ? `${parts.length} · ` : ""}${escapeHtml(formatImportBytes(totalSize))}</dd></div>
           </dl>
+          ${multipart ? `<section class="scanner-parts" aria-label="Partes detectadas"><strong>Archivos agrupados</strong><div>${parts.map((part, index) => `<div><span>${escapeHtml(part.part ? `Parte ${part.part}` : `Archivo ${index + 1}`)}</span><code>${escapeHtml(part.relative_path || part.name || "")}</code><small>${escapeHtml(formatImportBytes(part.size_bytes))}</small></div>`).join("")}</div></section>` : ""}
           ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${candidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}</section>` : ""}
           <section class="scanner-confirm-detected">
             <div><h4>${candidates.length ? "Vincular con otra identidad" : "Completar identidad detectada"}</h4><p>Usá esta opción cuando ninguna candidata corresponda. El año es obligatorio para evitar falsas coincidencias.</p></div>
@@ -2496,12 +2617,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <label><span>Título</span><input name="title" value="${escapeAttr(item.detected_title || "")}" maxlength="240" required></label>
               <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(19|20)[0-9]{2}" maxlength="4" required></label>
               <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === item.detected_kind ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
-              <button class="action-primary" type="submit" data-scanner-review="confirm-detected" data-file-id="${escapeAttr(item.id)}">Vincular identidad manual</button>
+              <button class="action-primary" type="submit" data-scanner-review="confirm-detected" data-file-id="${escapeAttr(item.id)}">Vincular ${actionObject}</button>
             </form>
           </section>
           <footer class="scanner-case-actions">
-            <div><strong>¿No pertenece al inventario?</strong><span>Omitir lo retira de esta cola mientras el archivo no cambie.</span></div>
-            <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Omitir este archivo</button>
+            <div><strong>¿No pertenece al inventario?</strong><span>Omitir retira ${multipart ? "todas las partes" : "el archivo"} de esta cola mientras no cambien.</span></div>
+            <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Omitir ${actionObject}</button>
             <span id="scannerReviewFeedback" role="status" aria-live="polite"></span>
           </footer>`;
       }
@@ -2517,7 +2638,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <strong>${escapeHtml(title)}</strong>
               <span>${escapeHtml(scannerCandidateReason(candidate.reason))} · ${escapeHtml(formatScannerScore(candidate.score))}</span>
             </div>
-            <button class="action-primary" type="button" data-scanner-review="confirm-candidate" data-candidate-key="${escapeAttr(candidate.key || "")}" data-file-id="${escapeAttr(selectedScannerItemId)}">Vincular archivo</button>
+            <button class="action-primary" type="button" data-scanner-review="confirm-candidate" data-candidate-key="${escapeAttr(candidate.key || "")}" data-file-id="${escapeAttr(selectedScannerItemId)}">Vincular ${Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "archivo"}</button>
           </header>
           <div class="scanner-field-comparison" role="table" aria-label="Comparación con ${escapeAttr(title)}">
             <div class="scanner-comparison-head" role="row"><span role="columnheader">Campo</span><span role="columnheader">Archivo</span><span role="columnheader">Obra candidata</span></div>
@@ -2604,9 +2725,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const fileId = button.dataset.fileId || selectedScannerItemId;
         if (action === "ignore") {
           const item = scannerQueue.find((entry) => entry.id === fileId);
+          const count = Number(item?.file_count || 1);
           const confirmed = confirm(
-            `¿Omitir "${item?.name || item?.detected_title || "este archivo"}"?\n\n`
-            + "Dejará de aparecer en la cola mientras no cambie. No se eliminará del disco ni del catálogo. Esta decisión todavía no puede restaurarse desde la interfaz."
+            `¿Omitir "${item?.detected_title || item?.name || "este archivo"}"${count > 1 ? ` y sus ${count} partes` : ""}?\n\n`
+            + `${count > 1 ? "Dejarán" : "Dejará"} de aparecer en la cola mientras no ${count > 1 ? "cambien" : "cambie"}. No se eliminará nada del disco ni del catálogo. Esta decisión todavía no puede restaurarse desde la interfaz.`
           );
           if (!confirmed) return;
         }
@@ -2636,7 +2758,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           await Promise.all([loadScannerQueue(), loadCatalog(), loadLibraries()]);
           selectedScannerItemId = scannerQueue[Math.min(priorIndex, scannerQueue.length - 1)]?.id || "";
           renderScannerQueue();
-          setCurationFeedback(action === "ignore" ? "Archivo omitido. No se eliminó del disco." : "Archivo vinculado al inventario compartido.", "success");
+          const affected = Number(payload.item?.file_count || 1);
+          setCurationFeedback(
+            action === "ignore"
+              ? `${affected > 1 ? `${affected} partes omitidas` : "Archivo omitido"}. No se eliminó nada del disco.`
+              : `${affected > 1 ? `${affected} partes vinculadas` : "Archivo vinculado"} al inventario compartido.`,
+            "success"
+          );
           if (selectedScannerItemId) focusSelectedScannerItem();
           else fields.refreshScannerQueue.focus({ preventScroll: true });
         } catch (error) {
@@ -4060,6 +4188,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             ? `<span class="merge-value merge-list-value">${values.map((entry) => `<span>${escapeHtml(entry)}</span>`).join("")}</span>`
             : '<span class="merge-value empty">Sin datos</span>';
         }
+        if (field.strategy === "release_dates") {
+          const dates = Array.isArray(value) ? value : [];
+          return dates.length
+            ? `<span class="merge-value merge-list-value">${dates.map((entry) => `<span>${escapeHtml(releaseDateLabel(entry))}</span>`).join("")}</span>`
+            : '<span class="merge-value empty">Sin fechas</span>';
+        }
         if (field.strategy === "boolean_or") {
           return `<span class="merge-value">${value ? "Sí" : "No"}</span>`;
         }
@@ -4092,6 +4226,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             return true;
           });
         }
+        if (field.strategy === "release_dates") {
+          const seen = new Set();
+          return [...asList(field.left), ...asList(field.right)].filter((entry) => {
+            const key = `${entry?.date || ""}|${entry?.country || ""}|${entry?.release_type || ""}`.toLowerCase();
+            if (!entry?.date || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
         if (field.strategy === "boolean_or") return Boolean(field.left || field.right);
         return field.left;
       }
@@ -4099,6 +4242,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function mergeCombineLabel(field) {
         if (field.strategy === "boolean_or") return "Preservar sí";
         if (field.strategy === "local_files") return "Conservar todos";
+        if (field.strategy === "release_dates") return "Conservar fechas";
         return "Combinar";
       }
 
@@ -4227,6 +4371,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           alternative_titles: "Títulos alternativos",
           kind: "Tipo de obra",
           year: "Año",
+          release_dates: "Fechas de estreno",
           description: "Descripción",
           wikipedia_extract: "Extracto de Wikipedia",
           genres: "Géneros",
@@ -4787,6 +4932,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         manualResults = [];
         catalogMergeResults = [];
         manualVisibleCount = SEARCH_PAGE_SIZE;
+        manualSourceVisibleCounts = {};
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
         externalSourcesLastUsed = [];
         externalSourcesAttempted = [];
@@ -4810,15 +4956,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         if (updateHistory) syncCollectionRoute("push");
         showView("catalog", { updateHistory: false, scroll: false });
-        if (fields.externalSource.checked) {
-          await searchManual("all");
-        } else {
-          setSearchState("results", collectionSearchMessage());
-        }
+        await searchManual("all");
       }
 
       function setSearchState(state, message = "") {
         const comparisonMode = collectionSearchMode !== "browse";
+        fields.collectionView.classList.toggle("has-search-results", Boolean(activeQuery) && state !== "idle");
         fields.searchContext.hidden = state !== "searching" && state !== "error" && !comparisonMode;
         fields.searchContext.dataset.state = state;
         fields.searchContextText.textContent = message;
@@ -4833,7 +4976,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.collectionView.classList.toggle("is-compare-mode", comparisonMode);
         fields.collectionView.dataset.searchMode = collectionSearchMode;
         fields.backToCollection.hidden = !comparisonMode;
-        if (!comparisonMode) fields.catalogMergeTitle.textContent = "Entrada de la colección";
+        if (!comparisonMode && !activeQuery) {
+          fields.catalogMergeKicker.textContent = "Comparación";
+          fields.catalogMergeTitle.textContent = "Entrada de la colección";
+        }
       }
 
       function collectionSearchMessage() {
@@ -4864,6 +5010,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             item.local_path,
             localFilesText(item),
             item.year,
+            Array.isArray(item.release_dates) ? item.release_dates.map((entry) => entry?.date || "").join(" ") : "",
             item.description,
             item.wikipedia_extract,
             item.notes,
@@ -5298,7 +5445,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function factsPanel(item) {
         const rows = [
-          ["Genero", item.genres, 4],
+          ["Género", item.genres, 4],
+          ["Estreno", primaryReleaseDateLabel(item), 1],
           ["Original", item.original_title, 1],
           ["Español", item.spanish_title, 1],
           ["Inglés", item.english_title, 1],
@@ -5312,6 +5460,23 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }).filter(Boolean);
         const content = rows.join("");
         return content ? `<dl class="facts">${content}</dl>` : "";
+      }
+
+      function primaryReleaseDateLabel(item) {
+        const dates = Array.isArray(item?.release_dates) ? item.release_dates : [];
+        const selected = dates.find((entry) => entry?.is_primary) || dates[0];
+        return selected ? releaseDateLabel(selected) : "";
+      }
+
+      function releaseDateLabel(entry) {
+        const raw = String(entry?.date || "");
+        const [year, month, day] = raw.split("-");
+        const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+        let label = year || "Fecha desconocida";
+        if (entry?.precision === "month" && month) label = `${months[Number(month) - 1] || month} de ${year}`;
+        if (entry?.precision === "day" && month && day) label = `${Number(day)} de ${months[Number(month) - 1] || month} de ${year}`;
+        if (entry?.country) label += ` · ${entry.country}`;
+        return label;
       }
 
       function availabilityPanel(item) {
@@ -5750,6 +5915,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       async function searchManual(source = "all", statusPrefix = "") {
         const query = fields.query.value.trim();
         if (query.length < 2) return;
+        const includeExternal = fields.externalSource.checked;
         if (externalSearchController) externalSearchController.abort();
         const controller = new AbortController();
         externalSearchController = controller;
@@ -5764,7 +5930,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         manualResults = [];
         selectedManualIndex = null;
         manualVisibleCount = SEARCH_PAGE_SIZE;
-        fields.externalSearchSection.classList.add("active");
+        manualSourceVisibleCounts = {};
+        fields.externalSearchSection.classList.toggle("active", includeExternal);
         fields.manualSearchStatus.textContent = statusPrefix || "Buscando...";
         fields.manualSearchResults.innerHTML = "";
         fields.searchButton.disabled = true;
@@ -5774,36 +5941,49 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         setSearchState(
           "searching",
           collectionSearchMode === "browse"
-            ? `${collectionSearchMessage()} Consultando fuentes externas…`
+            ? includeExternal
+              ? `Buscando “${query}” en tu catálogo y fuentes externas…`
+              : `Buscando “${query}” en tu catálogo…`
             : comparisonSearchMessage()
         );
         try {
-          const response = await apiFetch(`/api/search?q=${encodeURIComponent(query)}&source=${encodeURIComponent(source)}`, {
+          const response = await apiFetch(`/api/search?q=${encodeURIComponent(query)}&source=${encodeURIComponent(source)}&external=${includeExternal ? "true" : "false"}`, {
             signal: controller.signal
           });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const payload = await response.json();
           manualResults = payload.results || [];
+          if (collectionSearchMode === "browse") {
+            catalogMergeResults = payload.catalog?.results || [];
+            catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
+            fields.catalogMergeSection.classList.add("active");
+            fields.catalogMergeKicker.textContent = "Tu catálogo";
+            fields.catalogMergeTitle.textContent = "Coincidencias locales";
+            fields.catalogMergeStatus.textContent = `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "obra encontrada" : "obras encontradas"}, sin aplicar los filtros de la estantería.`;
+            renderCatalogMergeResults();
+          }
           externalHealth = payload.external || externalHealth;
-          externalSourcesAttempted = source === "all" ? ["wikipedia", "imdb", "filmaffinity"] : [source];
+          externalSourcesAttempted = includeExternal
+            ? source === "all" ? ["wikipedia", "imdb", "filmaffinity"] : [source]
+            : [];
           externalSourcesLastUsed = [...new Set(manualResults.map((result) => result.source || "").filter(Boolean))];
-          fields.manualSearchStatus.textContent = manualResults.length
+          fields.manualSearchStatus.textContent = includeExternal && manualResults.length
             ? `${manualResults.length} ${manualResults.length === 1 ? "resultado" : "resultados"}${source === "wikipedia" ? " de Wikipedia" : ""}`
-            : "Sin resultados";
+            : includeExternal ? "Sin resultados externos" : "";
           setSearchState(
             "results",
             collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
           );
-          renderManualResults();
+          if (includeExternal) renderManualResults();
           renderDatabaseMenu();
         } catch (error) {
           if (error.name === "AbortError" && externalSearchTimedOut) {
-            fields.manualSearchStatus.textContent = "La búsqueda externa tardó demasiado. Podés reintentar.";
-            setSearchState("error", `La consulta externa para “${query}” superó los 10 segundos.`);
+            fields.manualSearchStatus.textContent = "La búsqueda tardó demasiado. Podés reintentar.";
+            setSearchState("error", `La consulta para “${query}” superó los 10 segundos.`);
           } else if (error.name !== "AbortError") {
-            fields.manualSearchStatus.textContent = "No se pudo completar la búsqueda externa.";
-            setSearchState("error", `La colección sigue disponible, pero falló la consulta externa para “${query}”.`);
-            console.error("[catalog-viewer] external search failed", error);
+            fields.manualSearchStatus.textContent = "No se pudo completar la búsqueda.";
+            setSearchState("error", `La colección sigue disponible, pero falló la consulta para “${query}”.`);
+            console.error("[catalog-viewer] search failed", error);
           }
         } finally {
           window.clearTimeout(timeoutId);
@@ -5845,6 +6025,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.searchConsole.setAttribute("aria-busy", "false");
         fields.searchButton.textContent = "Buscar";
         manualResults = [];
+        manualSourceVisibleCounts = {};
         catalogMergeResults = [];
         selectedManualIndex = null;
         selectedExistingIdForSearch = null;
@@ -5864,6 +6045,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.catalogMergeResults.innerHTML = "";
         fields.externalSearchSection.classList.remove("active");
         fields.catalogMergeSection.classList.remove("active");
+        fields.catalogMergeKicker.textContent = "Comparación";
         fields.catalogMergeTitle.textContent = "Entrada de la colección";
         fields.reviewPrevious.hidden = true;
         fields.reviewNext.hidden = true;
@@ -5874,7 +6056,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (focus) fields.query.focus();
       }
 
-      function prepareManualMerge(index) {
+      async function prepareManualMerge(index) {
         selectedManualIndex = index;
         if (selectedExistingIdForSearch) {
           setCollectionSearchMode("link");
@@ -5882,6 +6064,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           catalogMergeResults = item ? [item] : [];
           catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
           fields.catalogMergeSection.classList.add("active");
+          fields.catalogMergeKicker.textContent = "Comparación";
           fields.catalogMergeTitle.textContent = "Entrada seleccionada";
           fields.catalogMergeStatus.textContent = item ? "Entrada seleccionada para comparar." : "No se encontró la entrada seleccionada.";
           renderCatalogMergeResults();
@@ -5895,50 +6078,85 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         activeQuery = fields.query.value.trim();
         render();
         syncCollectionRoute("push");
-        searchCatalogForMerge();
+        await searchCatalogForMerge("", result);
         setSearchState("results", comparisonSearchMessage());
         fields.searchContext.scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
-      function searchCatalogForMerge(queryValue = "") {
-        const query = (queryValue || fields.query.value).trim().toLowerCase();
+      async function searchCatalogForMerge(queryValue = "", incomingResult = null) {
+        const query = (queryValue || fields.query.value).trim();
         if (!query) return;
         setCollectionSearchMode("compare");
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
-        catalogMergeResults = items
-          .map((item) => ({ item, score: catalogMatchScore(item, query) }))
-          .filter((entry) => entry.score > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 60)
-          .map((entry) => entry.item);
         fields.catalogMergeSection.classList.add("active");
-        fields.catalogMergeTitle.textContent = selectedManualIndex === null
-          ? "Coincidencias de la colección"
-          : "Elegí una entrada local";
-        fields.catalogMergeStatus.textContent = selectedManualIndex === null
-          ? `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "coincidencia local" : "coincidencias locales"}.`
-          : `${catalogMergeResults.length} entradas encontradas para comparar.`;
-        renderCatalogMergeResults();
+        fields.catalogMergeKicker.textContent = "Comparación";
+        fields.catalogMergeTitle.textContent = "Elegí una entrada local";
+        fields.catalogMergeStatus.textContent = "Enriqueciendo la opción externa y comparando todos sus títulos…";
+        fields.catalogMergeResults.innerHTML = "";
+        try {
+          const response = incomingResult
+            ? await apiFetch("/api/search/catalog-candidates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ result: incomingResult })
+              })
+            : await apiFetch(`/api/search?q=${encodeURIComponent(query)}&external=false`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          catalogMergeResults = incomingResult
+            ? payload.results || []
+            : payload.catalog?.results || [];
+          fields.catalogMergeStatus.textContent = `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "entrada encontrada" : "entradas encontradas"}. Las coincidencias seguras aparecen primero.`;
+          renderCatalogMergeResults();
+        } catch (error) {
+          catalogMergeResults = [];
+          fields.catalogMergeStatus.textContent = "No pudimos comparar con el catálogo. Reintentá desde el resultado externo.";
+          console.error("[catalog-viewer] catalog candidate search failed", error);
+        }
       }
 
       function renderManualResults() {
-        const visible = manualResults.slice(0, manualVisibleCount);
-        const more = manualResults.length > manualVisibleCount
-          ? `<button class="load-more" type="button" data-click="show-more-manual">Cargar mas (${manualResults.length - manualVisibleCount})</button>`
-          : "";
-        fields.manualSearchResults.innerHTML = visible.map(searchResult).join("") + more;
+        const sourceLabels = {
+          wikipedia: ["Wikipedia", "Artículos y datos enciclopédicos"],
+          imdb: ["IMDb", "Títulos internacionales y reparto"],
+          filmaffinity: ["FilmAffinity", "Referencias en español"]
+        };
+        const grouped = Object.fromEntries(Object.keys(sourceLabels).map((source) => [source, []]));
+        manualResults.forEach((result, index) => {
+          if (grouped[result.source]) grouped[result.source].push({ result, index });
+        });
+        fields.manualSearchResults.innerHTML = Object.entries(sourceLabels).map(([source, labels]) => {
+          const rows = grouped[source];
+          const visibleCount = manualSourceVisibleCounts[source] || SEARCH_PAGE_SIZE;
+          const visible = rows.slice(0, visibleCount);
+          const more = rows.length > visibleCount
+            ? `<button class="load-more source-load-more" type="button" data-click="show-more-manual" data-source="${source}">Cargar más de ${escapeHtml(labels[0])} (${rows.length - visibleCount})</button>`
+            : "";
+          return `<section class="search-source-group" data-source-group="${source}">
+            <header class="search-source-heading">
+              <div><strong>${escapeHtml(labels[0])}</strong><span>${escapeHtml(labels[1])}</span></div>
+              <span>${rows.length} ${rows.length === 1 ? "resultado" : "resultados"}</span>
+            </header>
+            ${rows.length
+              ? `<div class="search-source-track">${visible.map(({ result, index }) => searchResult(result, index)).join("")}</div>${more}`
+              : `<p class="search-source-empty">Sin coincidencias en esta fuente.</p>`}
+          </section>`;
+        }).join("");
       }
 
       function renderCatalogMergeResults() {
         const visible = catalogMergeResults.slice(0, catalogMergeVisibleCount);
         const more = catalogMergeResults.length > catalogMergeVisibleCount
-          ? `<button class="load-more" type="button" data-click="show-more-catalog">Cargar mas (${catalogMergeResults.length - catalogMergeVisibleCount})</button>`
+          ? `<button class="load-more" type="button" data-click="show-more-catalog">Cargar más (${catalogMergeResults.length - catalogMergeVisibleCount})</button>`
           : "";
-        fields.catalogMergeResults.innerHTML = visible.map(catalogMergeResult).join("") + more;
+        fields.catalogMergeResults.innerHTML = visible.length
+          ? `<div class="search-source-track">${visible.map(catalogMergeResult).join("")}</div>${more}`
+          : `<p class="search-source-empty">No encontramos una coincidencia local. Probá otro título o agregá la obra como nueva.</p>`;
       }
 
-      function showMoreManualResults() {
-        manualVisibleCount += SEARCH_PAGE_SIZE;
+      function showMoreManualResults(source = "") {
+        if (source) manualSourceVisibleCounts[source] = (manualSourceVisibleCounts[source] || SEARCH_PAGE_SIZE) + SEARCH_PAGE_SIZE;
+        else manualVisibleCount += SEARCH_PAGE_SIZE;
         renderManualResults();
       }
 
@@ -5998,6 +6216,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               ${meta(item.year)}${meta(item.kind)}${meta(item.source)}${meta(firstListValue(item.genres))}${meta(firstListValue(item.directors))}
             </div>
             <div class="card-badges">
+              ${item._search?.reason ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(item._search))}</span>` : ""}
               <span class="pill ${hasExternalLink(item) ? "good" : "muted"}">${hasExternalLink(item) ? "con link" : "sin link"}</span>
               <span class="pill ${isInCatalog(item.en_catalogo) ? "good" : "muted"}">${isInCatalog(item.en_catalogo) ? "catalogo: si" : "catalogo: no"}</span>
             </div>
@@ -6075,6 +6294,32 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         let score = bestTitleSimilarity(existing, result);
         if (existing.year && String(existing.year) === String(result.year || "")) score = Math.min(100, score + 20);
         return `similitud: ${score}%`;
+      }
+
+      function searchReasonLabel(search = {}) {
+        const labels = {
+          shared_external_url: "mismo enlace",
+          shared_wikidata_id: "mismo Wikidata",
+          exact_title_year: "título y año exactos",
+          exact_title_missing_year: "título exacto; falta año",
+          exact_title_year_mismatch: "título exacto; año distinto",
+          exact_title_kind_mismatch: "título exacto; tipo distinto",
+          similar_title_requires_review: "título similar",
+          insufficient_evidence: "coincidencia posible"
+        };
+        if (labels[search.reason]) return labels[search.reason];
+        const fieldLabels = {
+          title: "título",
+          original_title: "título original",
+          spanish_title: "título en español",
+          english_title: "título en inglés",
+          alternative_titles: "nombre alternativo",
+          local_file: "archivo local",
+          external_id: "identificador externo",
+          external_link: "enlace externo",
+          director: "dirección"
+        };
+        return fieldLabels[search.matched_field] || "coincidencia local";
       }
 
       function bestTitleSimilarity(leftItem, rightItem) {
@@ -6200,27 +6445,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             expected_source: ""
           })
         });
-      }
-
-      function catalogMatchScore(item, query) {
-        const terms = query.split(/\s+/).filter(Boolean);
-        const titles = titleSearchValues(item).map(normalizeText).filter(Boolean);
-        const local = normalizeText(item.local_name || "");
-        const year = String(item.year || "");
-        const url = normalizeText(item.url || "");
-        const haystack = `${titles.join(" ")} ${local} ${year} ${url}`;
-        let score = 0;
-        for (const term of terms) {
-          const normalizedTerm = normalizeText(term);
-          if (haystack.includes(normalizedTerm)) {
-            score += 1;
-          } else if (normalizedTerm.length >= 5 && haystack.split(/\s+/).some((word) => oneEditApart(word, normalizedTerm))) {
-            score += 0.6;
-          }
-        }
-        if (titles.includes(normalizeText(query))) score += 5;
-        if (year && query.includes(year)) score += 2;
-        return score;
       }
 
       function normalizeText(value) {
@@ -6489,6 +6713,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogMergeResults = [item];
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
         fields.catalogMergeSection.classList.add("active");
+        fields.catalogMergeKicker.textContent = "Comparación";
         fields.catalogMergeTitle.textContent = "Entrada seleccionada";
         fields.catalogMergeStatus.textContent = "Elegí un resultado externo y tocá Comparar para revisar diferencias.";
         renderCatalogMergeResults();
@@ -6586,7 +6811,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const list = asList(value);
         if (!list.length) return "";
         const visible = list.slice(0, limit);
-        const suffix = list.length > limit ? ` y ${list.length - limit} mas` : "";
+        const suffix = list.length > limit ? ` y ${list.length - limit} más` : "";
         return visible.join(", ") + suffix;
       }
 

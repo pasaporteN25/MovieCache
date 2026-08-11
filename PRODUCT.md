@@ -45,6 +45,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   almacenamiento transaccional y consultas estructuradas.
 - La curacion incluye busqueda, matching asistido, deduplicacion y revision manual de
   coincidencias ambiguas.
+- La busqueda local consulta titulos multilenguaje, aliases, archivos e identificadores
+  desde el servidor. Las fuentes externas se presentan por separado y usan el mismo
+  matching conservador antes de escribir.
 
 ## Capabilities and Constraints
 
@@ -86,6 +89,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   rutas estan limitadas por configuracion del servidor; el owner prueba sin escribir,
   aplica el inventario y recien entonces puede automatizar recorridos horarios o
   diarios. Las identidades dudosas se resuelven desde la Bandeja.
+- El owner puede recorrer graficamente solamente las raices autorizadas y comprobar
+  lectura antes de registrar una biblioteca. `extras` y `sample` se omiten por defecto;
+  discos multipartes comparten identidad y decision sin perder sus archivos fisicos.
 - El inventario fisico pertenece a la instancia y aporta disponibilidad verificada a
   todos los catalogos sin exponer rutas a miembros. La declaracion manual permanece
   como una senal separada.
@@ -104,6 +110,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   disponibles, obras faltantes de colecciones seguidas, recuerdos personales por
   completar y rutas por director, genero o decada. La seleccion usa exclusivamente
   datos locales, evita repetir obras y no reemplaza la accion separada `Random`.
+- Las fechas de estreno se conservan con precision, pais, tipo y fuente. Una fecha
+  completa puede alimentar efemerides; un dato anual o mensual nunca se presenta como
+  si conocieramos el dia exacto.
 - Sonarr, Radarr, Letterboxd y otras fuentes son integraciones posibles. Su orden y el
   alcance de la sincronizacion siguen abiertos.
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas

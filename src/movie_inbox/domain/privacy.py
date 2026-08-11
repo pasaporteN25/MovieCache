@@ -19,6 +19,7 @@ SHARED_CATALOG_FIELDS = {
     "alternative_titles",
     "kind",
     "year",
+    "release_dates",
     "description",
     "wikipedia_url",
     "imdb_url",

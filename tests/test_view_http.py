@@ -17,6 +17,7 @@ from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
+from movie_inbox.infrastructure.schema import SCHEMA_VERSION
 from movie_inbox.web.app import MAX_JSON_BODY_BYTES, create_app
 from movie_inbox.web.catalog_api import background_enrich_catalog_item
 from movie_inbox.web.config import ViewerConfig
@@ -83,10 +84,105 @@ class ViewerHttpTests(unittest.TestCase):
         home_status, _ = self.request("GET", "/api/home?date=2026-08-10")
         export_status, _ = self.request("GET", "/api/catalog/export?format=json")
         cache_status, _ = self.request("GET", "/api/image-cache/status")
+        path_status, _ = self.request("GET", "/api/library-paths")
         self.assertEqual(status, 403)
         self.assertEqual(home_status, 403)
         self.assertEqual(export_status, 403)
         self.assertEqual(cache_status, 403)
+        self.assertEqual(path_status, 403)
+
+    def test_owner_can_browse_and_check_only_configured_library_paths(self) -> None:
+        films = self.media_path / "Peliculas"
+        films.mkdir()
+        outside = Path(self.temporary.name) / "outside"
+        outside.mkdir()
+
+        roots = self.client.get(
+            "/api/library-paths",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        listing = self.client.get(
+            "/api/library-paths",
+            params={"path": str(self.media_path)},
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        checked = self.client.post(
+            "/api/library-paths/check",
+            content=json.dumps({"path": str(films)}),
+            headers=self.post_headers(),
+        )
+        denied = self.client.post(
+            "/api/library-paths/check",
+            content=json.dumps({"path": str(outside)}),
+            headers=self.post_headers(),
+        )
+
+        self.assertEqual(roots.status_code, 200, roots.content)
+        self.assertEqual(roots.json()["directories"][0]["path"], str(self.media_path.resolve()))
+        self.assertEqual(listing.status_code, 200, listing.content)
+        self.assertEqual(listing.json()["directories"][0]["name"], "Peliculas")
+        self.assertEqual(checked.status_code, 200, checked.content)
+        self.assertTrue(checked.json()["readable"])
+        self.assertEqual(denied.status_code, 400, denied.content)
+
+    def test_search_returns_local_matches_and_external_results_grouped_by_source(self) -> None:
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [normalize_item({
+                "id": "beautiful-person",
+                "title": "The Beautiful Person",
+                "original_title": "La Belle Personne",
+                "spanish_title": "La bella persona",
+                "year": "2008",
+                "kind": "pelicula",
+            })]
+        )
+        external = [
+            {"source": "wikipedia", "title": "La Belle Personne", "url": "https://en.wikipedia.org/wiki/The_Beautiful_Person"},
+            {"source": "imdb", "title": "The Beautiful Person", "url": "https://www.imdb.com/title/tt1263778/"},
+            {"source": "filmaffinity", "title": "La bella persona", "url": "https://www.filmaffinity.com/es/film123.html"},
+        ]
+
+        with patch("movie_inbox.web.app.search_sources", return_value=external):
+            response = self.client.get(
+                "/api/search",
+                params={"q": "la belle personne", "external": "true"},
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertEqual(payload["catalog"]["results"][0]["id"], "beautiful-person")
+        self.assertEqual(payload["sources"]["wikipedia"]["count"], 1)
+        self.assertEqual(payload["sources"]["imdb"]["count"], 1)
+        self.assertEqual(payload["sources"]["filmaffinity"]["count"], 1)
+
+    def test_external_comparison_uses_enriched_titles_before_ranking_catalog(self) -> None:
+        with patch(
+            "movie_inbox.web.app.enrich_selected_result",
+            return_value={
+                "source": "imdb",
+                "title": "Heat",
+                "original_title": "Heat",
+                "year": "1995",
+                "kind": "pelicula",
+                "url": "https://www.imdb.com/title/tt0113277/",
+            },
+        ):
+            response = self.client.post(
+                "/api/search/catalog-candidates",
+                content=json.dumps({
+                    "result": {
+                        "source": "imdb",
+                        "title": "tt0113277",
+                        "url": "https://www.imdb.com/title/tt0113277/",
+                    }
+                }),
+                headers=self.post_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["results"][0]["id"], "heat")
+        self.assertTrue(response.json()["results"][0]["_search"]["accepted"])
 
     def test_image_cache_status_is_scoped_to_the_authenticated_catalog(self) -> None:
         headers = {"X-Movie-Inbox-Token": self.config.api_token}
@@ -176,7 +272,7 @@ class ViewerHttpTests(unittest.TestCase):
             r'attachment; filename="movie-inbox-lucas-\d{4}-\d{2}-\d{2}\.json"',
         )
         document = json_export.json()
-        self.assertEqual(document["schema_version"], 5)
+        self.assertEqual(document["schema_version"], SCHEMA_VERSION)
         self.assertEqual([item["id"] for item in document["items"]], ["heat"])
         self.assertNotIn("_source_file", document["items"][0])
         self.assertNotIn(str(self.temporary.name), json_export.text)
@@ -1457,7 +1553,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b"too large", payload)
 
     def test_invalid_catalog_is_reported_instead_of_becoming_empty(self) -> None:
-        self.catalog_path.write_text('{"schema_version": 6, "items": []}', encoding="utf-8")
+        self.catalog_path.write_text(
+            json.dumps({"schema_version": SCHEMA_VERSION + 1, "items": []}),
+            encoding="utf-8",
+        )
         status, payload = self.request(
             "GET",
             "/api/items",

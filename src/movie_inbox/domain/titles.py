@@ -8,6 +8,10 @@ import re
 import unicodedata
 
 
+_MEDIA_PART_PATTERN = re.compile(r"\b(?:cd|disc|disk|part)[ ._-]?(\d{1,2})\b", re.IGNORECASE)
+_DISC_PART_PATTERN = re.compile(r"\b(?:cd|disc|disk)\s*\d{1,2}\b", re.IGNORECASE)
+
+
 def clean_whitespace(value: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(value)).strip()
 
@@ -84,3 +88,13 @@ def infer_kind_from_text(*values: str) -> str:
         if matches:
             return min(matches)[2]
     return ""
+
+
+def detect_media_part(value: str) -> str:
+    match = _MEDIA_PART_PATTERN.search(str(value or ""))
+    return match.group(1) if match else ""
+
+
+def strip_disc_part_marker(value: str) -> str:
+    """Remove physical-disc markers without rewriting legitimate `Part 2` titles."""
+    return clean_whitespace(_DISC_PART_PATTERN.sub(" ", str(value or "")))

@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from movie_inbox.domain.titles import detect_media_part, strip_disc_part_marker
+
 
 DEFAULT_EXTENSIONS = {
     ".3g2", ".3gp", ".asf", ".avi", ".divx", ".flv", ".m2ts", ".m4v",
@@ -18,6 +20,7 @@ DEFAULT_EXTENSIONS = {
 }
 DEFAULT_EXCLUDED_DIRS = {
     "$recycle.bin", "system volume information", ".catalog-cache", ".catalog-state",
+    "extra", "extras", "sample", "samples",
 }
 SAMPLE_BYTES = 128 * 1024
 
@@ -41,7 +44,7 @@ def scan_media_files(
         raise FilesystemScanError("Managed library root cannot be a symbolic link or junction")
 
     allowed_extensions = normalize_extensions(extensions or DEFAULT_EXTENSIONS)
-    excluded = normalize_excluded_dirs(excluded_dirs or DEFAULT_EXCLUDED_DIRS)
+    excluded = DEFAULT_EXCLUDED_DIRS | normalize_excluded_dirs(excluded_dirs)
     prior = previous or {}
     rows: list[dict[str, Any]] = []
     errors: list[str] = []
@@ -111,6 +114,7 @@ def parse_release_name(name: str) -> tuple[str, str, str]:
     value = Path(name).stem
     kind = "serie" if re.search(r"\bS\d{1,2}(?:E\d{1,3})?\b", value, re.IGNORECASE) else "pelicula"
     value = value.replace(".", " ").replace("_", " ").replace("-", " ")
+    value = strip_disc_part_marker(value)
     value = re.sub(r"[\[\]{}]+", " ", value)
     value = re.sub(r"\bS\d{1,2}(?:E\d{1,3}(?:E\d{1,3})*)?\b.*$", "", value, flags=re.IGNORECASE)
     value = re.sub(
@@ -133,8 +137,7 @@ def parse_release_name(name: str) -> tuple[str, str, str]:
 
 
 def detect_part(name: str) -> str:
-    match = re.search(r"\b(?:cd|disc|disk|part)[ ._-]?(\d{1,2})\b", name, re.IGNORECASE)
-    return match.group(1) if match else ""
+    return detect_media_part(name)
 
 
 def normalize_extensions(values: Any) -> set[str]:

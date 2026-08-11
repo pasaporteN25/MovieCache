@@ -6,6 +6,7 @@ import re
 from urllib.parse import quote
 
 from movie_inbox.domain.catalog import merge_lists
+from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.external.common import fetch_json_safe
 
 
@@ -41,6 +42,9 @@ def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
     year = wikidata_claim_year(claims, "P577")
     if year:
         metadata["year"] = year
+    release_dates = wikidata_claim_release_dates(claims, entity_id)
+    if release_dates:
+        metadata["release_dates"] = release_dates
     for field, ids in ids_by_field.items():
         values = [labels.get(item_id, item_id) for item_id in ids if labels.get(item_id, item_id)]
         if values:
@@ -164,6 +168,41 @@ def wikidata_claim_year(claims: dict[str, object], prop: str) -> str:
         if match:
             return match.group(1).lstrip("+")
     return ""
+
+
+def wikidata_claim_release_dates(claims: dict[str, object], entity_id: str = "") -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for position, statement in enumerate(_ordered_statements(claims, "P577")):
+        value = _claim_value(statement)
+        if not isinstance(value, dict):
+            continue
+        raw_time = str(value.get("time") or "").lstrip("+")
+        match = re.match(r"^(\d{4})-(\d{2})-(\d{2})", raw_time)
+        if not match:
+            continue
+        year, month, day = match.groups()
+        try:
+            precision_value = int(value.get("precision") or 9)
+        except (TypeError, ValueError):
+            precision_value = 9
+        if precision_value >= 11:
+            release_date, precision = f"{year}-{month}-{day}", "day"
+        elif precision_value == 10:
+            release_date, precision = f"{year}-{month}", "month"
+        else:
+            release_date, precision = year, "year"
+        rows.append(
+            {
+                "date": release_date,
+                "precision": precision,
+                "country": "",
+                "release_type": "publication",
+                "source": "wikidata",
+                "source_url": f"https://www.wikidata.org/wiki/{entity_id}" if entity_id else "",
+                "is_primary": position == 0,
+            }
+        )
+    return normalize_release_dates(rows)
 
 
 def fetch_wikidata_labels(entity_ids: list[str]) -> dict[str, str]:

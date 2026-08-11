@@ -6,7 +6,7 @@
   "required": ["schema_version", "items"],
   "properties": {
     "schema_version": {
-      "const": 5
+      "const": 6
     },
     "items": {
       "type": "array",
@@ -48,11 +48,27 @@
       },
       "additionalProperties": false
     },
+    "releaseDate": {
+      "type": "object",
+      "required": [
+        "date", "precision", "country", "release_type", "source", "source_url", "is_primary"
+      ],
+      "properties": {
+        "date": {"type": "string"},
+        "precision": {"enum": ["year", "month", "day"]},
+        "country": {"type": "string"},
+        "release_type": {"type": "string"},
+        "source": {"type": "string"},
+        "source_url": {"type": "string"},
+        "is_primary": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
     "catalogItem": {
       "type": "object",
       "required": [
         "id", "title", "kind", "status", "en_catalogo", "local_files",
-        "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions"
+        "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions", "release_dates"
       ],
       "properties": {
         "id": {"type": "string"},
@@ -68,6 +84,7 @@
         "watched_at": {"type": "string"},
         "rating": {"type": "integer", "minimum": 0, "maximum": 10},
         "year": {"type": "string"},
+        "release_dates": {"type": "array", "items": {"$ref": "#/$defs/releaseDate"}},
         "description": {"type": "string"},
         "wikipedia_url": {"type": "string"},
         "imdb_url": {"type": "string"},
@@ -94,7 +111,7 @@
           "propertyNames": {
             "enum": [
               "title", "original_title", "spanish_title", "english_title",
-              "alternative_titles", "kind", "year", "description",
+              "alternative_titles", "kind", "year", "release_dates", "description",
               "wikipedia_title", "wikidata_id", "genres", "directors",
               "writers", "cast", "page_image", "backdrop_image", "tmdb_id", "wikipedia_extract"
             ]
@@ -106,7 +123,7 @@
           "items": {
             "enum": [
               "title", "original_title", "spanish_title", "english_title",
-              "alternative_titles", "kind", "year", "description",
+              "alternative_titles", "kind", "year", "release_dates", "description",
               "wikipedia_title", "wikidata_id", "genres", "directors",
               "writers", "cast", "page_image", "backdrop_image", "tmdb_id", "wikipedia_extract"
             ]

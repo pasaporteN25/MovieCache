@@ -18,7 +18,7 @@ from movie_inbox.application.library_repository import (
     LibraryRepositoryError,
     LibraryRunBusy,
 )
-from movie_inbox.domain.catalog import external_urls, title_match_keys_for_item
+from movie_inbox.domain.catalog import external_urls, title_match_key, title_match_keys_for_item
 from movie_inbox.domain.libraries import (
     LibraryFile,
     LibraryScanRun,
@@ -33,6 +33,7 @@ from movie_inbox.domain.libraries import (
     work_identity_key,
 )
 from movie_inbox.domain.matching import decide_match, explicit_kind
+from movie_inbox.domain.titles import detect_media_part
 
 
 CatalogUniverseProvider = Callable[[], list[dict[str, Any]]]
@@ -274,15 +275,20 @@ class ManagedLibraryService:
 
     def review_queue(self) -> list[dict[str, Any]]:
         libraries = {library.id: library for library in self.repository.list_libraries()}
-        return [
-            self.file_payload(item, libraries.get(item.library_id))
-            for item in self.repository.review_queue()
-        ]
+        groups: dict[str, list[LibraryFile]] = defaultdict(list)
+        for item in self.repository.review_queue():
+            groups[_multipart_group_key(item) or f"file:{item.id}"].append(item)
+        payloads: list[dict[str, Any]] = []
+        for grouped in groups.values():
+            ordered = sorted(grouped, key=_multipart_sort_key)
+            payloads.append(self.file_payload(ordered[0], libraries.get(ordered[0].library_id), ordered))
+        return payloads
 
     def review_file(self, file_id: str, payload: Mapping[str, Any]) -> dict[str, Any]:
         action = str(payload.get("action") or "").strip().casefold()
         selected_identity: dict[str, Any] | None = None
-        queue = {item.id: item for item in self.repository.review_queue()}
+        queue_items = self.repository.review_queue()
+        queue = {item.id: item for item in queue_items}
         item = queue.get(file_id)
         if item is None:
             raise LibraryNotFound("Scanner queue item was not found")
@@ -306,9 +312,21 @@ class ManagedLibraryService:
                 )
                 if not str(selected_identity.get("year") or "").strip():
                     raise ValueError("Confirm the year or choose an existing candidate")
-        updated = self.repository.review_file(file_id, action, selected_identity, self._now())
-        library = self.repository.get_library(updated.library_id)
-        return self.file_payload(updated, library)
+        group_key = _multipart_group_key(item)
+        siblings = [
+            value
+            for value in queue_items
+            if group_key and _multipart_group_key(value) == group_key
+        ] or [item]
+        updated = self.repository.review_files(
+            [value.id for value in siblings],
+            action,
+            selected_identity,
+            self._now(),
+        )
+        representative = sorted(updated, key=_multipart_sort_key)[0]
+        library = self.repository.get_library(representative.library_id)
+        return self.file_payload(representative, library, updated)
 
     def validate_root(self, value: str) -> Path:
         if not self.allowed_roots:
@@ -324,6 +342,83 @@ class ManagedLibraryService:
         if candidate.is_symlink() or bool(getattr(candidate, "is_junction", lambda: False)()):
             raise LibraryPathError("Managed library root cannot be a symbolic link or junction")
         return candidate
+
+    def browse_paths(self, value: str = "") -> dict[str, Any]:
+        if not self.allowed_roots:
+            raise LibraryPathError("Managed scanner has no allowed roots configured")
+        requested = str(value or "").strip()
+        if not requested:
+            roots = [self._path_entry(path, include_status=True) for path in self.allowed_roots]
+            return {
+                "path": "",
+                "root": "",
+                "parent": "",
+                "directories": roots,
+                "directory_count": len(roots),
+                "readable": any(bool(row.get("readable")) for row in roots),
+            }
+
+        candidate = self.validate_root(requested)
+        allowed = self._allowed_root(candidate)
+        directories: list[dict[str, Any]] = []
+        try:
+            with os.scandir(candidate) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_symlink() or not entry.is_dir(follow_symlinks=False):
+                            continue
+                    except OSError:
+                        continue
+                    child = Path(entry.path).resolve()
+                    if not _is_within(child, allowed):
+                        continue
+                    directories.append({"name": entry.name, "path": str(child), "readable": True})
+                    if len(directories) >= 200:
+                        break
+        except OSError as error:
+            raise LibraryPathError(f"Managed library path cannot be read: {error}") from error
+        directories.sort(key=lambda row: str(row["name"]).casefold())
+        parent = candidate.parent if candidate != allowed else None
+        return {
+            "path": str(candidate),
+            "root": str(allowed),
+            "parent": str(parent) if parent and _is_within(parent, allowed) else "",
+            "directories": directories,
+            "directory_count": len(directories),
+            "readable": True,
+        }
+
+    def check_path(self, value: str) -> dict[str, Any]:
+        payload = self.browse_paths(value)
+        if not payload.get("path"):
+            raise LibraryPathError("Choose a configured server path")
+        return {
+            "path": payload["path"],
+            "root": payload["root"],
+            "readable": True,
+            "directory_count": payload["directory_count"],
+        }
+
+    def _allowed_root(self, candidate: Path) -> Path:
+        matches = [root for root in self.allowed_roots if _is_within(candidate, root)]
+        if not matches:
+            raise LibraryPathError("Managed library path is outside the server allowlist")
+        return max(matches, key=lambda path: len(path.parts))
+
+    @staticmethod
+    def _path_entry(path: Path, *, include_status: bool = False) -> dict[str, Any]:
+        readable = False
+        if include_status:
+            try:
+                with os.scandir(path):
+                    readable = True
+            except OSError:
+                readable = False
+        return {
+            "name": path.name or str(path),
+            "path": str(path),
+            "readable": readable if include_status else True,
+        }
 
     def library_payload(self, library: ManagedLibrary) -> dict[str, Any]:
         counts_method = getattr(self.repository, "counts", None)
@@ -361,7 +456,12 @@ class ManagedLibraryService:
         }
 
     @staticmethod
-    def file_payload(item: LibraryFile, library: ManagedLibrary | None) -> dict[str, Any]:
+    def file_payload(
+        item: LibraryFile,
+        library: ManagedLibrary | None,
+        grouped: list[LibraryFile] | None = None,
+    ) -> dict[str, Any]:
+        parts = sorted(grouped or [item], key=_multipart_sort_key)
         return {
             "id": item.id,
             "library_id": item.library_id,
@@ -375,6 +475,18 @@ class ManagedLibraryService:
             "state": item.state,
             "candidates": [dict(value) for value in item.candidates],
             "last_seen_at": item.last_seen_at,
+            "file_count": len(parts),
+            "file_ids": [value.id for value in parts],
+            "parts": [
+                {
+                    "id": value.id,
+                    "part": detect_media_part(value.name),
+                    "name": value.name,
+                    "relative_path": value.relative_path,
+                    "size_bytes": value.size_bytes,
+                }
+                for value in parts
+            ],
         }
 
     def _classify_scan(
@@ -469,6 +581,18 @@ class ManagedLibraryService:
                         "candidate_count": len(candidates),
                     }
                 )
+        classified = _propagate_multipart_identity(classified)
+        for state in ("matched", "new", "review", "ignored"):
+            counts[state] = sum(1 for item in classified if item.state == state)
+        classified_by_path = {
+            _relative_path_key(item.relative_path): item
+            for item in classified
+        }
+        for row in preview:
+            item = classified_by_path.get(_relative_path_key(str(row.get("relative_path") or "")))
+            if item is not None:
+                row["state"] = item.state
+                row["candidate_count"] = len(item.candidates)
         counts["missing"] = len([item for item in previous if item.available and item.id not in claimed_ids])
         return classified, counts, preview
 
@@ -682,6 +806,59 @@ def _availability_matches(
         for position in sorted(positions)
         if identity_matches_item(records[position]["identity"], item)
     ]
+
+
+def _multipart_group_key(item: LibraryFile) -> str:
+    if not detect_media_part(item.name):
+        return ""
+    title = title_match_key(item.detected_title)
+    if not title:
+        return ""
+    parent = Path(item.relative_path).parent.as_posix().casefold()
+    return "|".join(
+        (
+            item.library_id.casefold(),
+            parent,
+            title,
+            item.detected_year.strip(),
+            item.detected_kind.casefold(),
+        )
+    )
+
+
+def _multipart_sort_key(item: LibraryFile) -> tuple[int, str]:
+    part = detect_media_part(item.name)
+    return (int(part) if part.isdigit() else 10_000, item.relative_path.casefold())
+
+
+def _propagate_multipart_identity(items: list[LibraryFile]) -> list[LibraryFile]:
+    """Reuse one confirmed sibling identity when a later physical part appears."""
+    groups: dict[str, list[LibraryFile]] = defaultdict(list)
+    for item in items:
+        key = _multipart_group_key(item)
+        if key:
+            groups[key].append(item)
+    replacements: dict[str, LibraryFile] = {}
+    for grouped in groups.values():
+        confirmed = {
+            item.work_key: item
+            for item in grouped
+            if item.state == "matched" and item.work_key and item.identity
+        }
+        if len(confirmed) != 1:
+            continue
+        work_key, source = next(iter(confirmed.items()))
+        for item in grouped:
+            if item.state not in {"new", "review"}:
+                continue
+            replacements[item.id] = replace(
+                item,
+                state="matched",
+                work_key=work_key,
+                identity=dict(source.identity),
+                candidates=(),
+            )
+    return [replacements.get(item.id, item) for item in items]
 
 
 def _scanner_cache_row(item: LibraryFile) -> dict[str, Any]:

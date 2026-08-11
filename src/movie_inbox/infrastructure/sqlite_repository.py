@@ -23,10 +23,11 @@ from movie_inbox.application.repository import (
 from movie_inbox.domain.metadata import normalize_local_files
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.catalog import possible_duplicate_candidates
+from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.infrastructure.schema import CATALOG_FIELDS, CatalogSchemaError, catalog_document
 
 
-DATABASE_SCHEMA_VERSION = 3
+DATABASE_SCHEMA_VERSION = 4
 LIST_METADATA_FIELDS = ("genres", "directors", "writers", "cast")
 
 SCHEMA_V1 = """
@@ -183,6 +184,24 @@ MIGRATIONS = {
             )""",
             "CREATE INDEX ix_catalog_items_link_curation ON catalog_items(link_curation_status)",
             "CREATE INDEX ix_duplicate_decisions_status ON duplicate_decisions(status)",
+        ),
+    ),
+    4: (
+        "release dates with precision and provenance",
+        (
+            """CREATE TABLE release_dates (
+                item_id TEXT NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL,
+                release_date TEXT NOT NULL,
+                precision TEXT NOT NULL CHECK (precision IN ('year', 'month', 'day')),
+                country TEXT NOT NULL DEFAULT '',
+                release_type TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT '',
+                source_url TEXT NOT NULL DEFAULT '',
+                is_primary INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
+                PRIMARY KEY (item_id, position)
+            )""",
+            "CREATE INDEX ix_release_dates_date ON release_dates(release_date)",
         ),
     ),
 }
@@ -497,6 +516,7 @@ class SqliteCatalogRepository:
             "watched_at": row["watched_at"],
             "rating": int(row["rating"]),
             "year": row["year"],
+            "release_dates": self._release_dates(connection, item_id),
             "description": row["description"],
             "wikipedia_url": "",
             "imdb_url": "",
@@ -584,6 +604,27 @@ class SqliteCatalogRepository:
             }
             for row in rows
         ]
+
+    @staticmethod
+    def _release_dates(connection: sqlite3.Connection, item_id: str) -> list[dict[str, Any]]:
+        rows = connection.execute(
+            "SELECT * FROM release_dates WHERE item_id = ? ORDER BY position",
+            (item_id,),
+        ).fetchall()
+        return normalize_release_dates(
+            [
+                {
+                    "date": row["release_date"],
+                    "precision": row["precision"],
+                    "country": row["country"],
+                    "release_type": row["release_type"],
+                    "source": row["source"],
+                    "source_url": row["source_url"],
+                    "is_primary": bool(row["is_primary"]),
+                }
+                for row in rows
+            ]
+        )
 
     @staticmethod
     def _metadata_sources(connection: sqlite3.Connection, item_id: str) -> dict[str, dict[str, Any]]:
@@ -754,6 +795,26 @@ class SqliteCatalogRepository:
         if previous is None or previous.get("local_files") != item.get("local_files"):
             connection.execute("DELETE FROM local_files WHERE item_id = ?", (item_id,))
             self._insert_local_files(connection, item_id, item.get("local_files", []))
+        if previous is None or previous.get("release_dates") != item.get("release_dates"):
+            connection.execute("DELETE FROM release_dates WHERE item_id = ?", (item_id,))
+            for release_position, release in enumerate(normalize_release_dates(item.get("release_dates"))):
+                connection.execute(
+                    """INSERT INTO release_dates(
+                        item_id, position, release_date, precision, country,
+                        release_type, source, source_url, is_primary
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        item_id,
+                        release_position,
+                        release["date"],
+                        release["precision"],
+                        release["country"],
+                        release["release_type"],
+                        release["source"],
+                        release["source_url"],
+                        int(bool(release["is_primary"])),
+                    ),
+                )
         if previous is None or previous.get("metadata_sources") != item.get("metadata_sources"):
             connection.execute("DELETE FROM metadata_provenance WHERE item_id = ?", (item_id,))
             self._insert_metadata_sources(connection, item_id, item.get("metadata_sources", {}))

@@ -83,6 +83,23 @@ class ManagedLibraryTests(unittest.TestCase):
                 {"name": "Relative", "root_path": "media", "schedule": "manual"},
             )
 
+    def test_allowed_paths_can_be_browsed_and_checked_without_exposing_outside_directories(self) -> None:
+        films = self.media / "Peliculas"
+        films.mkdir()
+        outside = self.root / "outside"
+        outside.mkdir()
+
+        roots = self.service.browse_paths()
+        listing = self.service.browse_paths(str(self.media))
+        checked = self.service.check_path(str(films))
+
+        self.assertEqual([row["path"] for row in roots["directories"]], [str(self.media.resolve())])
+        self.assertEqual([row["name"] for row in listing["directories"]], ["Peliculas"])
+        self.assertEqual(checked["path"], str(films.resolve()))
+        self.assertTrue(checked["readable"])
+        with self.assertRaises(LibraryPathError):
+            self.service.browse_paths(str(outside))
+
     def test_catalog_match_index_limits_work_without_losing_exact_matches(self) -> None:
         items = [
             {"id": f"unrelated-{position}", "title": f"Unrelated title {position}", "year": "1995"}
@@ -187,6 +204,66 @@ class ManagedLibraryTests(unittest.TestCase):
             [{"id": "arrival", "title": "Arrival", "year": "2016", "kind": "pelicula"}]
         )[0]
         self.assertTrue(decorated["_availability"]["server"])
+
+    def test_disc_parts_share_one_review_decision_and_one_work_identity(self) -> None:
+        film = self.media / "Once Upon a Time in America"
+        film.mkdir()
+        (film / "Once.Upon.a.Time.in.America.1984.CD1.mkv").write_bytes(b"first")
+        (film / "Once.Upon.a.Time.in.America.1984.CD2.mkv").write_bytes(b"second")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+
+        queue = self.service.review_queue()
+
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["file_count"], 2)
+        self.assertEqual([part["part"] for part in queue[0]["parts"]], ["1", "2"])
+        reviewed = self.service.review_file(
+            queue[0]["id"],
+            {
+                "action": "confirm",
+                "title": "Once Upon a Time in America",
+                "year": "1984",
+                "kind": "pelicula",
+            },
+        )
+
+        self.assertEqual(reviewed["state"], "matched")
+        self.assertEqual(reviewed["file_count"], 2)
+        self.assertEqual(self.service.review_queue(), [])
+        decorated = AvailabilityService(self.repository).decorate_items(
+            [{"id": "ouatia", "title": "Once Upon a Time in America", "year": "1984", "kind": "pelicula"}]
+        )[0]
+        self.assertEqual(decorated["_availability"]["file_count"], 2)
+
+    def test_later_disc_part_reuses_an_already_confirmed_sibling_identity(self) -> None:
+        film = self.media / "Once Upon a Time in America"
+        film.mkdir()
+        (film / "Once.Upon.a.Time.in.America.1984.CD1.mkv").write_bytes(b"first")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        pending = self.service.review_queue()[0]
+        self.service.review_file(
+            pending["id"],
+            {
+                "action": "confirm",
+                "title": "Once Upon a Time in America",
+                "year": "1984",
+                "kind": "pelicula",
+            },
+        )
+
+        (film / "Once.Upon.a.Time.in.America.1984.CD2.mkv").write_bytes(b"second")
+        applied = self.execute(library.id, "apply")
+
+        self.assertEqual(applied.summary["matched"], 2)
+        self.assertEqual(self.service.review_queue(), [])
+        decorated = AvailabilityService(self.repository).decorate_items(
+            [{"id": "ouatia", "title": "Once Upon a Time in America", "year": "1984", "kind": "pelicula"}]
+        )[0]
+        self.assertEqual(decorated["_availability"]["file_count"], 2)
 
     def test_missing_file_guard_preserves_last_valid_inventory(self) -> None:
         first = self.media / "Heat.1995.mkv"

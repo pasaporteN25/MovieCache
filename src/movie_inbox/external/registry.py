@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
 from movie_inbox.external.base import SourceAdapter
-from movie_inbox.external.common import clean_text, dedupe_results, interleave_batches, utc_now
+from movie_inbox.external.common import clean_text, dedupe_results, utc_now
 from movie_inbox.external.filmaffinity import FilmAffinityAdapter
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.wikipedia import WikipediaAdapter
@@ -50,7 +50,11 @@ class ExternalSourceService:
                     batches[name] = future.result()
                 except Exception as error:
                     self._record_error(name, error)
-        results = dedupe_results(interleave_batches([batches[name] for name in selected]))[:18]
+        # Keep each source together and preserve up to eight alternatives per adapter.
+        # Consumers can render independent shelves without losing later-source results.
+        results = dedupe_results(
+            [result for name in selected for result in dedupe_results(batches[name])[:8]]
+        )[: 8 * len(selected)]
         self._set_search_cache(cache_key, results)
         return [dict(result) for result in results], self.snapshot(cache_hit=False)
 

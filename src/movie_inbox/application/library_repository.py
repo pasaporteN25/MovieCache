@@ -64,6 +64,14 @@ class LibraryRepository(Protocol):
         updated_at: int,
     ) -> LibraryFile: ...
 
+    def review_files(
+        self,
+        file_ids: list[str],
+        action: str,
+        identity: dict[str, Any] | None,
+        updated_at: int,
+    ) -> list[LibraryFile]: ...
+
     def availability_records(self) -> list[dict[str, Any]]: ...
 
     def counts(self, library_id: str) -> dict[str, int]: ...
