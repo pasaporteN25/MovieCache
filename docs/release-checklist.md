@@ -27,7 +27,7 @@ wheel en un entorno limpio.
 
 ## 2. Preparacion segura
 
-1. Exportar o copiar el catalogo y `instance.db` antes de empezar.
+1. Crear y verificar un backup completo con `bash scripts/docker-backup.sh` antes de empezar.
 2. Elegir una carpeta descartable con dos o tres videos de prueba.
 3. Iniciar Movie Inbox habilitando solamente esa raiz con `--library-root`.
 4. Confirmar que el usuario del proceso tiene lectura y recorrido, pero no necesita
@@ -71,7 +71,7 @@ Usar siempre la biblioteca descartable preparada para este gate.
 - Suite local y CI en verde.
 - Sin perdida de inventario ante offline, permisos o reinicio.
 - Rutas y fingerprints visibles solamente para el owner.
-- Backup JSON verificable y restauracion de `instance.db` ensayada.
+- Backup completo con checksum verificable y restauracion de `instance.db` ensayada.
 - Sin errores nuevos en consola durante la secuencia principal.
 - Changelog, version de paquete y version runtime sincronizados.
 

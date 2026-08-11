@@ -32,6 +32,10 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("127.0.0.1}", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_MODE:-after-access", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS:-3", compose)
+        self.assertIn("movie-inbox-backup:", compose)
+        self.assertIn("movie-inbox-data:/var/lib/movie-inbox:ro", compose)
+        self.assertIn("MOVIE_INBOX_BACKUP_RETENTION_DAYS:-14", compose)
+        self.assertIn("network_mode: none", compose)
 
     def test_omv_example_uses_precreated_read_only_mount_slots(self) -> None:
         compose = (ROOT / "compose.omv.example.yaml").read_text(encoding="utf-8")
@@ -46,7 +50,23 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("MOVIE_INBOX_OWNER_PASSWORD_FILE", environment)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_MODE=after-access", environment)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS=3", environment)
+        self.assertIn("MOVIE_INBOX_BACKUP_PATH=./backups", environment)
+        self.assertIn("MOVIE_INBOX_BACKUP_RETENTION_DAYS=14", environment)
         self.assertNotIn("MOVIE_INBOX_OWNER_PASSWORD=", environment)
+
+    def test_scheduled_backup_stops_restarts_and_health_checks_the_service(self) -> None:
+        script = (ROOT / "scripts" / "docker-backup.sh").read_text(encoding="utf-8")
+        service = (ROOT / "deploy" / "movie-inbox-backup.service.example").read_text(encoding="utf-8")
+        timer = (ROOT / "deploy" / "movie-inbox-backup.timer.example").read_text(encoding="utf-8")
+
+        self.assertIn("flock -n", script)
+        self.assertIn('docker compose stop -t 30 "$APP_SERVICE"', script)
+        self.assertIn('docker compose run --rm --no-deps "$BACKUP_SERVICE"', script)
+        self.assertIn('docker compose start "$APP_SERVICE"', script)
+        self.assertIn("wait_for_health", script)
+        self.assertIn("ExecStart=/usr/bin/bash /opt/movie-inbox/scripts/docker-backup.sh", service)
+        self.assertIn("OnCalendar=*-*-* 03:30:00", timer)
+        self.assertIn("Persistent=true", timer)
 
     def test_ci_builds_imports_and_restarts_the_container(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")

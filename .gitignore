@@ -30,6 +30,7 @@ __pycache__/
 /imports/
 /media/
 /secrets/
+/backups/
 /compose.override.yaml
 /compose.override.yml
 /docker-compose.override.yaml

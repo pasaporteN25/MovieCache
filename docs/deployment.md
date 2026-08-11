@@ -140,11 +140,15 @@ Movie Inbox autentica la cuenta antes de entregar el visor. La cookie de sesion 
 - `--forwarded-allow-ips` contiene solamente la direccion del proxy.
 - El owner fue creado y el login funciona a traves del origen HTTPS.
 - `instance.db` no se publica y tiene un backup protegido separado.
+- El timer de backup esta activo, su ultima ejecucion termino correctamente y el
+  archivo mas reciente pasa `movie-inbox backup verify`.
 - Cada `--library-root` es especifico, existe al arrancar y el usuario del servicio tiene
   acceso de solo lectura; las rutas no aparecen en respuestas para miembros.
 - La restauracion desde una exportacion JSON fue probada.
 
-La automatizacion de deploy sigue fuera del workflow de CI por ahora: primero conviene hacer un despliegue manual completo y verificar backup/restauracion.
+La automatizacion de deploy sigue fuera del workflow de CI por ahora. El backup diario
+si puede programarse en el host con las unidades systemd incluidas; una actualizacion
+continua requiriendo un despliegue manual y una verificacion posterior.
 
 El repositorio tambien publica una imagen reproducible y `compose.yaml` para instancias
 nuevas. La guia [docker.md](docker.md) cubre importacion inicial, volumen persistente,

@@ -5,7 +5,17 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 
-from movie_inbox.cli import account, cache, database, enrich_catalog, import_catalog, match_external_links, migrate, scan_library
+from movie_inbox.cli import (
+    account,
+    backup,
+    cache,
+    database,
+    enrich_catalog,
+    import_catalog,
+    match_external_links,
+    migrate,
+    scan_library,
+)
 from movie_inbox.web import server
 
 
@@ -20,6 +30,7 @@ COMMANDS: dict[str, tuple[Command, str]] = {
     "match": (match_external_links.main, "Attach trusted external links."),
     "db": (database.main, "Import, export and inspect SQLite catalogs."),
     "cache": (cache.main, "Inspect, prune or clear the image cache."),
+    "backup": (backup.main, "Create and verify persistent instance backups."),
 }
 
 
