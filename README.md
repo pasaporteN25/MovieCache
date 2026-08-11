@@ -17,6 +17,7 @@ Incluye:
 - `scripts/txt_to_catalog.py`: lee un `.txt` con URLs o titulos y genera JSON y/o CSV.
 - `scripts/scan_video_catalog.sh`: recorre una carpeta local de peliculas y genera JSON desde archivos de video.
 - `scripts/scan_library.py`: sincroniza incrementalmente una biblioteca de video con el catalogo principal.
+- `scripts/docker-backup.sh`: detiene brevemente Compose, crea un backup verificado y comprueba el reinicio.
 - `scripts/view_catalog.py`: servidor local con visor, CRUD, busqueda y detalle del catalogo.
 - `src/movie_inbox/domain/`: modelos, normalizacion, matching y reglas de merge.
 - `src/movie_inbox/application/`: casos de uso compartidos por el visor, importadores y scanner.
@@ -48,6 +49,8 @@ movie-inbox match catalog.json --json catalog-con-links.json
 movie-inbox db import catalog.json --db data/movie-inbox.db
 movie-inbox db export data/movie-inbox.db --json backups/catalog.json
 movie-inbox cache info --dir .catalog-cache/images
+movie-inbox backup create data --output-dir backups --retention-days 14
+movie-inbox backup verify backups/movie-inbox-instance-20260811-033000Z.tar.gz
 ```
 
 En Windows, si la carpeta `Scripts` de Python no esta en `PATH`, usa la forma equivalente:
@@ -128,6 +131,13 @@ py -m movie_inbox db export data/movie-inbox.db --json backups/catalog-2026-07-1
 ```
 
 Cada usuario tambien puede abrir `Administrar > Base de datos` y descargar su catalogo personal. `Descargar JSON` conserva el documento versionado completo y es la opcion indicada para restaurar o migrar las obras; `Descargar CSV` ofrece una copia comoda para planillas. Ninguna de las dos descargas incluye cuentas, sesiones, privacidad, colecciones, seguimientos ni inventario compartido: para recuperar toda una instancia Docker se respalda el volumen completo como indica [docs/docker.md](docs/docker.md).
+
+`movie-inbox backup create` genera un `.tar.gz` atomico de una instancia completa y un
+checksum SHA-256 lateral. Exige `movie-inbox.db` e `instance.db`, lee el archivo para
+verificarlo antes de publicarlo, conserva catalogos de miembros y estado operativo, y
+omite por defecto `image-cache` porque puede reconstruirse. En Docker se ejecuta con
+una parada breve mediante `scripts/docker-backup.sh`; el timer systemd y la retencion
+diaria estan documentados en [docs/docker.md](docs/docker.md#backups-automaticos).
 
 SQLite normaliza obras, aliases, IDs externos, archivos locales, tags y procedencia. Las actualizaciones frecuentes son granulares: estado y fecha se actualizan directamente, mientras que metadata y relaciones reconstruyen solamente la parte modificada del item. Las operaciones batch conservan una transaccion unica pero sincronizan diferencias en vez de reescribir todas las relaciones. Tambien reserva tablas para temporadas y episodios, aunque esa funcionalidad todavia no forma parte del dominio ni de la interfaz. Los archivos `.db`, `.sqlite`, sus journals y `data/` se ignoran en Git.
 

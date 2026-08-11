@@ -27,7 +27,7 @@ En PowerShell, desde la raiz del repositorio:
 
 ```powershell
 Copy-Item .env.example .env
-New-Item -ItemType Directory -Force .\media, .\imports, .\secrets
+New-Item -ItemType Directory -Force .\backups, .\media, .\imports, .\secrets
 Copy-Item .\scripts\catalogv4.json .\imports\catalogv4.json
 ```
 
@@ -38,6 +38,8 @@ MOVIE_INBOX_PUBLIC_ORIGIN=http://localhost:8765
 # Primera unidad o arbol multimedia.
 MOVIE_INBOX_MEDIA_PATH=D:/Peliculas
 MOVIE_INBOX_IMPORT_PATH=./imports
+MOVIE_INBOX_BACKUP_PATH=./backups
+MOVIE_INBOX_BACKUP_RETENTION_DAYS=14
 MOVIE_INBOX_OWNER_USERNAME=lucas
 MOVIE_INBOX_IMAGE_CACHE_MB=512
 MOVIE_INBOX_IMAGE_WARM_MODE=after-access
@@ -49,7 +51,7 @@ ignorado por Git. En Linux debe ser legible por el UID `10001` del contenedor y 
 otros usuarios:
 
 ```bash
-mkdir -p imports media secrets
+mkdir -p backups imports media secrets
 cp .env.example .env
 printf '%s' 'CAMBIAR_ESTA_CONTRASENA' > secrets/owner-password.txt
 sudo chown 10001:10001 secrets/owner-password.txt
@@ -112,6 +114,45 @@ a `docker compose up -d`; las rutas y opciones permanecen en `.env` y Compose.
 En `Administrar > Bibliotecas`, registrar `/media/library/disco1`, no la ruta
 `D:/Peliculas` del host. Compose es la unica capa que conoce la ruta fisica externa.
 
+## Probar una biblioteca real
+
+Primero confirmar desde el contenedor que el mount existe y contiene videos. Este
+comando solo cuenta extensiones conocidas y no modifica nada:
+
+```bash
+docker compose exec -T movie-inbox python -c '
+from pathlib import Path
+from movie_inbox.infrastructure.library_scanner import DEFAULT_EXTENSIONS
+root = Path("/media/library/disco1")
+print("root:", root)
+print("exists:", root.is_dir())
+print("videos:", sum(1 for path in root.rglob("*") if path.is_file() and path.suffix.lower() in DEFAULT_EXTENSIONS))
+'
+```
+
+Despues, como owner:
+
+1. Abrir `Administrar > Bibliotecas` y crear una biblioteca.
+2. Usar un nombre reconocible, por ejemplo `Peliculas principal`.
+3. Elegir `/media/library/disco1` o una subcarpeta interna; nunca la ruta del host.
+4. Dejar la frecuencia en `Manual` durante la prueba.
+5. Ejecutar `Probar recorrido` y esperar a que termine.
+6. Revisar descubiertos, coincidencias, nuevos, ambiguos y errores de lectura.
+7. Ejecutar `Aplicar inventario` solamente cuando el recorrido de prueba sea coherente.
+8. Abrir `Bandeja > Scanner` para revisar los casos nuevos o ambiguos ya inventariados.
+
+`Probar recorrido` guarda el reporte, pero no disponibilidad ni archivos del inventario.
+`Aplicar inventario` vuelve a leer el directorio y persiste el inventario compartido.
+No modifica `status`, fecha de vista, rating o review. Un disco ausente, un error de
+permisos o una desaparicion masiva conservan el ultimo inventario valido.
+
+El scanner administrado no crea obras nuevas en un catalogo personal. Vincula archivos
+a identidades ya conocidas y deja los titulos nuevos o dudosos en la Bandeja. Esto evita
+que un release mal interpretado cree duplicados. Para incorporar la ampliacion de una
+biblioteca se usa por ahora `Bandeja > Importaciones` para crear las obras y luego se
+repite `Probar recorrido` para que el scanner las reconozca. Una accion explicita
+`Crear obra desde este archivo` dentro de la cola Scanner queda como incremento futuro.
+
 ## Varias unidades en OMV o Debian
 
 La imagen contiene ocho slots de montaje precreados. Esto permite conservar el
@@ -167,47 +208,111 @@ Para acceso directo dentro de una LAN sin Nginx se puede cambiar
 `MOVIE_INBOX_BIND_ADDRESS`, pero `MOVIE_INBOX_PUBLIC_ORIGIN` debe coincidir exactamente
 con la URL usada por el navegador.
 
-## Backup
+## Backups automaticos
 
-Exportar un backup portable del catalogo:
+El servicio `movie-inbox-backup` monta el volumen persistente en modo de solo lectura y
+escribe fuera de Docker. Cada ejecucion crea un `.tar.gz` atomico, lo vuelve a leer,
+comprueba que incluya `movie-inbox.db` e `instance.db` y publica un checksum SHA-256.
+Conserva catalogos de miembros, cuentas, privacidad, colecciones e inventario. El cache
+de portadas se omite porque es reproducible.
 
-```powershell
-docker compose exec -T movie-inbox movie-inbox db export `
-  /var/lib/movie-inbox/movie-inbox.db `
-  --json /var/lib/movie-inbox/catalog-backup.json
-docker compose cp `
-  movie-inbox:/var/lib/movie-inbox/catalog-backup.json `
-  .\catalog-backup.json
+Este archivo cubre todos los datos administrados por Movie Inbox, pero no el despliegue
+del host. `.env`, `compose.override.yaml` y `secrets/owner-password.txt` deben tener una
+copia protegida separada; tampoco se copian los videos montados en modo de solo lectura.
+
+En OMV o Debian, configurar una ruta de otro filesystem cuando sea posible:
+
+```dotenv
+MOVIE_INBOX_BACKUP_PATH=/srv/backups/movie-inbox
+MOVIE_INBOX_BACKUP_RETENTION_DAYS=14
 ```
 
-Para respaldar tambien usuarios, privacidad, colecciones y bibliotecas administradas,
-detener primero el servicio y copiar el volumen completo:
+Crear la ruta antes de ejecutar Compose. El bind no se crea automaticamente para evitar
+que un error de montaje termine escribiendo en otro lugar:
 
-```powershell
-docker compose stop movie-inbox
-docker compose cp movie-inbox:/var/lib/movie-inbox/. .\instance-backup
-docker compose start movie-inbox
+```bash
+mkdir -p /srv/backups/movie-inbox
+chmod 700 /srv/backups/movie-inbox
+cd /opt/movie-inbox
+docker compose config --quiet
 ```
 
-En OMV o Debian puede conservarse cada snapshot fuera del volumen de Docker:
+### Prueba manual
+
+El wrapper usa `flock`, detiene brevemente la aplicacion, crea el backup, vuelve a
+iniciarla y espera su healthcheck. Si el backup falla tambien intenta restaurar el
+servicio:
 
 ```bash
 cd /opt/movie-inbox
-backup_dir="/srv/backups/movie-inbox/$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$backup_dir"
-docker compose stop movie-inbox
-docker compose cp movie-inbox:/var/lib/movie-inbox/. "$backup_dir/"
-docker compose start movie-inbox
-echo "Backup completo: $backup_dir"
+bash scripts/docker-backup.sh
+ls -lh /srv/backups/movie-inbox
 ```
 
-Este snapshot contiene `movie-inbox.db`, `instance.db`, los catalogos de miembros,
-colecciones, privacidad, configuracion del scanner y cache. La descarga JSON disponible
-en `Administrar > Base de datos` es complementaria: permite restaurar las obras del
-usuario que la genera, pero no reemplaza este respaldo completo de la instancia.
+Verificar nuevamente cualquier archivo sin extraerlo:
 
-La copia completa debe guardarse fuera del host o volumen principal. Una restauracion se
-ensaya primero sobre un proyecto Compose separado.
+```bash
+archive=$(find /srv/backups/movie-inbox -maxdepth 1 -name '*.tar.gz' -printf '%T@ %p\n' \
+  | sort -nr | head -n1 | cut -d' ' -f2-)
+docker compose run --rm --no-deps movie-inbox-backup \
+  backup verify "/backups/$(basename "$archive")"
+```
+
+`docker compose run` reemplaza el `command` de creacion para esa ejecucion y conserva
+el entrypoint `movie-inbox` de la imagen.
+
+### Programacion diaria
+
+Instalar las unidades de ejemplo y revisar `OnCalendar` si se prefiere otro horario:
+
+```bash
+cd /opt/movie-inbox
+install -m 0644 deploy/movie-inbox-backup.service.example \
+  /etc/systemd/system/movie-inbox-backup.service
+install -m 0644 deploy/movie-inbox-backup.timer.example \
+  /etc/systemd/system/movie-inbox-backup.timer
+systemctl daemon-reload
+systemctl enable --now movie-inbox-backup.timer
+systemctl start movie-inbox-backup.service
+systemctl status movie-inbox-backup.service --no-pager
+systemctl list-timers movie-inbox-backup.timer
+```
+
+Consultar ejecuciones posteriores:
+
+```bash
+journalctl -u movie-inbox-backup.service -n 100 --no-pager
+```
+
+El timer usa `Persistent=true`: si el servidor estaba apagado a las 03:30, systemd
+ejecuta la tarea pendiente al volver. Los archivos completos mas antiguos que
+`MOVIE_INBOX_BACKUP_RETENTION_DAYS` se eliminan junto con su checksum.
+
+La unidad se ejecuta como root porque controla Docker; acceso al socket de Docker ya
+equivale a privilegios de administrador. El directorio de backups debe permanecer con
+modo `0700` y las unidades no deben aceptar parametros provenientes de la web.
+
+### Alcance y restauracion
+
+La descarga JSON de `Administrar > Base de datos` sigue siendo complementaria: permite
+recuperar las obras de ese usuario, pero no cuentas ni estado de instancia. Para probar
+un backup completo, primero validar el checksum y extraerlo en una carpeta temporal o
+en otro proyecto Compose; no sobrescribir el volumen activo como primera prueba:
+
+```bash
+cd /srv/backups/movie-inbox
+archive=$(find . -maxdepth 1 -name '*.tar.gz' -printf '%T@ %p\n' \
+  | sort -nr | head -n1 | cut -d' ' -f2-)
+sha256sum --check "$(basename "$archive").sha256"
+mkdir -p /tmp/movie-inbox-restore-test
+tar -xzf "$archive" -C /tmp/movie-inbox-restore-test
+find /tmp/movie-inbox-restore-test/movie-inbox -maxdepth 2 \
+  \( -name 'movie-inbox.db' -o -name 'instance.db' \) -ls
+```
+
+Al menos una copia debe vivir fuera del volumen y, preferentemente, fuera del mismo
+disco fisico. Una restauracion destructiva sigue siendo una operacion manual para evitar
+reemplazar por accidente una instancia sana.
 
 ## Actualizacion
 

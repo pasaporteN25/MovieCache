@@ -1,0 +1,15 @@
+[Unit]
+Description=Create a verified Movie Inbox instance backup
+Requires=docker.service
+After=docker.service
+ConditionPathExists=/opt/movie-inbox/compose.yaml
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/movie-inbox
+Environment=MOVIE_INBOX_PROJECT_DIR=/opt/movie-inbox
+ExecStart=/usr/bin/bash /opt/movie-inbox/scripts/docker-backup.sh
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

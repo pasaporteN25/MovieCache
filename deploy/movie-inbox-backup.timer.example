@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up Movie Inbox every day
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=15m
+Persistent=true
+Unit=movie-inbox-backup.service
+
+[Install]
+WantedBy=timers.target

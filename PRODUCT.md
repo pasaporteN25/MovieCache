@@ -95,6 +95,10 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - Las portadas se cargan progresivamente despues del primer acceso a cada catalogo o
   coleccion y quedan en el almacenamiento persistente de la instancia. La navegacion
   visible tiene prioridad y nunca espera a que termine la cola global.
+- Una instancia Docker puede producir backups completos verificados fuera de su volumen,
+  omitiendo el cache reproducible y conservando catalogos, cuentas, privacidad,
+  colecciones e inventario. La programacion pertenece al host y detiene brevemente la
+  aplicacion para obtener un estado coherente de SQLite.
 - `Inicio` ofrece una programacion editorial diaria, estable y explicable. Su cartelera
   principal solamente usa obras disponibles; las secciones pueden reunir pendientes
   disponibles, obras faltantes de colecciones seguidas, recuerdos personales por

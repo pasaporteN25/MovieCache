@@ -30,7 +30,18 @@ class PackageLayoutTests(unittest.TestCase):
     def test_installed_command_surface_is_complete(self) -> None:
         self.assertEqual(
             set(COMMANDS),
-            {"account", "import", "scan", "serve", "migrate", "enrich", "match", "db", "cache"},
+            {
+                "account",
+                "backup",
+                "cache",
+                "db",
+                "enrich",
+                "import",
+                "match",
+                "migrate",
+                "scan",
+                "serve",
+            },
         )
 
     def test_external_clients_are_registered_independently(self) -> None:

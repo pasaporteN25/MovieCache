@@ -68,6 +68,36 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
 
+  movie-inbox-backup:
+    image: ${MOVIE_INBOX_IMAGE:-movie-inbox:local}
+    profiles:
+      - maintenance
+    command:
+      - backup
+      - create
+      - /var/lib/movie-inbox
+      - --output-dir
+      - /backups
+      - --retention-days
+      - ${MOVIE_INBOX_BACKUP_RETENTION_DAYS:-14}
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - movie-inbox-data:/var/lib/movie-inbox:ro
+      - type: bind
+        source: ${MOVIE_INBOX_BACKUP_PATH:-./backups}
+        target: /backups
+        read_only: false
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
 secrets:
   owner_password:
     file: ${MOVIE_INBOX_OWNER_PASSWORD_FILE:-./secrets/owner-password.txt}
