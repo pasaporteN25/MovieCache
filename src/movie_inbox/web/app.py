@@ -66,6 +66,11 @@ from movie_inbox.application.library_service import (
     ManagedLibraryScheduler,
     ManagedLibraryService,
 )
+from movie_inbox.application.search_service import (
+    group_external_results,
+    rank_catalog_candidates,
+    search_catalog_items,
+)
 from movie_inbox.application.member_service import (
     ManagedMember,
     MemberAuthorizationError,
@@ -846,6 +851,25 @@ def create_app(config: ViewerConfig) -> FastAPI:
         except LibraryRepositoryError:
             return error_response("library_store_unavailable", 503)
 
+    @app.get("/api/library-paths", dependencies=[Depends(require_token)])
+    def browse_library_paths(request: Request, path: str = "") -> JSONResponse:
+        require_owner(request)
+        try:
+            return JSONResponse(library_service.browse_paths(path))
+        except LibraryPathError as error:
+            return error_response(str(error), 400)
+
+    @app.post("/api/library-paths/check")
+    def check_library_path(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        require_owner(request)
+        try:
+            return JSONResponse({"ok": True, **library_service.check_path(str(body.get("path") or ""))})
+        except LibraryPathError as error:
+            return error_response(str(error), 400)
+
     @app.post("/api/libraries")
     def create_managed_library(
         request: Request,
@@ -1519,14 +1543,53 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return curation_application_error_response(error)
 
     @app.get("/api/search", dependencies=[Depends(require_token)])
-    def search(q: str = "", source: str = "all") -> JSONResponse:
-        results = search_sources(q, source)
+    def search(
+        request: Request,
+        q: str = "",
+        source: str = "all",
+        external: bool = True,
+        identity: AuthenticatedIdentity = Depends(require_ready_identity),
+    ) -> JSONResponse:
+        _, _, rows = session_catalog_rows(identity)
+        catalog_results = search_catalog_items(rows, q)
+        results = search_sources(q, source) if external else []
+        source_groups = group_external_results(results)
         print(
             f"[catalog-viewer] search query={q!r} source={source} "
-            f"count={len(results)} result_sources={sorted(set(str(result.get('source') or '') for result in results))}",
+            f"catalog_count={len(catalog_results)} external_count={len(results)} "
+            f"result_sources={sorted(set(str(result.get('source') or '') for result in results))}",
             flush=True,
         )
-        return JSONResponse({"results": results, "external": external_sources_snapshot()})
+        return JSONResponse(
+            {
+                "query": q,
+                "catalog": {"results": catalog_results, "count": len(catalog_results)},
+                "sources": {
+                    name: {"results": grouped, "count": len(grouped)}
+                    for name, grouped in source_groups.items()
+                },
+                "results": results,
+                "external": external_sources_snapshot(),
+            }
+        )
+
+    @app.post("/api/search/catalog-candidates")
+    def search_catalog_candidates(
+        request: Request,
+        body: dict[str, Any] = Depends(authorized_json),
+    ) -> JSONResponse:
+        identity = require_ready_identity(request)
+        raw_result = body.get("result") if isinstance(body.get("result"), dict) else body
+        enriched = enrich_selected_result(raw_result)
+        _, _, rows = session_catalog_rows(identity)
+        candidates = rank_catalog_candidates(rows, enriched)
+        return JSONResponse(
+            {
+                "candidate": enriched,
+                "results": candidates,
+                "count": len(candidates),
+            }
+        )
 
     @app.get("/api/source-health", dependencies=[Depends(require_token)])
     def source_health() -> JSONResponse:

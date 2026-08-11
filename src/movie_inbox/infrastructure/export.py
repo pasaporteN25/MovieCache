@@ -27,6 +27,7 @@ def catalog_csv_text(items: list[CatalogItem]) -> str:
         for key in ("alternative_titles", "genres", "directors", "writers", "cast", "tags"):
             row[key] = ", ".join(row.get(key, []))
         row["local_files"] = json.dumps(row.get("local_files", []), ensure_ascii=False)
+        row["release_dates"] = json.dumps(row.get("release_dates", []), ensure_ascii=False)
         row["metadata_sources"] = json.dumps(row.get("metadata_sources", {}), ensure_ascii=False)
         row["locked_fields"] = ", ".join(row.get("locked_fields", []))
         writer.writerow(row)

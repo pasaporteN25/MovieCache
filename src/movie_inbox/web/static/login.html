@@ -23,30 +23,45 @@
             <span>ARCHIVE</span>
           </div>
           <div class="login-pass-body">
-            <div class="login-heading">
-              <span class="eyebrow">Credencial del videoclub</span>
-              <h2 id="loginTitle">Ingresar</h2>
+            <div class="login-member-layout">
+              <div class="login-member-data">
+                <div class="login-heading">
+                  <span class="eyebrow">Credencial del videoclub</span>
+                  <h2 id="loginTitle">Ingresar</h2>
+                </div>
+                <dl class="login-member-facts" aria-label="Datos de la credencial">
+                  <div><dt>Titular</dt><dd id="loginMemberAlias">Sin identificar</dd></div>
+                  <div><dt>Acceso</dt><dd>Cat&aacute;logo personal</dd></div>
+                  <div><dt>Vigencia</dt><dd>Sesi&oacute;n actual</dd></div>
+                </dl>
+                <form id="loginForm" class="login-form">
+                  <label>
+                    <span>Usuario</span>
+                    <input id="loginUsername" name="username" autocomplete="username" required autofocus>
+                  </label>
+                  <label>
+                    <span>Contrase&ntilde;a</span>
+                    <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+                  </label>
+                  <label class="login-password-toggle">
+                    <input id="showPassword" type="checkbox">
+                    <span>Mostrar contrase&ntilde;a</span>
+                  </label>
+                  <p id="loginFeedback" class="login-feedback" role="alert" aria-live="polite" hidden></p>
+                  <button id="loginSubmit" class="login-submit" type="submit">Entrar</button>
+                </form>
+              </div>
+              <aside class="login-member-photo" aria-label="Retrato genérico de la credencial">
+                <div class="login-photo-frame" aria-hidden="true"><span>MI</span></div>
+                <strong>SOCIO LOCAL</strong>
+                <span>Identidad privada</span>
+                <small>N&deg; -- / --</small>
+              </aside>
             </div>
-            <form id="loginForm" class="login-form">
-              <label>
-                <span>Usuario</span>
-                <input id="loginUsername" name="username" autocomplete="username" required autofocus>
-              </label>
-              <label>
-                <span>Contrase&ntilde;a</span>
-                <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
-              </label>
-              <label class="login-password-toggle">
-                <input id="showPassword" type="checkbox">
-                <span>Mostrar contrase&ntilde;a</span>
-              </label>
-              <p id="loginFeedback" class="login-feedback" role="alert" aria-live="polite" hidden></p>
-              <button id="loginSubmit" class="login-submit" type="submit">Entrar</button>
-            </form>
           </div>
           <footer class="login-pass-footer">
-            <span>Instancia privada</span>
-            <span>Sesi&oacute;n protegida</span>
+            <span>Emisi&oacute;n: instancia privada</span>
+            <span>Presentar para ingresar</span>
           </footer>
         </div>
       </section>

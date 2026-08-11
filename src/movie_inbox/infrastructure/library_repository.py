@@ -382,12 +382,28 @@ class SqliteLibraryRepository:
         identity: dict[str, Any] | None,
         updated_at: int,
     ) -> LibraryFile:
+        return self.review_files([file_id], action, identity, updated_at)[0]
+
+    def review_files(
+        self,
+        file_ids: list[str],
+        action: str,
+        identity: dict[str, Any] | None,
+        updated_at: int,
+    ) -> list[LibraryFile]:
+        unique_ids = list(dict.fromkeys(str(file_id or "") for file_id in file_ids if str(file_id or "")))
+        if not unique_ids:
+            raise LibraryNotFound("Scanner queue item was not found")
         with self._thread_lock:
             try:
                 with closing(self._connect()) as connection:
                     connection.execute("BEGIN IMMEDIATE")
-                    row = connection.execute("SELECT * FROM library_files WHERE id = ?", (file_id,)).fetchone()
-                    if row is None:
+                    placeholders = ",".join("?" for _ in unique_ids)
+                    rows = connection.execute(
+                        f"SELECT * FROM library_files WHERE id IN ({placeholders})",
+                        unique_ids,
+                    ).fetchall()
+                    if len(rows) != len(unique_ids):
                         connection.rollback()
                         raise LibraryNotFound("Scanner queue item was not found")
                     if action == "ignore":
@@ -404,12 +420,16 @@ class SqliteLibraryRepository:
                         raise ValueError("Scanner review action must be confirm or ignore")
                     connection.execute(
                         """UPDATE library_files SET state = ?, work_key = ?, identity_json = ?,
-                            candidates_json = '[]', updated_at = ? WHERE id = ?""",
-                        (state, work_key, _json_dump(payload), updated_at, file_id),
+                            candidates_json = '[]', updated_at = ?
+                            WHERE id IN (""" + placeholders + ")",
+                        (state, work_key, _json_dump(payload), updated_at, *unique_ids),
                     )
                     connection.commit()
-                    updated = connection.execute("SELECT * FROM library_files WHERE id = ?", (file_id,)).fetchone()
-                    return _file(updated)
+                    updated_rows = connection.execute(
+                        f"SELECT * FROM library_files WHERE id IN ({placeholders}) ORDER BY relative_key",
+                        unique_ids,
+                    ).fetchall()
+                    return [_file(row) for row in updated_rows]
             except (LibraryNotFound, ValueError):
                 raise
             except sqlite3.Error as error:

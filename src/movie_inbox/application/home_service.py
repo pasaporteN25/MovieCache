@@ -11,10 +11,11 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 from movie_inbox.domain.catalog import catalog_membership, external_urls, title_match_key
 from movie_inbox.domain.collections import CuratedCollection
 from movie_inbox.domain.normalization import normalize_bool, normalize_rating
+from movie_inbox.domain.releases import normalize_release_dates
 
 
 HOME_SECTION_LIMIT = 6
-HOME_SECTION_COUNT = 4
+HOME_SECTION_COUNT = 5
 _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -37,6 +38,10 @@ class EditorialHomeService:
 
         hero = self._hero(catalog, seed, used_ids)
         sections: list[dict[str, Any]] = []
+
+        anniversary = self._anniversary_section(catalog, day, seed, used_ids)
+        if anniversary:
+            sections.append(anniversary)
 
         available = self._available_section(catalog, seed, used_ids)
         if available:
@@ -101,7 +106,7 @@ class EditorialHomeService:
             reason = _reason(
                 "available_pending",
                 "Disponible y pendiente",
-                "Esta en tu biblioteca fisica y todavia no la marcaste como vista.",
+                "Está en tu biblioteca física y todavía no la marcaste como vista.",
             )
         else:
             reason = _reason(
@@ -136,7 +141,7 @@ class EditorialHomeService:
                     _reason(
                         "available_pending",
                         "Lista para ver",
-                        "El inventario confirma que esta disponible y sigue pendiente.",
+                        "El inventario confirma que está disponible y sigue pendiente.",
                     ),
                 )
             )
@@ -144,8 +149,53 @@ class EditorialHomeService:
             "available",
             "Para ver ahora",
             "Disponible esta noche",
-            "Pendientes que tu biblioteca fisica confirma como disponibles.",
-            {"kind": "catalog", "label": "Ver coleccion", "status": "to_watch"},
+            "Pendientes que tu biblioteca física confirma como disponibles.",
+            {"kind": "catalog", "label": "Ver colección", "status": "to_watch"},
+            entries,
+        )
+
+    def _anniversary_section(
+        self,
+        catalog: list[dict[str, Any]],
+        local_date: str,
+        seed: str,
+        used_ids: set[str],
+    ) -> dict[str, Any] | None:
+        day = date.fromisoformat(local_date)
+        candidates: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        for item in catalog:
+            if _catalog_key(item) in used_ids:
+                continue
+            release = _anniversary_release(item, day)
+            if release:
+                candidates.append((item, release))
+        selected = self._take(candidates, f"{seed}|anniversary", lambda row: _catalog_key(row[0]))
+        if not selected:
+            return None
+        entries: list[dict[str, Any]] = []
+        for item, release in selected:
+            used_ids.add(_catalog_key(item))
+            release_day = date.fromisoformat(str(release["date"]))
+            elapsed = max(0, day.year - release_day.year)
+            elapsed_label = f"hace {elapsed} año" if elapsed == 1 else f"hace {elapsed} años"
+            if elapsed == 0:
+                elapsed_label = "hoy"
+            entries.append(
+                _catalog_entry(
+                    item,
+                    _reason(
+                        "release_anniversary",
+                        f"Estreno del {_spanish_day_month(release_day)}",
+                        f"Su fecha de estreno registrada fue {elapsed_label}.",
+                    ),
+                )
+            )
+        return _section(
+            "anniversary",
+            "Efemérides del archivo",
+            "Estrenadas un día como hoy",
+            "Obras de tu catálogo con una fecha de estreno completa para esta jornada.",
+            {"kind": "catalog", "label": "Ver fichas"},
             entries,
         )
 
@@ -188,7 +238,7 @@ class EditorialHomeService:
                 "reason": _reason(
                     "followed_collection",
                     f"En {collection.title}",
-                    "Seguis esta coleccion y la obra todavia no esta en tu catalogo personal.",
+                    "Seguís esta colección y la obra todavía no está en tu catálogo personal.",
                 ),
             }
             for collection, entry in selected
@@ -227,26 +277,26 @@ class EditorialHomeService:
                 reason = _reason(
                     "watched_without_record",
                     "Vista, sin registro",
-                    "La marcaste como vista pero todavia no tiene puntaje ni review.",
+                    "La marcaste como vista pero todavía no tiene puntaje ni review.",
                 )
             elif missing_rating:
                 reason = _reason(
                     "watched_without_rating",
                     "Vista, sin puntuar",
-                    "Tu review esta guardada; falta sumar un puntaje.",
+                    "Tu review está guardada; falta sumar un puntaje.",
                 )
             else:
                 reason = _reason(
                     "watched_without_review",
                     "Vista, sin review",
-                    "Ya tiene puntaje; falta registrar que te dejo.",
+                    "Ya tiene puntaje; falta registrar qué te dejó.",
                 )
             entries.append(_catalog_entry(item, reason))
         return _section(
             "memory",
             "Memoria personal",
             "Tu archivo pide memoria",
-            "Obras vistas cuyo recuerdo todavia puede completarse.",
+            "Obras vistas cuyo recuerdo todavía puede completarse.",
             {"kind": "catalog", "label": "Ver fichas", "status": "watched"},
             entries,
         )
@@ -279,7 +329,7 @@ class EditorialHomeService:
             route["eyebrow"],
             route["title"],
             route["description"],
-            {"kind": "catalog", "label": "Explorar coleccion"},
+            {"kind": "catalog", "label": "Explorar colección"},
             entries,
         )
 
@@ -302,7 +352,7 @@ class EditorialHomeService:
                 _reason(
                     "recently_added",
                     "Agregada recientemente",
-                    "Es una de las incorporaciones mas nuevas de tu catalogo personal.",
+                    "Es una de las incorporaciones más nuevas de tu catálogo personal.",
                 ),
             )
             for item in selected
@@ -310,9 +360,9 @@ class EditorialHomeService:
         return _section(
             "recent",
             "Nuevos ingresos",
-            "Recien llegadas",
-            "Las incorporaciones mas recientes de tu archivo.",
-            {"kind": "catalog", "label": "Ver coleccion"},
+            "Recién llegadas",
+            "Las incorporaciones más recientes de tu archivo.",
+            {"kind": "catalog", "label": "Ver colección"},
             entries,
         )
 
@@ -442,9 +492,9 @@ def _routes(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
                 "key": f"director:{key}",
                 "eyebrow": "Programa de autor",
                 "title": f"Una ruta por {label}",
-                "description": f"Una linea de {label} dentro de tu propio archivo.",
+                "description": f"Una línea de {label} dentro de tu propio archivo.",
                 "reason_code": "shared_director",
-                "reason_label": f"Direccion: {label}",
+                "reason_label": f"Dirección: {label}",
                 "reason_detail": f"Forma parte de una ruta de obras dirigidas por {label}.",
                 "items": grouped,
             }
@@ -456,12 +506,12 @@ def _routes(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         routes.append(
             {
                 "key": f"genre:{key}",
-                "eyebrow": "Afinidad de genero",
+                "eyebrow": "Afinidad de género",
                 "title": f"Una ruta por {label}",
-                "description": f"Una seleccion de {label} que ya vive en tu catalogo.",
+                "description": f"Una selección de {label} que ya vive en tu catálogo.",
                 "reason_code": "shared_genre",
-                "reason_label": f"Genero: {label}",
-                "reason_detail": f"Comparte el genero {label} con el resto de esta ruta.",
+                "reason_label": f"Género: {label}",
+                "reason_detail": f"Comparte el género {label} con el resto de esta ruta.",
                 "items": grouped,
             }
         )
@@ -471,12 +521,12 @@ def _routes(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         routes.append(
             {
                 "key": f"decade:{decade}",
-                "eyebrow": "Sesion de epoca",
-                "title": f"Una ruta por los anos {decade}",
-                "description": f"Obras de los anos {decade} conservadas en tu archivo.",
+                "eyebrow": "Sesión de época",
+                "title": f"Una ruta por los años {decade}",
+                "description": f"Obras de los años {decade} conservadas en tu archivo.",
                 "reason_code": "shared_decade",
-                "reason_label": f"De los anos {decade}",
-                "reason_detail": f"Fue estrenada durante la decada de {decade}.",
+                "reason_label": f"De los años {decade}",
+                "reason_detail": f"Fue estrenada durante la década de {decade}.",
                 "items": grouped,
             }
         )
@@ -496,3 +546,21 @@ def _list_values(value: Any) -> list[str]:
 def _year(value: Any) -> int:
     match = re.search(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b", str(value or ""))
     return int(match.group(1)) if match else 0
+
+
+def _anniversary_release(item: Mapping[str, Any], day: date) -> dict[str, Any] | None:
+    for release in normalize_release_dates(item.get("release_dates")):
+        if release["precision"] != "day":
+            continue
+        release_day = date.fromisoformat(str(release["date"]))
+        if release_day.year <= day.year and (release_day.month, release_day.day) == (day.month, day.day):
+            return release
+    return None
+
+
+def _spanish_day_month(value: date) -> str:
+    months = (
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+    )
+    return f"{value.day} de {months[value.month - 1]}"

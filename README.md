@@ -43,7 +43,7 @@ movie-inbox import links.txt --json catalog.json --fetch
 movie-inbox scan --config scanner.json --dry-run
 movie-inbox account bootstrap --instance-db .movie-inbox/instance.db --catalog catalog.json --username lucas
 movie-inbox serve catalog.json
-movie-inbox migrate catalog-viejo.json --json catalog-v5.json
+movie-inbox migrate catalog-viejo.json --json catalog-v6.json
 movie-inbox enrich catalog.json --json catalog-enriquecido.json
 movie-inbox match catalog.json --json catalog-con-links.json
 movie-inbox db import catalog.json --db data/movie-inbox.db
@@ -187,8 +187,9 @@ Para otros sitios intenta extraer lo mas comun desde OpenGraph, `<title>` o meta
 ### Scanner administrado en el servidor
 
 Para una instancia self-hosted, el modo recomendado es habilitar explicitamente las
-raices que Movie Inbox puede leer al iniciar el visor. La aplicacion no ofrece un
-explorador remoto ni acepta rutas fuera de esta lista:
+raices que Movie Inbox puede leer al iniciar el visor. El owner puede recorrer esas
+raices desde un explorador interno y comprobar una carpeta antes de guardarla; la API
+no acepta ni muestra rutas fuera de esa lista, y los miembros nunca ven rutas:
 
 ```powershell
 movie-inbox serve data/movie-inbox.db `
@@ -204,6 +205,12 @@ entonces puede habilitarse `Escaneo automatico` si la frecuencia es horaria o di
 Una biblioteca manual nunca necesita activarse y conserva `Escanear ahora` como accion
 principal. Los recorridos se ejecutan fuera del request HTTP y su estado persiste en
 `instance.db`.
+
+El recorrido ignora por defecto subcarpetas llamadas `extra`, `extras`, `sample` o
+`samples`, sin importar mayusculas. Los archivos `CD1/CD2`, `disc1/disc2` o `disk1/disk2`
+que comparten carpeta, titulo, ano y tipo se presentan como una sola obra en la Bandeja.
+Confirmar u omitir ese caso actualiza todas sus partes en una unica transaccion, aunque
+el inventario conserva cada archivo y suma su disponibilidad real.
 
 El inventario fisico pertenece a la instancia. Una coincidencia fuerte aporta
 disponibilidad verificada a los catalogos de todos los usuarios sin copiar obras ni
@@ -366,11 +373,29 @@ La previsualizacion clasifica cada fila como `Nueva`, `Presente`, `Revisar` o `I
 
 Todos los usuarios pueden copiar las obras nuevas seleccionadas a su catalogo personal. Antes de confirmar pueden decidir si conservan estado, fecha de vista, puntaje y review. La operacion es idempotente: reintentar el mismo borrador no crea copias. El owner tambien puede convertir las filas validas en una coleccion local privada nueva; esa coleccion no hereda ningun campo personal y no modifica el catalogo. Este incremento no importa hacia colecciones existentes, no ejecuta enriquecimiento externo y no recorre discos.
 
-El visor tiene una consola de busqueda unica. Cada consulta filtra directamente `La coleccion`, sin repetir las mismas obras en una segunda lista local. `Buscar tambien en fuentes externas` agrega resultados de Wikipedia, IMDb y FilmAffinity solamente despues de tocar `Buscar` o presionar Enter. La consulta, los filtros y el orden quedan representados en la URL para que Atras y Adelante restauren la estanteria correcta. Si abriste varios catalogos, por defecto escribe en el primero resuelto; podes elegir otro archivo con el nombre compatible `--write-json`:
+El visor tiene una consola de busqueda unica. Al tocar `Buscar`, el servidor consulta el
+catalogo personal completo por titulo principal, original, espanol, ingles, aliases,
+nombres de archivo, IDs, links y metadata, ignorando tildes y tolerando una errata en
+palabras largas. `Buscar tambien en fuentes externas` agrega Wikipedia, IMDb y
+FilmAffinity solamente despues de la accion explicita. La consulta, los filtros y el
+orden quedan representados en la URL para que Atras y Adelante restauren la estanteria
+correcta. Si abriste varios catalogos, por defecto escribe en el primero resuelto;
+podes elegir otro archivo con el nombre compatible `--write-json`:
 
-Las consultas externas se ejecutan en paralelo mediante adaptadores independientes y se guardan durante 15 minutos en un cache de memoria. Un error en una fuente no cancela las otras. `External DBs` muestra estado, latencia, cantidad de resultados y errores por fuente, ademas de hits, misses y entradas del cache. Wikipedia devuelve primero datos livianos para mostrar resultados rapido y completa la metadata de la entrada elegida recien al agregarla o combinarla.
+Las consultas externas se ejecutan en paralelo mediante adaptadores independientes y
+se guardan durante 15 minutos en un cache de memoria. Un error en una fuente no cancela
+las otras. Los resultados aparecen en estanterias separadas de Wikipedia, IMDb y
+FilmAffinity, con seis opciones iniciales y carga adicional por fuente. `External DBs`
+muestra estado, latencia, cantidad de resultados y errores, ademas de hits, misses y
+entradas del cache. Wikipedia devuelve primero datos livianos y completa la metadata de
+la entrada elegida recien al agregarla o combinarla.
 
-Los resultados elegidos de IMDb tambien intentan resolverse mediante su ID en Wikidata/Wikipedia antes de guardarse. Eso permite completar titulo original, titulo en espanol, titulo en ingles y aliases de otros idiomas cuando existen. La busqueda local ignora tildes y tolera una errata de un caracter en palabras largas.
+Los resultados elegidos de IMDb tambien intentan resolverse mediante su ID en
+Wikidata/Wikipedia antes de guardarse. Eso permite completar titulo original, titulo en
+espanol, titulo en ingles, aliases y fechas de estreno con su precision cuando existen.
+Al comparar un resultado externo, el servidor enriquece primero esa opcion y aplica el
+mismo ranking sobre todo el catalogo, por lo que aliases o nombres locales que no
+coinciden con la consulta inicial siguen pudiendo aparecer antes de crear un duplicado.
 
 ```powershell
 python scripts/view_catalog.py catalog_wiki_v5.json --write-json catalog_wiki_v5.json
@@ -444,12 +469,20 @@ Un titulo exacto sin ano, con ano distinto o con tipo incompatible nunca se comb
 
 ## Esquema versionado y migracion
 
-Las escrituras nuevas usan `schema_version: 5` y guardan las entradas dentro de `items`. Los catalogos legacy y las versiones 1 a 4 pasan por migraciones explicitas antes de usarse. Una version futura, una raiz mal formada o una fila invalida se rechazan y nunca se interpretan como catalogo vacio ni se reescriben silenciosamente. Cada obra puede tener varios archivos fisicos en `local_files`; `local_name` y `local_path` se mantienen por compatibilidad. La version 3 sumo procedencia y bloqueos de metadata. La version 4 agrego a cada archivo `library_id`, `relative_path`, `fingerprint`, `last_seen_at` y `available` para soportar sincronizacion incremental. La version 5 agrega `link_curation_status`, `duplicate_decisions` y `curation_updated_at` para que las decisiones de la Bandeja sean persistentes.
+Las escrituras nuevas usan `schema_version: 6` y guardan las entradas dentro de `items`.
+Los catalogos legacy y las versiones 1 a 5 pasan por migraciones explicitas antes de
+usarse. Una version futura, una raiz mal formada o una fila invalida se rechazan y nunca
+se interpretan como catalogo vacio ni se reescriben silenciosamente. Cada obra puede
+tener varios archivos fisicos en `local_files`; `local_name` y `local_path` se mantienen
+por compatibilidad. La version 3 sumo procedencia y bloqueos de metadata. La version 4
+agrego identidad incremental a cada archivo. La version 5 agrego decisiones persistentes
+de curaduria. La version 6 incorpora `release_dates`, conservando fecha, precision, pais,
+tipo de estreno, fuente y la marca de fecha principal.
 
 Para convertir un catalogo completo sin reemplazar el original:
 
 ```powershell
-py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalogv5.json
+py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalogv6.json
 ```
 
 Las escrituras del visor y del importador son atomicas: primero se completa un archivo temporal y luego se reemplaza el JSON. El visor bloquea cada catalogo durante operaciones de escritura concurrentes y conserva un unico backup automatico reemplazable.

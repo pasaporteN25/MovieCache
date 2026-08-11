@@ -473,12 +473,12 @@
             <section class="search-section comparison-section" id="catalogMergeSection" aria-labelledby="catalogMergeTitle">
               <div class="section-heading">
                 <div>
-                  <span class="section-kicker">Comparación</span>
+                  <span id="catalogMergeKicker" class="section-kicker">Comparación</span>
                   <strong id="catalogMergeTitle">Entrada de la colección</strong>
                 </div>
                 <div class="status-line" id="catalogMergeStatus"></div>
               </div>
-              <div class="search-results" id="catalogMergeResults"></div>
+              <div class="search-results search-shelf-results" id="catalogMergeResults"></div>
             </section>
             <section class="search-section external-results-section" id="externalSearchSection" aria-labelledby="externalSearchTitle">
               <div class="section-heading">
@@ -488,7 +488,7 @@
                 </div>
                 <div class="status-line" id="manualSearchStatus"></div>
               </div>
-              <div class="search-results" id="manualSearchResults"></div>
+              <div class="search-source-groups" id="manualSearchResults"></div>
             </section>
           </div>
         </section>
@@ -698,8 +698,25 @@
           <label>
             <span>Ruta absoluta del servidor</span>
             <input id="libraryRootPath" name="root_path" autocomplete="off" placeholder="/mnt/peliculas" required>
-            <small id="libraryRootHint">La ruta debe estar dentro de una raíz habilitada al iniciar Movie Inbox.</small>
           </label>
+          <div class="library-path-tools">
+            <div class="library-path-actions">
+              <button id="browseLibraryPath" class="quiet-action" type="button">Explorar servidor</button>
+              <button id="checkLibraryPath" class="quiet-action" type="button">Comprobar ruta</button>
+            </div>
+            <small id="libraryRootHint">La ruta debe estar dentro de una raíz habilitada al iniciar Movie Inbox.</small>
+            <p id="libraryPathFeedback" class="library-path-feedback" role="status" aria-live="polite"></p>
+          </div>
+          <section id="libraryPathBrowser" class="library-path-browser" aria-label="Carpetas permitidas del servidor" hidden>
+            <header>
+              <div><strong id="libraryPathBrowserTitle">Raíces disponibles</strong><span id="libraryPathBrowserCurrent"></span></div>
+              <div>
+                <button id="libraryPathParent" class="quiet-action" type="button" hidden>Subir</button>
+                <button id="useLibraryPath" type="button" hidden>Usar esta carpeta</button>
+              </div>
+            </header>
+            <div id="libraryPathDirectories" class="library-path-directories"></div>
+          </section>
           <label>
             <span>Automatización después de aplicar</span>
             <select id="librarySchedule" name="schedule">

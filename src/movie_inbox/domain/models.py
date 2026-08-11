@@ -114,6 +114,7 @@ class CatalogItem(ModelMapping):
     watched_at: str = ""
     rating: int = 0
     year: str = ""
+    release_dates: list[dict[str, Any]] = field(default_factory=list)
     description: str = ""
     wikipedia_url: str = ""
     imdb_url: str = ""
@@ -144,6 +145,9 @@ class CatalogItem(ModelMapping):
     extra: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        from movie_inbox.domain.releases import normalize_release_dates
+
+        self.release_dates = normalize_release_dates(self.release_dates)
         self.local_files = self.coerce_field("local_files", self.local_files)
         self.metadata_sources = self.coerce_field("metadata_sources", self.metadata_sources)
         self.duplicate_decisions = self.coerce_field("duplicate_decisions", self.duplicate_decisions)
@@ -184,6 +188,7 @@ class ExternalSearchResult(TypedDict, total=False):
     alternative_titles: list[str]
     kind: str
     year: str
+    release_dates: list[dict[str, Any]]
     description: str
     wikipedia_url: str
     imdb_url: str

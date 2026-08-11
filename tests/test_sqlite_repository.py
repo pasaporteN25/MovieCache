@@ -34,6 +34,17 @@ def sample_item(item_id: str = "heat-1995"):
             "status": "to_watch",
             "rating": 0,
             "year": "1995",
+            "release_dates": [
+                {
+                    "date": "1995-12-15",
+                    "precision": "day",
+                    "country": "US",
+                    "release_type": "theatrical",
+                    "source": "wikidata",
+                    "source_url": "https://www.wikidata.org/wiki/Q42198",
+                    "is_primary": True,
+                }
+            ],
             "imdb_url": "https://www.imdb.com/title/tt0113277/",
             "wikidata_id": "Q42198",
             "genres": ["Crime", "Drama"],
@@ -94,12 +105,13 @@ class SqliteRepositoryTests(unittest.TestCase):
                 connection.commit()
 
             repository = SqliteCatalogRepository(path, normalize_item)
-            self.assertEqual(repository.database_version(), 3)
+            self.assertEqual(repository.database_version(), 4)
             with closing(sqlite3.connect(path)) as connection:
                 columns = {row[1] for row in connection.execute("PRAGMA table_info(catalog_items)")}
                 tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
             self.assertTrue({"backdrop_image", "tmdb_id", "link_curation_status", "curation_updated_at"} <= columns)
             self.assertIn("duplicate_decisions", tables)
+            self.assertIn("release_dates", tables)
 
     def test_relational_round_trip_preserves_catalog_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -115,6 +127,7 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.wikidata_id, "Q42198")
             self.assertEqual(loaded.backdrop_image, "https://images.example/backdrop.jpg")
             self.assertEqual(loaded.tmdb_id, "949")
+            self.assertEqual(loaded.release_dates[0]["date"], "1995-12-15")
             self.assertEqual(loaded.link_curation_status, "resolved")
             self.assertEqual(loaded.duplicate_decisions["other::catalog.json"]["status"], "not_duplicate")
             self.assertEqual(loaded.local_files[0].library_id, "movies-a")
@@ -127,10 +140,10 @@ class SqliteRepositoryTests(unittest.TestCase):
                     for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
                 }
             self.assertTrue(
-                {"catalog_items", "external_ids", "local_files", "seasons", "episodes", "duplicate_decisions"}
+                {"catalog_items", "external_ids", "local_files", "seasons", "episodes", "duplicate_decisions", "release_dates"}
                 <= tables
             )
-            self.assertEqual(repository.database_version(), 3)
+            self.assertEqual(repository.database_version(), 4)
 
     def test_catalog_service_mutates_sqlite_transactionally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -280,7 +293,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 self.assertEqual(import_json(source, database), 0)
                 self.assertEqual(export_json(database, exported), 0)
             payload = json.loads(exported.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema_version"], 5)
+            self.assertEqual(payload["schema_version"], 6)
             self.assertEqual(payload["items"][0]["id"], "heat-1995")
 
     def test_json_import_reads_source_without_creating_a_sidecar_lock(self) -> None:

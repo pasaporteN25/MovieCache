@@ -30,7 +30,7 @@ class EditorialHomeServiceTests(unittest.TestCase):
         self.assertEqual(first["hero"]["reason"]["code"], "available_pending")
         self.assertTrue(first["hero"]["item"]["en_catalogo"])
         self.assertEqual(first["hero"]["item"]["status"], "to_watch")
-        self.assertLessEqual(len(first["sections"]), 4)
+        self.assertLessEqual(len(first["sections"]), 5)
         self.assertTrue(all(len(section["items"]) <= 6 for section in first["sections"]))
 
         personal_keys = [first["hero"]["key"]]
@@ -41,7 +41,43 @@ class EditorialHomeServiceTests(unittest.TestCase):
             if entry["origin"]["kind"] == "catalog"
         )
         self.assertEqual(len(personal_keys), len(set(personal_keys)))
-        self.assertLessEqual(len(home_image_items(first)), 25)
+        self.assertLessEqual(len(home_image_items(first)), 31)
+
+    def test_release_anniversary_requires_a_complete_date(self) -> None:
+        exact = movie(
+            "anniversary",
+            release_dates=[
+                {
+                    "date": "1998-08-10",
+                    "precision": "day",
+                    "country": "",
+                    "release_type": "publication",
+                    "source": "wikidata",
+                    "source_url": "https://www.wikidata.org/wiki/Q1",
+                    "is_primary": True,
+                }
+            ],
+        )
+        year_only = movie(
+            "year-only",
+            release_dates=[
+                {
+                    "date": "1998",
+                    "precision": "year",
+                    "country": "",
+                    "release_type": "publication",
+                    "source": "wikidata",
+                    "source_url": "https://www.wikidata.org/wiki/Q2",
+                    "is_primary": True,
+                }
+            ],
+        )
+
+        payload = self.service.build("lucas", "2026-08-10", [exact, year_only])
+
+        section = next(row for row in payload["sections"] if row["id"] == "anniversary")
+        self.assertEqual([entry["item"]["id"] for entry in section["items"]], ["anniversary"])
+        self.assertEqual(section["items"][0]["reason"]["code"], "release_anniversary")
 
     def test_followed_collections_only_offer_missing_deduplicated_works(self) -> None:
         catalog = [movie("present", title="Present")]

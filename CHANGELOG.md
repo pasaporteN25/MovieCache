@@ -6,6 +6,21 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
+- Busqueda local del lado del servidor sobre titulos originales, espanoles, ingleses,
+  aliases, nombres de archivo, IDs, links y metadata, con ranking compartido para
+  buscar y comparar antes de agregar.
+- Resultados externos separados en estanterias de Wikipedia, IMDb y FilmAffinity, con
+  carga progresiva independiente y comparacion enriquecida contra todo el catalogo.
+- Fechas de estreno normalizadas con precision, pais, tipo y procedencia en JSON v6 y
+  SQLite v4, mas la seccion editorial `Estrenadas un dia como hoy` cuando hay fecha
+  completa confiable.
+- Acceso presentado como carnet de videoclub, manteniendo errores genericos y sin
+  enumerar usuarios antes de autenticar.
+- Explorador grafico de carpetas limitado a las raices autorizadas del servidor y
+  comprobacion de lectura antes de registrar una biblioteca.
+- Agrupacion de `CD1/CD2` y variantes `disc` como una sola decision del Scanner,
+  conservando cada archivo fisico y su tamano en el inventario.
+
 - Imagen Docker multi-stage sin privilegios, Compose con estado persistente, secret para el owner, biblioteca de solo lectura, healthcheck y configuracion local mediante `.env`.
 - Guia de importacion inicial, operacion, backup y actualizacion de una instancia Docker nueva.
 - Perfil de ejemplo para montar hasta ocho unidades de OMV/Debian en slots de solo lectura.
@@ -22,6 +37,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - El antiguo carrusel automatico fue reemplazado por una cartelera quieta; `Random` conserva la exploracion impredecible como una accion independiente.
 
 ### Corregido
+
+- Las carpetas `extra`, `extras`, `sample` y `samples` ya no aportan videos al scanner.
+- Los textos editoriales conservan tildes y `anos` se muestra correctamente como
+  `años`; el repositorio declara UTF-8 y finales LF para codigo y documentacion.
 
 - Los mounts multi-disco ya no intentan crear sus destinos sobre el filesystem raiz de solo lectura.
 - La importacion Docker puede leer catalogos desde `/imports` sin intentar crear un lock en ese mount de solo lectura.

@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from movie_inbox.domain.catalog import canonical_url, external_source_name, merge_lists, normalize_tags
 from movie_inbox.domain.models import ExternalSearchResult
+from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
 from movie_inbox.domain.titles import looks_like_external_id
 
 
@@ -67,6 +68,9 @@ class ExternalCatalogService:
             values = normalize_tags(metadata.get(field))
             if values:
                 enriched[field] = merge_lists(normalize_tags(enriched.get(field)), values)
+        release_dates = normalize_release_dates(metadata.get("release_dates"))
+        if release_dates:
+            enriched["release_dates"] = merge_release_dates(enriched.get("release_dates"), release_dates)
         for field in ("wikipedia_url", "imdb_url", "filmaffinity_url"):
             if metadata.get(field):
                 enriched[field] = str(metadata[field])

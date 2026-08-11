@@ -4,6 +4,7 @@ import unittest
 from typing import Any, Callable
 
 from movie_inbox.application.external_service import ExternalCatalogService
+from movie_inbox.external.registry import ExternalSourceService
 
 
 class FakeGateway:
@@ -25,7 +26,36 @@ class FakeGateway:
         return {"healthy": True}
 
 
+class FakeAdapter:
+    label = "Fake"
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def search(self, query: str) -> list[dict[str, Any]]:
+        return [
+            {
+                "title": f"{query} {position}",
+                "source": self.name,
+                "url": f"https://{self.name}.example/{position}",
+            }
+            for position in range(10)
+        ]
+
+
 class ExternalCatalogServiceTests(unittest.TestCase):
+    def test_registry_preserves_eight_results_for_each_source(self) -> None:
+        service = ExternalSourceService(
+            [FakeAdapter("wikipedia"), FakeAdapter("imdb"), FakeAdapter("filmaffinity")]
+        )
+
+        results, _ = service.search("Heat")
+
+        self.assertEqual(len(results), 24)
+        self.assertEqual([row["source"] for row in results[:8]], ["wikipedia"] * 8)
+        self.assertEqual([row["source"] for row in results[8:16]], ["imdb"] * 8)
+        self.assertEqual([row["source"] for row in results[16:]], ["filmaffinity"] * 8)
+
     def test_search_and_snapshot_are_delegated(self) -> None:
         gateway = FakeGateway()
         service = ExternalCatalogService(gateway, lambda _: {})

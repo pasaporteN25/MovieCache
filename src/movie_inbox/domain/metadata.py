@@ -18,6 +18,7 @@ METADATA_FIELDS = (
     "alternative_titles",
     "kind",
     "year",
+    "release_dates",
     "description",
     "wikipedia_title",
     "wikidata_id",

@@ -27,6 +27,7 @@ from movie_inbox.domain.metadata import (
 )
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.normalization import normalize_bool, normalize_kind, normalize_rating, normalize_status
+from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
 from movie_inbox.domain.titles import infer_kind_from_text, looks_like_external_id
 
 
@@ -56,6 +57,9 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
     item["directors"] = normalize_tags(item.get("directors") or item.get("director"))
     item["writers"] = normalize_tags(item.get("writers") or item.get("writer") or item.get("screenwriters"))
     item["cast"] = normalize_tags(item.get("cast") or item.get("actors") or item.get("actor"))
+    item["release_dates"] = normalize_release_dates(item.get("release_dates") or item.get("releaseDates"))
+    if not str(item.get("year") or "").strip() and item["release_dates"]:
+        item["year"] = str(item["release_dates"][0]["date"])[:4]
     item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
     item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
     alias_values = {
@@ -145,6 +149,7 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
     for alias in (
         "addedAt", "originalTitle", "spanishTitle", "englishTitle", "alternativeTitles",
         "watchedAt", "genre", "director", "writer", "screenwriters", "actors", "actor",
+        "releaseDates",
     ):
         item.pop(alias, None)
     return CatalogItem.from_mapping(item)
@@ -488,7 +493,10 @@ def merge_metadata_field(existing: MutableMapping[str, Any], incoming: Mapping[s
         return
     before = existing.get(field)
     incoming_value = incoming.get(field)
-    after: Any = merge_lists(normalize_tags(before), normalize_tags(incoming_value)) if field in LIST_FIELDS else before or incoming_value
+    if field == "release_dates":
+        after: Any = merge_release_dates(before, incoming_value)
+    else:
+        after = merge_lists(normalize_tags(before), normalize_tags(incoming_value)) if field in LIST_FIELDS else before or incoming_value
     if after == before:
         return
     existing[field] = after
