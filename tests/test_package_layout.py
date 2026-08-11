@@ -60,6 +60,7 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIn(b'apiFetch("/api/scanner/queue")', app_js[0])
         self.assertIn(b'/api/catalog/export?format=', app_js[0])
         self.assertIn(b'apiFetch("/api/image-cache/status")', app_js[0])
+        self.assertIn(b'apiFetch(`/api/home?date=', app_js[0])
         self.assertIn(b'data-poster-image', app_js[0])
         self.assertIn(b'fetchpriority="${fetchPriority}"', app_js[0])
         self.assertIn(b'classList.add("is-loaded")', app_js[0])
@@ -115,6 +116,7 @@ class PackageLayoutTests(unittest.TestCase):
             self.assertIn("/api/scanner/queue", paths)
             self.assertIn("/api/scanner/queue/{file_id}", paths)
             self.assertIn("/api/image-cache/status", paths)
+            self.assertIn("/api/home", paths)
 
 
 if __name__ == "__main__":

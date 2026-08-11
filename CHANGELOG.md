@@ -12,6 +12,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Descarga autenticada del catalogo personal en JSON portable o CSV desde Administrar.
 - Precarga progresiva y deduplicada de portadas despues del primer acceso autenticado, con prioridad para imagenes visibles, reintentos con backoff y estado compacto en Administrar.
 - Placeholders estables y carga diferida de portadas con prioridad para el primer viewport, ficha y spotlight.
+- Inicio editorial diario y estable con una cartelera disponible, recomendaciones explicables desde el catalogo personal y obras pendientes de colecciones seguidas.
+- Endpoint autenticado `/api/home` con seleccion determinista, limites estrictos, deduplicacion entre secciones y degradacion parcial cuando las colecciones no estan disponibles.
+
+### Cambiado
+
+- El antiguo carrusel automatico fue reemplazado por una cartelera quieta; `Random` conserva la exploracion impredecible como una accion independiente.
 
 ### Corregido
 

@@ -54,6 +54,7 @@ from movie_inbox.application.import_service import (
     ImportPermissionError,
     ImportService,
 )
+from movie_inbox.application.home_service import EditorialHomeService, home_image_items
 from movie_inbox.application.library_repository import (
     LibraryNotFound,
     LibraryRepositoryError,
@@ -276,6 +277,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         akira_kurosawa_collection(owner.id),
     )
     collection_service = CollectionService(collection_repository)
+    home_service = EditorialHomeService()
     import_repository = SqliteImportDraftRepository(config.instance_db)
     import_service = ImportService(
         import_repository,
@@ -312,6 +314,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.privacy_service = privacy_service
     app.state.collection_repository = collection_repository
     app.state.collection_service = collection_service
+    app.state.home_service = home_service
     app.state.import_repository = import_repository
     app.state.import_service = import_service
     app.state.library_repository = library_repository
@@ -444,6 +447,51 @@ def create_app(config: ViewerConfig) -> FastAPI:
 
     def session_catalog(request: Request) -> SessionCatalog:
         return SessionCatalog.from_identity(config, require_ready_identity(request))
+
+    def session_catalog_rows(
+        identity: AuthenticatedIdentity,
+    ) -> tuple[SessionCatalog, list[dict[str, Any]], list[dict[str, Any]]]:
+        catalog = SessionCatalog.from_identity(config, identity)
+        catalog_rows = load_items(catalog.config.patterns)
+        rows = availability_service.decorate_items(
+            catalog.public_rows(catalog_rows),
+            include_sources=identity.user.is_owner,
+        )
+        overrides = privacy_service.item_overrides(identity)
+        for row in rows:
+            row["_privacy"] = overrides.get(
+                str(row.get("id") or ""),
+                ItemPrivacyOverride(),
+            ).to_dict()
+        return catalog, catalog_rows, rows
+
+    def editorial_home_payload(
+        identity: AuthenticatedIdentity,
+        rows: list[dict[str, Any]],
+        local_date: str,
+    ) -> dict[str, Any]:
+        warnings: list[str] = []
+        try:
+            followed = collection_service.followed_collections(identity.user.id)
+        except CollectionRepositoryError:
+            followed = []
+            warnings.append("collections_unavailable")
+        payload = home_service.build(
+            identity.user.id,
+            local_date,
+            rows,
+            followed,
+            warnings=warnings,
+        )
+        image_warmer.register_items(
+            f"home:{identity.catalog.id}",
+            home_image_items(payload),
+        )
+        return payload
+
+    def requested_home_date(value: str) -> str:
+        requested = str(value or "").strip() or datetime.now(timezone.utc).date().isoformat()
+        return home_service.validate_date(requested)
 
     def request_workflow(request: Request):  # type: ignore[no-untyped-def]
         return curation_workflow(session_catalog(request).config)
@@ -1249,23 +1297,40 @@ def create_app(config: ViewerConfig) -> FastAPI:
         except CollectionRepositoryError:
             return error_response("collection_store_unavailable", 503)
 
-    @app.get("/api/items", dependencies=[Depends(require_token)])
-    def items(request: Request) -> JSONResponse:
+    @app.get("/api/home", dependencies=[Depends(require_token)])
+    def editorial_home(
+        request: Request,
+        local_date: str = Query(default="", alias="date"),
+    ) -> JSONResponse:
+        try:
+            day = requested_home_date(local_date)
+        except ValueError:
+            return error_response("invalid_home_date", 400)
         try:
             identity = require_ready_identity(request)
-            catalog = SessionCatalog.from_identity(config, identity)
-            catalog_rows = load_items(catalog.config.patterns)
-            rows = availability_service.decorate_items(
-                catalog.public_rows(catalog_rows),
-                include_sources=identity.user.is_owner,
-            )
+            _, _, rows = session_catalog_rows(identity)
+            return JSONResponse(editorial_home_payload(identity, rows, day))
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
+        except LibraryRepositoryError:
+            return error_response("library_store_unavailable", 503)
+        except IdentityRepositoryError:
+            return error_response("identity_store_unavailable", 503)
+
+    @app.get("/api/items", dependencies=[Depends(require_token)])
+    def items(
+        request: Request,
+        home_date: str = Query(default=""),
+    ) -> JSONResponse:
+        try:
+            day = requested_home_date(home_date)
+        except ValueError:
+            return error_response("invalid_home_date", 400)
+        try:
+            identity = require_ready_identity(request)
+            catalog, catalog_rows, rows = session_catalog_rows(identity)
             preferences = privacy_service.preferences(identity)
-            overrides = privacy_service.item_overrides(identity)
-            for row in rows:
-                row["_privacy"] = overrides.get(
-                    str(row.get("id") or ""),
-                    ItemPrivacyOverride(),
-                ).to_dict()
+            home = editorial_home_payload(identity, rows, day)
         except CatalogRepositoryError as error:
             return repository_error_response(error)
         except LibraryRepositoryError:
@@ -1296,6 +1361,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 "curation": {"counts": {**curation_counts(rows), "scanner": scanner_pending}},
                 "external": external_sources_snapshot(),
                 "privacy": preferences.to_dict(),
+                "home": home,
             }
         )
 

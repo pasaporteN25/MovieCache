@@ -56,28 +56,38 @@
         </div>
       </header>
 
-      <section id="homeView" class="app-view home-view">
+      <section id="homeView" class="app-view home-view" aria-busy="true">
         <section id="spotlight" class="spotlight" aria-labelledby="spotlightTitle">
           <div class="spotlight-bar">
             <div>
-              <span class="eyebrow">Selección del videoclub</span>
-              <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Ahora en pantalla</h2>
+              <span class="eyebrow">Programación personal</span>
+              <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Cartelera del día</h2>
             </div>
-            <button id="spotlightToggle" class="spotlight-toggle" type="button" aria-pressed="false">Pausar</button>
+            <time id="homeDate" class="spotlight-date"></time>
           </div>
-          <div id="spotlightStage" class="spotlight-stage" aria-live="off"></div>
+          <div id="spotlightStage" class="spotlight-stage" aria-live="off">
+            <div class="home-loading-hero" aria-hidden="true"></div>
+          </div>
         </section>
 
-        <section class="home-shelf" aria-labelledby="homeShelfTitle">
-          <div class="home-shelf-heading">
-            <div>
-              <span class="eyebrow">Disponible esta noche</span>
-              <h2 id="homeShelfTitle">Selección del catálogo</h2>
-            </div>
-            <button id="homeCollectionButton" class="quiet-action home-collection-action" type="button">Ver colección</button>
+        <p id="homeFeedback" class="home-feedback" role="status" aria-live="polite" hidden></p>
+        <div id="homeSections" class="home-editorial-sections">
+          <section class="home-loading-section" aria-hidden="true">
+            <span></span>
+            <div></div>
+          </section>
+        </div>
+        <section class="home-empty-state" id="homeEmpty" hidden>
+          <div>
+            <span class="section-kicker">Tu archivo empieza acá</span>
+            <h2>Prepará tu primera cartelera</h2>
+            <p>Agregá obras, importá una lista o seguí una colección para construir una programación personal.</p>
           </div>
-          <div class="grid home-grid" id="homeGrid"></div>
-          <p class="empty home-empty" id="homeEmpty" hidden>Tu selección aparecerá cuando haya obras disponibles en catálogo.</p>
+          <div class="home-empty-actions">
+            <button type="button" data-click="home-empty-catalog">Abrir colección</button>
+            <button class="quiet-action" type="button" data-click="home-empty-import">Importar lista</button>
+            <button class="quiet-action" type="button" data-click="home-empty-club">Explorar Club</button>
+          </div>
         </section>
       </section>
 

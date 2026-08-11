@@ -29,6 +29,13 @@ class CollectionService:
     def list_collections(self, user_id: str) -> list[dict[str, Any]]:
         return [self._summary(collection) for collection in self.repository.list_accessible(user_id)]
 
+    def followed_collections(self, user_id: str) -> list[CuratedCollection]:
+        return [
+            collection
+            for collection in self.repository.list_accessible(user_id)
+            if collection.followed
+        ]
+
     def collection_detail(
         self,
         user_id: str,
