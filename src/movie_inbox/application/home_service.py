@@ -16,6 +16,7 @@ from movie_inbox.domain.releases import normalize_release_dates
 
 HOME_SECTION_LIMIT = 6
 HOME_SECTION_COUNT = 5
+HOME_FEATURED_LIMIT = 4
 _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -36,7 +37,7 @@ class EditorialHomeService:
         seed = f"{user_id}|{day}"
         used_ids: set[str] = set()
 
-        hero = self._hero(catalog, seed, used_ids)
+        featured = self._featured(catalog, seed, used_ids)
         sections: list[dict[str, Any]] = []
 
         anniversary = self._anniversary_section(catalog, day, seed, used_ids)
@@ -66,12 +67,15 @@ class EditorialHomeService:
 
         return {
             "generated_for": day,
-            "hero": hero,
+            "featured": featured,
+            # Temporary compatibility for clients that still expect one hero entry.
+            "hero": featured[0] if featured else None,
             "sections": sections[:HOME_SECTION_COUNT],
             "warnings": list(dict.fromkeys(str(value) for value in warnings if str(value))),
             "limits": {
                 "section_items": HOME_SECTION_LIMIT,
                 "sections": HOME_SECTION_COUNT,
+                "featured_items": HOME_FEATURED_LIMIT,
             },
         }
 
@@ -88,33 +92,43 @@ class EditorialHomeService:
             raise ValueError("invalid_home_date")
         return requested
 
-    def _hero(
+    def _featured(
         self,
         catalog: list[dict[str, Any]],
         seed: str,
         used_ids: set[str],
-    ) -> dict[str, Any] | None:
+    ) -> list[dict[str, Any]]:
         available = [item for item in catalog if normalize_bool(item.get("en_catalogo"))]
         pending = [item for item in available if str(item.get("status") or "") != "watched"]
         pool = pending or available
         if not pool:
-            return None
+            return []
         illustrated = [item for item in pool if item.get("backdrop_image") or item.get("page_image")]
-        selected = self._stable_order(illustrated or pool, f"{seed}|hero", _catalog_key)[0]
-        used_ids.add(_catalog_key(selected))
-        if selected in pending:
-            reason = _reason(
-                "available_pending",
-                "Disponible y pendiente",
-                "Está en tu biblioteca física y todavía no la marcaste como vista.",
-            )
-        else:
-            reason = _reason(
-                "available_revisit",
-                "Disponible en tu archivo",
-                "Esta obra sigue disponible para volver a encontrarla esta noche.",
-            )
-        return _catalog_entry(selected, reason)
+        illustrated_ids = {_catalog_key(item) for item in illustrated}
+        remaining = [item for item in pool if _catalog_key(item) not in illustrated_ids]
+        selected = (
+            self._stable_order(illustrated, f"{seed}|featured|illustrated", _catalog_key)
+            + self._stable_order(remaining, f"{seed}|featured|remaining", _catalog_key)
+        )[:HOME_FEATURED_LIMIT]
+        entries: list[dict[str, Any]] = []
+        pending_ids = {_catalog_key(item) for item in pending}
+        for item in selected:
+            item_key = _catalog_key(item)
+            used_ids.add(item_key)
+            if item_key in pending_ids:
+                reason = _reason(
+                    "available_pending",
+                    "Disponible y pendiente",
+                    "Está en tu biblioteca física y todavía no la marcaste como vista.",
+                )
+            else:
+                reason = _reason(
+                    "available_revisit",
+                    "Disponible en tu archivo",
+                    "Esta obra sigue disponible para volver a encontrarla esta noche.",
+                )
+            entries.append(_catalog_entry(item, reason))
+        return entries
 
     def _available_section(
         self,
@@ -150,7 +164,11 @@ class EditorialHomeService:
             "Para ver ahora",
             "Disponible esta noche",
             "Pendientes que tu biblioteca física confirma como disponibles.",
-            {"kind": "catalog", "label": "Ver colección", "status": "to_watch"},
+            {
+                "kind": "catalog",
+                "label": "Ver colección",
+                "filters": {"status": ["to_watch"], "availability": ["available"]},
+            },
             entries,
         )
 
@@ -195,7 +213,11 @@ class EditorialHomeService:
             "Efemérides del archivo",
             "Estrenadas un día como hoy",
             "Obras de tu catálogo con una fecha de estreno completa para esta jornada.",
-            {"kind": "catalog", "label": "Ver fichas"},
+            {
+                "kind": "catalog",
+                "label": "Ver fichas",
+                "filters": {"release_day": [day.strftime("%m-%d")]},
+            },
             entries,
         )
 
@@ -297,7 +319,14 @@ class EditorialHomeService:
             "Memoria personal",
             "Tu archivo pide memoria",
             "Obras vistas cuyo recuerdo todavía puede completarse.",
-            {"kind": "catalog", "label": "Ver fichas", "status": "watched"},
+            {
+                "kind": "catalog",
+                "label": "Ver fichas",
+                "filters": {
+                    "status": ["watched"],
+                    "record": ["unrated", "unreviewed"],
+                },
+            },
             entries,
         )
 
@@ -329,7 +358,11 @@ class EditorialHomeService:
             route["eyebrow"],
             route["title"],
             route["description"],
-            {"kind": "catalog", "label": "Explorar colección"},
+            {
+                "kind": "catalog",
+                "label": "Explorar colección",
+                "filters": dict(route["filters"]),
+            },
             entries,
         )
 
@@ -362,7 +395,11 @@ class EditorialHomeService:
             "Nuevos ingresos",
             "Recién llegadas",
             "Las incorporaciones más recientes de tu archivo.",
-            {"kind": "catalog", "label": "Ver colección"},
+            {
+                "kind": "catalog",
+                "label": "Ver colección",
+                "filters": {"sort": "added-desc"},
+            },
             entries,
         )
 
@@ -392,9 +429,15 @@ class EditorialHomeService:
 def home_image_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Flatten only the works shown by the home payload for image warming."""
     rows: list[dict[str, Any]] = []
-    hero = payload.get("hero")
-    if isinstance(hero, Mapping) and isinstance(hero.get("item"), Mapping):
-        rows.append(dict(hero["item"]))
+    featured = payload.get("featured")
+    if isinstance(featured, list) and featured:
+        for entry in featured:
+            if isinstance(entry, Mapping) and isinstance(entry.get("item"), Mapping):
+                rows.append(dict(entry["item"]))
+    else:
+        hero = payload.get("hero")
+        if isinstance(hero, Mapping) and isinstance(hero.get("item"), Mapping):
+            rows.append(dict(hero["item"]))
     sections = payload.get("sections")
     if not isinstance(sections, list):
         return rows
@@ -422,7 +465,7 @@ def _section(
     eyebrow: str,
     title: str,
     description: str,
-    action: Mapping[str, str],
+    action: Mapping[str, Any],
     items: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
@@ -496,6 +539,7 @@ def _routes(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
                 "reason_code": "shared_director",
                 "reason_label": f"Dirección: {label}",
                 "reason_detail": f"Forma parte de una ruta de obras dirigidas por {label}.",
+                "filters": {"director": [label]},
                 "items": grouped,
             }
         )
@@ -512,6 +556,7 @@ def _routes(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
                 "reason_code": "shared_genre",
                 "reason_label": f"Género: {label}",
                 "reason_detail": f"Comparte el género {label} con el resto de esta ruta.",
+                "filters": {"genre": [label]},
                 "items": grouped,
             }
         )
@@ -527,6 +572,7 @@ def _routes(items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
                 "reason_code": "shared_decade",
                 "reason_label": f"De los años {decade}",
                 "reason_detail": f"Fue estrenada durante la década de {decade}.",
+                "filters": {"decade": [str(decade)]},
                 "items": grouped,
             }
         )

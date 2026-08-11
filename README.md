@@ -361,7 +361,7 @@ El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibi
 
 Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el usuario y el catalogo personal activos y permite cerrar todas las operaciones de esa sesion.
 
-La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` propone una cartelera diaria estable, formada solo por obras disponibles, y programas explicables que combinan pendientes disponibles, faltantes de colecciones seguidas, recuerdos personales incompletos y rutas por director, genero o decada. Cada sugerencia indica por que aparece, no se repite entre secciones y se calcula con datos locales; `Random` sigue siendo la accion independiente para explorar sin un criterio fijo. `Coleccion` concentra busqueda, filtros, orden, carga incremental y acceso al CRUD. `Bandeja` alterna entre la curaduria y las importaciones controladas. `Club` alterna entre catalogos compartidos por miembros y colecciones locales que pueden seguirse o copiarse de forma selectiva. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
+La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` propone entre una y cuatro recomendaciones diarias estables, formadas solo por obras disponibles, con sinopsis y seleccion manual; sus programas combinan pendientes disponibles, faltantes de colecciones seguidas, recuerdos personales incompletos y rutas por director, genero o decada. Las cards de programa muestran una razon breve sin repetir explicaciones completas. Cada sugerencia se calcula con datos locales y no se repite entre secciones; `Random` sigue siendo la accion independiente para explorar sin un criterio fijo. Los accesos desde Inicio abren `Coleccion` con su criterio real aplicado y representado en la URL. `Coleccion` concentra busqueda, filtros rapidos de estado, disponibilidad y tipo, un panel de facetas avanzadas, orden, carga incremental y acceso al CRUD. `Bandeja` alterna entre la curaduria y las importaciones controladas. `Club` alterna entre catalogos compartidos por miembros y colecciones locales que pueden seguirse o copiarse de forma selectiva. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
 
 ### Importaciones desde la Bandeja
 
@@ -377,9 +377,12 @@ El visor tiene una consola de busqueda unica. Al tocar `Buscar`, el servidor con
 catalogo personal completo por titulo principal, original, espanol, ingles, aliases,
 nombres de archivo, IDs, links y metadata, ignorando tildes y tolerando una errata en
 palabras largas. `Buscar tambien en fuentes externas` agrega Wikipedia, IMDb y
-FilmAffinity solamente despues de la accion explicita. La consulta, los filtros y el
-orden quedan representados en la URL para que Atras y Adelante restauren la estanteria
-correcta. Si abriste varios catalogos, por defecto escribe en el primero resuelto;
+FilmAffinity solamente despues de la accion explicita. La consulta, el orden y las
+facetas de estado, disponibilidad, tipo, fuente, director, genero, decada, rango de
+anos y memoria personal quedan representados en la URL para que Atras y Adelante
+restauren la estanteria correcta. Distintas facetas se combinan con `AND`; varios
+valores dentro de la misma faceta se combinan con `OR`. Si abriste varios catalogos,
+por defecto escribe en el primero resuelto;
 podes elegir otro archivo con el nombre compatible `--write-json`:
 
 Las consultas externas se ejecutan en paralelo mediante adaptadores independientes y

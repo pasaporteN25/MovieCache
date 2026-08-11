@@ -170,9 +170,9 @@ La paleta combina una base azul-negra de archivo con señales magenta, cyan, vio
 
 El contenido vive dentro de un contenedor de hasta 1500px, con márgenes laterales generosos en escritorio y compactos en móvil. La búsqueda se organiza como una consola horizontal; la colección usa una grilla autoajustable de cajas con proporción 2:3 y separación flexible.
 
-La densidad cambia en 1100px, 860px, 640px y 440px. A partir de 640px la cabecera se apila, el spotlight adopta una proporción más alta, la colección mantiene dos columnas y la ficha ocupa el viewport completo. Los objetos de formato fijo deben conservar proporciones y tracks estables para que títulos, badges y estados no desplacen la composición.
+La densidad cambia en 1100px, 860px, 640px y 440px. A partir de 640px la cabecera se apila, el spotlight adopta una proporción más alta, su selector de recomendaciones se desplaza horizontalmente, la colección mantiene dos columnas y la ficha ocupa el viewport completo. Los objetos de formato fijo deben conservar proporciones y tracks estables para que títulos, badges y estados no desplacen la composición.
 
-La complejidad administrativa usa divulgación progresiva. Filtros cotidianos, métricas y mantenimiento pueden compartir el lenguaje visual, pero no deben competir dentro del mismo momento de decisión.
+La complejidad administrativa usa divulgación progresiva. En `Colección`, estado, disponibilidad y tipo permanecen visibles; director, género, década, rango de años, fuente y memoria personal viven en `Más filtros`. Los chips activos son la lectura humana del estado enlazable. Filtros cotidianos, métricas y mantenimiento pueden compartir el lenguaje visual, pero no deben competir dentro del mismo momento de decisión.
 
 ## Elevation & Depth
 
