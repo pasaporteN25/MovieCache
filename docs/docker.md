@@ -236,6 +236,12 @@ comprueba que incluya `movie-inbox.db` e `instance.db` y publica un checksum SHA
 Conserva catalogos de miembros, cuentas, privacidad, colecciones e inventario. El cache
 de portadas se omite porque es reproducible.
 
+El proceso de mantenimiento conserva `cap_drop: ALL` y recibe solamente
+`DAC_READ_SEARCH`. Esa capacidad es necesaria para incluir archivos privados `0600`
+creados por el usuario interno de Movie Inbox, como el historial de curacion, sin dar
+escritura sobre el volumen de datos, que permanece montado en modo de solo lectura. El
+servicio tampoco tiene red y su filesystem raiz sigue siendo de solo lectura.
+
 Este archivo cubre todos los datos administrados por Movie Inbox, pero no el despliegue
 del host. `.env`, `compose.override.yaml` y `secrets/owner-password.txt` deben tener una
 copia protegida separada; tampoco se copian los videos montados en modo de solo lectura.
