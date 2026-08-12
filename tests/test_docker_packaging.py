@@ -64,7 +64,8 @@ class DockerPackagingTests(unittest.TestCase):
 
         self.assertIn("flock -n", script)
         self.assertIn("resolve_backup_host_path", script)
-        self.assertIn("docker compose config", script)
+        self.assertIn("docker compose --profile maintenance config", script)
+        self.assertIn("This command does not accept file or wildcard arguments.", script)
         self.assertIn('mkdir -p -- "$backup_host_path"', script)
         self.assertIn("Backup destination:", script)
         self.assertIn('docker compose stop -t 30 "$APP_SERVICE"', script)

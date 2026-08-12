@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+if [[ "$#" -ne 0 ]]; then
+  echo "Usage: bash scripts/docker-backup.sh" >&2
+  echo "This command does not accept file or wildcard arguments." >&2
+  exit 64
+fi
+
 PROJECT_DIR=${MOVIE_INBOX_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 APP_SERVICE=${MOVIE_INBOX_APP_SERVICE:-movie-inbox}
 BACKUP_SERVICE=${MOVIE_INBOX_BACKUP_SERVICE:-movie-inbox-backup}
@@ -19,14 +25,18 @@ if ! command -v flock >/dev/null 2>&1; then
 fi
 
 resolve_backup_host_path() {
-  docker compose config | awk '
+  docker compose --profile maintenance config | awk '
     $1 == "source:" {
       source = $0
       sub(/^[[:space:]]*source:[[:space:]]*/, "", source)
     }
-    $1 == "target:" && $2 == "/backups" {
-      print source
-      exit
+    $1 == "target:" {
+      target = $2
+      gsub(/^\"|\"$/, "", target)
+      if (target == "/backups") {
+        print source
+        exit
+      }
     }
   '
 }
@@ -41,7 +51,8 @@ prepare_backup_destination() {
 
   if [[ -z "$backup_host_path" ]]; then
     echo "Could not resolve the host path mounted at /backups." >&2
-    echo "Set MOVIE_INBOX_BACKUP_PATH in $PROJECT_DIR/.env." >&2
+    echo "Check the $BACKUP_SERVICE volumes with:" >&2
+    echo "  docker compose --profile maintenance config" >&2
     exit 1
   fi
   if [[ "$backup_host_path" != /* ]]; then
