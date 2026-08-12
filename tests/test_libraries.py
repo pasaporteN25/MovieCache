@@ -125,6 +125,84 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertGreater(detail["verified_at"], 0)
         self.assertEqual(detail["counts"]["files"], 0)
 
+    def test_unique_legacy_inventory_title_can_reconcile_a_missing_year(self) -> None:
+        self.catalog_items = [
+            normalize_item({
+                "id": "heat-legacy",
+                "title": "Heat",
+                "year": "1995",
+                "kind": "pelicula",
+                "source": "local_files",
+                "en_catalogo": True,
+                "local_name": "Heat 1995 1080p.mkv",
+            }).to_dict()
+        ]
+        (self.media / "Heat.1080p.mkv").write_bytes(b"heat")
+        library = self.create_library()
+
+        run = self.execute(library.id, "dry_run")
+
+        self.assertEqual(run.summary["matched"], 1)
+        self.assertEqual(run.summary["review"], 0)
+        self.assertEqual(run.summary["new"], 0)
+
+    def test_missing_year_without_legacy_inventory_evidence_still_requires_review(self) -> None:
+        (self.media / "Heat.1080p.mkv").write_bytes(b"heat")
+        library = self.create_library()
+
+        run = self.execute(library.id, "dry_run")
+
+        self.assertEqual(run.summary["matched"], 0)
+        self.assertEqual(run.summary["review"], 1)
+
+    def test_ambiguous_legacy_inventory_titles_still_require_review(self) -> None:
+        self.catalog_items = [
+            normalize_item({
+                "id": f"crash-{year}",
+                "title": "Crash",
+                "year": year,
+                "kind": "pelicula",
+                "source": "local_files",
+                "en_catalogo": True,
+                "local_name": f"Crash {year}.mkv",
+            }).to_dict()
+            for year in ("1996", "2004")
+        ]
+        (self.media / "Crash.1080p.mkv").write_bytes(b"crash")
+        library = self.create_library()
+
+        run = self.execute(library.id, "dry_run")
+
+        self.assertEqual(run.summary["matched"], 0)
+        self.assertEqual(run.summary["review"], 1)
+
+    def test_repeated_apply_reconciles_an_existing_legacy_review_case(self) -> None:
+        (self.media / "Heat.1080p.mkv").write_bytes(b"heat")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        self.assertEqual(self.service.library_detail(library.id)["counts"]["review"], 1)
+
+        self.catalog_items = [
+            normalize_item({
+                "id": "heat-legacy",
+                "title": "Heat",
+                "year": "1995",
+                "kind": "pelicula",
+                "source": "local_files",
+                "en_catalogo": True,
+                "local_name": "Heat 1995 1080p.mkv",
+            }).to_dict()
+        ]
+        rerun = self.execute(library.id, "apply")
+        counts = self.service.library_detail(library.id)["counts"]
+
+        self.assertEqual(rerun.summary["matched"], 1)
+        self.assertEqual(counts["files"], 1)
+        self.assertEqual(counts["matched"], 1)
+        self.assertEqual(counts["review"], 0)
+        self.assertEqual(self.service.review_queue(), [])
+
     def test_apply_requires_a_successful_test_scan(self) -> None:
         library = self.create_library()
 

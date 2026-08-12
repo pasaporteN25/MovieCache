@@ -18,6 +18,50 @@ if ! command -v flock >/dev/null 2>&1; then
   exit 1
 fi
 
+resolve_backup_host_path() {
+  docker compose config | awk '
+    $1 == "source:" {
+      source = $0
+      sub(/^[[:space:]]*source:[[:space:]]*/, "", source)
+    }
+    $1 == "target:" && $2 == "/backups" {
+      print source
+      exit
+    }
+  '
+}
+
+prepare_backup_destination() {
+  local backup_host_path
+  backup_host_path=$(resolve_backup_host_path)
+  backup_host_path=${backup_host_path#\"}
+  backup_host_path=${backup_host_path%\"}
+  backup_host_path=${backup_host_path#\'}
+  backup_host_path=${backup_host_path%\'}
+
+  if [[ -z "$backup_host_path" ]]; then
+    echo "Could not resolve the host path mounted at /backups." >&2
+    echo "Set MOVIE_INBOX_BACKUP_PATH in $PROJECT_DIR/.env." >&2
+    exit 1
+  fi
+  if [[ "$backup_host_path" != /* ]]; then
+    backup_host_path="$PROJECT_DIR/$backup_host_path"
+  fi
+
+  umask 077
+  if ! mkdir -p -- "$backup_host_path"; then
+    echo "Could not create backup destination: $backup_host_path" >&2
+    exit 1
+  fi
+  if [[ ! -d "$backup_host_path" || ! -w "$backup_host_path" ]]; then
+    echo "Backup destination is not a writable directory: $backup_host_path" >&2
+    exit 1
+  fi
+  echo "Backup destination: $backup_host_path"
+}
+
+prepare_backup_destination
+
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "A Movie Inbox backup is already running; this invocation was skipped."

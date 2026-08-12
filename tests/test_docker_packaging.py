@@ -60,6 +60,10 @@ class DockerPackagingTests(unittest.TestCase):
         timer = (ROOT / "deploy" / "movie-inbox-backup.timer.example").read_text(encoding="utf-8")
 
         self.assertIn("flock -n", script)
+        self.assertIn("resolve_backup_host_path", script)
+        self.assertIn("docker compose config", script)
+        self.assertIn('mkdir -p -- "$backup_host_path"', script)
+        self.assertIn("Backup destination:", script)
         self.assertIn('docker compose stop -t 30 "$APP_SERVICE"', script)
         self.assertIn('docker compose run --rm --no-deps "$BACKUP_SERVICE"', script)
         self.assertIn('docker compose start "$APP_SERVICE"', script)

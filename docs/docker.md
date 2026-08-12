@@ -153,6 +153,26 @@ biblioteca se usa por ahora `Bandeja > Importaciones` para crear las obras y lue
 repite `Probar recorrido` para que el scanner las reconozca. Una accion explicita
 `Crear obra desde este archivo` dentro de la cola Scanner queda como incremento futuro.
 
+### Reconciliar un inventario heredado
+
+Los contadores de una biblioteca separan cuatro estados: `Archivos` es el total fisico,
+`Vinculados` tiene identidad confirmada, `Comparar` posee candidatas ambiguas y `Nuevos`
+no encontro ninguna obra candidata. Las dos ultimas categorias aparecen en
+`Bandeja > Scanner`; no deben interpretarse juntas como errores de matching.
+
+Para instalaciones creadas desde el antiguo dump de archivos, un recorrido puede
+reconciliar automaticamente una coincidencia con ano ausente solamente cuando el titulo
+normalizado es exacto y unico, y la entrada previa conserva evidencia de inventario local.
+Titulos repetidos, anos incompatibles y entradas sin procedencia fisica permanecen para
+revision manual. Despues de actualizar, ejecutar primero `Probar cambios` y aplicar el
+inventario solamente si la nueva distribucion es coherente. El inventario usa ruta y
+huella, por lo que repetir el recorrido no duplica archivos sin cambios.
+
+Las decisiones y pendientes aplicados viven en `instance.db` y sobreviven a una
+actualizacion o recreacion normal del contenedor. Un `dry_run` conserva solamente el
+reporte; el inventario y la cola se escriben al usar `Aplicar inventario`. Nunca usar
+`docker compose down --volumes` durante esta recuperacion.
+
 ## Varias unidades en OMV o Debian
 
 La imagen contiene ocho slots de montaje precreados. Esto permite conservar el
@@ -227,15 +247,22 @@ MOVIE_INBOX_BACKUP_PATH=/srv/backups/movie-inbox
 MOVIE_INBOX_BACKUP_RETENTION_DAYS=14
 ```
 
-Crear la ruta antes de ejecutar Compose. El bind no se crea automaticamente para evitar
-que un error de montaje termine escribiendo en otro lugar:
+La variable debe vivir en `/opt/movie-inbox/.env`; cambiar solamente la documentacion o
+crear el directorio no modifica la interpolacion de Compose. El wrapper resuelve la ruta
+efectiva, la muestra y la crea con permisos restrictivos antes de detener la aplicacion.
+Prepararla manualmente sigue siendo recomendable para comprobar el filesystem elegido:
 
 ```bash
 mkdir -p /srv/backups/movie-inbox
 chmod 700 /srv/backups/movie-inbox
 cd /opt/movie-inbox
 docker compose config --quiet
+docker compose config | grep -A2 -B2 '/backups'
 ```
+
+El bind conserva `create_host_path: false`: una ejecucion directa de
+`docker compose run movie-inbox-backup` requiere que la ruta ya exista. Usar
+`scripts/docker-backup.sh` evita esa diferencia y valida que el destino sea escribible.
 
 ### Prueba manual
 

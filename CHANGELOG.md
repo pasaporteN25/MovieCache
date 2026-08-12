@@ -45,9 +45,15 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   `Random` conserva la exploracion impredecible como una accion independiente.
 - Las cards secundarias de Inicio conservan una etiqueta contextual breve y dejan la
   explicacion extensa en el encabezado de seccion o la ficha.
+- Bibliotecas separa archivos vinculados, ambiguos y nuevos en vez de agrupar los dos
+  ultimos bajo un unico contador de revision.
 
 ### Corregido
 
+- El wrapper de backup prepara y valida la ruta host interpolada por Compose antes de
+  detener la aplicacion, evitando mounts fallidos cuando el directorio aun no existe.
+- El scanner reconcilia titulos exactos y unicos sin ano contra entradas heredadas que
+  ya poseen evidencia fisica, manteniendo remakes y casos sin procedencia en revision.
 - Las carpetas `extra`, `extras`, `sample` y `samples` ya no aportan videos al scanner.
 - Los textos editoriales conservan tildes y `anos` se muestra correctamente como
   `años`; el repositorio declara UTF-8 y finales LF para codigo y documentacion.
