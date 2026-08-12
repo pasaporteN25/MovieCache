@@ -878,8 +878,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               </div>
               <dl class="library-record-metrics">
                 <div><dt>Archivos</dt><dd>${Number(counts.files || 0)}</dd></div>
-                <div><dt>Listos</dt><dd>${Number(counts.matched || 0)}</dd></div>
-                <div><dt>Revisar</dt><dd>${Number(counts.new || 0) + Number(counts.review || 0)}</dd></div>
+                <div><dt>Vinculados</dt><dd>${Number(counts.matched || 0)}</dd></div>
+                <div><dt>Comparar</dt><dd>${Number(counts.review || 0)}</dd></div>
+                <div><dt>Nuevos</dt><dd>${Number(counts.new || 0)}</dd></div>
               </dl>
               <div class="library-record-actions">
                 ${libraryPrimaryAction(library, workflow, running)}
@@ -1026,7 +1027,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const parts = [
           `${Number(summary.discovered || 0)} archivos`,
           `${Number(summary.matched || 0)} vinculados`,
-          `${Number(summary.new || 0) + Number(summary.review || 0)} para revisar`
+          `${Number(summary.review || 0)} para comparar`,
+          `${Number(summary.new || 0)} nuevos`
         ];
         const errors = run.errors || [];
         const outcome = run.mode === "dry_run"

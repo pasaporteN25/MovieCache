@@ -614,6 +614,7 @@ class ManagedLibraryService:
             str(row.get("kind") or "pelicula"),
         )
         groups: dict[str, dict[str, Any]] = {}
+        legacy_inventory_keys: set[str] = set()
         for catalog_item in match_index.candidates(detected):
             decision = decide_match(catalog_item, detected)
             if not decision.accepted and decision.score < 0.72:
@@ -626,12 +627,21 @@ class ManagedLibraryService:
             prior = groups.get(key)
             if prior is None or float(candidate["score"]) > float(prior.get("score") or 0):
                 groups[key] = candidate
+            if decision.reason == "exact_title_missing_year" and _has_legacy_inventory_evidence(catalog_item):
+                legacy_inventory_keys.add(key)
         accepted = [value for value in groups.values() if str(value.get("reason") or "") in {"shared_external_url", "shared_wikidata_id", "exact_title_year"}]
         if len(accepted) == 1:
             identity = dict(accepted[0])
             for key in ("key", "score", "reason"):
                 identity.pop(key, None)
             return "matched", identity, []
+        if not accepted and len(groups) == 1:
+            key, candidate = next(iter(groups.items()))
+            if key in legacy_inventory_keys:
+                identity = dict(candidate)
+                for field in ("key", "score", "reason"):
+                    identity.pop(field, None)
+                return "matched", identity, []
         candidates = sorted(groups.values(), key=lambda value: float(value.get("score") or 0), reverse=True)[:8]
         if candidates:
             return "review", {}, candidates
@@ -912,6 +922,16 @@ def _resolved_root(value: str) -> Path:
 
 def _relative_path_key(value: str) -> str:
     return os.path.normcase(str(value or "").replace("\\", "/"))
+
+
+def _has_legacy_inventory_evidence(item: Mapping[str, Any]) -> bool:
+    if not bool(item.get("en_catalogo")):
+        return False
+    if str(item.get("source") or "").strip().casefold() == "local_files":
+        return True
+    if str(item.get("local_name") or "").strip() or str(item.get("local_path") or "").strip():
+        return True
+    return bool(item.get("local_files"))
 
 
 def _is_within(candidate: Path, allowed: Path) -> bool:
