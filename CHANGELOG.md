@@ -57,6 +57,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - El servicio Docker de backup puede leer archivos privados `0600` del usuario interno
   mediante la capacidad minima `DAC_READ_SEARCH`, conservando el volumen fuente en
   modo de solo lectura y sin acceso de red.
+- El wrapper resuelve el destino desde el perfil Compose `maintenance` y rechaza
+  argumentos o comodines accidentales en lugar de diagnosticar incorrectamente `.env`.
 - Las carpetas `extra`, `extras`, `sample` y `samples` ya no aportan videos al scanner.
 - Los textos editoriales conservan tildes y `anos` se muestra correctamente como
   `años`; el repositorio declara UTF-8 y finales LF para codigo y documentacion.

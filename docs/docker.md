@@ -282,6 +282,13 @@ bash scripts/docker-backup.sh
 ls -lh /srv/backups/movie-inbox
 ```
 
+El comando no recibe rutas ni comodines: no agregar `*` al final. Para inspeccionar el
+mount efectivo del servicio, incluido su perfil de mantenimiento:
+
+```bash
+docker compose --profile maintenance config | grep -A3 -B3 '/backups'
+```
+
 Verificar nuevamente cualquier archivo sin extraerlo:
 
 ```bash
