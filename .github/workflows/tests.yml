@@ -107,10 +107,13 @@ jobs:
       - name: Create and verify instance backup
         shell: bash
         run: |
+          docker compose exec -T movie-inbox sh -c \
+            'umask 077; printf private-state > /var/lib/movie-inbox/.private-backup-smoke'
           bash scripts/docker-backup.sh
           archive="$(find backups -maxdepth 1 -name '*.tar.gz' -print -quit)"
           test -n "$archive"
           test -f "$archive.sha256"
+          tar -tzf "$archive" | grep -q 'movie-inbox/.private-backup-smoke'
           docker compose run --rm --no-deps movie-inbox-backup backup verify "/backups/$(basename "$archive")"
       - name: Show container logs on failure
         if: failure()

@@ -36,6 +36,9 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("movie-inbox-data:/var/lib/movie-inbox:ro", compose)
         self.assertIn("MOVIE_INBOX_BACKUP_RETENTION_DAYS:-14", compose)
         self.assertIn("network_mode: none", compose)
+        backup_service = compose.split("  movie-inbox-backup:", 1)[1]
+        self.assertIn("cap_drop:\n      - ALL", backup_service)
+        self.assertIn("cap_add:\n      - DAC_READ_SEARCH", backup_service)
 
     def test_omv_example_uses_precreated_read_only_mount_slots(self) -> None:
         compose = (ROOT / "compose.omv.example.yaml").read_text(encoding="utf-8")
@@ -79,6 +82,7 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("docker compose build", workflow)
         self.assertIn("docker compose run --rm movie-inbox db import", workflow)
         self.assertIn("docker compose restart movie-inbox", workflow)
+        self.assertIn(".private-backup-smoke", workflow)
         self.assertIn("ReadonlyRootfs", workflow)
         self.assertIn("test ! -w /imports", workflow)
 

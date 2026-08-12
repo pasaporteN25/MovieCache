@@ -95,6 +95,8 @@ services:
       - /tmp:size=32m,mode=1777
     cap_drop:
       - ALL
+    cap_add:
+      - DAC_READ_SEARCH
     security_opt:
       - no-new-privileges:true
 
