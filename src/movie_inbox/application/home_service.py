@@ -100,18 +100,17 @@ class EditorialHomeService:
     ) -> list[dict[str, Any]]:
         available = [item for item in catalog if normalize_bool(item.get("en_catalogo"))]
         pending = [item for item in available if str(item.get("status") or "") != "watched"]
-        pool = pending or available
-        if not pool:
+        illustrated = [item for item in available if item.get("backdrop_image") or item.get("page_image")]
+        if not illustrated:
             return []
-        illustrated = [item for item in pool if item.get("backdrop_image") or item.get("page_image")]
-        illustrated_ids = {_catalog_key(item) for item in illustrated}
-        remaining = [item for item in pool if _catalog_key(item) not in illustrated_ids]
+        pending_ids = {_catalog_key(item) for item in pending}
+        pending_illustrated = [item for item in illustrated if _catalog_key(item) in pending_ids]
+        revisit_illustrated = [item for item in illustrated if _catalog_key(item) not in pending_ids]
         selected = (
-            self._stable_order(illustrated, f"{seed}|featured|illustrated", _catalog_key)
-            + self._stable_order(remaining, f"{seed}|featured|remaining", _catalog_key)
+            self._stable_order(pending_illustrated, f"{seed}|featured|pending", _catalog_key)
+            + self._stable_order(revisit_illustrated, f"{seed}|featured|revisit", _catalog_key)
         )[:HOME_FEATURED_LIMIT]
         entries: list[dict[str, Any]] = []
-        pending_ids = {_catalog_key(item) for item in pending}
         for item in selected:
             item_key = _catalog_key(item)
             used_ids.add(item_key)

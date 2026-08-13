@@ -1,34 +1,42 @@
 # Movie Inbox
 
-Pequena base para convertir una lista desordenada de links de peliculas/series en datos mas utiles.
+Gestor self-hosted para organizar obras, disponibilidad fisica y memoria personal a partir de listas, fuentes externas y bibliotecas locales.
 
 ## Estado del proyecto
 
-La version candidata actual es **v0.2.0-rc1**. Movie Inbox funciona como un gestor local de catalogo con almacenamiento JSON o SQLite: importa listas y archivos, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews desde una interfaz web con autenticacion local.
+La version candidata actual es **v0.2.0-rc1**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
 
-El catalogo usa esquemas versionados. JSON sigue siendo el formato legible y portable de intercambio y backup; SQLite puede usarse como fuente de verdad transaccional. Los catalogos personales, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
+En una instalacion nueva, SQLite es la fuente de verdad recomendada. JSON conserva un contrato versionado como formato de importacion, exportacion y auditoria, pero una exportacion individual no reemplaza el backup completo de la instancia. Catalogos, cuentas, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
 
 El gate reproducible de pruebas y aceptacion en un servidor real esta documentado en [docs/release-checklist.md](docs/release-checklist.md).
 
 El codigo principal vive en el paquete instalable `src/movie_inbox`. Los archivos de `scripts/` son lanzadores compatibles con los comandos usados en v0.1.
 
-Incluye:
+Nucleo actual:
 
-- `scripts/txt_to_catalog.py`: lee un `.txt` con URLs o titulos y genera JSON y/o CSV.
-- `scripts/scan_video_catalog.sh`: recorre una carpeta local de peliculas y genera JSON desde archivos de video.
-- `scripts/scan_library.py`: sincroniza incrementalmente una biblioteca de video con el catalogo principal.
 - `scripts/docker-backup.sh`: detiene brevemente Compose, crea un backup verificado y comprueba el reinicio.
-- `scripts/view_catalog.py`: servidor local con visor, CRUD, busqueda y detalle del catalogo.
 - `src/movie_inbox/domain/`: modelos, normalizacion, matching y reglas de merge.
 - `src/movie_inbox/application/`: casos de uso compartidos por el visor, importadores y scanner.
 - `src/movie_inbox/infrastructure/`: esquemas, repositorios JSON/SQLite y exportacion.
 - `src/movie_inbox/external/`: clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity.
 - `src/movie_inbox/web/`: aplicacion FastAPI, servidor Uvicorn, proxy seguro de imagenes y assets estaticos.
 - `catalog.schema.json`: contrato JSON versionado del catalogo.
-- `chrome-extension/`: extension de Chrome para guardar la pestana actual con datos minimos y exportar CSV/JSON.
 - `PRODUCT.md` y `DESIGN.md`: contratos de producto, terminologia y lenguaje visual del visor.
 
-## Instalacion y comandos
+Herramientas conservadas por compatibilidad:
+
+- `scripts/txt_to_catalog.py`: importa TXT con URLs o titulos y genera JSON/CSV.
+- `scripts/scan_video_catalog.sh`: genera un JSON puntual desde archivos de video.
+- `scripts/scan_library.py`: scanner incremental anterior al flujo administrado.
+- `scripts/view_catalog.py`: lanzador compatible del servidor actual.
+- `scripts/build_viewer.py`: visor HTML estatico para exportaciones.
+- `chrome-extension/`: capturador experimental con exportacion CSV/JSON, sin sincronizacion directa con la instancia.
+
+## Puesta en marcha
+
+Para una instancia permanente, Docker Compose es el camino recomendado. Mantiene SQLite, catalogos de miembros y cache de imagenes en un volumen persistente; las bibliotecas se montan en solo lectura y los backups se escriben fuera del volumen. La guia completa, incluido el primer acceso y la actualizacion sin perder datos, esta en [docs/docker.md](docs/docker.md).
+
+La instalacion nativa sigue siendo util para desarrollar o ejecutar herramientas puntuales.
 
 Para trabajar desde un checkout, instala el paquete en modo editable:
 
@@ -109,7 +117,7 @@ El Club tambien separa `Miembros` de `Colecciones`. Una coleccion es una lista c
 
 Cada instancia instala una sola vez la coleccion inicial `Akira Kurosawa`, basada en la tabla de obras como director de Wikipedia. Incluye 31 registros, entre ellos la obra codirigida `Those Who Make Tomorrow`, y no se sigue automaticamente. Colecciones, seguimientos y la marca de instalacion viven en `instance.db`; no forman parte del JSON personal.
 
-## SQLite y backups JSON
+## Persistencia y backups
 
 Para crear una base SQLite sin modificar el JSON original:
 
@@ -141,7 +149,9 @@ diaria estan documentados en [docs/docker.md](docs/docker.md#backups-automaticos
 
 SQLite normaliza obras, aliases, IDs externos, archivos locales, tags y procedencia. Las actualizaciones frecuentes son granulares: estado y fecha se actualizan directamente, mientras que metadata y relaciones reconstruyen solamente la parte modificada del item. Las operaciones batch conservan una transaccion unica pero sincronizan diferencias en vez de reescribir todas las relaciones. Tambien reserva tablas para temporadas y episodios, aunque esa funcionalidad todavia no forma parte del dominio ni de la interfaz. Los archivos `.db`, `.sqlite`, sus journals y `data/` se ignoran en Git.
 
-## Uso del script
+## Importacion TXT por CLI (compatibilidad)
+
+Para el uso cotidiano se recomienda `Bandeja > Importaciones`, que ofrece previsualizacion y deduplicacion antes de escribir. La CLI sigue siendo util para conversiones repetibles o trabajo fuera del servidor.
 
 Crear un archivo, por ejemplo `links.txt`:
 
@@ -233,9 +243,9 @@ miembros hayan compartido de forma explicita. Los catalogos privados nunca se us
 fuente de candidatos. El matching indexa titulos y terminos al comenzar cada recorrido,
 por lo que no necesita comparar cada archivo contra todas las obras de la instancia.
 
-### Scanner Python incremental
+### Scanner Python incremental (compatibilidad)
 
-Para un servidor o una tarea programada conviene usar el scanner Python. `scanner.example.json` muestra la configuracion de una biblioteca; las rutas relativas se resuelven desde la carpeta donde esta ese archivo.
+Este comando conserva el flujo anterior para reconciliar un catalogo de forma puntual. En una instancia permanente conviene usar `Administrar > Bibliotecas`, que limita las raices visibles, separa Probar/Aplicar/Automatizar y persiste el inventario compartido. `scanner.example.json` muestra la configuracion de la CLI; las rutas relativas se resuelven desde la carpeta donde esta ese archivo.
 
 El primer recorrido debe ser una simulacion:
 
@@ -259,7 +269,7 @@ La CLI legacy sigue disponible para reconciliar directamente un unico catalogo. 
 
 Si el disco no existe o no esta montado, el scanner aborta antes de modificar el catalogo. Tambien compara el recorrido con el ultimo estado y omite bajas cuando desaparece mas del porcentaje configurado en `max_missing_ratio` (50% por defecto), lo que cubre puntos de montaje que siguen existiendo pero aparecen vacios. Si hubo errores parciales de lectura, actualiza lo que pudo ver pero no marca archivos ausentes ni reemplaza el ultimo estado completo. El scanner solo administra `local_files` y la disponibilidad agregada `en_catalogo`: no modifica `status`, `watched_at`, `rating` ni `review`, y no consulta fuentes externas durante el recorrido.
 
-### Export rapido con Bash
+### Export rapido con Bash (compatibilidad)
 
 Si tenes una carpeta con archivos de video, podes generar un JSON compatible con el catalogo:
 
@@ -313,7 +323,9 @@ Cuando se puede resolver un `wikidata_id`, el enriquecimiento intenta completar 
 
 Durante el merge automatico solo se combinan entradas con una senal fuerte: URL externa compartida, mismo `wikidata_id`, o titulo exacto junto con ano exacto y tipo compatible. Los titulos iguales sin ano quedan pendientes de revision. Si cualquiera de las dos entradas tiene `en_catalogo: true`, el resultado final conserva `en_catalogo: true`.
 
-## Sumar exports a un catalogo general
+## Sumar exports a un catalogo general (compatibilidad)
+
+La Bandeja web reemplaza este recorrido para una instancia activa. Estos comandos siguen siendo validos para catalogos JSON independientes o migraciones controladas.
 
 Cuando tengas un export de la extension, por ejemplo `movie-inbox-2026-04-27.csv`, podes sumarlo a tu catalogo general asi:
 
@@ -335,7 +347,11 @@ Si queres que los links nuevos de Wikipedia entren enriquecidos:
 python scripts/txt_to_catalog.py movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv --fetch
 ```
 
-## Visualizar el catalogo
+## Interfaz web
+
+El servidor actual se inicia con `movie-inbox serve` y trabaja directamente con SQLite o JSON mediante el mismo contrato de repositorio. En Docker, Compose inicia ese mismo proceso y conserva sus datos en el volumen de la instancia.
+
+### Visor HTML estatico (compatibilidad)
 
 El JSON consolidado puede convertirse en una vista HTML estatica:
 
@@ -344,6 +360,8 @@ python scripts/build_viewer.py catalog.json --html catalog-view.html
 ```
 
 Despues abris `catalog-view.html` en el navegador. La vista incluye buscador, filtros por estado/tipo/fuente, conteo de resultados y tarjetas con imagen/resumen cuando el JSON tiene esa data.
+
+### Servidor nativo
 
 Tambien podes levantar un visor local en Python para mirar uno o varios JSONs exportados por la extension:
 
@@ -359,9 +377,9 @@ python scripts/view_catalog.py exports/*.json --port 8765
 
 El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibilidad, `--write-json` sigue disponible como alias de `--write-catalog`.
 
-Este visor relee los archivos cada vez que apretas "Actualizar", asi que sirve para ir tirando exports nuevos de Chrome y verlos sin regenerar nada. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el usuario y el catalogo personal activos y permite cerrar todas las operaciones de esa sesion.
+Cuando la fuente es JSON, `Actualizar` vuelve a leer el archivo; con SQLite consulta el estado transaccional actual. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el usuario y el catalogo personal activos y permite cerrar todas las operaciones de esa sesion.
 
-La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` propone entre una y cuatro recomendaciones diarias estables, formadas solo por obras disponibles, con sinopsis y seleccion manual; sus programas combinan pendientes disponibles, faltantes de colecciones seguidas, recuerdos personales incompletos y rutas por director, genero o decada. Las cards de programa muestran una razon breve sin repetir explicaciones completas. Cada sugerencia se calcula con datos locales y no se repite entre secciones; `Random` sigue siendo la accion independiente para explorar sin un criterio fijo. Los accesos desde Inicio abren `Coleccion` con su criterio real aplicado y representado en la URL. `Coleccion` concentra busqueda, filtros rapidos de estado, disponibilidad y tipo, un panel de facetas avanzadas, orden, carga incremental y acceso al CRUD. `Bandeja` alterna entre la curaduria y las importaciones controladas. `Club` alterna entre catalogos compartidos por miembros y colecciones locales que pueden seguirse o copiarse de forma selectiva. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
+La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` propone hasta cuatro recomendaciones diarias estables, formadas solo por obras disponibles que tengan una imagen real, con sinopsis y seleccion manual; sus programas combinan pendientes disponibles, faltantes de colecciones seguidas, recuerdos personales incompletos y rutas por director, genero o decada. Cada sugerencia se calcula con datos locales y no se repite entre secciones; `Random` sigue siendo la accion independiente para explorar sin un criterio fijo. Los accesos desde Inicio abren `Coleccion` con su criterio real aplicado y representado en la URL. `Coleccion` concentra busqueda, filtros rapidos de estado, disponibilidad y tipo, un panel de facetas avanzadas, orden, carga incremental y acceso al CRUD. `Bandeja` alterna entre la curaduria y las importaciones controladas. `Club` alterna entre catalogos compartidos por miembros y colecciones locales que pueden seguirse o copiarse de forma selectiva. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
 
 ### Importaciones desde la Bandeja
 
@@ -560,7 +578,7 @@ py scripts/enrich_catalog.py catalog_clean.json --json catalog_wiki_v5.json --cs
 
 El enriquecedor acepta tanto JSON como SQLite. Para pruebas largas sigue siendo prudente escribir a una salida distinta y revisar el reporte antes de reemplazar la fuente principal.
 
-## Extension de Chrome
+## Extension de Chrome (experimental)
 
 1. Abrir `chrome://extensions`.
 2. Activar "Developer mode".
@@ -576,11 +594,13 @@ La extension permite:
 
 Nota: Chrome puede pedir confirmacion o guardar los archivos en la carpeta de descargas segun tu configuracion.
 
-## Siguiente paso natural
+## Estado de compatibilidad
 
-Cuando ya tengas un catalogo estable, JSON puede ser la semilla portable y SQLite la base de trabajo para:
+La aplicacion web, SQLite, Docker, la Bandeja y el scanner administrado son el camino principal. Estas piezas permanecen en el repositorio porque todavia sirven para migraciones o capturas puntuales, pero no gobiernan el flujo self-hosted:
 
-- una webapp local
-- una app Kotlin
-- temporadas y episodios sobre el esquema relacional preparado
-- importacion desde la extension
+- visor HTML estatico
+- scanner Bash y scanner Python por archivo de configuracion
+- wrappers historicos de `scripts/`
+- extension de Chrome basada en exportaciones manuales
+
+Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras, no capacidades de v0.2.0-rc1.
