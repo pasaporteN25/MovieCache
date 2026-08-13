@@ -6,6 +6,7 @@ import re
 from typing import Any
 from urllib.parse import quote
 
+from movie_inbox.domain.search import parse_search_query
 from movie_inbox.external.common import fetch_json, fetch_json_safe
 
 
@@ -14,7 +15,11 @@ class ImdbAdapter:
     label = "IMDb"
 
     def search(self, query: str) -> list[dict[str, Any]]:
-        key = re.sub(r"[^a-z0-9_ -]+", "", query.lower()).strip().replace(" ", "_")
+        intent = parse_search_query(query)
+        if intent.source and intent.source != self.name:
+            return []
+        lookup = intent.external_id or intent.title or query
+        key = re.sub(r"[^a-z0-9_ -]+", "", lookup.lower()).strip().replace(" ", "_")
         if not key:
             return []
         raw = fetch_json(f"https://v3.sg.media-imdb.com/suggestion/x/{quote(key)}.json")
@@ -47,8 +52,8 @@ class ImdbAdapter:
 
 
 def imdb_id_from_text(value: str) -> str:
-    match = re.search(r"\btt\d{7,9}\b", value)
-    return match.group(0) if match else ""
+    match = re.search(r"\btt\d{7,9}\b", value, flags=re.IGNORECASE)
+    return match.group(0).lower() if match else ""
 
 
 def fetch_wikipedia_by_imdb_id(imdb_id: str) -> dict[str, Any]:
