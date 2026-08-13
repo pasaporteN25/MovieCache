@@ -156,6 +156,36 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(payload["sources"]["imdb"]["count"], 1)
         self.assertEqual(payload["sources"]["filmaffinity"]["count"], 1)
 
+    def test_progressive_external_search_can_skip_catalog_lookup(self) -> None:
+        external = [{
+            "source": "wikipedia",
+            "title": "Evil Dead Burn",
+            "year": "2026",
+            "url": "https://en.wikipedia.org/wiki/Evil_Dead_Burn",
+        }]
+
+        with (
+            patch("movie_inbox.web.app.search_catalog_items") as catalog_search,
+            patch("movie_inbox.web.app.search_sources", return_value=external) as external_search,
+        ):
+            response = self.client.get(
+                "/api/search",
+                params={
+                    "q": "Evil Dead Burn 2026",
+                    "source": "wikipedia",
+                    "external": "true",
+                    "catalog": "false",
+                },
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertEqual(payload["catalog"], {"results": [], "count": 0})
+        self.assertEqual(payload["sources"]["wikipedia"]["count"], 1)
+        catalog_search.assert_not_called()
+        external_search.assert_called_once_with("Evil Dead Burn 2026", "wikipedia")
+
     def test_external_comparison_uses_enriched_titles_before_ranking_catalog(self) -> None:
         with patch(
             "movie_inbox.web.app.enrich_selected_result",
@@ -988,6 +1018,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'.personal-record-read', css)
         self.assertIn(b'.drawer-navigation', css)
         self.assertIn(b'.unsaved-dialog', css)
+        self.assertIn(b'.search-source-feedback', css)
+        self.assertIn(b'.source-search-spinner', css)
         self.assertIn(b'prefers-reduced-motion', css)
 
         status, javascript = self.request("GET", "/static/app.js")
@@ -1000,6 +1032,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'0 pts', javascript)
         self.assertIn(b'showModal()', javascript)
         self.assertIn(b'SEARCH_TIMEOUT_MS', javascript)
+        self.assertIn(b'Promise.allSettled(tasks)', javascript)
+        self.assertIn(b'catalog=false', javascript)
+        self.assertIn(b'retry-external-source', javascript)
+        self.assertIn(b'function loadExternalSourceResults(', javascript)
         self.assertIn(b'backdrop_image', javascript)
         self.assertIn(b'spotlight-cta', javascript)
         self.assertIn(b'function renderEditorialHome()', javascript)

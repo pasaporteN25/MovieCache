@@ -696,6 +696,29 @@
         min-height: 54px;
         padding: 12px 0;
       }
+      .search-source-feedback {
+        align-items: center;
+        color: var(--muted);
+        display: flex;
+        gap: 10px;
+        justify-content: flex-start;
+        min-height: 54px;
+        padding: 8px 0;
+      }
+      .search-source-feedback.is-error {
+        align-items: center;
+        justify-content: space-between;
+      }
+      .source-search-spinner {
+        border: 2px solid var(--control-border);
+        border-right-color: var(--teal);
+        border-radius: 50%;
+        height: 16px;
+        width: 16px;
+        animation: source-search-spin 720ms linear infinite;
+      }
+      .source-retry { min-height: 34px; width: auto; }
+      @keyframes source-search-spin { to { transform: rotate(360deg); } }
       .source-load-more { justify-self: start; width: auto; }
       .match-reason { border-color: rgba(255, 196, 70, 0.52); color: var(--gold); }
       .search-result {
@@ -5445,6 +5468,7 @@
         .home-loading-section > span,
         .home-loading-section > div { animation: none; }
         .library-running-signal { animation: none; }
+        .source-search-spinner { animation: none; }
         .dvd-card:hover .dvd-flipper,
         .dvd-card:has(.dvd-open-surface:focus-visible) .dvd-flipper { transform: none; }
       }
