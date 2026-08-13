@@ -4,6 +4,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+## [0.2.0-rc2] - 2026-08-13
+
 ### Agregado
 
 - Busqueda local del lado del servidor sobre titulos originales, espanoles, ingleses,
@@ -43,12 +45,19 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 - El antiguo carrusel automatico fue reemplazado por una cartelera de seleccion manual;
   `Random` conserva la exploracion impredecible como una accion independiente.
-- Las cards secundarias de Inicio conservan una etiqueta contextual breve y dejan la
-  explicacion extensa en el encabezado de seccion o la ficha.
+- Las cards secundarias de Inicio eliminan leyendas contextuales repetitivas y dejan la
+  explicacion en el encabezado de seccion o la ficha.
 - Bibliotecas separa archivos vinculados, ambiguos y nuevos en vez de agrupar los dos
   ultimos bajo un unico contador de revision.
 
 ### Corregido
+
+- La busqueda de Wikipedia resuelve primero titulos y URLs exactos, conserva resultados
+  si falla uno de los idiomas y ya no permite que un error transitorio quede cacheado
+  como una respuesta vacia durante 15 minutos.
+- La busqueda local y externa separa titulo, ano, URL e identificador antes de puntuar;
+  `Evil Dead Burn 2026` y su URL de Wikipedia encuentran la misma obra sin relajar las
+  reglas conservadoras de merge.
 
 - El wrapper de backup prepara y valida la ruta host interpolada por Compose antes de
   detener la aplicacion, evitando mounts fallidos cuando el directorio aun no existe.

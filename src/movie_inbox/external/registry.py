@@ -7,6 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
 
+from movie_inbox.domain.search import external_result_score, parse_search_query
 from movie_inbox.external.base import SourceAdapter
 from movie_inbox.external.common import clean_text, dedupe_results, utc_now
 from movie_inbox.external.filmaffinity import FilmAffinityAdapter
@@ -15,6 +16,7 @@ from movie_inbox.external.wikipedia import WikipediaAdapter
 
 
 SEARCH_CACHE_TTL_SECONDS = 15 * 60
+EMPTY_SEARCH_CACHE_TTL_SECONDS = 30
 SEARCH_CACHE_MAX_ENTRIES = 128
 
 
@@ -33,7 +35,13 @@ class ExternalSourceService:
         query = query.strip()
         if len(query) < 2:
             return [], self.snapshot()
-        selected = list(self.adapters) if source == "all" else [source] if source in self.adapters else list(self.adapters)
+        intent = parse_search_query(query)
+        if source == "all":
+            selected = [intent.source] if intent.source in self.adapters else list(self.adapters)
+        elif source in self.adapters:
+            selected = [source]
+        else:
+            selected = list(self.adapters)
         cache_key = (" ".join(query.casefold().split()), source if source in self.adapters else "all")
         cached = self._get_search_cache(cache_key)
         if cached is not None:
@@ -42,20 +50,22 @@ class ExternalSourceService:
         with self._lock:
             self._cache_misses += 1
         batches: dict[str, list[dict[str, Any]]] = {name: [] for name in selected}
+        succeeded: dict[str, bool] = {name: False for name in selected}
         with ThreadPoolExecutor(max_workers=len(selected), thread_name_prefix="catalog-search") as executor:
             futures = {executor.submit(self._run_adapter, name, query): name for name in selected}
             for future in as_completed(futures):
                 name = futures[future]
                 try:
-                    batches[name] = future.result()
+                    batches[name], succeeded[name] = future.result()
                 except Exception as error:
                     self._record_error(name, error)
         # Keep each source together and preserve up to eight alternatives per adapter.
         # Consumers can render independent shelves without losing later-source results.
         results = dedupe_results(
-            [result for name in selected for result in dedupe_results(batches[name])[:8]]
+            [result for name in selected for result in self._rank_batch(query, batches[name])[:8]]
         )[: 8 * len(selected)]
-        self._set_search_cache(cache_key, results)
+        if all(succeeded.values()):
+            self._set_search_cache(cache_key, results)
         return [dict(result) for result in results], self.snapshot(cache_hit=False)
 
     def selected_metadata(self, url: str, loader: Callable[[str], dict[str, Any]]) -> tuple[dict[str, Any], bool]:
@@ -78,6 +88,7 @@ class ExternalSourceService:
                 "sources": {name: dict(state) for name, state in self._health.items()},
                 "cache": {
                     "ttl_seconds": SEARCH_CACHE_TTL_SECONDS,
+                    "empty_ttl_seconds": EMPTY_SEARCH_CACHE_TTL_SECONDS,
                     "search_entries": len(self._search_cache),
                     "metadata_entries": len(self._metadata_cache),
                     "hits": self._cache_hits,
@@ -86,13 +97,13 @@ class ExternalSourceService:
                 },
             }
 
-    def _run_adapter(self, name: str, query: str) -> list[dict[str, Any]]:
+    def _run_adapter(self, name: str, query: str) -> tuple[list[dict[str, Any]], bool]:
         started = time.monotonic()
         try:
             results = self.adapters[name].search(query)
         except Exception as error:
             self._record_error(name, error, started)
-            return []
+            return [], False
         latency_ms = round((time.monotonic() - started) * 1000)
         with self._lock:
             self._health[name].update(
@@ -105,7 +116,7 @@ class ExternalSourceService:
                     "error": "",
                 }
             )
-        return results
+        return results, True
 
     def _record_error(self, name: str, error: Exception, started: float | None = None) -> None:
         latency_ms = round((time.monotonic() - started) * 1000) if started is not None else 0
@@ -126,7 +137,8 @@ class ExternalSourceService:
             cached = self._search_cache.get(key)
             if not cached:
                 return None
-            if now - cached[0] > SEARCH_CACHE_TTL_SECONDS:
+            ttl = SEARCH_CACHE_TTL_SECONDS if cached[1] else EMPTY_SEARCH_CACHE_TTL_SECONDS
+            if now - cached[0] > ttl:
                 del self._search_cache[key]
                 return None
             self._cache_hits += 1
@@ -135,7 +147,25 @@ class ExternalSourceService:
     def _set_search_cache(self, key: tuple[str, str], results: list[dict[str, Any]]) -> None:
         with self._lock:
             self._search_cache[key] = (time.monotonic(), [dict(result) for result in results])
-            self._prune_cache(self._search_cache)
+            self._prune_search_cache()
+
+    def _prune_search_cache(self) -> None:
+        now = time.monotonic()
+        for key, (created_at, results) in list(self._search_cache.items()):
+            ttl = SEARCH_CACHE_TTL_SECONDS if results else EMPTY_SEARCH_CACHE_TTL_SECONDS
+            if now - created_at > ttl:
+                del self._search_cache[key]
+        while len(self._search_cache) > SEARCH_CACHE_MAX_ENTRIES:
+            del self._search_cache[min(self._search_cache, key=lambda key: self._search_cache[key][0])]
+
+    @staticmethod
+    def _rank_batch(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows = dedupe_results(results)
+        ranked = sorted(
+            enumerate(rows),
+            key=lambda row: (-external_result_score(query, row[1]), row[0]),
+        )
+        return [row for _, row in ranked]
 
     @staticmethod
     def _prune_cache(cache: dict[Any, tuple[float, Any]]) -> None:

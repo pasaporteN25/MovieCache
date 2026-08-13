@@ -43,6 +43,31 @@ class FakeAdapter:
         ]
 
 
+class FlakyAdapter:
+    name = "wikipedia"
+    label = "Wikipedia"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def search(self, query: str) -> list[dict[str, Any]]:
+        self.calls += 1
+        if self.calls == 1:
+            raise TimeoutError("temporary lookup failure")
+        return [{"title": query, "source": self.name, "url": "https://en.wikipedia.org/wiki/Heat"}]
+
+
+class RelevanceAdapter:
+    name = "wikipedia"
+    label = "Wikipedia"
+
+    def search(self, query: str) -> list[dict[str, Any]]:
+        return [
+            {"title": "Evil Dead Rise", "year": "2023", "source": self.name, "url": "https://example.test/1"},
+            {"title": "Evil Dead Burn", "year": "2026", "source": self.name, "url": "https://example.test/2"},
+        ]
+
+
 class ExternalCatalogServiceTests(unittest.TestCase):
     def test_registry_preserves_eight_results_for_each_source(self) -> None:
         service = ExternalSourceService(
@@ -55,6 +80,24 @@ class ExternalCatalogServiceTests(unittest.TestCase):
         self.assertEqual([row["source"] for row in results[:8]], ["wikipedia"] * 8)
         self.assertEqual([row["source"] for row in results[8:16]], ["imdb"] * 8)
         self.assertEqual([row["source"] for row in results[16:]], ["filmaffinity"] * 8)
+
+    def test_failed_search_is_not_cached_as_an_empty_result(self) -> None:
+        adapter = FlakyAdapter()
+        service = ExternalSourceService([adapter])
+
+        first, _ = service.search("Heat")
+        second, _ = service.search("Heat")
+
+        self.assertEqual(first, [])
+        self.assertEqual(second[0]["title"], "Heat")
+        self.assertEqual(adapter.calls, 2)
+
+    def test_external_results_are_ranked_by_title_and_year(self) -> None:
+        service = ExternalSourceService([RelevanceAdapter()])
+
+        results, _ = service.search("Evil Dead Burn 2026")
+
+        self.assertEqual(results[0]["title"], "Evil Dead Burn")
 
     def test_search_and_snapshot_are_delegated(self) -> None:
         gateway = FakeGateway()

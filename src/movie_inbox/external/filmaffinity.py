@@ -6,6 +6,7 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import quote
 
+from movie_inbox.domain.search import parse_search_query
 from movie_inbox.domain.titles import infer_year
 from movie_inbox.external.common import clean_text, fetch_text
 
@@ -15,6 +16,10 @@ class FilmAffinityAdapter:
     label = "FilmAffinity"
 
     def search(self, query: str) -> list[dict[str, Any]]:
+        intent = parse_search_query(query)
+        if intent.source:
+            return []
+        query = intent.title or query
         parser = FilmAffinityParser()
         parser.feed(fetch_text(f"https://www.filmaffinity.com/es/search.php?stext={quote(query)}"))
         return parser.results[:8]

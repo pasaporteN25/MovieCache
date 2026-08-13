@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import re
-import unicodedata
-from difflib import SequenceMatcher
 from typing import Any, Mapping, Sequence
 
-from movie_inbox.domain.catalog import normalize_local_files, normalize_tags
+from movie_inbox.domain.catalog import canonical_url, normalize_local_files, normalize_tags
 from movie_inbox.domain.matching import decide_match
+from movie_inbox.domain.search import SearchIntent, parse_search_query, search_key, text_match_score
 
 
 SEARCH_RESULT_LIMIT = 60
-_YEAR_PATTERN = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b")
 
 
 def search_catalog_items(
@@ -21,19 +18,12 @@ def search_catalog_items(
     limit: int = SEARCH_RESULT_LIMIT,
 ) -> list[dict[str, Any]]:
     """Rank a personal catalog without applying the viewer's active filters."""
-    normalized_query = _search_key(query)
-    if len(normalized_query) < 2:
+    intent = parse_search_query(query)
+    if len(intent.title_key or intent.external_id or intent.key) < 2:
         return []
-    query_terms = normalized_query.split()
-    requested_year = _query_year(query)
     ranked: list[tuple[float, str, dict[str, Any]]] = []
     for item in items:
-        score, matched_field, matched_value = _catalog_search_score(
-            item,
-            normalized_query,
-            query_terms,
-            requested_year,
-        )
+        score, matched_field, matched_value = _catalog_search_score(item, intent)
         if score < 28:
             continue
         payload = dict(item)
@@ -106,24 +96,29 @@ def group_external_results(results: Sequence[Mapping[str, Any]]) -> dict[str, li
 
 def _catalog_search_score(
     item: Mapping[str, Any],
-    query: str,
-    query_terms: list[str],
-    requested_year: str,
+    intent: SearchIntent,
 ) -> tuple[float, str, str]:
     best_score = 0.0
     best_field = ""
     best_value = ""
     for field, value, weight in _search_values(item):
-        normalized_value = _search_key(value)
-        if not normalized_value:
-            continue
-        score = _value_score(normalized_value, query, query_terms) * weight
+        queries = _field_queries(field, intent)
+        values = _field_values(field, value)
+        score = max(
+            (
+                text_match_score(normalized_value, query, tuple(query.split())) * weight
+                for normalized_value in values
+                for query in queries
+                if normalized_value and query
+            ),
+            default=0.0,
+        )
         if score > best_score:
             best_score, best_field, best_value = score, field, value
 
     item_year = str(item.get("year") or "").strip()
-    if requested_year:
-        if item_year == requested_year:
+    if intent.year:
+        if item_year == intent.year:
             best_score += 12
         elif item_year:
             best_score -= 18
@@ -180,29 +175,26 @@ def _search_values(item: Mapping[str, Any]) -> list[tuple[str, str, float]]:
     return values
 
 
-def _value_score(value: str, query: str, query_terms: list[str]) -> float:
-    if value == query:
-        return 100.0
-    if value.startswith(query):
-        return 88.0
-    if query in value:
-        return 82.0
-    value_terms = value.split()
-    covered = sum(1 for term in query_terms if _term_matches(term, value_terms))
-    coverage = covered / max(1, len(query_terms))
-    if coverage == 1:
-        return 70.0 + (12.0 * min(1.0, len(query) / max(1, len(value))))
-    ratio = SequenceMatcher(None, query, value).ratio()
-    return max(coverage * 62.0, ratio * 58.0)
+def _field_queries(field: str, intent: SearchIntent) -> list[str]:
+    if field in {"external_id", "external_link"}:
+        return list(
+            dict.fromkeys(
+                value
+                for value in (
+                    search_key(intent.external_id),
+                    search_key(intent.canonical_url),
+                    intent.key,
+                )
+                if value
+            )
+        )
+    return [intent.title_key or intent.key]
 
 
-def _term_matches(term: str, values: list[str]) -> bool:
-    return any(
-        term in value
-        or value in term
-        or (len(term) >= 5 and SequenceMatcher(None, term, value).ratio() >= 0.82)
-        for value in values
-    )
+def _field_values(field: str, value: str) -> list[str]:
+    if field == "external_link":
+        return list(dict.fromkeys([search_key(canonical_url(value)), search_key(value)]))
+    return [search_key(value)]
 
 
 def _candidate_query(candidate: Mapping[str, Any]) -> str:
@@ -213,17 +205,6 @@ def _candidate_query(candidate: Mapping[str, Any]) -> str:
     titles.extend(normalize_tags(candidate.get("alternative_titles")))
     title = next((value for value in titles if value), "")
     return " ".join(value for value in (title, str(candidate.get("year") or "").strip()) if value)
-
-
-def _query_year(value: str) -> str:
-    match = _YEAR_PATTERN.search(str(value or ""))
-    return match.group(1) if match else ""
-
-
-def _search_key(value: Any) -> str:
-    text = unicodedata.normalize("NFKD", str(value or "").casefold())
-    text = "".join(character for character in text if not unicodedata.combining(character))
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
 
 
 def _search_reason(score: float, field: str) -> str:

@@ -1,6 +1,6 @@
 # Gate de release
 
-Este gate prepara `v0.2.0-rc1` sin agregar capacidades. Combina pruebas automaticas
+Este gate prepara `v0.2.0-rc2` sin agregar capacidades. Combina pruebas automaticas
 con una aceptacion manual sobre una biblioteca descartable. Nunca se ejecuta por primera
 vez contra la unica copia de un catalogo o un disco sin backup.
 
@@ -46,14 +46,26 @@ wheel en un entorno limpio.
 7. Cambiar la frecuencia a manual. La automatizacion debe apagarse y `Escanear ahora`
    debe quedar disponible.
 
-## 4. Comparador del Scanner
+## 4. Busqueda y curaduria
+
+1. Buscar `Evil Dead Burn 2026`. Wikipedia debe mostrar la obra exacta antes que
+   resultados similares aunque el otro idioma no responda.
+2. Buscar `https://en.wikipedia.org/wiki/Evil_Dead_Burn`. La URL debe resolverse de
+   forma directa y la busqueda local debe encontrar una entrada del mismo titulo aunque
+   todavia no tenga ese link.
+3. Simular un error temporal de una fuente y repetir la consulta. El vacio fallido no
+   debe quedar cacheado; una respuesta vacia valida puede durar como maximo 30 segundos.
+4. Comparar una coincidencia ambigua. El ranking mejorado no debe convertir un titulo
+   sin evidencia de ano o ID externo en un merge automatico.
+
+## 5. Comparador del Scanner
 
 1. Agregar un archivo con identidad ambigua y aplicar un recorrido.
 2. Abrir `Bandeja > Scanner` y comparar titulo, ano, tipo, aliases, similitud y fuentes.
 3. Vincular una candidata. Debe asociar inventario fisico sin crear una obra personal.
 4. Omitir otro archivo y confirmar el aviso. No debe borrarse del disco ni del catalogo.
 
-## 5. Recuperacion
+## 6. Recuperacion
 
 Usar siempre la biblioteca descartable preparada para este gate.
 
@@ -66,7 +78,7 @@ Usar siempre la biblioteca descartable preparada para este gate.
 4. Interrumpir el proceso durante un recorrido y reiniciarlo. La ejecucion anterior debe
    quedar fallida, la biblioteca en advertencia y el inventario previo intacto.
 
-## 6. Criterio de salida
+## 7. Criterio de salida
 
 - Suite local y CI en verde.
 - Sin perdida de inventario ante offline, permisos o reinicio.

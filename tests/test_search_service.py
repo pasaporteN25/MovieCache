@@ -37,6 +37,21 @@ class CatalogSearchServiceTests(unittest.TestCase):
         item = {"id": "one", "title": "Amélie", "year": "2001"}
         self.assertEqual(search_catalog_items([item], "amelie")[0]["id"], "one")
 
+    def test_title_and_year_are_scored_as_separate_search_evidence(self) -> None:
+        item = {"id": "evil-dead-burn", "title": "Evil Dead Burn", "year": "2026"}
+
+        result = search_catalog_items([item], "Evil Dead Burn 2026")[0]
+
+        self.assertEqual(result["id"], "evil-dead-burn")
+        self.assertEqual(result["_search"]["reason"], "exact_title")
+
+    def test_wikipedia_url_can_find_an_unlinked_local_title(self) -> None:
+        item = {"id": "evil-dead-burn", "title": "Evil Dead Burn", "year": "2026"}
+
+        results = search_catalog_items([item], "https://en.wikipedia.org/wiki/Evil_Dead_Burn")
+
+        self.assertEqual(results[0]["id"], "evil-dead-burn")
+
     def test_exact_title_and_year_is_ranked_as_an_accepted_candidate(self) -> None:
         results = rank_catalog_candidates(
             self.items,

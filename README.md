@@ -4,7 +4,7 @@ Gestor self-hosted para organizar obras, disponibilidad fisica y memoria persona
 
 ## Estado del proyecto
 
-La version candidata actual es **v0.2.0-rc1**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+La version candidata actual es **v0.2.0-rc2**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
 
 En una instalacion nueva, SQLite es la fuente de verdad recomendada. JSON conserva un contrato versionado como formato de importacion, exportacion y auditoria, pero una exportacion individual no reemplaza el backup completo de la instancia. Catalogos, cuentas, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
 
@@ -403,10 +403,14 @@ valores dentro de la misma faceta se combinan con `OR`. Si abriste varios catalo
 por defecto escribe en el primero resuelto;
 podes elegir otro archivo con el nombre compatible `--write-json`:
 
-Las consultas externas se ejecutan en paralelo mediante adaptadores independientes y
-se guardan durante 15 minutos en un cache de memoria. Un error en una fuente no cancela
-las otras. Los resultados aparecen en estanterias separadas de Wikipedia, IMDb y
-FilmAffinity, con seis opciones iniciales y carga adicional por fuente. `External DBs`
+Las consultas externas se ejecutan en paralelo mediante adaptadores independientes. Los
+resultados positivos se guardan durante 15 minutos y una respuesta vacia solamente 30
+segundos; una fuente con error no se cachea ni cancela las otras. Las URLs conocidas,
+los IDs de IMDb y las consultas `titulo + ano` se interpretan antes de buscar, y cada
+fuente ordena sus alternativas por coincidencia de titulo y ano. Wikipedia prioriza la
+coincidencia exacta dentro de la consulta amplia y usa la resolucion directa como
+respaldo; si falla un idioma conserva los resultados del otro. Los resultados aparecen en estanterias separadas de Wikipedia,
+IMDb y FilmAffinity, con seis opciones iniciales y carga adicional por fuente. `External DBs`
 muestra estado, latencia, cantidad de resultados y errores, ademas de hits, misses y
 entradas del cache. Wikipedia devuelve primero datos livianos y completa la metadata de
 la entrada elegida recien al agregarla o combinarla.
@@ -603,4 +607,4 @@ La aplicacion web, SQLite, Docker, la Bandeja y el scanner administrado son el c
 - wrappers historicos de `scripts/`
 - extension de Chrome basada en exportaciones manuales
 
-Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras, no capacidades de v0.2.0-rc1.
+Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras, no capacidades de v0.2.0-rc2.
