@@ -176,12 +176,49 @@ class EditorialHomeServiceTests(unittest.TestCase):
         payload = self.service.build(
             "lucas",
             "2026-08-10",
-            [movie("watched", status="watched", en_catalogo=True, rating=8, review="Completa")],
+            [
+                movie(
+                    "watched",
+                    status="watched",
+                    en_catalogo=True,
+                    rating=8,
+                    review="Completa",
+                    page_image="https://upload.wikimedia.org/watched.jpg",
+                )
+            ],
         )
 
         self.assertEqual(payload["hero"]["item"]["id"], "watched")
         self.assertEqual(payload["hero"]["reason"]["code"], "available_revisit")
         self.assertEqual(len(payload["featured"]), 1)
+
+    def test_featured_items_always_have_an_image(self) -> None:
+        payload = self.service.build(
+            "lucas",
+            "2026-08-10",
+            [
+                movie("pending-without-image", en_catalogo=True),
+                movie(
+                    "watched-with-image",
+                    status="watched",
+                    en_catalogo=True,
+                    page_image="https://upload.wikimedia.org/watched.jpg",
+                ),
+            ],
+        )
+
+        self.assertEqual([entry["item"]["id"] for entry in payload["featured"]], ["watched-with-image"])
+        self.assertTrue(
+            all(entry["item"].get("page_image") or entry["item"].get("backdrop_image") for entry in payload["featured"])
+        )
+
+        empty = self.service.build(
+            "lucas",
+            "2026-08-10",
+            [movie("only-placeholder", en_catalogo=True)],
+        )
+        self.assertIsNone(empty["hero"])
+        self.assertEqual(empty["featured"], [])
 
     def test_invalid_local_date_is_rejected(self) -> None:
         for value in ("", "10-08-2026", "2026-02-30", "2026-8-10"):

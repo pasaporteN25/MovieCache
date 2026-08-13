@@ -5,11 +5,6 @@ const password = document.querySelector("#loginPassword");
 const showPassword = document.querySelector("#showPassword");
 const feedback = document.querySelector("#loginFeedback");
 const submit = document.querySelector("#loginSubmit");
-const memberAlias = document.querySelector("#loginMemberAlias");
-
-username.addEventListener("input", () => {
-  memberAlias.textContent = username.value.trim() || "Sin identificar";
-});
 
 showPassword.addEventListener("change", () => {
   password.type = showPassword.checked ? "text" : "password";

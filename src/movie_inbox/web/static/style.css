@@ -1987,6 +1987,13 @@
         display: grid;
         min-height: 470px;
       }
+      .member-login-pass {
+        aspect-ratio: 1.58 / 1;
+        justify-self: end;
+        max-width: 560px;
+        min-height: 0;
+        width: 100%;
+      }
       .login-pass-stripe,
       .login-pass-footer {
         align-items: center;
@@ -2010,73 +2017,67 @@
         padding: 26px;
       }
       .login-member-layout {
-        align-items: start;
+        align-items: center;
         display: grid;
-        gap: 22px;
-        grid-template-columns: minmax(0, 1fr) 118px;
+        gap: 20px;
+        grid-template-columns: 124px minmax(0, 1fr);
       }
-      .login-member-data { display: grid; gap: 18px; min-width: 0; }
-      .login-member-facts {
-        border-block: 1px solid var(--line);
+      .login-member-data {
         display: grid;
-        margin: 0;
-        padding: 8px 0;
+        gap: 12px;
+        grid-column: 2;
+        min-width: 0;
       }
-      .login-member-facts > div {
-        display: grid;
-        gap: 8px;
-        grid-template-columns: 62px minmax(0, 1fr);
-        padding: 4px 0;
+      .login-member-number {
+        align-items: baseline;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        padding-bottom: 7px;
       }
-      .login-member-facts dt,
-      .login-member-facts dd { font-size: 11px; margin: 0; }
-      .login-member-facts dt {
-        color: var(--muted);
+      .login-member-number span,
+      .login-member-number strong {
         font-family: "Courier New", monospace;
+        font-size: 10px;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
       }
-      .login-member-facts dd { color: var(--ink); font-weight: 800; overflow-wrap: anywhere; }
-      .login-member-photo { display: grid; gap: 6px; text-align: center; }
+      .login-member-number span {
+        color: var(--muted);
+      }
+      .login-member-number strong { color: var(--gold); }
+      .login-member-photo {
+        grid-column: 1;
+        grid-row: 1;
+      }
       .login-photo-frame {
-        align-items: center;
-        aspect-ratio: 3 / 4;
+        aspect-ratio: 1;
         background: var(--violet);
         box-shadow: 5px 7px 0 rgba(0, 0, 0, 0.38);
-        display: grid;
-        justify-items: center;
         overflow: hidden;
         position: relative;
+        width: 100%;
       }
       .login-photo-frame::before {
         background: #11152a;
         border-radius: 50%;
         content: "";
-        height: 58px;
+        height: 42%;
+        left: 29%;
         position: absolute;
-        top: 22px;
-        width: 58px;
+        top: 13%;
+        width: 42%;
       }
       .login-photo-frame::after {
         background: #11152a;
         border-radius: 50% 50% 0 0;
-        bottom: -18px;
+        bottom: -14%;
         content: "";
-        height: 82px;
+        height: 62%;
+        left: 8%;
         position: absolute;
-        width: 104px;
+        width: 84%;
       }
-      .login-photo-frame span {
-        color: var(--gold);
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
-        font-size: 18px;
-        font-weight: 900;
-        position: relative;
-        transform: translateY(10px);
-        z-index: 1;
-      }
-      .login-member-photo > strong { color: var(--gold); font-size: 10px; }
-      .login-member-photo > span,
-      .login-member-photo > small { color: var(--muted); font-size: 9px; }
       .login-heading h2 {
         font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
         font-size: 34px;
@@ -2086,6 +2087,19 @@
         text-transform: uppercase;
       }
       .login-form { display: grid; gap: 14px; }
+      .member-login-pass .login-form {
+        gap: 9px 12px;
+        grid-template-columns: minmax(0, 1fr) 88px;
+      }
+      .member-login-pass .login-form > label:not(.login-password-toggle) { grid-column: 1; }
+      .member-login-pass .login-password-toggle,
+      .member-login-pass .login-feedback { grid-column: 1 / -1; }
+      .member-login-pass .login-submit {
+        align-self: stretch;
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        min-width: 88px;
+      }
       .login-form > label:not(.login-password-toggle) { display: grid; gap: 6px; }
       .login-form > label > span {
         color: var(--muted);
@@ -2137,9 +2151,7 @@
         .login-brand h1 { font-size: clamp(38px, 13vw, 58px); overflow-wrap: anywhere; }
         .login-brand p { font-size: 15px; margin-top: 12px; }
         .login-pass { min-height: 430px; }
-        .login-member-layout { grid-template-columns: minmax(0, 1fr) 96px; }
-        .login-photo-frame::before { height: 48px; top: 18px; width: 48px; }
-        .login-photo-frame::after { height: 68px; width: 86px; }
+        .member-login-pass { justify-self: center; min-height: 0; }
         .password-pass { min-height: 560px; }
         .login-pass-body { padding: 24px 20px; }
         #currentUserLabel { max-width: 76px; }
@@ -2148,16 +2160,15 @@
         .login-pass-stripe,
         .login-pass-footer { font-size: 8px; letter-spacing: 0.08em; padding-inline: 10px; }
         .login-pass-body { padding: 20px 16px; }
-        .login-member-layout { gap: 14px; grid-template-columns: minmax(0, 1fr) 78px; }
+        .member-login-pass { aspect-ratio: auto; }
+        .login-member-layout { gap: 14px; grid-template-columns: 76px minmax(0, 1fr); }
         .login-member-layout > * { min-width: 0; }
-        .login-member-facts > div { gap: 6px; grid-template-columns: 54px minmax(0, 1fr); }
-        .login-member-facts dt,
-        .login-member-facts dd { font-size: 10px; }
-        .login-photo-frame::before { height: 40px; top: 15px; width: 40px; }
-        .login-photo-frame::after { height: 56px; width: 70px; }
-        .login-member-photo > strong { font-size: 9px; }
-        .login-member-photo > span,
-        .login-member-photo > small { font-size: 8px; }
+        .member-login-pass .login-form { grid-template-columns: minmax(0, 1fr); }
+        .member-login-pass .login-form > *,
+        .member-login-pass .login-submit {
+          grid-column: 1;
+          grid-row: auto;
+        }
       }
       .home-editorial-sections {
         display: grid;
@@ -2174,7 +2185,7 @@
         justify-content: space-between;
         margin-bottom: 18px;
       }
-      .home-program-heading > div { max-width: 72ch; }
+      .home-program-heading > div { flex: 1; max-width: none; min-width: 0; }
       .home-program-heading h2,
       .home-empty-state h2,
       .admin-heading h2 {
@@ -2193,6 +2204,12 @@
         line-height: 1.5;
         margin: 7px 0 0;
       }
+      .home-program-heading h2 {
+        font-size: 36px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .home-section-action { flex: 0 0 auto; width: auto; }
       .home-program-grid {
         align-items: start;
@@ -2203,24 +2220,8 @@
       .home-editorial-item {
         align-content: start;
         display: grid;
-        gap: 7px;
         min-width: 0;
       }
-      .home-entry-reason {
-        min-height: 22px;
-        padding: 2px;
-      }
-      .home-entry-reason strong {
-        color: var(--teal);
-        font-family: "Courier New", monospace;
-        font-size: 10px;
-        line-height: 1.3;
-        text-transform: uppercase;
-      }
-      .home-entry-reason[data-reason="followed_collection"] strong { color: var(--violet); }
-      .home-entry-reason[data-reason^="watched_"] strong { color: var(--gold); }
-      .home-entry-reason[data-reason^="shared_"] strong { color: var(--red); }
-      .home-entry-reason[data-reason="recently_added"] strong { color: var(--teal); }
       .dvd-front-status.collection {
         background: color-mix(in srgb, var(--violet) 22%, transparent);
         border-color: var(--violet);
@@ -4473,6 +4474,7 @@
         .system-menu-panel { max-width: calc(100vw - 28px); }
         .format-mark { display: none; }
         .home-program-heading, .admin-heading, .curation-heading, .club-heading { align-items: stretch; display: grid; }
+        .home-program-heading h2 { font-size: 28px; }
         .home-section-action, .admin-refresh, .curation-heading > button, .club-heading > button { width: 100%; }
         .curation-heading-actions { display: grid; grid-template-columns: 1fr 1fr; justify-content: stretch; }
         .curation-heading-actions .history-mode-control { grid-column: 1 / -1; }

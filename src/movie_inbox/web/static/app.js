@@ -4768,7 +4768,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function editorialEntry(entry, index, prioritize) {
         const item = entry?.item || {};
         const origin = entry?.origin || {};
-        const reason = entry?.reason || {};
         const options = origin.kind === "collection"
           ? {
               action: "open-home-collection-detail",
@@ -4777,12 +4776,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               collectionTitle: origin.collection_title || "Colección"
             }
           : {};
-        return `<div class="home-editorial-item">
-          ${card(item, index, prioritize, options)}
-          <div class="home-entry-reason" data-reason="${escapeAttr(reason.code || "editorial")}">
-            <strong>${escapeHtml(reason.label || "En tu programación")}</strong>
-          </div>
-        </div>`;
+        return `<div class="home-editorial-item">${card(item, index, prioritize, options)}</div>`;
       }
 
       function editorialPersonalIds() {
