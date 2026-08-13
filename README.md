@@ -410,7 +410,8 @@ los IDs de IMDb y las consultas `titulo + ano` se interpretan antes de buscar, y
 fuente ordena sus alternativas por coincidencia de titulo y ano. Wikipedia prioriza la
 coincidencia exacta dentro de la consulta amplia y usa la resolucion directa como
 respaldo; si falla un idioma conserva los resultados del otro. Los resultados aparecen en estanterias separadas de Wikipedia,
-IMDb y FilmAffinity, con seis opciones iniciales y carga adicional por fuente. `External DBs`
+IMDb y FilmAffinity apenas responde cada fuente, con seis opciones iniciales, carga
+adicional y reintento independiente cuando una consulta falla o supera 10 segundos. `External DBs`
 muestra estado, latencia, cantidad de resultados y errores, ademas de hits, misses y
 entradas del cache. Wikipedia devuelve primero datos livianos y completa la metadata de
 la entrada elegida recien al agregarla o combinarla.

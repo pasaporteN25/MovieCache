@@ -12,7 +12,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   aliases, nombres de archivo, IDs, links y metadata, con ranking compartido para
   buscar y comparar antes de agregar.
 - Resultados externos separados en estanterias de Wikipedia, IMDb y FilmAffinity, con
-  carga progresiva independiente y comparacion enriquecida contra todo el catalogo.
+  carga progresiva independiente, timeout y reintento por fuente, y comparacion
+  enriquecida contra todo el catalogo. Cada estanteria aparece apenas responde sin
+  esperar a las otras fuentes.
 - Fechas de estreno normalizadas con precision, pais, tipo y procedencia en JSON v6 y
   SQLite v4, mas la seccion editorial `Estrenadas un dia como hoy` cuando hay fecha
   completa confiable.

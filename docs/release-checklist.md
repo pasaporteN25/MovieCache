@@ -57,6 +57,9 @@ wheel en un entorno limpio.
    debe quedar cacheado; una respuesta vacia valida puede durar como maximo 30 segundos.
 4. Comparar una coincidencia ambigua. El ranking mejorado no debe convertir un titulo
    sin evidencia de ano o ID externo en un merge automatico.
+5. Demorar una fuente externa. Las otras estanterias deben mostrar sus resultados sin
+   esperarla; la fuente demorada debe terminar con un estado propio y permitir
+   reintentarla sin repetir la busqueda local ni las fuentes que ya respondieron.
 
 ## 5. Comparador del Scanner
 

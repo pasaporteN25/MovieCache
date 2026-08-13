@@ -90,7 +90,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let externalSourcesLastUsed = [];
       let externalSourcesAttempted = [];
       let externalSearchController = null;
-      let externalSearchTimedOut = false;
+      let externalSourceSearchStates = {};
       let duplicatesOnly = false;
       let collectionFilters = {
         status: new Set(),
@@ -116,6 +116,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       const CATALOG_PAGE_SIZE = 36;
       const CLUB_PAGE_SIZE = 24;
       const SEARCH_TIMEOUT_MS = 10000;
+      const EXTERNAL_SEARCH_SOURCES = ["wikipedia", "imdb", "filmaffinity"];
+      const EXTERNAL_SOURCE_LABELS = {
+        wikipedia: ["Wikipedia", "Artículos y datos enciclopédicos"],
+        imdb: ["IMDb", "Títulos internacionales y reparto"],
+        filmaffinity: ["FilmAffinity", "Referencias en español"]
+      };
+      externalSourceSearchStates = emptyExternalSourceSearchStates();
       const IMAGE_CACHE_STATUS_INTERVAL_MS = 5000;
       const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
       const IMPORT_PREVIEW_PAGE_SIZE = 200;
@@ -685,6 +692,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "detail-random": openAnotherRandomDetail,
           "retry-merge-comparison": retryMergeComparison,
           "show-more-manual": () => showMoreManualResults(target.dataset.source || ""),
+          "retry-external-source": () => retryExternalSource(target.dataset.source || ""),
           "show-more-catalog": showMoreCatalogResults,
           "merge-result": () => mergeSearchResult(index, id),
           "add-result": () => addSearchResult(index),
@@ -5055,9 +5063,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const health = externalHealth?.sources?.[source] || {};
         const consumed = externalSourcesLastUsed.includes(source);
         const attempted = externalSourcesAttempted.includes(source);
+        const searchState = externalSourceSearchStates[source]?.status || "idle";
         const stateLabels = { ready: "lista", ok: "disponible", empty: "sin resultados", error: "error" };
         const state = stateLabels[health.status] || (fields.externalSource.checked ? "lista" : "apagada");
-        const request = attempted ? (consumed ? `${health.result_count || 0} resultados` : "sin resultados") : "sin consultar";
+        const request = searchState === "loading"
+          ? "consultando"
+          : ["error", "timeout"].includes(searchState)
+            ? "consulta incompleta"
+            : attempted ? (consumed ? `${health.result_count || 0} resultados` : "sin resultados") : "sin consultar";
         const latency = health.latency_ms ? `${health.latency_ms} ms` : "";
         const error = health.error ? ` | ${health.error}` : "";
         const status = [state, request, latency].filter(Boolean).join(" | ") + error;
@@ -6237,6 +6250,142 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         return `/image-cache?url=${encodeURIComponent(url)}`;
       }
 
+      function emptyExternalSourceSearchStates() {
+        return Object.fromEntries(EXTERNAL_SEARCH_SOURCES.map((source) => [source, {
+          status: "idle",
+          count: 0,
+          error: ""
+        }]));
+      }
+
+      function requestedExternalSources(source, includeExternal) {
+        if (!includeExternal) return [];
+        return source === "all" || !EXTERNAL_SEARCH_SOURCES.includes(source)
+          ? [...EXTERNAL_SEARCH_SOURCES]
+          : [source];
+      }
+
+      function setSearchBusy(busy) {
+        fields.searchButton.disabled = busy;
+        fields.searchButton.textContent = busy ? "Buscando..." : "Buscar";
+        fields.searchConsole.setAttribute("aria-busy", String(busy));
+        if (busy) fields.searchButton.setAttribute("aria-busy", "true");
+        else fields.searchButton.removeAttribute("aria-busy");
+      }
+
+      function isCurrentSearch(controller) {
+        return externalSearchController === controller && !controller.signal.aborted;
+      }
+
+      function mergeExternalHealth(payload, source) {
+        const incoming = payload?.external || {};
+        externalHealth = {
+          ...externalHealth,
+          sources: {
+            ...(externalHealth?.sources || {}),
+            ...(incoming.sources?.[source] ? { [source]: incoming.sources[source] } : {})
+          },
+          cache: incoming.cache || externalHealth?.cache || {}
+        };
+      }
+
+      function replaceExternalSourceResults(source, results) {
+        const rows = (Array.isArray(results) ? results : []).map((result) => ({
+          ...result,
+          source: result.source || source
+        }));
+        manualResults = manualResults
+          .filter((result) => result.source !== source)
+          .concat(rows);
+        manualSourceVisibleCounts[source] = SEARCH_PAGE_SIZE;
+        externalSourcesLastUsed = [...new Set(manualResults.map((result) => result.source || "").filter(Boolean))];
+        return rows;
+      }
+
+      function updateExternalSearchSummary() {
+        const states = externalSourcesAttempted.map((source) => externalSourceSearchStates[source] || {});
+        const loading = states.filter((state) => state.status === "loading").length;
+        const failed = states.filter((state) => ["error", "timeout"].includes(state.status)).length;
+        const completed = states.length - loading;
+        const count = manualResults.length;
+        if (!states.length) {
+          fields.manualSearchStatus.textContent = "";
+        } else if (loading) {
+          fields.manualSearchStatus.textContent = `${completed}/${states.length} fuentes listas · ${count} ${count === 1 ? "resultado" : "resultados"}`;
+        } else if (count) {
+          fields.manualSearchStatus.textContent = `${count} ${count === 1 ? "resultado" : "resultados"}${failed ? ` · ${failed} ${failed === 1 ? "fuente incompleta" : "fuentes incompletas"}` : ""}`;
+        } else if (failed) {
+          fields.manualSearchStatus.textContent = "No pudimos completar las fuentes externas. Podés reintentarlas por separado.";
+        } else {
+          fields.manualSearchStatus.textContent = "Sin resultados externos";
+        }
+      }
+
+      async function loadLocalSearchResults(query, controller) {
+        try {
+          const response = await apiFetch(`/api/search?q=${encodeURIComponent(query)}&external=false&catalog=true`, {
+            signal: controller.signal
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          if (!isCurrentSearch(controller)) return;
+          catalogMergeResults = payload.catalog?.results || [];
+          catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
+          fields.catalogMergeSection.classList.add("active");
+          fields.catalogMergeKicker.textContent = "Tu catálogo";
+          fields.catalogMergeTitle.textContent = "Coincidencias locales";
+          fields.catalogMergeStatus.textContent = `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "obra encontrada" : "obras encontradas"}, sin aplicar los filtros de la estantería.`;
+          renderCatalogMergeResults();
+        } catch (error) {
+          if (error.name === "AbortError" || !isCurrentSearch(controller)) return;
+          fields.catalogMergeSection.classList.add("active");
+          fields.catalogMergeStatus.textContent = "No pudimos actualizar las coincidencias locales. Tu colección sigue disponible.";
+          console.error("[catalog-viewer] local search failed", error);
+        }
+      }
+
+      async function loadExternalSourceResults(query, source, controller) {
+        const sourceController = new AbortController();
+        let timedOut = false;
+        const abortSource = () => sourceController.abort();
+        controller.signal.addEventListener("abort", abortSource, { once: true });
+        const timeoutId = window.setTimeout(() => {
+          timedOut = true;
+          sourceController.abort();
+        }, SEARCH_TIMEOUT_MS);
+        try {
+          const response = await apiFetch(`/api/search?q=${encodeURIComponent(query)}&source=${encodeURIComponent(source)}&external=true&catalog=false`, {
+            signal: sourceController.signal
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          if (!isCurrentSearch(controller)) return;
+          mergeExternalHealth(payload, source);
+          const rows = replaceExternalSourceResults(source, payload.results || []);
+          const health = payload.external?.sources?.[source] || {};
+          externalSourceSearchStates[source] = rows.length
+            ? { status: "ready", count: rows.length, error: "" }
+            : health.status === "error"
+              ? { status: "error", count: 0, error: health.error || "source_error" }
+              : { status: "empty", count: 0, error: "" };
+        } catch (error) {
+          if (!isCurrentSearch(controller)) return;
+          replaceExternalSourceResults(source, []);
+          externalSourceSearchStates[source] = timedOut
+            ? { status: "timeout", count: 0, error: "timeout" }
+            : { status: "error", count: 0, error: error.message || "source_error" };
+          if (error.name !== "AbortError") console.error(`[catalog-viewer] ${source} search failed`, error);
+        } finally {
+          window.clearTimeout(timeoutId);
+          controller.signal.removeEventListener("abort", abortSource);
+          if (isCurrentSearch(controller)) {
+            updateExternalSearchSummary();
+            renderManualResults();
+            renderDatabaseMenu();
+          }
+        }
+      }
+
       async function searchManual(source = "all", statusPrefix = "") {
         const query = fields.query.value.trim();
         if (query.length < 2) return;
@@ -6244,25 +6393,23 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (externalSearchController) externalSearchController.abort();
         const controller = new AbortController();
         externalSearchController = controller;
-        externalSearchTimedOut = false;
-        const timeoutId = window.setTimeout(() => {
-          if (externalSearchController === controller) {
-            externalSearchTimedOut = true;
-            controller.abort();
-          }
-        }, SEARCH_TIMEOUT_MS);
+        const sources = requestedExternalSources(source, includeExternal);
         manualSearchSource = source;
         manualResults = [];
         selectedManualIndex = null;
         manualVisibleCount = SEARCH_PAGE_SIZE;
         manualSourceVisibleCounts = {};
+        externalSourcesAttempted = [...sources];
+        externalSourcesLastUsed = [];
+        externalSourceSearchStates = emptyExternalSourceSearchStates();
+        sources.forEach((name) => {
+          externalSourceSearchStates[name] = { status: "loading", count: 0, error: "" };
+        });
         fields.externalSearchSection.classList.toggle("active", includeExternal);
-        fields.manualSearchStatus.textContent = statusPrefix || "Buscando...";
+        fields.manualSearchStatus.textContent = statusPrefix || (includeExternal ? "Consultando fuentes…" : "");
         fields.manualSearchResults.innerHTML = "";
-        fields.searchButton.disabled = true;
-        fields.searchButton.setAttribute("aria-busy", "true");
-        fields.searchConsole.setAttribute("aria-busy", "true");
-        fields.searchButton.textContent = "Buscando...";
+        setSearchBusy(true);
+        if (includeExternal) renderManualResults();
         setSearchState(
           "searching",
           collectionSearchMode === "browse"
@@ -6271,68 +6418,72 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               : `Buscando “${query}” en tu catálogo…`
             : comparisonSearchMessage()
         );
+        const tasks = [];
+        if (collectionSearchMode === "browse") tasks.push(loadLocalSearchResults(query, controller));
+        sources.forEach((name) => tasks.push(loadExternalSourceResults(query, name, controller)));
         try {
-          const response = await apiFetch(`/api/search?q=${encodeURIComponent(query)}&source=${encodeURIComponent(source)}&external=${includeExternal ? "true" : "false"}`, {
-            signal: controller.signal
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const payload = await response.json();
-          manualResults = payload.results || [];
-          if (collectionSearchMode === "browse") {
-            catalogMergeResults = payload.catalog?.results || [];
-            catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
-            fields.catalogMergeSection.classList.add("active");
-            fields.catalogMergeKicker.textContent = "Tu catálogo";
-            fields.catalogMergeTitle.textContent = "Coincidencias locales";
-            fields.catalogMergeStatus.textContent = `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "obra encontrada" : "obras encontradas"}, sin aplicar los filtros de la estantería.`;
-            renderCatalogMergeResults();
-          }
-          externalHealth = payload.external || externalHealth;
-          externalSourcesAttempted = includeExternal
-            ? source === "all" ? ["wikipedia", "imdb", "filmaffinity"] : [source]
-            : [];
-          externalSourcesLastUsed = [...new Set(manualResults.map((result) => result.source || "").filter(Boolean))];
-          fields.manualSearchStatus.textContent = includeExternal && manualResults.length
-            ? `${manualResults.length} ${manualResults.length === 1 ? "resultado" : "resultados"}${source === "wikipedia" ? " de Wikipedia" : ""}`
-            : includeExternal ? "Sin resultados externos" : "";
+          await Promise.allSettled(tasks);
+          if (!isCurrentSearch(controller)) return;
+          updateExternalSearchSummary();
           setSearchState(
             "results",
             collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
           );
           if (includeExternal) renderManualResults();
           renderDatabaseMenu();
-        } catch (error) {
-          if (error.name === "AbortError" && externalSearchTimedOut) {
-            fields.manualSearchStatus.textContent = "La búsqueda tardó demasiado. Podés reintentar.";
-            setSearchState("error", `La consulta para “${query}” superó los 10 segundos.`);
-          } else if (error.name !== "AbortError") {
-            fields.manualSearchStatus.textContent = "No se pudo completar la búsqueda.";
-            setSearchState("error", `La colección sigue disponible, pero falló la consulta para “${query}”.`);
-            console.error("[catalog-viewer] search failed", error);
-          }
         } finally {
-          window.clearTimeout(timeoutId);
           if (externalSearchController === controller) {
             externalSearchController = null;
-            externalSearchTimedOut = false;
-            fields.searchButton.disabled = false;
-            fields.searchButton.removeAttribute("aria-busy");
-            fields.searchConsole.setAttribute("aria-busy", "false");
-            fields.searchButton.textContent = "Buscar";
+            setSearchBusy(false);
+            if (includeExternal) renderManualResults();
+          }
+        }
+      }
+
+      async function retryExternalSource(source) {
+        const query = fields.query.value.trim();
+        if (!EXTERNAL_SEARCH_SOURCES.includes(source) || query.length < 2 || externalSearchController) return;
+        const controller = new AbortController();
+        externalSearchController = controller;
+        if (!externalSourcesAttempted.includes(source)) externalSourcesAttempted.push(source);
+        replaceExternalSourceResults(source, []);
+        externalSourceSearchStates[source] = { status: "loading", count: 0, error: "" };
+        fields.externalSearchSection.classList.add("active");
+        setSearchBusy(true);
+        updateExternalSearchSummary();
+        renderManualResults();
+        setSearchState("searching", `Reintentando ${EXTERNAL_SOURCE_LABELS[source][0]} para “${query}”…`);
+        try {
+          await loadExternalSourceResults(query, source, controller);
+          if (!isCurrentSearch(controller)) return;
+          updateExternalSearchSummary();
+          setSearchState(
+            "results",
+            collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
+          );
+        } finally {
+          if (externalSearchController === controller) {
+            externalSearchController = null;
+            setSearchBusy(false);
+            renderManualResults();
+            renderDatabaseMenu();
           }
         }
       }
 
       function cancelExternalSearch() {
         if (!externalSearchController) return;
-        externalSearchTimedOut = false;
-        externalSearchController.abort();
+        const controller = externalSearchController;
         externalSearchController = null;
-        fields.searchButton.disabled = false;
-        fields.searchButton.removeAttribute("aria-busy");
-        fields.searchConsole.setAttribute("aria-busy", "false");
-        fields.searchButton.textContent = "Buscar";
+        controller.abort();
+        externalSourcesAttempted.forEach((source) => {
+          if (externalSourceSearchStates[source]?.status === "loading") {
+            externalSourceSearchStates[source] = { status: "canceled", count: 0, error: "" };
+          }
+        });
+        setSearchBusy(false);
         fields.manualSearchStatus.textContent = "Búsqueda externa cancelada.";
+        renderManualResults();
         setSearchState(
           "results",
           collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
@@ -6344,11 +6495,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.collectionUtilityMenu.open = false;
         if (externalSearchController) externalSearchController.abort();
         externalSearchController = null;
-        externalSearchTimedOut = false;
-        fields.searchButton.disabled = false;
-        fields.searchButton.removeAttribute("aria-busy");
-        fields.searchConsole.setAttribute("aria-busy", "false");
-        fields.searchButton.textContent = "Buscar";
+        setSearchBusy(false);
         manualResults = [];
         manualSourceVisibleCounts = {};
         catalogMergeResults = [];
@@ -6362,6 +6509,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         externalSourcesLastUsed = [];
         externalSourcesAttempted = [];
+        externalSourceSearchStates = emptyExternalSourceSearchStates();
         if (resetExternal) fields.externalSource.checked = false;
         fields.query.value = "";
         fields.manualSearchStatus.textContent = "";
@@ -6441,32 +6589,63 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function renderManualResults() {
-        const sourceLabels = {
-          wikipedia: ["Wikipedia", "Artículos y datos enciclopédicos"],
-          imdb: ["IMDb", "Títulos internacionales y reparto"],
-          filmaffinity: ["FilmAffinity", "Referencias en español"]
-        };
-        const grouped = Object.fromEntries(Object.keys(sourceLabels).map((source) => [source, []]));
+        const grouped = Object.fromEntries(EXTERNAL_SEARCH_SOURCES.map((source) => [source, []]));
         manualResults.forEach((result, index) => {
           if (grouped[result.source]) grouped[result.source].push({ result, index });
         });
-        fields.manualSearchResults.innerHTML = Object.entries(sourceLabels).map(([source, labels]) => {
+        fields.manualSearchResults.innerHTML = Object.entries(EXTERNAL_SOURCE_LABELS).map(([source, labels]) => {
           const rows = grouped[source];
+          const state = externalSourceSearchStates[source] || { status: "idle", count: 0, error: "" };
           const visibleCount = manualSourceVisibleCounts[source] || SEARCH_PAGE_SIZE;
           const visible = rows.slice(0, visibleCount);
           const more = rows.length > visibleCount
             ? `<button class="load-more source-load-more" type="button" data-click="show-more-manual" data-source="${source}">Cargar más de ${escapeHtml(labels[0])} (${rows.length - visibleCount})</button>`
             : "";
-          return `<section class="search-source-group" data-source-group="${source}">
+          return `<section class="search-source-group" data-source-group="${source}" aria-busy="${state.status === "loading"}">
             <header class="search-source-heading">
               <div><strong>${escapeHtml(labels[0])}</strong><span>${escapeHtml(labels[1])}</span></div>
-              <span>${rows.length} ${rows.length === 1 ? "resultado" : "resultados"}</span>
+              <span>${externalSourceStateLabel(state, rows.length)}</span>
             </header>
             ${rows.length
               ? `<div class="search-source-track">${visible.map(({ result, index }) => searchResult(result, index)).join("")}</div>${more}`
-              : `<p class="search-source-empty">Sin coincidencias en esta fuente.</p>`}
+              : externalSourceFeedback(source, state)}
           </section>`;
         }).join("");
+      }
+
+      function externalSourceStateLabel(state, count) {
+        if (state.status === "loading") return "Consultando…";
+        if (state.status === "timeout") return "Tiempo agotado";
+        if (state.status === "error") return "No disponible";
+        if (state.status === "canceled") return "Cancelada";
+        if (state.status === "idle") return "Sin consultar";
+        return `${count} ${count === 1 ? "resultado" : "resultados"}`;
+      }
+
+      function externalSourceFeedback(source, state) {
+        const label = EXTERNAL_SOURCE_LABELS[source]?.[0] || source;
+        if (state.status === "loading") {
+          return `<div class="search-source-feedback is-loading" role="status">
+            <span class="source-search-spinner" aria-hidden="true"></span>
+            <span>Consultando ${escapeHtml(label)}…</span>
+          </div>`;
+        }
+        if (["error", "timeout"].includes(state.status)) {
+          const message = state.status === "timeout"
+            ? `${label} tardó más de ${SEARCH_TIMEOUT_MS / 1000} segundos.`
+            : `${label} no respondió correctamente.`;
+          return `<div class="search-source-feedback is-error" role="status">
+            <span>${escapeHtml(message)}</span>
+            <button class="quiet-action source-retry" type="button" data-click="retry-external-source" data-source="${source}" ${externalSearchController ? "disabled" : ""}>Reintentar</button>
+          </div>`;
+        }
+        if (state.status === "canceled") {
+          return `<p class="search-source-empty">Consulta cancelada.</p>`;
+        }
+        if (state.status === "idle") {
+          return `<p class="search-source-empty">Esta fuente no fue consultada.</p>`;
+        }
+        return `<p class="search-source-empty">Sin coincidencias en esta fuente.</p>`;
       }
 
       function renderCatalogMergeResults() {

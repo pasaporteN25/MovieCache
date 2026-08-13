@@ -1548,14 +1548,18 @@ def create_app(config: ViewerConfig) -> FastAPI:
         q: str = "",
         source: str = "all",
         external: bool = True,
+        catalog: bool = True,
         identity: AuthenticatedIdentity = Depends(require_ready_identity),
     ) -> JSONResponse:
-        _, _, rows = session_catalog_rows(identity)
-        catalog_results = search_catalog_items(rows, q)
+        catalog_results: list[dict[str, Any]] = []
+        if catalog:
+            _, _, rows = session_catalog_rows(identity)
+            catalog_results = search_catalog_items(rows, q)
         results = search_sources(q, source) if external else []
         source_groups = group_external_results(results)
         print(
             f"[catalog-viewer] search query={q!r} source={source} "
+            f"catalog={catalog} "
             f"catalog_count={len(catalog_results)} external_count={len(results)} "
             f"result_sources={sorted(set(str(result.get('source') or '') for result in results))}",
             flush=True,
