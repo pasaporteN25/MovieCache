@@ -24,6 +24,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let clubLoading = false;
       let clubVisibleCount = 24;
       let items = [];
+      let catalogSearchIndex = new WeakMap();
+      let catalogMetrics = emptyCatalogMetrics();
+      let catalogRevision = 0;
+      let editorialRevision = 0;
+      let lastCatalogGridKey = "";
+      let lastEditorialRenderRevision = -1;
       let sourceFiles = [];
       let manualResults = [];
       let selectedManualIndex = null;
@@ -35,6 +41,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let randomOrder = [];
       let selectedDetailId = "";
       let detailReturnFocus = null;
+      let descriptionReturnFocus = null;
       let detailReturnCardId = "";
       let detailNavigationIds = [];
       let detailNavigationMode = "catalog";
@@ -183,7 +190,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         collectionUtilityMenu: document.querySelector(".collection-view .utility-menu"),
         randomButton: document.querySelector("#randomButton"),
         randomCatalogOnly: document.querySelector("#randomCatalogOnly"),
-        mobileRandomCatalogOnly: document.querySelector("#mobileRandomCatalogOnly"),
         randomScopeLabel: document.querySelector("#randomScopeLabel"),
         homeView: document.querySelector("#homeView"),
         clubView: document.querySelector("#clubView"),
@@ -567,7 +573,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.clearCurationHistory.addEventListener("click", clearCurationHistory);
       fields.randomButton.addEventListener("click", openRandomDetail);
       fields.randomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.randomCatalogOnly));
-      fields.mobileRandomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.mobileRandomCatalogOnly));
       fields.cancelSearch.addEventListener("click", cancelExternalSearch);
       fields.reviewPrevious.addEventListener("click", previousWikiReview);
       fields.reviewNext.addEventListener("click", nextWikiReview);
@@ -619,7 +624,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (event.target === fields.unsavedDetailDialog) keepEditingDetail();
       });
       fields.catalogLoadMore.addEventListener("click", showMoreCatalogItems);
-      fields.closeDescriptionDialog.addEventListener("click", () => fields.descriptionDialog.close());
+      fields.closeDescriptionDialog.addEventListener("click", closeDescriptionDialog);
+      fields.descriptionDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeDescriptionDialog();
+      });
+      fields.descriptionDialog.addEventListener("close", restoreDescriptionFocus);
       fields.closeMergeComparator.addEventListener("click", () => closeMergeComparator());
       fields.cancelMergeComparator.addEventListener("click", () => closeMergeComparator());
       fields.confirmReviewedMerge.addEventListener("click", submitReviewedMerge);
@@ -1794,6 +1804,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
         items = payload.items || [];
         editorialHome = normalizeEditorialHome(payload.home);
+        prepareCatalogViewModel();
+        editorialRevision += 1;
         sourceFiles = payload.sources || [];
         writeJsonPath = payload.write_json || "";
         privacyPreferences = { ...privacyPreferences, ...(payload.privacy || {}) };
@@ -4465,7 +4477,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           openDetail(item.id, {
             context: {
               mode: "random",
-              label: fields.randomCatalogOnly.checked ? "Random · Catálogo" : "Random · Todo",
+              label: fields.randomCatalogOnly.checked ? "Al azar · Catálogo" : "Al azar · Todo",
               ids: candidates.map((candidate) => candidate.id)
             }
           });
@@ -4483,7 +4495,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function syncRandomControl() {
         const count = randomCandidates().length;
         const catalogOnly = fields.randomCatalogOnly.checked;
-        fields.mobileRandomCatalogOnly.checked = catalogOnly;
         fields.randomScopeLabel.textContent = catalogOnly ? "Catálogo" : "Todo";
         fields.randomButton.disabled = count === 0;
         fields.randomButton.title = count
@@ -4494,7 +4505,6 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function changeRandomScope(source) {
         const catalogOnly = Boolean(source.checked);
         fields.randomCatalogOnly.checked = catalogOnly;
-        fields.mobileRandomCatalogOnly.checked = catalogOnly;
         syncRandomControl();
       }
 
@@ -4820,7 +4830,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           const payload = await response.json();
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           editorialHome = normalizeEditorialHome(payload);
+          editorialRevision += 1;
           renderEditorialHome();
+          lastEditorialRenderRevision = editorialRevision;
         } catch (error) {
           fields.homeFeedback.hidden = false;
           fields.homeFeedback.innerHTML = `No pudimos actualizar la programación. <button type="button" data-click="refresh-home">Reintentar</button>`;
@@ -5285,33 +5297,78 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           || (records.has("unreviewed") && !String(item.review || "").trim());
       }
 
+      function emptyCatalogMetrics() {
+        return {
+          total: 0,
+          catalogued: 0,
+          watched: 0,
+          toWatch: 0,
+          rated: 0,
+          withImage: 0,
+          externalLinks: 0,
+          withoutExternalLinks: 0,
+          imdbLinks: 0,
+          filmAffinityLinks: 0,
+          duplicates: 0
+        };
+      }
+
+      function catalogSearchDocument(item) {
+        return [
+          item.title,
+          item.original_title,
+          item.spanish_title,
+          item.english_title,
+          asList(item.alternative_titles).join(" "),
+          item.local_name,
+          item.local_path,
+          localFilesText(item),
+          item.year,
+          Array.isArray(item.release_dates) ? item.release_dates.map((entry) => entry?.date || "").join(" ") : "",
+          item.description,
+          item.wikipedia_extract,
+          item.notes,
+          item.review,
+          item.watched_at,
+          item.rating,
+          asList(item.genres).join(" "),
+          asList(item.directors).join(" "),
+          asList(item.writers).join(" "),
+          asList(item.cast).join(" "),
+          Array.isArray(item.tags) ? item.tags.join(" ") : item.tags
+        ].join(" ");
+      }
+
+      function prepareCatalogViewModel() {
+        const metrics = emptyCatalogMetrics();
+        const searchIndex = new WeakMap();
+        for (const item of items) {
+          searchIndex.set(item, normalizeText(catalogSearchDocument(item)));
+          metrics.total += 1;
+          if (isInCatalog(item.en_catalogo)) metrics.catalogued += 1;
+          if (item.status === "watched") metrics.watched += 1;
+          if (item.status === "to_watch") metrics.toWatch += 1;
+          if (normalizeRating(item.rating) > 0) metrics.rated += 1;
+          if (item.page_image) metrics.withImage += 1;
+          if (hasExternalLink(item)) metrics.externalLinks += 1;
+          else metrics.withoutExternalLinks += 1;
+          if (hasHost(item.url, "imdb.com") || hasHost(item.imdb_url, "imdb.com")) metrics.imdbLinks += 1;
+          if (hasHost(item.url, "filmaffinity.com") || hasHost(item.filmaffinity_url, "filmaffinity.com")) {
+            metrics.filmAffinityLinks += 1;
+          }
+          if (Number(item._duplicate_count || 0) > 0) metrics.duplicates += 1;
+        }
+        catalogSearchIndex = searchIndex;
+        catalogMetrics = metrics;
+        catalogRevision += 1;
+        lastCatalogGridKey = "";
+      }
+
       function filteredItems() {
-        const query = activeQuery.trim();
+        const normalizedQuery = normalizeText(activeQuery.trim());
         return items.filter((item) => {
-          const haystack = [
-            item.title,
-            item.original_title,
-            item.spanish_title,
-            item.english_title,
-            asList(item.alternative_titles).join(" "),
-            item.local_name,
-            item.local_path,
-            localFilesText(item),
-            item.year,
-            Array.isArray(item.release_dates) ? item.release_dates.map((entry) => entry?.date || "").join(" ") : "",
-            item.description,
-            item.wikipedia_extract,
-            item.notes,
-            item.review,
-            item.watched_at,
-            item.rating,
-            asList(item.genres).join(" "),
-            asList(item.directors).join(" "),
-            asList(item.writers).join(" "),
-            asList(item.cast).join(" "),
-            Array.isArray(item.tags) ? item.tags.join(" ") : item.tags
-          ].join(" ");
-          return (!query || matchesSearchText(haystack, query))
+          const searchText = catalogSearchIndex.get(item) || normalizeText(catalogSearchDocument(item));
+          return (!normalizedQuery || matchesNormalizedSearchText(searchText, normalizedQuery))
             && (!duplicatesOnly || Number(item._duplicate_count || 0) > 0)
             && filterSetMatchesValue(collectionFilters.status, item.status)
             && filterSetMatchesValue(
@@ -5466,17 +5523,17 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const shown = filtered.slice(0, catalogVisibleCount);
 
         renderHeaderStats();
-        fields.total.textContent = items.length;
-        fields.catalogCount.textContent = items.filter((item) => isInCatalog(item.en_catalogo)).length;
-        fields.watchedCount.textContent = items.filter((item) => item.status === "watched").length;
-        fields.toWatchCount.textContent = items.filter((item) => item.status === "to_watch").length;
-        fields.ratedCount.textContent = items.filter((item) => normalizeRating(item.rating) > 0).length;
-        fields.withImage.textContent = items.filter((item) => item.page_image).length;
-        fields.wikiLinks.textContent = items.filter(hasExternalLink).length;
-        fields.withoutWiki.textContent = items.filter((item) => !hasExternalLink(item)).length;
-        fields.imdbLinks.textContent = items.filter((item) => hasHost(item.url, "imdb.com") || hasHost(item.imdb_url, "imdb.com")).length;
-        fields.faLinks.textContent = items.filter((item) => hasHost(item.url, "filmaffinity.com") || hasHost(item.filmaffinity_url, "filmaffinity.com")).length;
-        fields.duplicateCount.textContent = items.filter((item) => Number(item._duplicate_count || 0) > 0).length;
+        fields.total.textContent = catalogMetrics.total;
+        fields.catalogCount.textContent = catalogMetrics.catalogued;
+        fields.watchedCount.textContent = catalogMetrics.watched;
+        fields.toWatchCount.textContent = catalogMetrics.toWatch;
+        fields.ratedCount.textContent = catalogMetrics.rated;
+        fields.withImage.textContent = catalogMetrics.withImage;
+        fields.wikiLinks.textContent = catalogMetrics.externalLinks;
+        fields.withoutWiki.textContent = catalogMetrics.withoutExternalLinks;
+        fields.imdbLinks.textContent = catalogMetrics.imdbLinks;
+        fields.faLinks.textContent = catalogMetrics.filmAffinityLinks;
+        fields.duplicateCount.textContent = catalogMetrics.duplicates;
         fields.showDuplicates.textContent = duplicatesOnly ? "Ver todo" : "Ver duplicadas";
         fields.sourceFiles.textContent = sourceFiles.length;
         fields.catalogSummary.textContent = catalogSummaryText(filtered);
@@ -5484,21 +5541,26 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.empty.textContent = activeQuery
           ? `No encontramos obras para “${activeQuery}” con los filtros actuales.`
           : "No hay obras que coincidan con los filtros actuales.";
-        fields.grid.innerHTML = shown
-          .map((item, index) => card(item, index, currentView === "catalog"))
-          .join("");
+        const gridKey = `${catalogRevision}:${currentView === "catalog" ? "catalog" : "background"}:${shown.map((item) => item.id).join("|")}`;
+        if (gridKey !== lastCatalogGridKey) {
+          fields.grid.innerHTML = shown
+            .map((item, index) => card(item, index, currentView === "catalog"))
+            .join("");
+          lastCatalogGridKey = gridKey;
+        }
         fields.catalogLoadMore.hidden = shown.length >= filtered.length;
         fields.catalogLoadMore.textContent = `Cargar más (${filtered.length - shown.length})`;
-        renderEditorialHome();
+        if (lastEditorialRenderRevision !== editorialRevision) {
+          renderEditorialHome();
+          lastEditorialRenderRevision = editorialRevision;
+        }
         renderActiveFilters();
         syncRandomControl();
         renderDetail();
       }
 
       function renderHeaderStats() {
-        const watched = items.filter((item) => item.status === "watched").length;
-        const catalogued = items.filter((item) => isInCatalog(item.en_catalogo)).length;
-        fields.stats.textContent = `${items.length} obras · ${watched} vistas · ${catalogued} en catálogo`;
+        fields.stats.textContent = `${catalogMetrics.total} obras · ${catalogMetrics.watched} vistas · ${catalogMetrics.catalogued} en catálogo`;
       }
 
       function catalogSummaryText(filtered) {
@@ -5951,7 +6013,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const item = candidates[Math.floor(Math.random() * candidates.length)];
         requestDetailTransition(() => {
           detailNavigationIds = randomCandidates().map((candidate) => candidate.id);
-          detailNavigationLabel = fields.randomCatalogOnly.checked ? "Random · Catálogo" : "Random · Todo";
+          detailNavigationLabel = fields.randomCatalogOnly.checked ? "Al azar · Catálogo" : "Al azar · Todo";
           showDetailFromQueue(item.id);
         });
       }
@@ -6083,7 +6145,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ["Alternativos", "alternative_titles", "text"],
           ["Tipo", "kind", "kind"],
           ["Año", "year", "text"],
-          ["Descripcion", "description", "textarea"],
+          ["Descripción", "description", "textarea"],
           ["Generos", "genres", "text"],
           ["Directores", "directors", "text"],
           ["Guionistas", "writers", "text"],
@@ -6775,7 +6837,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (!description) return "";
         const text = String(description).trim();
         const more = text.length > 90
-          ? `<button class="description-more" type="button" data-click="show-description" data-collection="${escapeAttr(collection)}" data-key="${escapeAttr(key)}">Ver mas</button>`
+          ? `<button class="description-more" type="button" data-click="show-description" data-collection="${escapeAttr(collection)}" data-key="${escapeAttr(key)}">Ver más</button>`
           : "";
         return `<p class="result-summary">${escapeHtml(text)}</p>${more}`;
       }
@@ -6785,11 +6847,23 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ? manualResults[Number(key)]
           : items.find((entry) => entry.id === key);
         if (!item) return;
-        const title = displayTitle(item) || "Descripcion";
-        const description = item.wikipedia_extract || item.description || item.notes || item.review || "Sin descripcion.";
+        const title = displayTitle(item) || "Descripción";
+        const description = item.wikipedia_extract || item.description || item.notes || item.review || "Sin descripción.";
+        descriptionReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         fields.descriptionDialogTitle.textContent = title;
         fields.descriptionDialogText.textContent = description;
         fields.descriptionDialog.showModal();
+        fields.closeDescriptionDialog.focus();
+      }
+
+      function closeDescriptionDialog() {
+        if (fields.descriptionDialog.open) fields.descriptionDialog.close();
+      }
+
+      function restoreDescriptionFocus() {
+        const target = descriptionReturnFocus;
+        descriptionReturnFocus = null;
+        if (target?.isConnected) target.focus({ preventScroll: true });
       }
 
       function candidateSimilarity(result) {
@@ -6962,8 +7036,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function matchesSearchText(value, query) {
-        const normalizedValue = normalizeText(value);
-        const normalizedQuery = normalizeText(query);
+        return matchesNormalizedSearchText(normalizeText(value), normalizeText(query));
+      }
+
+      function matchesNormalizedSearchText(normalizedValue, normalizedQuery) {
         if (!normalizedQuery || normalizedValue.includes(normalizedQuery)) return true;
         const words = normalizedValue.split(/\s+/).filter(Boolean);
         return normalizedQuery.split(/\s+/).filter(Boolean).every((term) => (

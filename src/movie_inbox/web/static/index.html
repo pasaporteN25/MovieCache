@@ -15,20 +15,19 @@
           <h1>__MOVIE_INBOX_TITLE__</h1>
           <div class="stats" id="stats" aria-live="polite">Cargando...</div>
         </div>
-        <div class="header-actions">
-          <nav class="primary-nav" aria-label="Navegación principal">
-            <button id="homeButton" class="nav-action active" type="button" aria-current="page">Inicio</button>
-            <button id="catalogButton" class="nav-action" type="button">Colección</button>
-            <button id="inboxButton" class="nav-action inbox-nav-action" type="button">
-              Bandeja <span id="inboxBadge" class="nav-count" hidden>0</span>
-            </button>
-            <button id="clubButton" class="nav-action" type="button">Club</button>
-            <button id="randomButton" class="nav-action random-nav-action" type="button">Random</button>
-            <label class="random-scope-control">
-              <input id="randomCatalogOnly" type="checkbox" aria-label="Limitar Random a entradas en catálogo" checked>
-              <span id="randomScopeLabel">Catálogo</span>
-            </label>
-          </nav>
+        <nav class="primary-nav" aria-label="Navegación principal">
+          <button id="homeButton" class="nav-action active" type="button" aria-current="page">Inicio</button>
+          <button id="catalogButton" class="nav-action" type="button">Colección</button>
+          <button id="inboxButton" class="nav-action inbox-nav-action" type="button">
+            Bandeja <span id="inboxBadge" class="nav-count" hidden>0</span>
+          </button>
+          <button id="clubButton" class="nav-action" type="button">Club</button>
+        </nav>
+        <div class="header-utilities" role="group" aria-label="Acciones de la cuenta">
+          <button id="randomButton" class="header-command random-command" type="button">
+            <span>Al azar</span>
+            <small id="randomScopeLabel">Catálogo</small>
+          </button>
           <details id="systemMenu" class="system-menu">
             <summary aria-label="Abrir menú de cuenta">
               <span id="currentUserInitial" class="account-mark" aria-hidden="true">MI</span>
@@ -41,18 +40,15 @@
                 <span id="currentCatalogName">Catálogo personal</span>
                 <small id="currentUserRole">Owner</small>
               </div>
-              <label class="system-menu-toggle mobile-random-scope">
-                <input id="mobileRandomCatalogOnly" type="checkbox" checked>
-                <span>Random solo en catálogo</span>
+              <label class="system-menu-toggle random-scope-control">
+                <input id="randomCatalogOnly" type="checkbox" checked>
+                <span>Al azar solo en catálogo</span>
               </label>
               <button id="privacyButton" class="system-menu-action" type="button">Privacidad</button>
               <button id="adminButton" class="system-menu-action" type="button">Administrar</button>
               <button id="logoutButton" class="system-menu-action logout-action" type="button">Cerrar sesión</button>
             </div>
           </details>
-          <div class="format-mark" aria-hidden="true">
-            <span>REW</span><strong>PLAY</strong><span>FF</span>
-          </div>
         </div>
       </header>
 
@@ -111,7 +107,7 @@
         <p id="clubFeedback" class="club-feedback" role="status" aria-live="polite"></p>
         <section id="clubMembersPanel" class="club-mode-panel" hidden>
           <nav id="clubMemberTabs" class="club-member-tabs" aria-label="Cat&aacute;logos compartidos"></nav>
-          <section id="clubCatalogPanel" class="club-catalog-panel" aria-live="polite">
+          <section id="clubCatalogPanel" class="club-catalog-panel">
             <div class="club-empty">
               <strong>El estante compartido est&aacute; vac&iacute;o</strong>
               <p>Cuando alguien habilite su cat&aacute;logo aparecer&aacute; en este espacio.</p>
@@ -130,10 +126,10 @@
               </div>
               <span id="followedCollectionsSummary" class="collection-directory-summary">0 siguiendo</span>
             </header>
-            <div id="collectionList" class="collection-list" aria-live="polite"></div>
+            <div id="collectionList" class="collection-list"></div>
           </section>
 
-          <section id="collectionDetailPanel" class="collection-detail-panel" aria-live="polite" hidden>
+          <section id="collectionDetailPanel" class="collection-detail-panel" hidden>
             <button id="backToCollections" class="text-action collection-back-action" type="button">Volver a colecciones</button>
             <header class="collection-detail-heading">
               <div>
@@ -220,7 +216,7 @@
             </div>
             <div id="curationQueue" class="curation-queue" aria-label="Casos disponibles"></div>
           </div>
-          <div id="curationDetail" class="curation-detail" aria-live="polite">
+          <div id="curationDetail" class="curation-detail">
             <div class="curation-empty">
               <strong>Seleccioná un caso</strong>
               <p>La evidencia y las acciones disponibles aparecerán en esta mesa.</p>
@@ -239,7 +235,7 @@
                 </div>
                 <button id="newImportDraft" class="quiet-action" type="button">Nueva</button>
               </div>
-              <div id="importDraftList" class="import-draft-list" aria-live="polite"></div>
+              <div id="importDraftList" class="import-draft-list"></div>
             </aside>
 
             <div class="import-stage">
@@ -300,7 +296,7 @@
                 </form>
               </section>
 
-              <section id="importReviewPanel" class="import-review-panel" aria-live="polite" hidden>
+              <section id="importReviewPanel" class="import-review-panel" hidden>
                 <header class="import-stage-heading import-review-heading">
                   <div>
                     <span id="importReviewKicker" class="section-kicker">Borrador listo</span>
@@ -395,9 +391,9 @@
                 </div>
                 <button id="refreshScannerQueue" class="quiet-action" type="button">Actualizar</button>
               </div>
-              <div id="scannerQueue" class="scanner-queue" aria-live="polite"></div>
+              <div id="scannerQueue" class="scanner-queue"></div>
             </aside>
-            <section id="scannerQueueDetail" class="scanner-queue-detail" aria-live="polite">
+            <section id="scannerQueueDetail" class="scanner-queue-detail">
               <div class="curation-empty">
                 <strong>Seleccioná un archivo</strong>
                 <p>Compará la evidencia y vinculá el archivo sin modificar ningún catálogo personal.</p>
@@ -626,7 +622,7 @@
           </div>
           <div id="libraryConfiguration" class="library-configuration" role="status"></div>
           <p id="libraryFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
-          <div id="libraryList" class="library-list" aria-live="polite">
+          <div id="libraryList" class="library-list">
             <p class="member-list-empty">Abrí Administrar para comprobar las rutas configuradas.</p>
           </div>
         </section>
@@ -644,7 +640,7 @@
             <span>Sin registro p&uacute;blico</span>
           </div>
           <p id="memberFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
-          <div id="memberList" class="member-list" aria-live="polite">
+          <div id="memberList" class="member-list">
             <p class="member-list-empty">Abr&iacute; Administrar para cargar las cuentas.</p>
           </div>
           <div id="archivedMemberSection" class="archived-member-section" hidden>
@@ -1006,7 +1002,7 @@
       </div>
     </dialog>
 
-    <dialog id="descriptionDialog">
+    <dialog id="descriptionDialog" aria-labelledby="descriptionDialogTitle" aria-describedby="descriptionDialogText">
       <div class="description-dialog-body">
         <h2 id="descriptionDialogTitle"></h2>
         <p id="descriptionDialogText"></p>
