@@ -109,6 +109,23 @@ class FrontendQualityTests(unittest.TestCase):
         self.assertIn("catalogSearchIndex = searchIndex", self.javascript)
         self.assertIn("fields.total.textContent = catalogMetrics.total", self.javascript)
 
+    def test_effective_availability_is_not_presented_as_the_manual_flag(self) -> None:
+        self.assertIn("function availabilityState(item)", self.javascript)
+        self.assertIn('availability.effective ? "Disponible" : "No disponible"', self.javascript)
+        self.assertIn("Inventario del servidor", self.javascript)
+        self.assertIn("Declarar disponibilidad manual", self.javascript)
+        self.assertNotIn("<span>Declaración personal</span><strong>", self.javascript)
+        self.assertIn("No se borrarán videos ni el inventario del servidor", self.javascript)
+        self.assertIn("Al azar solo entre disponibles", self.html)
+
+    def test_scanner_keeps_distinct_works_behind_an_explicit_review_step(self) -> None:
+        self.assertIn('"review-distinct"', self.javascript)
+        self.assertIn('"create-distinct"', self.javascript)
+        self.assertIn("Revisar alta como obra distinta", self.javascript)
+        self.assertIn("Conservar ambas y vincular", self.javascript)
+        self.assertIn("body.distinct_review_token", self.javascript)
+        self.assertIn("scanner-create-guard.is-confirming", self.css)
+
 
 if __name__ == "__main__":
     unittest.main()

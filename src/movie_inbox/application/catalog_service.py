@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
@@ -132,6 +135,9 @@ class CatalogService:
         title = str(payload.get("title") or "").strip()
         year = str(payload.get("year") or "").strip()
         kind = normalize_kind(payload.get("kind"))
+        distinct_intent = normalize_bool(payload.get("distinct_intent"))
+        distinct_review_token = str(payload.get("distinct_review_token") or "").strip()
+        scanner_reference = str(payload.get("scanner_reference") or "").strip()
         title_key = title_match_key(title)
         if not title_key:
             raise ValueError("Scanner item requires a recognizable title")
@@ -168,12 +174,55 @@ class CatalogService:
                 match_items.append(item)
                 if item.id:
                     known_ids.add(item.id)
+            generated_match = next(
+                (existing for existing in match_items if existing.id and existing.id == candidate.id),
+                None,
+            )
+            if generated_match is not None and not distinct_intent:
+                return False, (
+                    False,
+                    "existing",
+                    {
+                        "item": generated_match.to_dict(),
+                        "match": {
+                            "accepted": True,
+                            "reason": "same_scanner_identity",
+                            "score": 1.0,
+                            "evidence": {"id": candidate.id},
+                        },
+                        "writable": generated_match.id in writable_ids,
+                    },
+                )
+            distinct_candidate_id = _scanner_distinct_id(candidate, scanner_reference) if scanner_reference else ""
+            distinct_match = next(
+                (
+                    existing
+                    for existing in match_items
+                    if distinct_candidate_id and existing.id == distinct_candidate_id
+                ),
+                None,
+            )
+            if distinct_match is not None:
+                return False, (
+                    False,
+                    "existing",
+                    {
+                        "item": distinct_match.to_dict(),
+                        "match": {
+                            "accepted": True,
+                            "reason": "same_scanner_reference",
+                            "score": 1.0,
+                            "evidence": {"id": distinct_candidate_id},
+                        },
+                        "writable": distinct_match.id in writable_ids,
+                    },
+                )
             accepted = [
                 (existing, decision)
                 for existing in match_items
                 if (decision := decide_match(existing, candidate)).accepted
             ]
-            if len(accepted) == 1:
+            if len(accepted) == 1 and not distinct_intent:
                 existing, decision = accepted[0]
                 return False, (
                     False,
@@ -184,15 +233,54 @@ class CatalogService:
                         "writable": existing.id in writable_ids,
                     },
                 )
-            if len(accepted) > 1:
-                return False, (
-                    False,
-                    "possible_duplicate",
-                    {"candidates": [_scanner_catalog_candidate(item) for item, _ in accepted[:5]]},
-                )
-            candidates = possible_duplicate_candidates(match_items, candidate)
+            candidates = [
+                {
+                    **_scanner_catalog_candidate(item),
+                    "reason": decision.reason,
+                    "score": decision.score,
+                }
+                for item, decision in accepted[:5]
+            ] if accepted else possible_duplicate_candidates(match_items, candidate)[:5]
             if candidates:
-                return False, (False, "possible_duplicate", {"candidates": candidates[:5]})
+                review_token = _scanner_distinct_review_token(
+                    candidate,
+                    candidates,
+                    scanner_reference,
+                )
+                if (
+                    not distinct_intent
+                    or not distinct_review_token
+                    or not hmac.compare_digest(distinct_review_token, review_token)
+                ):
+                    return False, (
+                        False,
+                        "possible_duplicate",
+                        {
+                            "candidates": candidates,
+                            "distinct_review_token": review_token,
+                        },
+                    )
+                if not distinct_candidate_id:
+                    raise ValueError("Distinct scanner item requires a stable scanner reference")
+                candidate["id"] = distinct_candidate_id
+                for existing in candidates:
+                    reference = str(existing.get("id") or "").strip()
+                    if reference:
+                        apply_duplicate_curation_decision(candidate, reference, "not_duplicate")
+                items.insert(0, candidate)
+                return True, (
+                    True,
+                    "created_distinct",
+                    {
+                        "item": candidate.to_dict(),
+                        "writable": True,
+                        "reviewed_candidate_ids": [
+                            str(existing.get("id") or "")
+                            for existing in candidates
+                            if str(existing.get("id") or "")
+                        ],
+                    },
+                )
             items.insert(0, candidate)
             return True, (True, "created", {"item": candidate.to_dict(), "writable": True})
 
@@ -598,3 +686,49 @@ def _scanner_catalog_candidate(item: Mapping[str, Any]) -> dict[str, Any]:
         "source": str(item.get("source") or ""),
         "url": str(item.get("url") or ""),
     }
+
+
+def _scanner_distinct_review_token(
+    candidate: Mapping[str, Any],
+    candidates: list[Mapping[str, Any]],
+    scanner_reference: str,
+) -> str:
+    """Bind an explicit distinct-work confirmation to the reviewed identities."""
+    seed = {
+        "candidate": {
+            "title": title_match_key(str(candidate.get("title") or "")),
+            "year": str(candidate.get("year") or "").strip(),
+            "kind": normalize_kind(candidate.get("kind")),
+        },
+        "scanner_reference": scanner_reference,
+        "matches": sorted(
+            (
+                {
+                    "id": str(item.get("id") or "").strip(),
+                    "title": title_match_key(str(item.get("title") or "")),
+                    "year": str(item.get("year") or "").strip(),
+                    "kind": normalize_kind(item.get("kind")),
+                    "url": str(item.get("url") or "").strip(),
+                    "wikidata_id": str(item.get("wikidata_id") or "").strip().upper(),
+                }
+                for item in candidates
+            ),
+            key=lambda item: (
+                item["id"],
+                item["title"],
+                item["year"],
+                item["kind"],
+                item["url"],
+                item["wikidata_id"],
+            ),
+        ),
+    }
+    serialized = json.dumps(seed, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _scanner_distinct_id(candidate: Mapping[str, Any], scanner_reference: str) -> str:
+    title = title_match_key(str(candidate.get("title") or ""))
+    year = str(candidate.get("year") or "").strip()
+    kind = normalize_kind(candidate.get("kind"))
+    return stable_id(f"scanner-distinct:{scanner_reference}|{title}|{year}|{kind}")

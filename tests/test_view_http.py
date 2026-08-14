@@ -1603,6 +1603,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, blocked.content)
         self.assertEqual(blocked.json()["reason"], "possible_duplicate")
         self.assertEqual(blocked.json()["candidates"][0]["id"], "legacy-1917")
+        self.assertTrue(blocked.json()["distinct_review_token"])
         self.assertEqual(len(repository.read()), 2)
 
         linked = self.client.post(
