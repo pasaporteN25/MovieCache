@@ -4,6 +4,18 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Agregado
+
+- La cola del Scanner permite separar casos para comparar de archivos sin coincidencia,
+  buscar dentro de los pendientes y crear una obra en el catálogo personal antes de
+  vincular su disponibilidad física.
+
+### Corregido
+
+- Los títulos formados por años, como `1917`, `1984` y `2001: A Space Odyssey`, conservan
+  una identidad válida durante el matching. Crear desde el Scanner vuelve a comprobar
+  coincidencias fuertes y reutiliza la obra existente para no introducir duplicados.
+
 ## [0.2.1] - 2026-08-13
 
 ### Corregido

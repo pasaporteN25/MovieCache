@@ -92,6 +92,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - El owner puede recorrer graficamente solamente las raices autorizadas y comprobar
   lectura antes de registrar una biblioteca. `extras` y `sample` se omiten por defecto;
   discos multipartes comparten identidad y decision sin perder sus archivos fisicos.
+- En la cola del Scanner, una candidata confirma solamente la identidad fisica. Un caso
+  sin coincidencia puede crear una obra pendiente en el catalogo personal del owner y
+  vincularla, comprobando antes coincidencias fuertes para evitar duplicados.
 - El inventario fisico pertenece a la instancia y aporta disponibilidad verificada a
   todos los catalogos sin exponer rutas a miembros. La declaracion manual permanece
   como una senal separada.

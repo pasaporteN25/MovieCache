@@ -146,12 +146,12 @@ Despues, como owner:
 No modifica `status`, fecha de vista, rating o review. Un disco ausente, un error de
 permisos o una desaparicion masiva conservan el ultimo inventario valido.
 
-El scanner administrado no crea obras nuevas en un catalogo personal. Vincula archivos
-a identidades ya conocidas y deja los titulos nuevos o dudosos en la Bandeja. Esto evita
-que un release mal interpretado cree duplicados. Para incorporar la ampliacion de una
-biblioteca se usa por ahora `Bandeja > Importaciones` para crear las obras y luego se
-repite `Probar recorrido` para que el scanner las reconozca. Una accion explicita
-`Crear obra desde este archivo` dentro de la cola Scanner queda como incremento futuro.
+El scanner administrado vincula automaticamente las coincidencias fuertes y deja los
+titulos nuevos o dudosos en la Bandeja. Elegir una candidata solo confirma la identidad
+fisica. Si ninguna corresponde, `Crear obra y vincular` comprueba de nuevo el catalogo
+personal del owner, reutiliza una coincidencia fuerte si existe y, en caso contrario,
+crea una obra pendiente. La disponibilidad proviene del inventario compartido; no se
+marcan vistas ni se modifican rating o review.
 
 ### Reconciliar un inventario heredado
 

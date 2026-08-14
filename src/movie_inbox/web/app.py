@@ -1007,16 +1007,78 @@ def create_app(config: ViewerConfig) -> FastAPI:
     def review_scanner_item(
         file_id: str,
         request: Request,
+        background_tasks: BackgroundTasks,
         body: dict[str, Any] = Depends(authorized_json),
     ) -> JSONResponse:
         require_owner(request)
         try:
+            if str(body.get("action") or "").strip().casefold() == "create":
+                scanner_item = next(
+                    (
+                        item
+                        for item in library_service.review_queue()
+                        if str(item.get("id") or "") == file_id
+                    ),
+                    None,
+                )
+                if scanner_item is None:
+                    raise LibraryNotFound("Scanner queue item was not found")
+                catalog = session_catalog(request)
+                write_path = write_path_for(catalog.config, "")
+                created, catalog_reason, catalog_result = catalog_service(write_path).ensure_scanner_item(
+                    body,
+                    allow_possible_duplicates=bool(scanner_item.get("candidates")),
+                    comparison_items=load_items(catalog.config.patterns),
+                )
+                if catalog_reason == "possible_duplicate":
+                    return JSONResponse(
+                        {
+                            "ok": False,
+                            "reason": catalog_reason,
+                            "candidates": catalog.public_payload(catalog_result.get("candidates", [])),
+                        },
+                        status_code=409,
+                    )
+                catalog_item = catalog_result.get("item")
+                if not isinstance(catalog_item, dict):
+                    return error_response("catalog_item_unavailable", 500)
+                item = library_service.review_file(
+                    file_id,
+                    {
+                        "action": "confirm",
+                        "title": str(catalog_item.get("title") or ""),
+                        "year": str(catalog_item.get("year") or ""),
+                        "kind": str(catalog_item.get("kind") or "pelicula"),
+                    },
+                )
+                background_enrichment = "not_needed"
+                if catalog_result.get("writable") and needs_background_title_enrichment(catalog_item):
+                    background_tasks.add_task(
+                        background_enrich_catalog_item,
+                        write_path,
+                        str(catalog_item.get("id") or ""),
+                        catalog_item,
+                    )
+                    background_enrichment = "scheduled"
+                return JSONResponse(
+                    {
+                        "ok": True,
+                        "reason": "scanner_item_created_and_linked" if created else "scanner_item_reused_and_linked",
+                        "item": item,
+                        "catalog_action": catalog_reason,
+                        "catalog_item": catalog.public_payload(catalog_item),
+                        "background_enrichment": background_enrichment,
+                    },
+                    status_code=201 if created else 200,
+                )
             item = library_service.review_file(file_id, body)
             return JSONResponse({"ok": True, "reason": "scanner_item_reviewed", "item": item})
         except LibraryNotFound:
             return error_response("scanner_item_not_found", 404)
         except ValueError as error:
             return error_response(str(error), 400)
+        except CatalogRepositoryError as error:
+            return repository_error_response(error)
         except LibraryRepositoryError:
             return error_response("library_store_unavailable", 503)
 

@@ -231,6 +231,68 @@ class SqliteRepositoryTests(unittest.TestCase):
                 self.assertEqual(connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0)
             self.assertEqual([item.id for item in repository.read()], ["arrival-2016", "heat-1995"])
 
+    def test_scanner_item_is_created_once_and_reused_by_strong_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
+            repository.write([sample_item()])
+            service = CatalogService(repository)
+
+            created, reason, result = service.ensure_scanner_item(
+                {"title": "1917", "year": "2019", "kind": "pelicula"}
+            )
+            reused, reused_reason, reused_result = service.ensure_scanner_item(
+                {"title": "1917", "year": "2019", "kind": "pelicula"}
+            )
+
+            self.assertTrue(created)
+            self.assertEqual(reason, "created")
+            self.assertFalse(result["item"]["en_catalogo"])
+            self.assertFalse(reused)
+            self.assertEqual(reused_reason, "existing")
+            self.assertEqual(reused_result["item"]["id"], result["item"]["id"])
+            self.assertEqual(len(repository.read()), 2)
+            with self.assertRaisesRegex(ValueError, "four-digit year"):
+                service.ensure_scanner_item({"title": "Arrival", "year": "unknown", "kind": "pelicula"})
+
+    def test_scanner_review_can_reject_a_weak_candidate_and_create_the_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
+            repository.write([
+                normalize_item({"id": "once-upon", "title": "Once Upon a Time", "year": "2020"})
+            ])
+            service = CatalogService(repository)
+            payload = {"title": "Once Upon Time", "year": "2020", "kind": "pelicula"}
+
+            blocked, blocked_reason, _ = service.ensure_scanner_item(payload)
+            created, created_reason, _ = service.ensure_scanner_item(
+                payload,
+                allow_possible_duplicates=True,
+            )
+
+            self.assertFalse(blocked)
+            self.assertEqual(blocked_reason, "possible_duplicate")
+            self.assertTrue(created)
+            self.assertEqual(created_reason, "created")
+            self.assertEqual(len(repository.read()), 2)
+
+    def test_scanner_checks_read_only_catalog_sources_before_creating(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
+            repository.write([sample_item()])
+
+            created, reason, result = CatalogService(repository).ensure_scanner_item(
+                {"title": "Arrival", "year": "2016", "kind": "pelicula"},
+                comparison_items=[
+                    normalize_item({"id": "arrival-read-only", "title": "Arrival", "year": "2016"})
+                ],
+            )
+
+            self.assertFalse(created)
+            self.assertEqual(reason, "existing")
+            self.assertEqual(result["item"]["id"], "arrival-read-only")
+            self.assertFalse(result["writable"])
+            self.assertEqual(len(repository.read()), 1)
+
     def test_attach_local_file_is_granular_and_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "catalog.sqlite"

@@ -81,6 +81,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let scannerQueue = [];
       let selectedScannerItemId = "";
       let scannerQueueLoading = false;
+      let scannerQueueFilter = "all";
+      let scannerQueueQuery = "";
       let mergeReview = null;
       let mergeContext = null;
       let mergeChoices = {};
@@ -204,6 +206,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         importDraftCount: document.querySelector("#importDraftCount"),
         scannerQueueCount: document.querySelector("#scannerQueueCount"),
         scannerQueueMeta: document.querySelector("#scannerQueueMeta"),
+        scannerQueueFilters: document.querySelector("#scannerQueueFilters"),
+        scannerAllCount: document.querySelector("#scannerAllCount"),
+        scannerReviewCount: document.querySelector("#scannerReviewCount"),
+        scannerNewCount: document.querySelector("#scannerNewCount"),
+        scannerQueueSearch: document.querySelector("#scannerQueueSearch"),
         scannerQueue: document.querySelector("#scannerQueue"),
         scannerQueueDetail: document.querySelector("#scannerQueueDetail"),
         refreshScannerQueue: document.querySelector("#refreshScannerQueue"),
@@ -554,6 +561,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       fields.inboxModeTabs.addEventListener("click", changeInboxMode);
       fields.scannerQueue.addEventListener("click", selectScannerQueueItem);
       fields.scannerQueue.addEventListener("keydown", moveScannerQueueSelection);
+      fields.scannerQueueFilters.addEventListener("click", changeScannerQueueFilter);
+      fields.scannerQueueSearch.addEventListener("input", searchScannerQueue);
       fields.scannerQueueDetail.addEventListener("click", handleScannerReviewAction);
       fields.scannerQueueDetail.addEventListener("submit", handleScannerReviewAction);
       fields.refreshScannerQueue.addEventListener("click", () => loadScannerQueue({ announce: true }));
@@ -1369,6 +1378,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (value.includes("test scan")) return "Primero ejecutá un recorrido de prueba satisfactorio.";
         if (value.includes("already uses")) return "Esa ruta ya está registrada en otra biblioteca.";
         if (value === "library_store_unavailable") return "El inventario no está disponible. Reintentá en unos segundos.";
+        if (value === "possible_duplicate") return "Encontramos obras parecidas en tu catálogo. Revisá primero las coincidencias para evitar un duplicado.";
+        if (value.includes("recognizable identity") || value.includes("recognizable title")) return "El título detectado no alcanza para identificar la obra. Corregilo y volvé a intentar.";
+        if (value.includes("Confirm the year")) return "Confirmá el año antes de crear la obra.";
+        if (value.includes("valid four-digit year")) return "Ingresá un año válido de cuatro cifras.";
+        if (value === "catalog_item_unavailable") return "La obra se guardó de forma incompleta. Actualizá la Bandeja antes de reintentar.";
         return value && !value.startsWith("HTTP") ? value : "No pudimos completar la operación de biblioteca.";
       }
 
@@ -2601,15 +2615,37 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function renderScannerQueue() {
-        fields.scannerQueueMeta.textContent = `${scannerQueue.length} ${scannerQueue.length === 1 ? "caso" : "casos"}`;
+        const reviewCount = scannerQueue.filter((item) => item.state === "review").length;
+        const newCount = scannerQueue.filter((item) => item.state === "new").length;
+        fields.scannerAllCount.textContent = String(scannerQueue.length);
+        fields.scannerReviewCount.textContent = String(reviewCount);
+        fields.scannerNewCount.textContent = String(newCount);
+        fields.scannerQueueFilters.querySelectorAll("[data-scanner-filter]").forEach((button) => {
+          const active = button.dataset.scannerFilter === scannerQueueFilter;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        const visible = visibleScannerQueue();
+        fields.scannerQueueMeta.textContent = visible.length === scannerQueue.length
+          ? `${scannerQueue.length} ${scannerQueue.length === 1 ? "pendiente" : "pendientes"}`
+          : `${visible.length} de ${scannerQueue.length} pendientes`;
         if (!scannerQueue.length) {
           fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Scanner al día</strong><p>No quedan identidades físicas por confirmar.</p></div>`;
           fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Sin decisiones pendientes</strong><p>Los próximos casos aparecerán después de un recorrido aplicado.</p></div>`;
           return;
         }
-        fields.scannerQueue.innerHTML = scannerQueue.map((item) => {
+        if (!visible.length) {
+          selectedScannerItemId = "";
+          fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Sin resultados</strong><p>Probá otro filtro o término de búsqueda.</p></div>`;
+          fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>No hay casos para mostrar</strong><p>La cola completa conserva ${scannerQueue.length} pendientes.</p></div>`;
+          return;
+        }
+        if (!visible.some((item) => item.id === selectedScannerItemId)) {
+          selectedScannerItemId = visible[0].id;
+        }
+        fields.scannerQueue.innerHTML = visible.map((item) => {
           const active = item.id === selectedScannerItemId;
-          const label = item.state === "review" ? "Comparar" : "Nueva";
+          const label = item.state === "review" ? "Comparar" : "Sin coincidencia";
           const partLabel = Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "";
           return `<button class="scanner-queue-item${active ? " active" : ""}" type="button" data-scanner-item="${escapeAttr(item.id)}" aria-pressed="${active}">
             <span class="scanner-queue-state">${label}</span>
@@ -2621,6 +2657,36 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         renderScannerQueueDetail();
       }
 
+      function visibleScannerQueue() {
+        const query = normalizeText(scannerQueueQuery);
+        return scannerQueue.filter((item) => {
+          if (scannerQueueFilter !== "all" && item.state !== scannerQueueFilter) return false;
+          if (!query) return true;
+          const values = [
+            item.detected_title,
+            item.detected_year,
+            item.detected_kind,
+            item.name,
+            item.relative_path,
+            item.library_name
+          ];
+          return normalizeText(values.filter(Boolean).join(" ")).includes(query);
+        });
+      }
+
+      function changeScannerQueueFilter(event) {
+        const button = event.target.closest("[data-scanner-filter]");
+        if (!button) return;
+        scannerQueueFilter = button.dataset.scannerFilter || "all";
+        renderScannerQueue();
+        focusSelectedScannerItem();
+      }
+
+      function searchScannerQueue(event) {
+        scannerQueueQuery = event.target.value || "";
+        renderScannerQueue();
+      }
+
       function selectScannerQueueItem(event) {
         const button = event.target.closest("[data-scanner-item]");
         if (!button) return;
@@ -2630,12 +2696,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function moveScannerQueueSelection(event) {
-        if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(event.key) || !scannerQueue.length) return;
+        const visible = visibleScannerQueue();
+        if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(event.key) || !visible.length) return;
         event.preventDefault();
-        const current = Math.max(0, scannerQueue.findIndex((item) => item.id === selectedScannerItemId));
+        const current = Math.max(0, visible.findIndex((item) => item.id === selectedScannerItemId));
         const forwards = event.key === "ArrowDown" || event.key === "ArrowRight";
-        const next = (current + (forwards ? 1 : -1) + scannerQueue.length) % scannerQueue.length;
-        selectedScannerItemId = scannerQueue[next].id;
+        const next = (current + (forwards ? 1 : -1) + visible.length) % visible.length;
+        selectedScannerItemId = visible[next].id;
         renderScannerQueue();
         focusSelectedScannerItem();
       }
@@ -2664,11 +2731,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <h3>${escapeHtml(item.detected_title || item.name || "Sin título")}</h3>
               <p>${multipart ? `${parts.length} archivos serán tratados como una sola obra.` : escapeHtml(item.relative_path || item.name || "")}</p>
             </div>
-            <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} ${candidates.length === 1 ? "candidata" : "candidatas"}` : "Completar identidad"}</span>
+            <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} ${candidates.length === 1 ? "candidata" : "candidatas"}` : "Sin coincidencia"}</span>
           </header>
           <div class="scanner-scope-note" role="note">
-            <strong>Vínculo físico</strong>
-            <span>Confirmar identifica ${multipart ? "estas partes" : "este archivo"} dentro del inventario compartido. No agrega la obra a tu catálogo personal ni cambia estados, puntuaciones o reviews.</span>
+            <strong>${candidates.length ? "Elegir coincidencia" : "Nueva obra"}</strong>
+            <span>${candidates.length
+              ? `Vincular una candidata identifica ${multipart ? "estas partes" : "este archivo"} dentro del inventario compartido sin copiar la obra a tu catálogo personal.`
+              : `Crear agrega la obra a tu catálogo personal y vincula ${multipart ? "estas partes" : "este archivo"} como disponibilidad física. No la marca como vista.`}</span>
           </div>
           <dl class="scanner-file-facts">
             <div><dt>Biblioteca</dt><dd>${escapeHtml(item.library_name || "Biblioteca")}</dd></div>
@@ -2679,12 +2748,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           ${multipart ? `<section class="scanner-parts" aria-label="Partes detectadas"><strong>Archivos agrupados</strong><div>${parts.map((part, index) => `<div><span>${escapeHtml(part.part ? `Parte ${part.part}` : `Archivo ${index + 1}`)}</span><code>${escapeHtml(part.relative_path || part.name || "")}</code><small>${escapeHtml(formatImportBytes(part.size_bytes))}</small></div>`).join("")}</div></section>` : ""}
           ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${candidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}</section>` : ""}
           <section class="scanner-confirm-detected">
-            <div><h4>${candidates.length ? "Vincular con otra identidad" : "Completar identidad detectada"}</h4><p>Usá esta opción cuando ninguna candidata corresponda. El año es obligatorio para evitar falsas coincidencias.</p></div>
+            <div><h4>${candidates.length ? "¿Ninguna coincide?" : "Crear obra desde el archivo"}</h4><p>Revisá la identidad antes de crearla. El año es obligatorio y el catálogo se comprueba otra vez para evitar duplicados.</p></div>
             <form data-scanner-confirm-form>
               <label><span>Título</span><input name="title" value="${escapeAttr(item.detected_title || "")}" maxlength="240" required></label>
-              <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(19|20)[0-9]{2}" maxlength="4" required></label>
+              <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(18|19|20|21)[0-9]{2}" maxlength="4" required></label>
               <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === item.detected_kind ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
-              <button class="action-primary" type="submit" data-scanner-review="confirm-detected" data-file-id="${escapeAttr(item.id)}">Vincular ${actionObject}</button>
+              <button class="action-primary" type="submit" data-scanner-review="create-detected" data-file-id="${escapeAttr(item.id)}">Crear obra y vincular ${actionObject}</button>
             </form>
           </section>
           <footer class="scanner-case-actions">
@@ -2785,7 +2854,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       async function handleScannerReviewAction(event) {
         const button = event.submitter?.closest?.("[data-scanner-review]")
           || event.target.closest?.("[data-scanner-review]")
-          || event.target.querySelector?.("[data-scanner-review='confirm-detected']");
+          || event.target.querySelector?.("[data-scanner-review='create-detected']");
         if (!button) return;
         event.preventDefault();
         const action = button.dataset.scannerReview;
@@ -2799,10 +2868,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           );
           if (!confirmed) return;
         }
-        const body = { action: action === "ignore" ? "ignore" : "confirm" };
+        const body = {
+          action: action === "ignore" ? "ignore" : action === "create-detected" ? "create" : "confirm"
+        };
         if (action === "confirm-candidate") {
           body.candidate_key = button.dataset.candidateKey || "";
-        } else if (action === "confirm-detected") {
+        } else if (action === "create-detected") {
           const form = button.closest("form");
           if (!form?.reportValidity()) return;
           const data = new FormData(form);
@@ -2812,7 +2883,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         }
         button.disabled = true;
         const feedback = fields.scannerQueueDetail.querySelector("#scannerReviewFeedback");
-        if (feedback) feedback.textContent = action === "ignore" ? "Omitiendo archivo…" : "Guardando vínculo…";
+        if (feedback) {
+          feedback.textContent = action === "ignore"
+            ? "Omitiendo archivo…"
+            : action === "create-detected" ? "Comprobando catálogo y creando obra…" : "Guardando vínculo…";
+        }
         try {
           const response = await apiFetch(`/api/scanner/queue/${encodeURIComponent(fileId)}`, {
             method: "POST",
@@ -2826,10 +2901,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           selectedScannerItemId = scannerQueue[Math.min(priorIndex, scannerQueue.length - 1)]?.id || "";
           renderScannerQueue();
           const affected = Number(payload.item?.file_count || 1);
+          const linkedLabel = affected > 1 ? `${affected} partes vinculadas` : "Archivo vinculado";
           setCurationFeedback(
             action === "ignore"
               ? `${affected > 1 ? `${affected} partes omitidas` : "Archivo omitido"}. No se eliminó nada del disco.`
-              : `${affected > 1 ? `${affected} partes vinculadas` : "Archivo vinculado"} al inventario compartido.`,
+              : action === "create-detected"
+                ? payload.catalog_action === "existing"
+                  ? `La obra ya estaba en tu catálogo. ${linkedLabel} al inventario compartido.`
+                  : `Obra agregada a tu catálogo. ${linkedLabel} al inventario compartido.`
+                : `${linkedLabel} al inventario compartido.`,
             "success"
           );
           if (selectedScannerItemId) focusSelectedScannerItem();

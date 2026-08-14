@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from datetime import datetime, timezone
 from typing import Any
 
 from movie_inbox.application.repository import CatalogRepository
@@ -25,6 +27,7 @@ from movie_inbox.domain.catalog import (
     possible_duplicate_candidates,
     same_catalog_item,
     stable_id,
+    title_match_key,
     title_match_keys_for_item,
     today_date,
 )
@@ -116,6 +119,83 @@ class CatalogService:
                     }
                 )
             return added_count > 0, results
+
+        return self.repository.mutate(mutation)
+
+    def ensure_scanner_item(
+        self,
+        payload: Mapping[str, Any],
+        *,
+        allow_possible_duplicates: bool = False,
+        comparison_items: list[Mapping[str, Any]] | None = None,
+    ) -> tuple[bool, str, dict[str, Any]]:
+        """Create a detected work or reuse one strong personal-catalog match."""
+        title = str(payload.get("title") or "").strip()
+        year = str(payload.get("year") or "").strip()
+        kind = normalize_kind(payload.get("kind"))
+        title_key = title_match_key(title)
+        if not title_key:
+            raise ValueError("Scanner item requires a recognizable title")
+        if not year:
+            raise ValueError("Confirm the year before creating a catalog item")
+        if not year.isdigit() or not 1800 <= int(year) <= 2199:
+            raise ValueError("Scanner item requires a valid four-digit year")
+        added_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        candidate = normalize_item(
+            {
+                "id": stable_id(f"scanner:{title_key}|{year}|{kind}"),
+                "source": "local_files",
+                "title": title,
+                "kind": kind,
+                "status": "to_watch",
+                "year": year,
+                "en_catalogo": False,
+                "metadata_sources": {
+                    "title": metadata_source_record("local_files", "", False, added_at),
+                    "kind": metadata_source_record("local_files", "", False, added_at),
+                },
+                "added_at": added_at,
+            }
+        )
+        comparison = [normalize_item(item) for item in (comparison_items or [])]
+
+        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str, dict[str, Any]]]:
+            writable_ids = {item.id for item in items if item.id}
+            match_items = list(items)
+            known_ids = set(writable_ids)
+            for item in comparison:
+                if item.id and item.id in known_ids:
+                    continue
+                match_items.append(item)
+                if item.id:
+                    known_ids.add(item.id)
+            accepted = [
+                (existing, decision)
+                for existing in match_items
+                if (decision := decide_match(existing, candidate)).accepted
+            ]
+            if len(accepted) == 1:
+                existing, decision = accepted[0]
+                return False, (
+                    False,
+                    "existing",
+                    {
+                        "item": existing.to_dict(),
+                        "match": decision.to_dict(),
+                        "writable": existing.id in writable_ids,
+                    },
+                )
+            if len(accepted) > 1:
+                return False, (
+                    False,
+                    "possible_duplicate",
+                    {"candidates": [_scanner_catalog_candidate(item) for item, _ in accepted[:5]]},
+                )
+            candidates = possible_duplicate_candidates(match_items, candidate)
+            if candidates and not allow_possible_duplicates:
+                return False, (False, "possible_duplicate", {"candidates": candidates[:5]})
+            items.insert(0, candidate)
+            return True, (True, "created", {"item": candidate.to_dict(), "writable": True})
 
         return self.repository.mutate(mutation)
 
@@ -508,3 +588,14 @@ def _new_local_item(
             "added_at": scanned_at,
         }
     )
+
+
+def _scanner_catalog_candidate(item: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(item.get("id") or ""),
+        "title": str(item.get("title") or ""),
+        "year": str(item.get("year") or ""),
+        "kind": str(item.get("kind") or ""),
+        "source": str(item.get("source") or ""),
+        "url": str(item.get("url") or ""),
+    }

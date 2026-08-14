@@ -230,13 +230,16 @@ miembros reciben solamente el estado agregado; rutas, nombres de archivo y huell
 exclusivos del owner.
 
 Archivos nuevos, titulos sin ano y coincidencias ambiguas aparecen en
-`Bandeja > Scanner`. Confirmar una identidad no agrega automaticamente la obra a ningun
-catalogo personal. El comparador muestra titulo, ano, tipo, aliases, similitud y las
-fuentes externas ya disponibles antes de vincular el archivo. `Omitir este archivo` no
-borra datos ni toca el disco: retira el caso mientras conserve la misma huella y exige
-confirmacion porque todavia no puede restaurarse desde la interfaz. Si un disco
-desaparece o la proporcion de bajas supera el limite configurado, se conserva el ultimo
-inventario valido.
+`Bandeja > Scanner`. Elegir una candidata vincula el archivo con una identidad existente
+del inventario compartido y no copia esa obra a ningun catalogo. Cuando ninguna candidata
+corresponde, `Crear obra y vincular` vuelve a comprobar el catalogo personal del owner:
+reutiliza una coincidencia fuerte o crea una entrada pendiente nueva y le aporta
+disponibilidad fisica verificada. No cambia fecha de vista, rating ni review. La cola se
+puede filtrar entre casos para comparar y archivos sin coincidencia, o buscar por titulo,
+ano, ruta y biblioteca. `Omitir este archivo` no borra datos ni toca el disco: retira el
+caso mientras conserve la misma huella y exige confirmacion porque todavia no puede
+restaurarse desde la interfaz. Si un disco desaparece o la proporcion de bajas supera el
+limite configurado, se conserva el ultimo inventario valido.
 
 Las sugerencias se construyen con el catalogo del owner y con catalogos que sus
 miembros hayan compartido de forma explicita. Los catalogos privados nunca se usan como
