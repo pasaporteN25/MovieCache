@@ -9,6 +9,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - La cola del Scanner permite separar casos para comparar de archivos sin coincidencia,
   buscar dentro de los pendientes y crear una obra en el catálogo personal antes de
   vincular su disponibilidad física.
+- Cuando ninguna candidata corresponde, `Conservar ambas` permite crear una obra distinta
+  mediante una comprobación en dos pasos. La confirmación queda ligada a las coincidencias
+  revisadas y registra la nueva pareja como `No son duplicados`.
 
 ### Corregido
 
@@ -18,11 +21,14 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - El Scanner ya no usa la presencia previa de candidatas como permiso implícito para
   crear otra ficha. Un título exacto con año diferente queda bloqueado para comparación
   y una coincidencia descubierta en la comprobación final puede vincularse directamente.
-- La Bandeja distingue `Vincular` de `Agregar obra y vincular`: la segunda acción sólo
-  aparece cuando el catálogo no contiene ninguna coincidencia razonable.
+- La Bandeja distingue `Vincular`, `Agregar obra y vincular` y `Conservar ambas`: esta
+  última requiere revisar nuevamente las coincidencias antes de crear una ficha separada.
 - Curaduría detecta el patrón heredado en el que un título numérico quedó guardado
   también como año, para poder revisar casos como `1917 / 1917` frente a `1917 / 2019`
   sin tratar como duplicados a todos los remakes con años diferentes.
+- Las cards y la ficha ya no presentan como contradictorias la disponibilidad efectiva
+  y la declaración manual. La interfaz muestra `Disponible` cuando existe inventario
+  verificado y detalla por separado si también hubo una declaración manual.
 
 ## [0.2.1] - 2026-08-13
 

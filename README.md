@@ -229,15 +229,21 @@ cambiar `status`, `watched_at`, `rating` o `review`. La declaracion manual de
 miembros reciben solamente el estado agregado; rutas, nombres de archivo y huellas son
 exclusivos del owner.
 
+La interfaz llama `Disponible` al resultado efectivo de ambas procedencias. En la ficha,
+`Inventario del servidor` y `Declaracion manual` se muestran por separado; por eso una
+declaracion manual inactiva no vuelve indisponible una obra que conserva un archivo
+vinculado en una biblioteca administrada.
+
 Archivos nuevos, titulos sin ano y coincidencias ambiguas aparecen en
 `Bandeja > Scanner`. Elegir una candidata vincula el archivo con una identidad existente
 del inventario compartido y no copia esa obra a ningun catalogo. Cuando ninguna candidata
 corresponde y tampoco existe una ficha parecida, `Agregar obra y vincular` vuelve a
 comprobar el catalogo personal del owner, crea una entrada pendiente y le aporta
 disponibilidad fisica verificada. Si aparece cualquier coincidencia revisable, el Scanner
-no permite crear otra ficha: hay que vincular la existente o agregar primero la obra
-realmente distinta desde el buscador general y aplicar nuevamente el inventario. No
-cambia fecha de vista, rating ni review.
+ofrece comparar y vincular la existente. Si ninguna corresponde, `Conservar ambas`
+repite la comprobacion con el titulo, ano y tipo confirmados; un segundo paso explicito
+crea una ficha separada, confirma el archivo con su identidad y registra las candidatas
+revisadas como obras diferentes. No cambia fecha de vista, rating ni review.
 La cola se puede filtrar entre casos para comparar y archivos sin coincidencia, o buscar
 por titulo, ano, ruta y biblioteca. `Omitir este archivo` no borra datos ni toca el disco:
 retira el caso mientras conserve la misma huella y exige confirmacion porque todavia no

@@ -145,7 +145,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         ["watched_at", "Fecha de vista"],
         ["rating", "Puntaje"],
         ["review", "Review"],
-        ["en_catalogo", "En catálogo"]
+        ["en_catalogo", "Disponibilidad declarada"]
       ];
       const COLLECTION_MULTI_FILTER_KEYS = [
         "status", "availability", "kind", "source", "decade", "genre", "director", "record", "release_day"
@@ -2721,7 +2721,26 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function renderScannerQueueDetail() {
         const item = scannerQueue.find((entry) => entry.id === selectedScannerItemId);
         if (!item) return;
+        const createConflict = scannerCreateConflicts.get(item.id) || null;
         const candidates = scannerCandidatesForItem(item);
+        const distinctReviewReady = Boolean(createConflict?.reviewToken);
+        const createDraft = createConflict?.draft || {};
+        const createAction = candidates.length
+          ? distinctReviewReady ? "create-distinct" : "review-distinct"
+          : "create-detected";
+        const createHeading = candidates.length
+          ? distinctReviewReady ? "Confirmar obra distinta" : "¿Ninguna coincide?"
+          : "Agregar al catálogo personal";
+        const createDescription = candidates.length
+          ? distinctReviewReady
+            ? `La comprobación final encontró las fichas de arriba. Confirmar conserva ambas obras, crea una ficha separada y registra ${actionObjectLabel(item)} con su identidad.`
+            : "Corregí título, año o tipo si hace falta. Revisaremos otra vez tu catálogo antes de permitir una ficha separada."
+          : "Esta acción crea una ficha pendiente y vincula su disponibilidad física. El año es obligatorio y el catálogo se comprueba nuevamente antes de escribir.";
+        const createButtonLabel = candidates.length
+          ? distinctReviewReady
+            ? `Conservar ambas y vincular ${actionObjectLabel(item)}`
+            : "Revisar alta como obra distinta"
+          : `Agregar obra y vincular ${actionObjectLabel(item)}`;
         const parts = Array.isArray(item.parts) && item.parts.length ? item.parts : [{
           name: item.name,
           relative_path: item.relative_path,
@@ -2754,19 +2773,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           </dl>
           ${multipart ? `<section class="scanner-parts" aria-label="Partes detectadas"><strong>Archivos agrupados</strong><div>${parts.map((part, index) => `<div><span>${escapeHtml(part.part ? `Parte ${part.part}` : `Archivo ${index + 1}`)}</span><code>${escapeHtml(part.relative_path || part.name || "")}</code><small>${escapeHtml(formatImportBytes(part.size_bytes))}</small></div>`).join("")}</div></section>` : ""}
           ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${candidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}</section>` : ""}
-          ${candidates.length ? `
-            <section class="scanner-confirm-detected scanner-create-guard">
-              <div><h4>¿Es una obra distinta?</h4><p>El Scanner no crea una segunda ficha mientras haya coincidencias. Si ninguna corresponde, agregá primero la obra desde el buscador general y después aplicá un nuevo recorrido desde Bibliotecas.</p></div>
-            </section>` : `
-            <section class="scanner-confirm-detected">
-              <div><h4>Agregar al catálogo personal</h4><p>Esta acción crea una ficha pendiente y vincula su disponibilidad física. El año es obligatorio y el catálogo se comprueba nuevamente antes de escribir.</p></div>
-              <form data-scanner-confirm-form>
-                <label><span>Título</span><input name="title" value="${escapeAttr(item.detected_title || "")}" maxlength="240" required></label>
-                <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(18|19|20|21)[0-9]{2}" maxlength="4" required></label>
-                <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === item.detected_kind ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
-                <button class="action-primary" type="submit" data-scanner-review="create-detected" data-file-id="${escapeAttr(item.id)}">Agregar obra y vincular ${actionObject}</button>
-              </form>
-            </section>`}
+          <section class="scanner-confirm-detected${candidates.length ? " scanner-create-guard" : ""}${distinctReviewReady ? " is-confirming" : ""}">
+            <div><h4>${createHeading}</h4><p>${createDescription}</p></div>
+            <form data-scanner-confirm-form>
+              <label><span>Título</span><input name="title" value="${escapeAttr(createDraft.title ?? item.detected_title ?? "")}" maxlength="240" required></label>
+              <label><span>Año</span><input name="year" value="${escapeAttr(createDraft.year ?? item.detected_year ?? "")}" inputmode="numeric" pattern="(18|19|20|21)[0-9]{2}" maxlength="4" required></label>
+              <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === (createDraft.kind || item.detected_kind) ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
+              <button class="action-primary" type="submit" data-scanner-review="${createAction}" data-file-id="${escapeAttr(item.id)}">${createButtonLabel}</button>
+            </form>
+          </section>
           <footer class="scanner-case-actions">
             <div><strong>¿No pertenece al inventario?</strong><span>Omitir retira ${multipart ? "todas las partes" : "el archivo"} de esta cola mientras no cambien.</span></div>
             <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Omitir ${actionObject}</button>
@@ -2775,19 +2790,51 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function scannerCandidatesForItem(item) {
+        const conflict = scannerCreateConflicts.get(item.id);
+        const verified = Array.isArray(conflict?.candidates) ? conflict.candidates : [];
+        const verifiedKeys = new Set(verified.flatMap(scannerCandidateEquivalenceKeys));
+        const detected = (Array.isArray(item.candidates) ? item.candidates : []).filter((candidate) =>
+          !scannerCandidateEquivalenceKeys(candidate).some((key) => verifiedKeys.has(key))
+        );
         const rows = [
-          ...(Array.isArray(item.candidates) ? item.candidates : []),
-          ...(scannerCreateConflicts.get(item.id) || [])
+          ...verified,
+          ...detected
         ];
         const seen = new Set();
         return rows.filter((candidate) => {
-          const identity = candidate.key
-            || candidate.catalog_item_id
-            || [candidate.id, normalizeText(candidate.title), candidate.year, candidate.kind].filter(Boolean).join(":");
+          const identity = candidate.catalog_item_id
+            || candidate.id
+            || candidate.key
+            || [normalizeText(candidate.title), candidate.year, candidate.kind].filter(Boolean).join(":");
           if (!identity || seen.has(identity)) return false;
           seen.add(identity);
           return true;
         });
+      }
+
+      function scannerCandidateEquivalenceKeys(candidate) {
+        const year = String(candidate.year || "").trim();
+        const kind = String(candidate.kind || "").trim();
+        const titles = [
+          candidate.title,
+          candidate.original_title,
+          candidate.spanish_title,
+          candidate.english_title,
+          ...(Array.isArray(candidate.alternative_titles) ? candidate.alternative_titles : [])
+        ];
+        const keys = titles
+          .map(normalizeText)
+          .filter(Boolean)
+          .map((title) => `title:${title}|${year}|${kind}`);
+        if (candidate.wikidata_id) keys.push(`wikidata:${String(candidate.wikidata_id).toUpperCase()}`);
+        [candidate.url, candidate.wikipedia_url, candidate.imdb_url, candidate.filmaffinity_url]
+          .filter(Boolean)
+          .forEach((url) => keys.push(`url:${url}`));
+        return [...new Set(keys)];
+      }
+
+      function actionObjectLabel(item) {
+        return Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "archivo";
       }
 
       function scannerCandidate(candidate, item, index) {
@@ -2886,7 +2933,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       async function handleScannerReviewAction(event) {
         const button = event.submitter?.closest?.("[data-scanner-review]")
           || event.target.closest?.("[data-scanner-review]")
-          || event.target.querySelector?.("[data-scanner-review='create-detected']");
+          || event.target.querySelector?.("[data-scanner-confirm-form] [data-scanner-review]");
         if (!button) return;
         event.preventDefault();
         const action = button.dataset.scannerReview;
@@ -2903,7 +2950,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const body = {
           action: action === "ignore"
             ? "ignore"
-            : action === "create-detected"
+            : ["create-detected", "review-distinct", "create-distinct"].includes(action)
               ? "create"
               : action === "link-catalog" ? "link_catalog" : "confirm"
         };
@@ -2911,20 +2958,26 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           body.candidate_key = button.dataset.candidateKey || "";
         } else if (action === "link-catalog") {
           body.catalog_item_id = button.dataset.catalogItemId || "";
-        } else if (action === "create-detected") {
+        } else if (["create-detected", "review-distinct", "create-distinct"].includes(action)) {
           const form = button.closest("form");
           if (!form?.reportValidity()) return;
           const data = new FormData(form);
           body.title = data.get("title") || "";
           body.year = data.get("year") || "";
           body.kind = data.get("kind") || "pelicula";
+          if (action !== "create-detected") body.distinct_intent = true;
+          if (action === "create-distinct") {
+            body.distinct_review_token = scannerCreateConflicts.get(fileId)?.reviewToken || "";
+          }
         }
         button.disabled = true;
         const feedback = fields.scannerQueueDetail.querySelector("#scannerReviewFeedback");
         if (feedback) {
           feedback.textContent = action === "ignore"
             ? "Omitiendo archivo…"
-            : action === "create-detected" ? "Comprobando catálogo y creando obra…" : "Guardando vínculo…";
+            : action === "review-distinct" ? "Comprobando coincidencias actuales…"
+              : action === "create-distinct" ? "Creando una obra distinta…"
+                : action === "create-detected" ? "Comprobando catálogo y creando obra…" : "Guardando vínculo…";
         }
         try {
           const response = await apiFetch(`/api/scanner/queue/${encodeURIComponent(fileId)}`, {
@@ -2936,15 +2989,25 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           if (response.status === 409 && payload.reason === "possible_duplicate") {
             scannerCreateConflicts.set(
               fileId,
-              (payload.candidates || []).map((candidate) => ({
-                ...candidate,
-                catalog_item_id: candidate.id || ""
-              }))
+              {
+                candidates: (payload.candidates || []).map((candidate) => ({
+                  ...candidate,
+                  catalog_item_id: candidate.id || ""
+                })),
+                reviewToken: payload.distinct_review_token || "",
+                draft: {
+                  title: body.title || "",
+                  year: body.year || "",
+                  kind: body.kind || "pelicula"
+                }
+              }
             );
             renderScannerQueueDetail();
             const conflictFeedback = fields.scannerQueueDetail.querySelector("#scannerReviewFeedback");
             if (conflictFeedback) {
-              conflictFeedback.textContent = "Encontramos una ficha existente. Comparala y vinculá el archivo; el catálogo no fue modificado.";
+              conflictFeedback.textContent = payload.distinct_review_token
+                ? "La comprobación encontró fichas parecidas. Vinculá la correcta o confirmá que querés conservar ambas; todavía no modificamos nada."
+                : "Encontramos una ficha existente. Comparala y vinculá el archivo; el catálogo no fue modificado.";
             }
             return;
           }
@@ -2959,10 +3022,12 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           setCurationFeedback(
             action === "ignore"
               ? `${affected > 1 ? `${affected} partes omitidas` : "Archivo omitido"}. No se eliminó nada del disco.`
-              : action === "create-detected"
+              : ["create-detected", "review-distinct", "create-distinct"].includes(action)
                 ? payload.catalog_action === "existing"
                   ? `La obra ya estaba en tu catálogo. ${linkedLabel} al inventario compartido.`
-                  : `Obra agregada a tu catálogo. ${linkedLabel} al inventario compartido.`
+                  : payload.catalog_action === "created_distinct"
+                    ? `Conservamos ambas obras. Nueva ficha creada y ${linkedLabel.toLowerCase()} con su identidad.`
+                    : `Obra agregada a tu catálogo. ${linkedLabel} al inventario compartido.`
                 : `${linkedLabel} al inventario compartido.`,
             "success"
           );
@@ -4017,7 +4082,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <h4>${escapeHtml(item.title || "Sin título")}</h4>
               <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(item.source)}</div>
               <div class="card-badges">
-                <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "en catálogo" : "fuera de catálogo"}</span>
+                <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "manual: sí" : "manual: no"}</span>
                 <span class="pill ${item.status === "watched" ? "good" : "muted"}">${item.status === "watched" ? "vista" : "pendiente"}</span>
               </div>
             </div>
@@ -4334,7 +4399,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <strong>${escapeHtml(item.title || "Sin título")}</strong>
             <small>${escapeHtml([item.year, item.kind, item.source].filter(Boolean).join(" · "))}</small>
             <div class="card-badges">
-              <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "en catálogo" : "fuera de catálogo"}</span>
+              <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "manual: sí" : "manual: no"}</span>
               <span class="pill ${item.local_files_count ? "good" : "muted"}">${item.local_files_count || 0} archivos</span>
             </div>
           </div>
@@ -4595,7 +4660,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           review: "Review",
           notes: "Notas",
           tags: "Etiquetas",
-          en_catalogo: "En catálogo",
+          en_catalogo: "Disponibilidad manual",
           local_files: "Archivos locales"
         }[key] || key;
       }
@@ -4611,7 +4676,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           openDetail(item.id, {
             context: {
               mode: "random",
-              label: fields.randomCatalogOnly.checked ? "Al azar · Catálogo" : "Al azar · Todo",
+              label: fields.randomCatalogOnly.checked ? "Al azar · Disponibles" : "Al azar · Todo",
               ids: candidates.map((candidate) => candidate.id)
             }
           });
@@ -4629,11 +4694,11 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function syncRandomControl() {
         const count = randomCandidates().length;
         const catalogOnly = fields.randomCatalogOnly.checked;
-        fields.randomScopeLabel.textContent = catalogOnly ? "Catálogo" : "Todo";
+        fields.randomScopeLabel.textContent = catalogOnly ? "Disponibles" : "Todo";
         fields.randomButton.disabled = count === 0;
         fields.randomButton.title = count
-          ? `Abrir una ficha al azar entre ${count} ${catalogOnly ? "entradas en catálogo" : "entradas"}`
-          : catalogOnly ? "No hay entradas en catálogo con los filtros actuales" : "No hay entradas disponibles";
+          ? `Abrir una ficha al azar entre ${count} ${catalogOnly ? "obras disponibles" : "obras"}`
+          : catalogOnly ? "No hay obras disponibles con los filtros actuales" : "No hay obras para elegir";
       }
 
       function changeRandomScope(source) {
@@ -4821,7 +4886,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (!item) {
           fields.spotlightStage.innerHTML = `<div class="spotlight-empty">
             <strong>La pantalla espera una obra disponible</strong>
-            <span>Marcá una entrada como “en catálogo” para encabezar la cartelera del día.</span>
+            <span>Vinculá un archivo o declará una obra disponible para encabezar la cartelera del día.</span>
           </div>`;
           return;
         }
@@ -5694,7 +5759,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       }
 
       function renderHeaderStats() {
-        fields.stats.textContent = `${catalogMetrics.total} obras · ${catalogMetrics.watched} vistas · ${catalogMetrics.catalogued} en catálogo`;
+        fields.stats.textContent = `${catalogMetrics.total} obras · ${catalogMetrics.watched} vistas · ${catalogMetrics.catalogued} disponibles`;
       }
 
       function catalogSummaryText(filtered) {
@@ -5760,7 +5825,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           : "";
         const accessibleStatus = fromCollection
           ? `en la colección ${collectionTitle}, disponible para agregar`
-          : `${watched ? "vista" : "pendiente"}, ${catalogued ? "en catálogo" : "fuera de catálogo"}, ${rating} puntos`;
+          : `${watched ? "vista" : "pendiente"}, ${catalogued ? "disponible" : "sin disponibilidad"}, ${rating} puntos`;
         const backMeta = [item.year, firstListValue(item.directors)].filter(Boolean).join(" · ") || "Ficha sin completar";
         return `<article class="card dvd-card${fromCollection ? " is-collection-entry" : ""}" data-click="${escapeAttr(action)}" data-id="${escapeAttr(actionId)}" data-key="${escapeAttr(entryKey)}">
           <div class="dvd-flipper" aria-hidden="true">
@@ -5780,7 +5845,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
                     <div class="dvd-front-statuses">
                       ${fromCollection
                         ? `<span class="dvd-front-status collection">Colección</span><span class="dvd-front-status pending">Por agregar</span>`
-                        : `<span class="dvd-front-status ${catalogued ? "catalogued" : "muted"}">${catalogued ? "Catálogo" : "No catálogo"}</span><span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>`}
+                        : `<span class="dvd-front-status ${catalogued ? "catalogued" : "muted"}">${catalogued ? "Disponible" : "No disponible"}</span><span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>`}
                     </div>
                   </div>
                 </div>
@@ -5799,7 +5864,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
                   <div class="dvd-back-statuses">
                     ${fromCollection
                       ? `<span class="active">En ${escapeHtml(collectionTitle)}</span><span>Fuera de tu catálogo</span><strong>Lista para revisar</strong>`
-                      : `<span class="${watched ? "active" : ""}">${watched ? "✓ Vista" : "Pendiente"}</span><span class="${catalogued ? "active" : ""}">${catalogued ? "En catálogo" : "Fuera"}</span><strong>${rating ? `${rating} pts` : "0 pts · Sin puntuar"}</strong>`}
+                      : `<span class="${watched ? "active" : ""}">${watched ? "✓ Vista" : "Pendiente"}</span><span class="${catalogued ? "active" : ""}">${catalogued ? "Disponible" : "No disponible"}</span><strong>${rating ? `${rating} pts` : "0 pts · Sin puntuar"}</strong>`}
                   </div>
                   <span class="dvd-back-hint">Click para abrir la ficha →</span>
                   <div class="dvd-barcode"><span></span><small>${escapeHtml(String(item.id || "movie-inbox").slice(0, 18))}</small></div>
@@ -6016,21 +6081,25 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function availabilityPanel(item) {
         const localText = localFilesText(item);
         const duplicates = Number(item._duplicate_count || 0);
-        const availability = item._availability || {};
-        const manual = availability.manual ?? isInCatalog(item.en_catalogo);
-        const server = Boolean(availability.server);
-        const sourceText = (availability.sources || [])
+        const state = availabilityState(item);
+        const sourceText = (state.details.sources || [])
           .map((source) => `${source.library_name} (${source.file_count})`)
           .join(" · ");
-        return `<dl class="availability-list">
-          <div><dt>En catálogo</dt><dd>${isInCatalog(item.en_catalogo) ? "Sí" : "No"}</dd></div>
-          <div><dt>Declaración personal</dt><dd>${manual ? "Sí" : "No"}</dd></div>
-          <div><dt>Servidor verificado</dt><dd>${server ? `${Number(availability.file_count || 0)} ${Number(availability.file_count || 0) === 1 ? "archivo" : "archivos"}` : "No"}</dd></div>
-          ${sourceText ? `<div><dt>Bibliotecas</dt><dd>${escapeHtml(sourceText)}</dd></div>` : ""}
-          ${localText ? `<div><dt>Archivos heredados</dt><dd>${escapeHtml(localText)}</dd></div>` : ""}
-          <div><dt>Fuente de metadata</dt><dd>${escapeHtml(item.source || "Sin fuente")}</dd></div>
-          ${duplicates ? `<div><dt>Duplicados</dt><dd>${escapeHtml(`${duplicates} coincidencia(s): ${item._duplicate_reason || "misma obra"}`)}</dd></div>` : ""}
-        </dl>`;
+        const fileLabel = `${state.fileCount} ${state.fileCount === 1 ? "archivo verificado" : "archivos verificados"}`;
+        return `<div class="availability-panel">
+          <dl class="availability-list">
+            <div><dt>Disponibilidad</dt><dd>${state.effective ? "Disponible" : "No disponible"} · ${escapeHtml(state.origin)}</dd></div>
+            <div><dt>Declaración manual</dt><dd>${state.manual ? "Activa" : "Inactiva"}</dd></div>
+            <div><dt>Inventario del servidor</dt><dd>${state.server ? fileLabel : "Sin archivos vinculados"}</dd></div>
+            ${sourceText ? `<div><dt>Bibliotecas</dt><dd>${escapeHtml(sourceText)}</dd></div>` : ""}
+            ${localText ? `<div><dt>Archivos heredados</dt><dd>${escapeHtml(localText)}</dd></div>` : ""}
+            <div><dt>Fuente de metadata</dt><dd>${escapeHtml(item.source || "Sin fuente")}</dd></div>
+            ${duplicates ? `<div><dt>Duplicados</dt><dd>${escapeHtml(`${duplicates} coincidencia(s): ${item._duplicate_reason || "misma obra"}`)}</dd></div>` : ""}
+          </dl>
+          <button class="drawer-secondary-action" type="button" data-click="toggle-catalog" data-id="${escapeAttr(item.id)}" aria-pressed="${state.manual}">
+            ${state.manual ? "Quitar declaración manual" : "Declarar disponibilidad manual"}
+          </button>
+        </div>`;
       }
 
       function openDetail(id, { updateHistory = true, context = null, skipGuard = false } = {}) {
@@ -6147,7 +6216,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const item = candidates[Math.floor(Math.random() * candidates.length)];
         requestDetailTransition(() => {
           detailNavigationIds = randomCandidates().map((candidate) => candidate.id);
-          detailNavigationLabel = fields.randomCatalogOnly.checked ? "Al azar · Catálogo" : "Al azar · Todo";
+          detailNavigationLabel = fields.randomCatalogOnly.checked ? "Al azar · Disponibles" : "Al azar · Todo";
           showDetailFromQueue(item.id);
         });
       }
@@ -6170,8 +6239,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         const subtitle = titleSubtitle(item);
         const summary = item.wikipedia_extract || item.description || item.notes || "";
         const watched = item.status === "watched";
-        const catalogued = isInCatalog(item.en_catalogo);
-        const manuallyCatalogued = item._availability?.manual ?? catalogued;
+        const availability = availabilityState(item);
         const metadataSection = detailPersonalEditing ? "" : `
           <details class="drawer-accordion drawer-editor">
             <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>
@@ -6189,13 +6257,13 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <div class="drawer-byline">${[item.year, firstListValue(item.directors), listText(item.genres, 2)].filter(Boolean).map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</div>
             </div>
           </section>
-          <section class="drawer-quick-actions" aria-label="Estado personal">
+          <section class="drawer-quick-actions" aria-label="Estado y disponibilidad">
             <button class="drawer-state ${watched ? "active" : ""}" type="button" data-click="toggle-watched" data-id="${escapeAttr(item.id)}" data-status="${escapeAttr(item.status || "to_watch")}" aria-pressed="${watched}">
               <span>Estado</span><strong>${watched ? "Vista" : "Pendiente"}</strong><small>${item.watched_at ? escapeHtml(item.watched_at) : "Sin fecha"}</small>
             </button>
-            <button class="drawer-state ${manuallyCatalogued ? "active" : ""}" type="button" data-click="toggle-catalog" data-id="${escapeAttr(item.id)}" aria-pressed="${manuallyCatalogued}">
-              <span>Declaración personal</span><strong>${manuallyCatalogued ? "Incluida" : "No incluida"}</strong><small>${item._availability?.server ? "Servidor disponible" : "Cambiar estado"}</small>
-            </button>
+            <div class="drawer-state ${availability.effective ? "active" : ""}">
+              <span>Disponibilidad</span><strong>${availability.effective ? "Disponible" : "No disponible"}</strong><small>${escapeHtml(availability.origin)}</small>
+            </div>
             <button class="drawer-state rating-state ${rating ? "active" : ""}" type="button" data-click="edit-personal" data-id="${escapeAttr(item.id)}">
               <span>Puntuación</span><strong>${rating ? `${rating}/10` : "Sin puntuar"}</strong><small>Editar registro</small>
             </button>
@@ -6223,7 +6291,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           <details class="drawer-accordion danger-zone">
             <summary><span>Mantenimiento</span><small>Acciones sensibles</small></summary>
             <div class="drawer-accordion-body">
-              <p>Eliminar quita esta entrada del catálogo editable. No borra archivos de video.</p>
+              <p>Eliminar quita esta ficha del catálogo personal. No borra videos ni el inventario del servidor; otra ficha equivalente puede conservar la disponibilidad.</p>
               <button class="danger" type="button" data-click="delete-item" data-id="${escapeAttr(item.id)}">Eliminar del catálogo</button>
             </div>
           </details>
@@ -6918,7 +6986,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <div class="card-badges">
               ${item._search?.reason ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(item._search))}</span>` : ""}
               <span class="pill ${hasExternalLink(item) ? "good" : "muted"}">${hasExternalLink(item) ? "con link" : "sin link"}</span>
-              <span class="pill ${isInCatalog(item.en_catalogo) ? "good" : "muted"}">${isInCatalog(item.en_catalogo) ? "catalogo: si" : "catalogo: no"}</span>
+              <span class="pill ${isInCatalog(item.en_catalogo) ? "good" : "muted"}">${isInCatalog(item.en_catalogo) ? "disponible: sí" : "disponible: no"}</span>
             </div>
             ${searchDescription(summary, "catalog", item.id)}
             <div class="result-actions">
@@ -7104,7 +7172,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           <div>
             <strong>${escapeHtml(candidate.title || "Sin titulo")}</strong>
             <div class="meta">
-              ${meta(candidate.year)}${meta(candidate.source)}${meta(firstListValue(candidate.genres))}${meta(firstListValue(candidate.directors))}${meta(isInCatalog(candidate.en_catalogo) ? "catalogo: si" : "catalogo: no")}
+              ${meta(candidate.year)}${meta(candidate.source)}${meta(firstListValue(candidate.genres))}${meta(firstListValue(candidate.directors))}${meta(isInCatalog(candidate.en_catalogo) ? "disponibilidad manual: sí" : "disponibilidad manual: no")}
             </div>
           </div>
           <div class="duplicate-actions">
@@ -7209,7 +7277,9 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         event.preventDefault();
         const item = items.find((entry) => entry.id === id);
         const title = item?.title || item?.local_name || "Sin título";
-        const confirmed = confirm(`¿Eliminar "${title}" del catálogo? Esta acción modifica los datos.`);
+        const confirmed = confirm(
+          `¿Eliminar "${title}" del catálogo personal?\n\nNo se borrarán videos ni el inventario del servidor.`
+        );
         if (!confirmed) return;
         const button = event.target.closest("[data-click='delete-item']");
         if (button) button.disabled = true;
@@ -7272,7 +7342,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         event.preventDefault();
         const item = items.find((entry) => entry.id === id);
         if (!item) return;
-        const manualValue = item._availability?.manual ?? isInCatalog(item.en_catalogo);
+        const manualValue = availabilityState(item).manual;
         const nextValue = !manualValue;
         const detailAction = selectedDetailId === id;
         if (detailAction) setDetailFeedback("Guardando disponibilidad…", "working", 0);
@@ -7531,6 +7601,24 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function isInCatalog(value) {
         return value === true || value === "si" || value === "sí" || value === "true";
+      }
+
+      function availabilityState(item) {
+        const details = item?._availability || {};
+        const manual = typeof details.manual === "boolean"
+          ? details.manual
+          : isInCatalog(item?.en_catalogo);
+        const server = Boolean(details.server);
+        const effective = typeof details.effective === "boolean"
+          ? details.effective
+          : Boolean(manual || server || isInCatalog(item?.en_catalogo));
+        const fileCount = Math.max(0, Number(details.file_count || 0));
+        const origin = server && manual
+          ? "Servidor y declaración manual"
+          : server
+            ? "Inventario del servidor"
+            : manual ? "Declaración manual" : "Sin procedencia asociada";
+        return { effective, manual, server, fileCount, origin, details };
       }
 
       function hasHost(url, host) {

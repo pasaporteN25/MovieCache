@@ -1849,6 +1849,8 @@
       .availability-list > div { display: grid; gap: 8px; grid-template-columns: 100px minmax(0, 1fr); }
       .availability-list dt { color: var(--muted); font-size: var(--text-label); font-weight: 800; text-transform: uppercase; }
       .availability-list dd { font-size: var(--text-meta); margin: 0; overflow-wrap: anywhere; }
+      .availability-panel { display: grid; gap: 12px; }
+      .availability-panel .drawer-secondary-action { justify-self: start; }
       .drawer-secondary-action { justify-self: start; width: auto; }
       .danger-zone { border-color: rgba(255, 102, 122, 0.48); }
       .danger-zone .drawer-accordion-body { background: rgba(255, 102, 122, 0.08); }
@@ -5413,6 +5415,15 @@
       .scanner-confirm-detected label { display: grid; gap: 5px; }
       .scanner-confirm-detected label > span { color: var(--muted); font-size: var(--text-label); font-weight: 800; }
       .scanner-confirm-detected button { width: auto; }
+      .scanner-create-guard {
+        border-top: 1px solid rgba(255, 190, 85, 0.55);
+        padding-top: 14px;
+      }
+      .scanner-create-guard.is-confirming {
+        background: rgba(255, 190, 85, 0.06);
+        padding: 12px;
+      }
+      .scanner-create-guard.is-confirming h4 { color: var(--text-gold-soft); }
       .scanner-case-actions {
         align-items: center;
         border-top: 1px solid var(--line);

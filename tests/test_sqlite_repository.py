@@ -254,23 +254,94 @@ class SqliteRepositoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "four-digit year"):
                 service.ensure_scanner_item({"title": "Arrival", "year": "unknown", "kind": "pelicula"})
 
-    def test_scanner_cannot_bypass_a_possible_duplicate(self) -> None:
+    def test_scanner_requires_the_current_review_token_to_keep_both_works(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
             repository.write([
                 normalize_item({"id": "once-upon", "title": "Once Upon a Time", "year": "2020"})
             ])
             service = CatalogService(repository)
-            payload = {"title": "Once Upon Time", "year": "2020", "kind": "pelicula"}
+            payload = {
+                "title": "Once Upon Time",
+                "year": "2020",
+                "kind": "pelicula",
+                "scanner_reference": "file-once-upon",
+            }
 
-            blocked, blocked_reason, _ = service.ensure_scanner_item(payload)
-            blocked_again, repeated_reason, _ = service.ensure_scanner_item(payload)
+            blocked, blocked_reason, review = service.ensure_scanner_item(payload)
+            blocked_without_intent, no_intent_reason, _ = service.ensure_scanner_item({
+                **payload,
+                "distinct_review_token": review["distinct_review_token"],
+            })
+            blocked_again, repeated_reason, repeated_review = service.ensure_scanner_item({
+                **payload,
+                "distinct_intent": True,
+                "distinct_review_token": "stale-token",
+            })
+            created, created_reason, created_result = service.ensure_scanner_item({
+                **payload,
+                "distinct_intent": True,
+                "distinct_review_token": repeated_review["distinct_review_token"],
+            })
+            retried, retry_reason, retry_result = service.ensure_scanner_item({
+                **payload,
+                "distinct_intent": True,
+                "distinct_review_token": repeated_review["distinct_review_token"],
+            })
 
             self.assertFalse(blocked)
             self.assertEqual(blocked_reason, "possible_duplicate")
+            self.assertTrue(review["distinct_review_token"])
+            self.assertFalse(blocked_without_intent)
+            self.assertEqual(no_intent_reason, "possible_duplicate")
             self.assertFalse(blocked_again)
             self.assertEqual(repeated_reason, "possible_duplicate")
-            self.assertEqual(len(repository.read()), 1)
+            self.assertEqual(review["distinct_review_token"], repeated_review["distinct_review_token"])
+            self.assertTrue(created)
+            self.assertEqual(created_reason, "created_distinct")
+            self.assertEqual(created_result["reviewed_candidate_ids"], ["once-upon"])
+            self.assertFalse(retried)
+            self.assertEqual(retry_reason, "existing")
+            self.assertEqual(retry_result["item"]["id"], created_result["item"]["id"])
+            rows = repository.read()
+            self.assertEqual(len(rows), 2)
+            distinct = next(item for item in rows if item.id != "once-upon")
+            self.assertEqual(distinct.duplicate_decisions["once-upon"]["status"], "not_duplicate")
+
+    def test_scanner_only_overrides_an_exact_match_after_distinct_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
+            repository.write([
+                normalize_item({"id": "heat-imdb", "title": "Heat", "year": "1995", "kind": "pelicula"})
+            ])
+            service = CatalogService(repository)
+            payload = {
+                "title": "Heat",
+                "year": "1995",
+                "kind": "pelicula",
+                "scanner_reference": "file-heat-copy",
+            }
+
+            reused, reused_reason, reused_result = service.ensure_scanner_item(payload)
+            blocked, blocked_reason, review = service.ensure_scanner_item({
+                **payload,
+                "distinct_intent": True,
+            })
+            created, created_reason, created_result = service.ensure_scanner_item({
+                **payload,
+                "distinct_intent": True,
+                "distinct_review_token": review["distinct_review_token"],
+            })
+
+            self.assertFalse(reused)
+            self.assertEqual(reused_reason, "existing")
+            self.assertEqual(reused_result["item"]["id"], "heat-imdb")
+            self.assertFalse(blocked)
+            self.assertEqual(blocked_reason, "possible_duplicate")
+            self.assertTrue(created)
+            self.assertEqual(created_reason, "created_distinct")
+            self.assertEqual(created_result["reviewed_candidate_ids"], ["heat-imdb"])
+            self.assertEqual(len(repository.read()), 2)
 
     def test_scanner_blocks_numeric_title_with_a_bad_legacy_year(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

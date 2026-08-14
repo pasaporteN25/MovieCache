@@ -1053,7 +1053,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 catalog = session_catalog(request)
                 write_path = write_path_for(catalog.config, "")
                 created, catalog_reason, catalog_result = catalog_service(write_path).ensure_scanner_item(
-                    body,
+                    {**body, "scanner_reference": file_id},
                     comparison_items=load_items(catalog.config.patterns),
                 )
                 if catalog_reason == "possible_duplicate":
@@ -1062,6 +1062,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
                             "ok": False,
                             "reason": catalog_reason,
                             "candidates": catalog.public_payload(catalog_result.get("candidates", [])),
+                            "distinct_review_token": str(
+                                catalog_result.get("distinct_review_token") or ""
+                            ),
                         },
                         status_code=409,
                     )
