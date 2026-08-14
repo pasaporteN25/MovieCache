@@ -93,8 +93,10 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   lectura antes de registrar una biblioteca. `extras` y `sample` se omiten por defecto;
   discos multipartes comparten identidad y decision sin perder sus archivos fisicos.
 - En la cola del Scanner, una candidata confirma solamente la identidad fisica. Un caso
-  sin coincidencia puede crear una obra pendiente en el catalogo personal del owner y
-  vincularla, comprobando antes coincidencias fuertes para evitar duplicados.
+  sin coincidencias puede crear una obra pendiente en el catalogo personal del owner y
+  vincularla. Una coincidencia revisable, incluso un titulo exacto con otro ano, bloquea
+  la creacion desde Scanner; una obra realmente distinta se agrega primero mediante el
+  flujo general del catalogo.
 - El inventario fisico pertenece a la instancia y aporta disponibilidad verificada a
   todos los catalogos sin exponer rutas a miembros. La declaracion manual permanece
   como una senal separada.

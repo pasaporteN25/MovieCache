@@ -78,7 +78,7 @@ from movie_inbox.application.member_service import (
 )
 from movie_inbox.application.privacy_service import PrivacyService, SharedCatalogUnavailable
 from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity
-from movie_inbox.domain.libraries import LibraryValidationError
+from movie_inbox.domain.libraries import LibraryValidationError, work_identity
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
@@ -1012,7 +1012,34 @@ def create_app(config: ViewerConfig) -> FastAPI:
     ) -> JSONResponse:
         require_owner(request)
         try:
-            if str(body.get("action") or "").strip().casefold() == "create":
+            action = str(body.get("action") or "").strip().casefold()
+            if action == "link_catalog":
+                catalog_item_id = str(body.get("catalog_item_id") or "").strip()
+                catalog = session_catalog(request)
+                catalog_item = next(
+                    (
+                        item
+                        for item in load_items(catalog.config.patterns)
+                        if str(item.get("id") or "") == catalog_item_id
+                    ),
+                    None,
+                )
+                if catalog_item is None:
+                    return error_response("catalog_item_not_found", 404)
+                item = library_service.review_file(
+                    file_id,
+                    {"action": "confirm", "identity": work_identity(catalog_item)},
+                )
+                return JSONResponse(
+                    {
+                        "ok": True,
+                        "reason": "scanner_item_linked_to_catalog",
+                        "item": item,
+                        "catalog_action": "existing",
+                        "catalog_item": catalog.public_payload(catalog_item),
+                    }
+                )
+            if action == "create":
                 scanner_item = next(
                     (
                         item
@@ -1027,7 +1054,6 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 write_path = write_path_for(catalog.config, "")
                 created, catalog_reason, catalog_result = catalog_service(write_path).ensure_scanner_item(
                     body,
-                    allow_possible_duplicates=bool(scanner_item.get("candidates")),
                     comparison_items=load_items(catalog.config.patterns),
                 )
                 if catalog_reason == "possible_duplicate":
@@ -1046,9 +1072,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
                     file_id,
                     {
                         "action": "confirm",
-                        "title": str(catalog_item.get("title") or ""),
-                        "year": str(catalog_item.get("year") or ""),
-                        "kind": str(catalog_item.get("kind") or "pelicula"),
+                        "identity": work_identity(catalog_item),
                     },
                 )
                 background_enrichment = "not_needed"

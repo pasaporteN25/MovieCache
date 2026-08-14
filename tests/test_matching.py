@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from movie_inbox.domain.catalog import external_source_name, title_match_key, trusted_external_url
+from movie_inbox.domain.catalog import (
+    external_source_name,
+    possible_duplicate_candidates,
+    title_match_key,
+    trusted_external_url,
+)
 from movie_inbox.domain.libraries import work_identity_key
 from movie_inbox.domain.matching import decide_match
 
@@ -42,6 +47,21 @@ class MatchingTests(unittest.TestCase):
                         candidate,
                     ).accepted
                 )
+
+    def test_exact_title_with_a_different_year_remains_a_review_candidate(self) -> None:
+        candidates = possible_duplicate_candidates(
+            [{"id": "legacy-1917", "title": "1917", "year": "1917", "kind": "pelicula"}],
+            {"title": "1917", "year": "2019", "kind": "pelicula"},
+        )
+
+        self.assertEqual([candidate["id"] for candidate in candidates], ["legacy-1917"])
+        self.assertEqual(candidates[0]["reason"], "exact_title_year_mismatch")
+
+        unrelated = possible_duplicate_candidates(
+            [{"id": "crash-1996", "title": "Crash", "year": "1996"}],
+            {"title": "Crush", "year": "2022"},
+        )
+        self.assertEqual(unrelated, [])
 
     def test_shared_external_identifier_is_strong_evidence(self) -> None:
         decision = decide_match(

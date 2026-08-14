@@ -83,6 +83,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let scannerQueueLoading = false;
       let scannerQueueFilter = "all";
       let scannerQueueQuery = "";
+      let scannerCreateConflicts = new Map();
       let mergeReview = null;
       let mergeContext = null;
       let mergeChoices = {};
@@ -1383,6 +1384,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (value.includes("Confirm the year")) return "Confirmá el año antes de crear la obra.";
         if (value.includes("valid four-digit year")) return "Ingresá un año válido de cuatro cifras.";
         if (value === "catalog_item_unavailable") return "La obra se guardó de forma incompleta. Actualizá la Bandeja antes de reintentar.";
+        if (value === "catalog_item_not_found") return "La ficha ya no está en tu catálogo. Actualizá la Bandeja y volvé a comparar.";
+        if (value.includes("not a scanner candidate")) return "Esa ficha ya no coincide con el archivo. Actualizá la Bandeja y revisá las candidatas.";
         return value && !value.startsWith("HTTP") ? value : "No pudimos completar la operación de biblioteca.";
       }
 
@@ -2597,6 +2600,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           const payload = await response.json();
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           scannerQueue = payload.items || [];
+          const queueIds = new Set(scannerQueue.map((item) => item.id));
+          scannerCreateConflicts = new Map(
+            [...scannerCreateConflicts].filter(([fileId]) => queueIds.has(fileId))
+          );
           curationCounts.scanner = Number(payload.count || scannerQueue.length);
           if (!scannerQueue.some((item) => item.id === selectedScannerItemId)) {
             selectedScannerItemId = scannerQueue[0]?.id || "";
@@ -2714,7 +2721,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       function renderScannerQueueDetail() {
         const item = scannerQueue.find((entry) => entry.id === selectedScannerItemId);
         if (!item) return;
-        const candidates = item.candidates || [];
+        const candidates = scannerCandidatesForItem(item);
         const parts = Array.isArray(item.parts) && item.parts.length ? item.parts : [{
           name: item.name,
           relative_path: item.relative_path,
@@ -2734,10 +2741,10 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} ${candidates.length === 1 ? "candidata" : "candidatas"}` : "Sin coincidencia"}</span>
           </header>
           <div class="scanner-scope-note" role="note">
-            <strong>${candidates.length ? "Elegir coincidencia" : "Nueva obra"}</strong>
+            <strong>${candidates.length ? "Vincular con una obra existente" : "Obra ausente del catálogo"}</strong>
             <span>${candidates.length
-              ? `Vincular una candidata identifica ${multipart ? "estas partes" : "este archivo"} dentro del inventario compartido sin copiar la obra a tu catálogo personal.`
-              : `Crear agrega la obra a tu catálogo personal y vincula ${multipart ? "estas partes" : "este archivo"} como disponibilidad física. No la marca como vista.`}</span>
+              ? `Elegí la ficha que representa ${multipart ? "estas partes" : "este archivo"}. Vincular sólo registra su disponibilidad física; no crea ni combina fichas.`
+              : `No encontramos una ficha compatible. Podés agregarla a tu catálogo personal y vincular ${multipart ? "estas partes" : "este archivo"} sin marcarla como vista.`}</span>
           </div>
           <dl class="scanner-file-facts">
             <div><dt>Biblioteca</dt><dd>${escapeHtml(item.library_name || "Biblioteca")}</dd></div>
@@ -2747,15 +2754,19 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           </dl>
           ${multipart ? `<section class="scanner-parts" aria-label="Partes detectadas"><strong>Archivos agrupados</strong><div>${parts.map((part, index) => `<div><span>${escapeHtml(part.part ? `Parte ${part.part}` : `Archivo ${index + 1}`)}</span><code>${escapeHtml(part.relative_path || part.name || "")}</code><small>${escapeHtml(formatImportBytes(part.size_bytes))}</small></div>`).join("")}</div></section>` : ""}
           ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${candidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}</section>` : ""}
-          <section class="scanner-confirm-detected">
-            <div><h4>${candidates.length ? "¿Ninguna coincide?" : "Crear obra desde el archivo"}</h4><p>Revisá la identidad antes de crearla. El año es obligatorio y el catálogo se comprueba otra vez para evitar duplicados.</p></div>
-            <form data-scanner-confirm-form>
-              <label><span>Título</span><input name="title" value="${escapeAttr(item.detected_title || "")}" maxlength="240" required></label>
-              <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(18|19|20|21)[0-9]{2}" maxlength="4" required></label>
-              <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === item.detected_kind ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
-              <button class="action-primary" type="submit" data-scanner-review="create-detected" data-file-id="${escapeAttr(item.id)}">Crear obra y vincular ${actionObject}</button>
-            </form>
-          </section>
+          ${candidates.length ? `
+            <section class="scanner-confirm-detected scanner-create-guard">
+              <div><h4>¿Es una obra distinta?</h4><p>El Scanner no crea una segunda ficha mientras haya coincidencias. Si ninguna corresponde, agregá primero la obra desde el buscador general y después aplicá un nuevo recorrido desde Bibliotecas.</p></div>
+            </section>` : `
+            <section class="scanner-confirm-detected">
+              <div><h4>Agregar al catálogo personal</h4><p>Esta acción crea una ficha pendiente y vincula su disponibilidad física. El año es obligatorio y el catálogo se comprueba nuevamente antes de escribir.</p></div>
+              <form data-scanner-confirm-form>
+                <label><span>Título</span><input name="title" value="${escapeAttr(item.detected_title || "")}" maxlength="240" required></label>
+                <label><span>Año</span><input name="year" value="${escapeAttr(item.detected_year || "")}" inputmode="numeric" pattern="(18|19|20|21)[0-9]{2}" maxlength="4" required></label>
+                <label><span>Tipo</span><select name="kind">${["pelicula", "serie", "anime", "documental"].map((kind) => `<option value="${kind}" ${kind === item.detected_kind ? "selected" : ""}>${importKindLabel(kind)}</option>`).join("")}</select></label>
+                <button class="action-primary" type="submit" data-scanner-review="create-detected" data-file-id="${escapeAttr(item.id)}">Agregar obra y vincular ${actionObject}</button>
+              </form>
+            </section>`}
           <footer class="scanner-case-actions">
             <div><strong>¿No pertenece al inventario?</strong><span>Omitir retira ${multipart ? "todas las partes" : "el archivo"} de esta cola mientras no cambien.</span></div>
             <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Omitir ${actionObject}</button>
@@ -2763,10 +2774,31 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           </footer>`;
       }
 
+      function scannerCandidatesForItem(item) {
+        const rows = [
+          ...(Array.isArray(item.candidates) ? item.candidates : []),
+          ...(scannerCreateConflicts.get(item.id) || [])
+        ];
+        const seen = new Set();
+        return rows.filter((candidate) => {
+          const identity = candidate.key
+            || candidate.catalog_item_id
+            || [candidate.id, normalizeText(candidate.title), candidate.year, candidate.kind].filter(Boolean).join(":");
+          if (!identity || seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        });
+      }
+
       function scannerCandidate(candidate, item, index) {
         const title = candidate.spanish_title || candidate.title || candidate.original_title || "Obra sin título";
         const aliases = scannerCandidateAliases(candidate, title);
         const links = scannerCandidateLinks(candidate);
+        const catalogItemId = candidate.catalog_item_id || "";
+        const action = catalogItemId ? "link-catalog" : "confirm-candidate";
+        const reference = catalogItemId
+          ? `data-catalog-item-id="${escapeAttr(catalogItemId)}"`
+          : `data-candidate-key="${escapeAttr(candidate.key || "")}"`;
         return `<article class="scanner-candidate-card">
           <header class="scanner-candidate-header">
             <div>
@@ -2774,7 +2806,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
               <strong>${escapeHtml(title)}</strong>
               <span>${escapeHtml(scannerCandidateReason(candidate.reason))} · ${escapeHtml(formatScannerScore(candidate.score))}</span>
             </div>
-            <button class="action-primary" type="button" data-scanner-review="confirm-candidate" data-candidate-key="${escapeAttr(candidate.key || "")}" data-file-id="${escapeAttr(selectedScannerItemId)}">Vincular ${Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "archivo"}</button>
+            <button class="action-primary" type="button" data-scanner-review="${action}" ${reference} data-file-id="${escapeAttr(selectedScannerItemId)}">Vincular ${Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "archivo"}</button>
           </header>
           <div class="scanner-field-comparison" role="table" aria-label="Comparación con ${escapeAttr(title)}">
             <div class="scanner-comparison-head" role="row"><span role="columnheader">Campo</span><span role="columnheader">Archivo</span><span role="columnheader">Obra candidata</span></div>
@@ -2869,10 +2901,16 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           if (!confirmed) return;
         }
         const body = {
-          action: action === "ignore" ? "ignore" : action === "create-detected" ? "create" : "confirm"
+          action: action === "ignore"
+            ? "ignore"
+            : action === "create-detected"
+              ? "create"
+              : action === "link-catalog" ? "link_catalog" : "confirm"
         };
         if (action === "confirm-candidate") {
           body.candidate_key = button.dataset.candidateKey || "";
+        } else if (action === "link-catalog") {
+          body.catalog_item_id = button.dataset.catalogItemId || "";
         } else if (action === "create-detected") {
           const form = button.closest("form");
           if (!form?.reportValidity()) return;
@@ -2895,7 +2933,23 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
             body: JSON.stringify(body)
           });
           const payload = await response.json();
+          if (response.status === 409 && payload.reason === "possible_duplicate") {
+            scannerCreateConflicts.set(
+              fileId,
+              (payload.candidates || []).map((candidate) => ({
+                ...candidate,
+                catalog_item_id: candidate.id || ""
+              }))
+            );
+            renderScannerQueueDetail();
+            const conflictFeedback = fields.scannerQueueDetail.querySelector("#scannerReviewFeedback");
+            if (conflictFeedback) {
+              conflictFeedback.textContent = "Encontramos una ficha existente. Comparala y vinculá el archivo; el catálogo no fue modificado.";
+            }
+            return;
+          }
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          scannerCreateConflicts.delete(fileId);
           const priorIndex = scannerQueue.findIndex((item) => item.id === fileId);
           await Promise.all([loadScannerQueue(), loadCatalog(), loadLibraries()]);
           selectedScannerItemId = scannerQueue[Math.min(priorIndex, scannerQueue.length - 1)]?.id || "";

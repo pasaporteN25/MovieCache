@@ -296,6 +296,40 @@ class ManagedLibraryTests(unittest.TestCase):
         )[0]
         self.assertTrue(decorated["_availability"]["server"])
 
+    def test_catalog_identity_can_link_a_year_mismatch_but_an_unrelated_work_cannot(self) -> None:
+        legacy = normalize_item({
+            "id": "legacy-1917",
+            "title": "1917",
+            "year": "1917",
+            "kind": "pelicula",
+            "imdb_url": "https://www.imdb.com/title/tt8579674/",
+        }).to_dict()
+        self.catalog_items = [legacy]
+        (self.media / "1917.2019.1080p.BluRay.mkv").write_bytes(b"numeric-title")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        pending = self.service.review_queue()[0]
+
+        with self.assertRaisesRegex(ValueError, "not a scanner candidate"):
+            self.service.review_file(
+                pending["id"],
+                {
+                    "action": "confirm",
+                    "identity": {"title": "Arrival", "year": "2016", "kind": "pelicula"},
+                },
+            )
+
+        reviewed = self.service.review_file(
+            pending["id"],
+            {"action": "confirm", "identity": legacy},
+        )
+
+        self.assertEqual(reviewed["state"], "matched")
+        self.assertEqual(self.service.review_queue(), [])
+        decorated = AvailabilityService(self.repository).decorate_items([legacy])[0]
+        self.assertTrue(decorated["_availability"]["server"])
+
     def test_disc_parts_share_one_review_decision_and_one_work_identity(self) -> None:
         film = self.media / "Once Upon a Time in America"
         film.mkdir()

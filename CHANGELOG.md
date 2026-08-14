@@ -13,8 +13,16 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 ### Corregido
 
 - Los títulos formados por años, como `1917`, `1984` y `2001: A Space Odyssey`, conservan
-  una identidad válida durante el matching. Crear desde el Scanner vuelve a comprobar
+  una identidad válida durante el matching. Agregar desde el Scanner vuelve a comprobar
   coincidencias fuertes y reutiliza la obra existente para no introducir duplicados.
+- El Scanner ya no usa la presencia previa de candidatas como permiso implícito para
+  crear otra ficha. Un título exacto con año diferente queda bloqueado para comparación
+  y una coincidencia descubierta en la comprobación final puede vincularse directamente.
+- La Bandeja distingue `Vincular` de `Agregar obra y vincular`: la segunda acción sólo
+  aparece cuando el catálogo no contiene ninguna coincidencia razonable.
+- Curaduría detecta el patrón heredado en el que un título numérico quedó guardado
+  también como año, para poder revisar casos como `1917 / 1917` frente a `1917 / 2019`
+  sin tratar como duplicados a todos los remakes con años diferentes.
 
 ## [0.2.1] - 2026-08-13
 

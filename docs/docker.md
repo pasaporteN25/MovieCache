@@ -148,10 +148,12 @@ permisos o una desaparicion masiva conservan el ultimo inventario valido.
 
 El scanner administrado vincula automaticamente las coincidencias fuertes y deja los
 titulos nuevos o dudosos en la Bandeja. Elegir una candidata solo confirma la identidad
-fisica. Si ninguna corresponde, `Crear obra y vincular` comprueba de nuevo el catalogo
-personal del owner, reutiliza una coincidencia fuerte si existe y, en caso contrario,
-crea una obra pendiente. La disponibilidad proviene del inventario compartido; no se
-marcan vistas ni se modifican rating o review.
+fisica. `Agregar obra y vincular` aparece solamente cuando no hay candidatas y comprueba
+de nuevo el catalogo personal antes de crear una obra pendiente. Un titulo exacto con
+otro ano tambien se considera una coincidencia revisable: el Scanner bloquea la nueva
+ficha y permite vincular la existente. Si se trata realmente de otra obra, se agrega
+primero desde el buscador general y luego se aplica un nuevo recorrido. La disponibilidad
+proviene del inventario compartido; no se marcan vistas ni se modifican rating o review.
 
 ### Reconciliar un inventario heredado
 
