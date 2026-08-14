@@ -304,6 +304,20 @@ class ManagedLibraryService:
                 candidate.pop("key", None)
                 candidate.pop("score", None)
                 selected_identity = candidate
+            elif isinstance(payload.get("identity"), Mapping):
+                selected_identity = work_identity(payload["identity"])
+                if not str(selected_identity.get("title") or "").strip():
+                    raise ValueError("Catalog item does not provide a recognizable identity")
+                if not str(selected_identity.get("year") or "").strip():
+                    raise ValueError("Confirm the year or choose an existing candidate")
+                detected = detected_work_identity(
+                    item.detected_title,
+                    item.detected_year,
+                    item.detected_kind,
+                )
+                decision = decide_match(selected_identity, detected)
+                if not decision.accepted and decision.score < 0.72:
+                    raise ValueError("Catalog item is not a scanner candidate")
             else:
                 selected_identity = detected_work_identity(
                     str(payload.get("title") or item.detected_title),

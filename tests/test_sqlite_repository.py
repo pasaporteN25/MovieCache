@@ -254,7 +254,7 @@ class SqliteRepositoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "four-digit year"):
                 service.ensure_scanner_item({"title": "Arrival", "year": "unknown", "kind": "pelicula"})
 
-    def test_scanner_review_can_reject_a_weak_candidate_and_create_the_work(self) -> None:
+    def test_scanner_cannot_bypass_a_possible_duplicate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
             repository.write([
@@ -264,16 +264,36 @@ class SqliteRepositoryTests(unittest.TestCase):
             payload = {"title": "Once Upon Time", "year": "2020", "kind": "pelicula"}
 
             blocked, blocked_reason, _ = service.ensure_scanner_item(payload)
-            created, created_reason, _ = service.ensure_scanner_item(
-                payload,
-                allow_possible_duplicates=True,
-            )
+            blocked_again, repeated_reason, _ = service.ensure_scanner_item(payload)
 
             self.assertFalse(blocked)
             self.assertEqual(blocked_reason, "possible_duplicate")
-            self.assertTrue(created)
-            self.assertEqual(created_reason, "created")
-            self.assertEqual(len(repository.read()), 2)
+            self.assertFalse(blocked_again)
+            self.assertEqual(repeated_reason, "possible_duplicate")
+            self.assertEqual(len(repository.read()), 1)
+
+    def test_scanner_blocks_numeric_title_with_a_bad_legacy_year(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
+            repository.write([
+                normalize_item({
+                    "id": "legacy-1917",
+                    "title": "1917",
+                    "year": "1917",
+                    "kind": "pelicula",
+                    "imdb_url": "https://www.imdb.com/title/tt8579674/",
+                })
+            ])
+
+            created, reason, result = CatalogService(repository).ensure_scanner_item(
+                {"title": "1917", "year": "2019", "kind": "pelicula"}
+            )
+
+            self.assertFalse(created)
+            self.assertEqual(reason, "possible_duplicate")
+            self.assertEqual(result["candidates"][0]["id"], "legacy-1917")
+            self.assertEqual(result["candidates"][0]["reason"], "exact_title_year_mismatch")
+            self.assertEqual(len(repository.read()), 1)
 
     def test_scanner_checks_read_only_catalog_sources_before_creating(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

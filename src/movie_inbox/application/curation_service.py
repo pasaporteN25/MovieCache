@@ -96,11 +96,20 @@ def _duplicate_evidence(left: Mapping[str, Any], right: Mapping[str, Any]) -> li
         evidence.append("Comparten el mismo enlace externo")
     left_titles = set(title_match_keys_for_item(left))
     right_titles = set(title_match_keys_for_item(right))
-    if left_titles & right_titles:
+    shared_titles = left_titles & right_titles
+    if shared_titles:
         left_year = str(left.get("year") or "")
         right_year = str(right.get("year") or "")
         if left_year and left_year == right_year:
             evidence.append(f"Comparten título normalizado y año {left_year}")
+        elif any(
+            len(title) == 4
+            and title.isdigit()
+            and title in {left_year, right_year}
+            and left_year != right_year
+            for title in shared_titles
+        ):
+            evidence.append("Una ficha parece usar el título numérico como año heredado")
         else:
             evidence.append("Comparten un título normalizado")
     return evidence or ["La similitud del catálogo requiere revisión manual"]

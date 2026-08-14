@@ -347,23 +347,53 @@ def possible_duplicate_candidates(items: list[Mapping[str, Any]], item: Mapping[
         existing_titles = title_match_keys_for_item(existing)
         existing_year = str(existing.get("year") or "")
         exact = bool(set(existing_titles) & set(item_titles))
-        similar = any(title_similarity(left, right) >= 0.75 for left in existing_titles for right in item_titles)
+        similarity = max(
+            (title_similarity(left, right) for left in existing_titles for right in item_titles),
+            default=0.0,
+        )
+        similar = similarity >= 0.75
         if not item_titles or not existing_titles or (not exact and not similar):
             continue
-        if item_year and existing_year and item_year != existing_year:
+        year_mismatch = bool(item_year and existing_year and item_year != existing_year)
+        if year_mismatch and not exact:
             continue
+        if exact and year_mismatch:
+            reason = "exact_title_year_mismatch"
+        elif exact and (not item_year or not existing_year):
+            reason = "exact_title_missing_year"
+        elif exact:
+            reason = "exact_title_year"
+        else:
+            reason = "similar_title_requires_review"
         candidates.append(
             {
                 "id": existing.get("id", ""),
                 "title": existing.get("title", ""),
+                "original_title": existing.get("original_title", ""),
+                "spanish_title": existing.get("spanish_title", ""),
+                "english_title": existing.get("english_title", ""),
+                "alternative_titles": existing.get("alternative_titles", []),
                 "year": existing.get("year", ""),
+                "kind": existing.get("kind", ""),
                 "source": existing.get("source", ""),
                 "url": existing.get("url", ""),
+                "wikipedia_url": existing.get("wikipedia_url", ""),
+                "imdb_url": existing.get("imdb_url", ""),
+                "filmaffinity_url": existing.get("filmaffinity_url", ""),
+                "wikidata_id": existing.get("wikidata_id", ""),
                 "en_catalogo": existing.get("en_catalogo", False),
-                "local_name": existing.get("local_name", ""),
+                "reason": reason,
+                "score": round(similarity, 3),
             }
         )
-    return candidates
+    return sorted(
+        candidates,
+        key=lambda candidate: (
+            str(candidate.get("reason") or "") == "exact_title_year",
+            float(candidate.get("score") or 0),
+        ),
+        reverse=True,
+    )
 
 
 def catalog_membership(item: Mapping[str, Any], items: list[Mapping[str, Any]]) -> dict[str, Any]:
@@ -396,6 +426,7 @@ def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
         return
     parents = list(range(len(items)))
     owners: dict[str, int] = {}
+    numeric_title_indexes: dict[str, list[int]] = {}
 
     def root(index: int) -> int:
         while parents[index] != index:
@@ -423,10 +454,23 @@ def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
         item["_curation_ref"] = curation_item_reference(item)
         keys = [f"url:{url}" for url in sorted(external_urls(item))]
         year = str(item.get("year") or "").strip()
+        title_keys = title_match_keys_for_item(item)
         if year:
-            keys.extend(f"title-year:{title}:{year}" for title in title_match_keys_for_item(item))
+            keys.extend(f"title-year:{title}:{year}" for title in title_keys)
+        for title in title_keys:
+            if re.fullmatch(r"(?:19|20)\d{2}", title):
+                numeric_title_indexes.setdefault(title, []).append(index)
         for key in keys:
             union(index, owners[key]) if key in owners else owners.setdefault(key, index)
+
+    # Old scanner imports could mistake a numeric title (for example "1917")
+    # for its release year. Surface only that narrow legacy pattern for review;
+    # ordinary remakes with the same title and different years stay separate.
+    for title, indexes in numeric_title_indexes.items():
+        years = {str(items[index].get("year") or "").strip() for index in indexes}
+        if len(indexes) > 1 and title in years and any(year and year != title for year in years):
+            for index in indexes[1:]:
+                union(indexes[0], index)
 
     groups: dict[int, list[int]] = {}
     for index in range(len(items)):

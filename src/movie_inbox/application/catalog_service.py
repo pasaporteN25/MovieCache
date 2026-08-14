@@ -126,10 +126,9 @@ class CatalogService:
         self,
         payload: Mapping[str, Any],
         *,
-        allow_possible_duplicates: bool = False,
         comparison_items: list[Mapping[str, Any]] | None = None,
     ) -> tuple[bool, str, dict[str, Any]]:
-        """Create a detected work or reuse one strong personal-catalog match."""
+        """Create a detected work only when no personal-catalog match needs review."""
         title = str(payload.get("title") or "").strip()
         year = str(payload.get("year") or "").strip()
         kind = normalize_kind(payload.get("kind"))
@@ -192,7 +191,7 @@ class CatalogService:
                     {"candidates": [_scanner_catalog_candidate(item) for item, _ in accepted[:5]]},
                 )
             candidates = possible_duplicate_candidates(match_items, candidate)
-            if candidates and not allow_possible_duplicates:
+            if candidates:
                 return False, (False, "possible_duplicate", {"candidates": candidates[:5]})
             items.insert(0, candidate)
             return True, (True, "created", {"item": candidate.to_dict(), "writable": True})
