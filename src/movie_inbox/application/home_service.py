@@ -40,9 +40,9 @@ class EditorialHomeService:
         featured = self._featured(catalog, seed, used_ids)
         sections: list[dict[str, Any]] = []
 
+        # Reserve anniversary works before other programs, then present the
+        # small, date-specific shelf at the end of the daily lineup.
         anniversary = self._anniversary_section(catalog, day, seed, used_ids)
-        if anniversary:
-            sections.append(anniversary)
 
         available = self._available_section(catalog, seed, used_ids)
         if available:
@@ -64,6 +64,9 @@ class EditorialHomeService:
             recent = self._recent_section(catalog, used_ids)
             if recent:
                 sections.append(recent)
+
+        if anniversary:
+            sections.append(anniversary)
 
         return {
             "generated_for": day,
@@ -91,6 +94,66 @@ class EditorialHomeService:
         if parsed.isoformat() != requested:
             raise ValueError("invalid_home_date")
         return requested
+
+    @staticmethod
+    def featured_snapshot(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+        """Keep only stable catalog references and the reason shown that day."""
+        featured = payload.get("featured")
+        if not isinstance(featured, list):
+            return []
+        snapshot: list[dict[str, Any]] = []
+        for entry in featured[:HOME_FEATURED_LIMIT]:
+            if not isinstance(entry, Mapping):
+                continue
+            item = entry.get("item")
+            origin = entry.get("origin")
+            reason = entry.get("reason")
+            if not isinstance(item, Mapping) or not isinstance(origin, Mapping):
+                continue
+            item_id = str(origin.get("item_id") or item.get("id") or "").strip()
+            if not item_id:
+                continue
+            snapshot.append(
+                {
+                    "item_id": item_id,
+                    "reason": {
+                        key: str((reason or {}).get(key) or "")
+                        for key in ("code", "label", "detail")
+                    } if isinstance(reason, Mapping) else {},
+                }
+            )
+        return snapshot
+
+    @staticmethod
+    def restore_featured_snapshot(
+        snapshot: Sequence[Mapping[str, Any]],
+        catalog_items: Sequence[Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Hydrate a saved order with current catalog metadata and availability."""
+        by_id = {
+            str(item.get("id") or ""): item
+            for item in catalog_items
+            if str(item.get("id") or "")
+        }
+        restored: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for row in snapshot[:HOME_FEATURED_LIMIT]:
+            item_id = str(row.get("item_id") or "").strip()
+            item = by_id.get(item_id)
+            if item is None or item_id in seen:
+                continue
+            reason = row.get("reason") if isinstance(row.get("reason"), Mapping) else {}
+            restored.append(
+                _catalog_entry(
+                    item,
+                    {
+                        key: str(reason.get(key) or "")
+                        for key in ("code", "label", "detail")
+                    },
+                )
+            )
+            seen.add(item_id)
+        return restored
 
     def _featured(
         self,

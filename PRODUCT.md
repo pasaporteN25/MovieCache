@@ -116,6 +116,9 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   disponibles, obras faltantes de colecciones seguidas, recuerdos personales por
   completar y rutas por director, genero o decada. La seleccion usa exclusivamente
   datos locales, evita repetir obras y no reemplaza la accion separada `Random`.
+- La cartelera conserva para cada usuario su seleccion destacada de hoy y ayer. Cambiar
+  de jornada reemplaza la misma marquesina; no duplica obras ni altera el catalogo.
+  Las efemerides se presentan al final de la programacion editorial por su menor densidad.
 - Los accesos editoriales hacia `Coleccion` conservan su criterio mediante filtros
   enlazables. Distintas facetas se combinan por interseccion y varios valores de una
   misma faceta por union; la URL, los chips y Atras/Adelante representan el mismo estado.

@@ -220,7 +220,7 @@ class IdentityTests(unittest.TestCase):
                 tables = {row[0] for row in connection.execute(
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 )}
-            self.assertEqual(versions, [1, 2, 3, 4, 5])
+            self.assertEqual(versions, [1, 2, 3, 4, 5, 6])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
@@ -232,6 +232,7 @@ class IdentityTests(unittest.TestCase):
             self.assertIn("collection_follows", tables)
             self.assertIn("import_drafts", tables)
             self.assertIn("import_draft_items", tables)
+            self.assertIn("home_featured_snapshots", tables)
 
     def test_privacy_and_archival_are_reversible_without_losing_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

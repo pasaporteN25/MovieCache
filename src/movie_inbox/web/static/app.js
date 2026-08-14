@@ -117,6 +117,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
       let catalogVisibleCount = 36;
       let externalHealth = { sources: {}, cache: {} };
       let editorialHome = { generated_for: "", featured: [], hero: null, sections: [], warnings: [] };
+      const editorialFeaturedCache = new Map();
       let spotlightIndex = 0;
       let imageCacheStatus = null;
       let imageCacheStatusLoading = false;
@@ -218,6 +219,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         collectionView: document.querySelector("#collectionView"),
         adminView: document.querySelector("#adminView"),
         homeDate: document.querySelector("#homeDate"),
+        homeDateToday: document.querySelector("#homeDateToday"),
+        homeDateYesterday: document.querySelector("#homeDateYesterday"),
         homeSections: document.querySelector("#homeSections"),
         homeFeedback: document.querySelector("#homeFeedback"),
         homeEmpty: document.querySelector("#homeEmpty"),
@@ -694,6 +697,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           "spotlight-previous": () => moveSpotlight(-1, "spotlight-previous"),
           "spotlight-next": () => moveSpotlight(1, "spotlight-next"),
           "spotlight-select": () => selectSpotlight(Number(target.dataset.index || 0), true),
+          "home-date-today": () => loadEditorialFeaturedDate(todayLocalDate()),
+          "home-date-yesterday": () => loadEditorialFeaturedDate(localDateOffset(-1)),
           "home-empty-catalog": goToCollectionRoot,
           "home-empty-import": goToImports,
           "home-empty-club": goToClub,
@@ -1821,6 +1826,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
         items = payload.items || [];
         editorialHome = normalizeEditorialHome(payload.home);
+        editorialFeaturedCache.clear();
+        rememberEditorialFeatured(editorialHome);
         prepareCatalogViewModel();
         editorialRevision += 1;
         sourceFiles = payload.sources || [];
@@ -4849,7 +4856,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function normalizeEditorialHome(payload) {
         if (!payload || typeof payload !== "object") {
-          return { generated_for: todayLocalDate(), featured: [], hero: null, sections: [], warnings: [] };
+          return {
+            generated_for: todayLocalDate(),
+            featured: [],
+            hero: null,
+            sections: [],
+            warnings: [],
+            featured_source: ""
+          };
         }
         const featured = Array.isArray(payload.featured)
           ? payload.featured.filter((entry) => entry && typeof entry === "object").slice(0, 4)
@@ -4859,7 +4873,8 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           featured,
           hero: featured[0] || null,
           sections: Array.isArray(payload.sections) ? payload.sections : [],
-          warnings: Array.isArray(payload.warnings) ? payload.warnings : []
+          warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+          featured_source: String(payload.featured_source || "")
         };
       }
 
@@ -4871,11 +4886,15 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
         fields.homeSections.hidden = !hasSections;
         fields.homeDate.dateTime = editorialHome.generated_for || "";
         fields.homeDate.textContent = homeDateLabel(editorialHome.generated_for);
+        syncHomeDateControl();
         const collectionsUnavailable = editorialHome.warnings.includes("collections_unavailable");
-        fields.homeFeedback.hidden = !collectionsUnavailable;
+        const historyUnavailable = editorialHome.warnings.includes("home_history_unavailable");
+        fields.homeFeedback.hidden = !(collectionsUnavailable || historyUnavailable);
         fields.homeFeedback.innerHTML = collectionsUnavailable
           ? `Las colecciones seguidas no respondieron. Tu programación personal sigue disponible. <button type="button" data-click="refresh-home">Reintentar</button>`
-          : "";
+          : historyUnavailable
+            ? `No pudimos guardar el historial de la cartelera. Las recomendaciones de hoy siguen disponibles. <button type="button" data-click="refresh-home">Reintentar</button>`
+            : "";
       }
 
       function renderEditorialHero() {
@@ -5017,10 +5036,87 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           day: "numeric",
           month: "long"
         }).format(parsed);
-        return `Hoy · ${label}`;
+        const prefix = value === localDateOffset(-1)
+          ? "Ayer"
+          : value === todayLocalDate() ? "Hoy" : "Archivo";
+        return `${prefix} · ${label}`;
+      }
+
+      function rememberEditorialFeatured(payload) {
+        const date = String(payload?.generated_for || "");
+        if (!date) return;
+        editorialFeaturedCache.set(date, {
+          featured: Array.isArray(payload.featured) ? payload.featured : [],
+          featured_source: String(payload.featured_source || "")
+        });
+      }
+
+      function syncHomeDateControl() {
+        const selected = editorialHome.generated_for || todayLocalDate();
+        fields.homeDateToday.setAttribute("aria-pressed", String(selected === todayLocalDate()));
+        fields.homeDateYesterday.setAttribute("aria-pressed", String(selected === localDateOffset(-1)));
+      }
+
+      function applyEditorialFeaturedDate(localDate, snapshot) {
+        const featured = Array.isArray(snapshot.featured) ? snapshot.featured : [];
+        editorialHome = {
+          ...editorialHome,
+          generated_for: localDate,
+          featured,
+          hero: featured[0] || null,
+          featured_source: String(snapshot.featured_source || "")
+        };
+        spotlightIndex = 0;
+        renderEditorialHero();
+        fields.homeDate.dateTime = localDate;
+        fields.homeDate.textContent = homeDateLabel(localDate);
+        syncHomeDateControl();
+      }
+
+      async function loadEditorialFeaturedDate(localDate, options = {}) {
+        const requestedDate = String(localDate || "");
+        if (!requestedDate || (requestedDate === editorialHome.generated_for && !options.force)) return;
+        const cached = !options.force ? editorialFeaturedCache.get(requestedDate) : null;
+        if (cached) {
+          applyEditorialFeaturedDate(requestedDate, cached);
+          return;
+        }
+        const isYesterday = requestedDate === localDateOffset(-1);
+        fields.homeDateToday.disabled = true;
+        fields.homeDateYesterday.disabled = true;
+        fields.spotlight.setAttribute("aria-busy", "true");
+        fields.homeFeedback.hidden = false;
+        fields.homeFeedback.textContent = isYesterday
+          ? "Recuperando las recomendaciones guardadas de ayer…"
+          : "Actualizando las recomendaciones de hoy…";
+        try {
+          const snapshotQuery = isYesterday ? "&saved_featured=true" : "";
+          const response = await apiFetch(`/api/home?date=${encodeURIComponent(requestedDate)}${snapshotQuery}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          const normalized = normalizeEditorialHome(payload);
+          rememberEditorialFeatured(normalized);
+          applyEditorialFeaturedDate(requestedDate, normalized);
+          fields.homeFeedback.hidden = true;
+          fields.homeFeedback.textContent = "";
+        } catch (error) {
+          const retryAction = isYesterday ? "home-date-yesterday" : "home-date-today";
+          fields.homeFeedback.hidden = false;
+          fields.homeFeedback.innerHTML = `No pudimos recuperar esas recomendaciones. <button type="button" data-click="${retryAction}">Reintentar</button>`;
+        } finally {
+          fields.homeDateToday.disabled = false;
+          fields.homeDateYesterday.disabled = false;
+          fields.spotlight.setAttribute("aria-busy", "false");
+        }
       }
 
       async function refreshEditorialHome() {
+        const requestedDate = editorialHome.generated_for || todayLocalDate();
+        if (requestedDate !== todayLocalDate()) {
+          editorialFeaturedCache.delete(requestedDate);
+          await loadEditorialFeaturedDate(requestedDate, { force: true });
+          return;
+        }
         fields.homeView.setAttribute("aria-busy", "true");
         fields.homeFeedback.hidden = false;
         fields.homeFeedback.textContent = "Actualizando la programación…";
@@ -5029,6 +5125,7 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
           const payload = await response.json();
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           editorialHome = normalizeEditorialHome(payload);
+          rememberEditorialFeatured(editorialHome);
           editorialRevision += 1;
           renderEditorialHome();
           lastEditorialRenderRevision = editorialRevision;
@@ -7676,6 +7773,14 @@ const API_TOKEN = document.querySelector('[name="movie-inbox-token"]').content;
 
       function todayLocalDate() {
         const date = new Date();
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        return date.toISOString().slice(0, 10);
+      }
+
+      function localDateOffset(offset) {
+        const date = new Date();
+        date.setHours(12, 0, 0, 0);
+        date.setDate(date.getDate() + Number(offset || 0));
         date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
         return date.toISOString().slice(0, 10);
       }

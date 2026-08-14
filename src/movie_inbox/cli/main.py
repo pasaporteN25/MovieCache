@@ -15,6 +15,7 @@ from movie_inbox.cli import (
     match_external_links,
     migrate,
     scan_library,
+    search_lab,
 )
 from movie_inbox.web import server
 
@@ -31,6 +32,7 @@ COMMANDS: dict[str, tuple[Command, str]] = {
     "db": (database.main, "Import, export and inspect SQLite catalogs."),
     "cache": (cache.main, "Inspect, prune or clear the image cache."),
     "backup": (backup.main, "Create and verify persistent instance backups."),
+    "search-lab": (search_lab.main, "Measure search quality without changing a catalog."),
 }
 
 
@@ -53,7 +55,7 @@ def print_help() -> None:
     print("usage: movie-inbox <command> [options]\n")
     print("commands:")
     for name, (_, description) in COMMANDS.items():
-        print(f"  {name:<8} {description}")
+        print(f"  {name:<10} {description}")
     print("\nRun movie-inbox <command> --help for command-specific options.")
 
 

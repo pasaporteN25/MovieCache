@@ -219,6 +219,38 @@
         text-align: right;
         text-transform: uppercase;
       }
+      .spotlight-date-control {
+        align-items: end;
+        display: grid;
+        gap: 4px;
+        justify-items: end;
+      }
+      .spotlight-date-tabs {
+        border: 1px solid rgba(120, 92, 255, 0.5);
+        display: inline-grid;
+        grid-template-columns: repeat(2, minmax(48px, 1fr));
+      }
+      .spotlight-date-tabs button {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        color: var(--muted);
+        font-size: var(--text-caption);
+        min-height: 28px;
+        padding: 4px 9px;
+        width: auto;
+      }
+      .spotlight-date-tabs button + button {
+        border-left: 1px solid rgba(120, 92, 255, 0.5);
+      }
+      .spotlight-date-tabs button[aria-pressed="true"] {
+        background: rgba(34, 216, 229, 0.14);
+        color: var(--teal);
+      }
+      .spotlight-date-tabs button:disabled {
+        cursor: wait;
+        opacity: 0.62;
+      }
       .spotlight-stage { position: relative; }
       .spotlight-viewport { aspect-ratio: 16 / 5.25; min-height: 260px; position: relative; }
       .spotlight-empty {
@@ -4534,7 +4566,8 @@
         .spotlight-copy strong { font-size: clamp(28px, 10vw, 44px); }
         .spotlight-copy p { font-size: var(--text-meta); line-height: 1.35; }
         .spotlight-cta { min-height: 44px; }
-        .spotlight-date { max-width: 116px; }
+        .spotlight-date-control,
+        .spotlight-date { max-width: 122px; }
         .search-main,
         .search-main:not(:has(#clearManualSearch:not([hidden]))),
         .collection-view.is-compare-mode .search-main { grid-template-columns: 1fr 1fr; }
@@ -4703,6 +4736,15 @@
         }
       }
       @media (max-width: 440px) {
+        .spotlight-bar { align-items: start; flex-wrap: wrap; gap: 8px; }
+        .spotlight-date-control {
+          align-items: center;
+          grid-template-columns: auto minmax(0, 1fr);
+          max-width: none;
+          width: 100%;
+        }
+        .spotlight-date-tabs button { min-height: 44px; }
+        .spotlight-date { max-width: none; }
         .search-main,
         .search-main:not(:has(#clearManualSearch:not([hidden]))),
         .collection-view.is-compare-mode .search-main { grid-template-columns: 1fr 1fr; }
@@ -4720,6 +4762,7 @@
         .drawer-navigation-counter { font-size: var(--text-label); }
       }
       @media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
+        .spotlight-date-tabs button { min-height: 44px; }
         main {
           padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
           padding-left: max(14px, env(safe-area-inset-left, 0px));

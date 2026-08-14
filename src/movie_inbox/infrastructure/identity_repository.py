@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
 
-INSTANCE_SCHEMA_VERSION = 5
+INSTANCE_SCHEMA_VERSION = 6
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -273,11 +273,24 @@ CREATE INDEX ix_library_files_availability
 ON library_files(available, state, work_key);
 """
 
+INSTANCE_SCHEMA_V6 = """
+CREATE TABLE home_featured_snapshots (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    local_date TEXT NOT NULL,
+    entries_json TEXT NOT NULL DEFAULT '[]',
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, local_date)
+);
+CREATE INDEX ix_home_featured_snapshots_user_date
+ON home_featured_snapshots(user_id, local_date DESC);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
     4: ("bounded user import drafts", INSTANCE_SCHEMA_V4),
     5: ("managed media libraries and shared availability", INSTANCE_SCHEMA_V5),
+    6: ("daily featured recommendation snapshots", INSTANCE_SCHEMA_V6),
 }
 
 
