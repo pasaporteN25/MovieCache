@@ -4,6 +4,29 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Cambiado
+
+- La cabecera separa navegación, descubrimiento y cuenta: `Inicio`, `Colección`,
+  `Bandeja` y `Club` son destinos; `Al azar` queda como comando y su alcance se
+  configura desde el menú de cuenta.
+- El visor precalcula métricas y documentos de búsqueda al cargar el catálogo y evita
+  reconstruir la grilla o el Inicio editorial cuando su contenido visible no cambió.
+- Se incorporaron tokens semánticos para superficies, texto, acciones, radios y escala
+  tipográfica, con un piso de 10 px para etiquetas técnicas.
+
+### Corregido
+
+- Las acciones rosas alcanzan contraste AA con tinta oscura y el título conserva una
+  alternativa visible en el modo de alto contraste de Windows.
+- Las listas dinámicas dejaron de anunciar paneles completos a lectores de pantalla;
+  el diálogo de descripción ahora posee nombre, descripción y retorno de foco.
+- El retrato decorativo del carnet de acceso ya no crea un landmark vacío.
+
+### Pruebas
+
+- Se agregó un smoke de Chromium para navegación por teclado, semántica de diálogos,
+  targets táctiles y ausencia de overflow en escritorio y móvil.
+
 ## [0.2.0-rc2] - 2026-08-13
 
 ### Agregado

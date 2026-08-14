@@ -541,7 +541,15 @@ Si Windows bloquea la ejecucion de scripts, se puede habilitar solamente para es
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\scripts\check.ps1"
 ```
 
-En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/workflows/tests.yml` corre la misma validacion en Linux/Python 3.11 y Windows/Python 3.14 en cada push a `master` y en cada pull request. Un job adicional construye el wheel, lo instala en un entorno limpio, ejecuta `movie-inbox --help`, carga HTML/CSS/JS desde el paquete y consulta `/healthz` sobre una instancia real. CI valida una revision; no despliega ni accede al catalogo personal.
+En Linux o en el servidor se usa `bash scripts/check.sh`. El workflow `.github/workflows/tests.yml` corre la misma validacion en Linux/Python 3.11 y Windows/Python 3.14 en cada push a `master` y en cada pull request. Jobs adicionales construyen el wheel en un entorno limpio y prueban en Chromium el acceso autenticado, el teclado, los dialogos y los viewports de escritorio y movil. CI valida una revision; no despliega ni accede al catalogo personal.
+
+La prueba de navegador es opcional en desarrollo porque descarga Chromium:
+
+```powershell
+py -m pip install -e ".[test,browser-test]"
+py -m playwright install chromium
+py -m unittest discover -s tests/browser -p "test_*.py" -v
+```
 
 ## Despliegue en servidor
 

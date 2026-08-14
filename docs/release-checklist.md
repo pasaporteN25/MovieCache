@@ -84,6 +84,8 @@ Usar siempre la biblioteca descartable preparada para este gate.
 ## 7. Criterio de salida
 
 - Suite local y CI en verde.
+- Job `Chromium / accessible responsive shell` en verde para teclado, diálogo de
+  descripción, targets táctiles y overflow en 1280 px y 390 px.
 - Sin perdida de inventario ante offline, permisos o reinicio.
 - Rutas y fingerprints visibles solamente para el owner.
 - Backup completo con checksum verificable y restauracion de `instance.db` ensayada.

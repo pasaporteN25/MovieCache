@@ -11,7 +11,9 @@ colors:
   night-shelf: "#11152a"
   case-blue: "#191d38"
   screen-white: "#f5f3ff"
+  ink-on-signal: "#080a18"
   dusty-lavender: "#a7aac7"
+  action-violet: "#c247ff"
   soft-signal-line: "rgba(139, 124, 255, 0.34)"
   projection-panel: "rgba(17, 21, 42, 0.9)"
   control-background: "#0c1025"
@@ -42,6 +44,14 @@ typography:
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: "0"
+  control:
+    fontSize: "14px"
+  small:
+    fontSize: "13px"
+  meta:
+    fontSize: "12px"
+  caption:
+    fontSize: "11px"
   label:
     fontFamily: '"Courier New", monospace'
     fontSize: "10px"
@@ -66,7 +76,7 @@ spacing:
 components:
   button-primary:
     backgroundColor: "{colors.playhead-pink}"
-    textColor: "{colors.screen-white}"
+    textColor: "{colors.ink-on-signal}"
     typography: "{typography.body}"
     rounded: "{rounded.control}"
     padding: "8px 10px"
@@ -217,7 +227,9 @@ Los bordes son finos, violetas o cyan según contexto. Las barras laterales de c
 - **Error / Disabled:** advertencia dorada para problemas recuperables; menor contraste para deshabilitado sin perder legibilidad.
 
 ### Navigation
-- Grupo rectangular y compacto con fondo translúcido, borde violeta y separación mínima. El estado activo usa tinta cyan y un relleno tonal; Random usa dorado porque representa una excepción de descubrimiento.
+- `Inicio`, `Colección`, `Bandeja` y `Club` forman el único grupo de navegación primaria. El estado activo usa tinta cyan y un relleno tonal.
+- `Al azar` es un comando dorado separado de los destinos; su alcance vive dentro del menú de cuenta junto con preferencias y administración. En móvil, las cuatro vistas ocupan la barra inferior y las utilidades permanecen en la cabecera.
+- El rosa de acción usa tinta `ink-on-signal`; nunca texto blanco sobre Playhead Pink para tamaños normales.
 
 ### Spotlight
 - Marquesina panorámica con imagen real, gradientes de legibilidad, título condensado y CTA magenta. Debe poder pausarse y reducir protagonismo cuando el usuario entra en una tarea operativa.
