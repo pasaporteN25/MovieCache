@@ -4,7 +4,7 @@ Gestor self-hosted para organizar obras, disponibilidad fisica y memoria persona
 
 ## Estado del proyecto
 
-La version candidata actual es **v0.2.0-rc2**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+La version estable actual es **v0.2.1**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
 
 En una instalacion nueva, SQLite es la fuente de verdad recomendada. JSON conserva un contrato versionado como formato de importacion, exportacion y auditoria, pero una exportacion individual no reemplaza el backup completo de la instancia. Catalogos, cuentas, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
 
@@ -616,4 +616,4 @@ La aplicacion web, SQLite, Docker, la Bandeja y el scanner administrado son el c
 - wrappers historicos de `scripts/`
 - extension de Chrome basada en exportaciones manuales
 
-Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras, no capacidades de v0.2.0-rc2.
+Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras, no capacidades de v0.2.1.

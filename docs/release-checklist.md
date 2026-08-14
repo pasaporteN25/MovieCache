@@ -1,6 +1,6 @@
 # Gate de release
 
-Este gate prepara `v0.2.0-rc2` sin agregar capacidades. Combina pruebas automaticas
+Este gate prepara `v0.2.1` sin agregar capacidades. Combina pruebas automaticas
 con una aceptacion manual sobre una biblioteca descartable. Nunca se ejecuta por primera
 vez contra la unica copia de un catalogo o un disco sin backup.
 
