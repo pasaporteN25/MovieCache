@@ -273,9 +273,16 @@ def title_match_key(value: str) -> str:
     value = unicodedata.normalize("NFKD", html.unescape(value).lower())
     value = "".join(character for character in value if not unicodedata.combining(character))
     value = re.sub(r"\([^)]*\)", " ", value)
-    value = re.sub(r"\b(19\d{2}|20\d{2})\b", " ", value)
     value = re.sub(r"[^a-z0-9]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
+    tokens = value.split()
+    # A leading year-shaped token can be the title itself (1917, 1984 or
+    # 2001: A Space Odyssey). Release years elsewhere remain filename noise.
+    tokens = [
+        token
+        for index, token in enumerate(tokens)
+        if index == 0 or not re.fullmatch(r"(?:19|20)\d{2}", token)
+    ]
+    return " ".join(tokens)
 
 
 def normalize_path_text(value: str) -> str:

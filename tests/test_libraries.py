@@ -125,6 +125,19 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertGreater(detail["verified_at"], 0)
         self.assertEqual(detail["counts"]["files"], 0)
 
+    def test_numeric_title_matches_an_existing_catalog_item(self) -> None:
+        self.catalog_items = [
+            normalize_item({"id": "1917", "title": "1917", "year": "2019", "kind": "pelicula"}).to_dict()
+        ]
+        (self.media / "1917.2019.1080p.BluRay.mkv").write_bytes(b"numeric-title")
+        library = self.create_library()
+
+        run = self.execute(library.id, "dry_run")
+
+        self.assertEqual(run.summary["matched"], 1)
+        self.assertEqual(run.summary["new"], 0)
+        self.assertEqual(run.summary["review"], 0)
+
     def test_unique_legacy_inventory_title_can_reconcile_a_missing_year(self) -> None:
         self.catalog_items = [
             normalize_item({

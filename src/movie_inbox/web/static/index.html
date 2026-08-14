@@ -387,16 +387,27 @@
               <div class="scanner-queue-heading">
                 <div>
                   <strong>Vinculación física</strong>
-                  <span id="scannerQueueMeta">0 archivos</span>
+                  <span id="scannerQueueMeta">0 pendientes</span>
                 </div>
                 <button id="refreshScannerQueue" class="quiet-action" type="button">Actualizar</button>
+              </div>
+              <div class="scanner-queue-tools">
+                <div id="scannerQueueFilters" class="scanner-queue-filters" role="group" aria-label="Filtrar archivos pendientes">
+                  <button class="active" type="button" data-scanner-filter="all" aria-pressed="true">Todos <span id="scannerAllCount">0</span></button>
+                  <button type="button" data-scanner-filter="review" aria-pressed="false">Comparar <span id="scannerReviewCount">0</span></button>
+                  <button type="button" data-scanner-filter="new" aria-pressed="false">Sin coincidencia <span id="scannerNewCount">0</span></button>
+                </div>
+                <label class="scanner-queue-search">
+                  <span class="sr-only">Buscar en la cola del Scanner</span>
+                  <input id="scannerQueueSearch" type="search" placeholder="Buscar título, año o archivo" autocomplete="off">
+                </label>
               </div>
               <div id="scannerQueue" class="scanner-queue"></div>
             </aside>
             <section id="scannerQueueDetail" class="scanner-queue-detail">
               <div class="curation-empty">
                 <strong>Seleccioná un archivo</strong>
-                <p>Compará la evidencia y vinculá el archivo sin modificar ningún catálogo personal.</p>
+                <p>Vinculalo con una obra existente o creá una entrada nueva cuando no haya coincidencias.</p>
               </div>
             </section>
           </div>

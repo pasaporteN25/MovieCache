@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from movie_inbox.domain.catalog import external_source_name, trusted_external_url
+from movie_inbox.domain.catalog import external_source_name, title_match_key, trusted_external_url
+from movie_inbox.domain.libraries import work_identity_key
 from movie_inbox.domain.matching import decide_match
 
 
@@ -56,6 +57,16 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(trusted_external_url("https://imdb.com.example.org/title/tt0113277/"), "")
         self.assertEqual(external_source_name("https://user@imdb.com/title/tt0113277/"), "")
         self.assertEqual(external_source_name("https://imdb.com:8443/title/tt0113277/"), "")
+
+    def test_year_shaped_titles_keep_their_identity(self) -> None:
+        self.assertEqual(title_match_key("1917"), "1917")
+        self.assertEqual(title_match_key("1984"), "1984")
+        self.assertEqual(title_match_key("2001: A Space Odyssey"), "2001 a space odyssey")
+        self.assertEqual(title_match_key("1917 2019"), "1917")
+        self.assertEqual(title_match_key("Heat 1995"), "heat")
+        self.assertTrue(
+            work_identity_key({"title": "1917", "year": "2019", "kind": "pelicula"}).startswith("work:")
+        )
 
 
 if __name__ == "__main__":

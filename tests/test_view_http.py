@@ -1487,7 +1487,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(library.json()["library"]["counts"]["files"], 1)
         self.assertTrue(items.json()["items"][0]["_availability"]["server"])
 
-    def test_unknown_scanner_file_requires_an_owner_decision(self) -> None:
+    @patch("movie_inbox.web.app.background_enrich_catalog_item")
+    def test_unknown_scanner_file_can_create_a_personal_catalog_item(self, enrich) -> None:
         (self.media_path / "Arrival.2016.mkv").write_bytes(b"arrival-video")
         created = self.client.post(
             "/api/libraries",
@@ -1522,7 +1523,7 @@ class ViewerHttpTests(unittest.TestCase):
         reviewed = self.client.post(
             f"/api/scanner/queue/{queue_item['id']}",
             content=json.dumps({
-                "action": "confirm",
+                "action": "create",
                 "title": "Arrival",
                 "year": "2016",
                 "kind": "pelicula",
@@ -1533,8 +1534,34 @@ class ViewerHttpTests(unittest.TestCase):
             "/api/scanner/queue",
             headers={"X-Movie-Inbox-Token": self.config.api_token},
         )
-        self.assertEqual(reviewed.status_code, 200, reviewed.content)
+        catalog = JsonCatalogRepository(self.catalog_path, normalize_item).read()
+        arrival = next(item for item in catalog if item.title == "Arrival")
+        items = self.client.get(
+            "/api/items",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+
+        self.assertEqual(reviewed.status_code, 201, reviewed.content)
+        self.assertEqual(reviewed.json()["catalog_action"], "created")
         self.assertEqual(empty.json()["count"], 0)
+        self.assertFalse(arrival.en_catalogo)
+        self.assertTrue(next(item for item in items.json()["items"] if item["id"] == arrival.id)["_availability"]["server"])
+        enrich.assert_called_once()
+
+    def test_scanner_create_does_not_write_for_a_missing_queue_item(self) -> None:
+        response = self.client.post(
+            "/api/scanner/queue/missing-file",
+            content=json.dumps({
+                "action": "create",
+                "title": "Arrival",
+                "year": "2016",
+                "kind": "pelicula",
+            }),
+            headers=self.post_headers(),
+        )
+
+        self.assertEqual(response.status_code, 404, response.content)
+        self.assertEqual([item.title for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()], ["Heat"])
 
     def test_scanner_candidates_do_not_reveal_a_private_member_catalog(self) -> None:
         created_member = self.client.post(
