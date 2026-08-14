@@ -4,6 +4,16 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+## [0.2.1] - 2026-08-13
+
+### Corregido
+
+- La version del paquete, la version runtime y la documentacion ahora identifican la
+  release estable de forma consistente; el tag `v0.2.0` conservaba por error los
+  metadatos internos de `0.2.0rc2`.
+
+## [0.2.0] - 2026-08-13
+
 ### Cambiado
 
 - La cabecera separa navegación, descubrimiento y cuenta: `Inicio`, `Colección`,
