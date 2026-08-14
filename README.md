@@ -59,6 +59,7 @@ movie-inbox db export data/movie-inbox.db --json backups/catalog.json
 movie-inbox cache info --dir .catalog-cache/images
 movie-inbox backup create data --output-dir backups --retention-days 14
 movie-inbox backup verify backups/movie-inbox-instance-20260811-033000Z.tar.gz
+movie-inbox search-lab run --json reports/search-baseline.json --html reports/search-baseline.html
 ```
 
 En Windows, si la carpeta `Scripts` de Python no esta en `PATH`, usa la forma equivalente:
@@ -70,6 +71,33 @@ py -m movie_inbox serve catalog.json
 El ejecutable suele quedar en `%LocalAppData%\Programs\Python\Python314\Scripts`. Agregar esa carpeta al `PATH` permite invocar directamente `movie-inbox` desde una terminal nueva.
 
 Los comandos `py scripts/txt_to_catalog.py ...`, `py scripts/scan_library.py ...` y `py scripts/view_catalog.py ...` siguen funcionando y llaman a la misma implementacion del paquete.
+
+### Search Lab de v0.3.0
+
+`Search Lab` mide el ranking productivo actual sin cambiarlo. El corpus incluido usa
+datos sinteticos y respuestas externas grabadas, por lo que el runner no consulta la
+red, no abre SQLite y no escribe en ningun catalogo. Una baseline que no alcanza los
+umbrales se informa como `FAIL (baseline recorded)` pero retorna codigo `0`:
+
+```powershell
+movie-inbox search-lab run `
+  --json reports/search-baseline.json `
+  --html reports/search-baseline.html
+```
+
+Para convertirlo en un gate de CI se agrega `--enforce`; en ese modo retorna codigo
+`1` mientras alguna metrica quede debajo del objetivo o aparezca un resultado
+prohibido. Tambien se puede inspeccionar un export JSON real en modo de solo lectura:
+
+```powershell
+movie-inbox search-lab inspect backups/catalog.json "Heat" --mode catalog --html reports/heat.html
+movie-inbox search-lab inspect backups/catalog.json "The Fly" --mode identity --year 1986
+movie-inbox search-lab inspect backups/catalog.json "1917" --mode scanner --year 2019
+```
+
+`inspect` no acepta una base `.db`, no crea locks y se niega a usar el archivo de
+entrada como destino de un reporte. El corpus, las metricas y el orden de trabajo de
+v0.3.0 estan documentados en [docs/search-quality.md](docs/search-quality.md).
 
 ### Primer acceso
 
@@ -391,7 +419,7 @@ El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibi
 
 Cuando la fuente es JSON, `Actualizar` vuelve a leer el archivo; con SQLite consulta el estado transaccional actual. La portada redirige al login hasta que exista una sesion valida; el menu de cuenta muestra el usuario y el catalogo personal activos y permite cerrar todas las operaciones de esa sesion.
 
-La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` propone hasta cuatro recomendaciones diarias estables, formadas solo por obras disponibles que tengan una imagen real, con sinopsis y seleccion manual; sus programas combinan pendientes disponibles, faltantes de colecciones seguidas, recuerdos personales incompletos y rutas por director, genero o decada. Cada sugerencia se calcula con datos locales y no se repite entre secciones; `Random` sigue siendo la accion independiente para explorar sin un criterio fijo. Los accesos desde Inicio abren `Coleccion` con su criterio real aplicado y representado en la URL. `Coleccion` concentra busqueda, filtros rapidos de estado, disponibilidad y tipo, un panel de facetas avanzadas, orden, carga incremental y acceso al CRUD. `Bandeja` alterna entre la curaduria y las importaciones controladas. `Club` alterna entre catalogos compartidos por miembros y colecciones locales que pueden seguirse o copiarse de forma selectiva. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
+La interfaz separa `Inicio`, `Coleccion`, `Bandeja` y `Club`. `Inicio` propone hasta cuatro recomendaciones diarias estables, formadas solo por obras disponibles que tengan una imagen real, con sinopsis y seleccion manual. El selector `Hoy / Ayer` reemplaza esa misma marquesina y conserva por usuario las dos jornadas mas recientes; no modifica el catalogo. Sus programas combinan pendientes disponibles, faltantes de colecciones seguidas, recuerdos personales incompletos y rutas por director, genero o decada. `Estrenadas un dia como hoy` queda al final de esa programacion, en el quinto lugar cuando estan disponibles los cuatro programas anteriores. Cada sugerencia se calcula con datos locales y no se repite entre secciones; `Random` sigue siendo la accion independiente para explorar sin un criterio fijo. Los accesos desde Inicio abren `Coleccion` con su criterio real aplicado y representado en la URL. `Coleccion` concentra busqueda, filtros rapidos de estado, disponibilidad y tipo, un panel de facetas avanzadas, orden, carga incremental y acceso al CRUD. `Bandeja` alterna entre la curaduria y las importaciones controladas. `Club` alterna entre catalogos compartidos por miembros y colecciones locales que pueden seguirse o copiarse de forma selectiva. `Administrar`, dentro del menu de cuenta del owner, agrupa miembros, resumen, base de datos, salud de fuentes externas, matching y duplicados.
 
 ### Importaciones desde la Bandeja
 
@@ -567,7 +595,7 @@ py -m unittest discover -s tests/browser -p "test_*.py" -v
 
 El checkout contiene codigo, no datos. En un servidor, el catalogo y `instance.db` deben vivir fuera del repo, por ejemplo en `/var/lib/movie-inbox/`, y los backups en otra ruta persistente. Nginx apunta al proceso web que escucha en loopback; nunca apunta al directorio Git ni sirve ninguna base directamente.
 
-El despliegue reproducible con una instancia nueva, importacion inicial y medios de solo lectura esta documentado en [docs/docker.md](docs/docker.md). El despliegue nativo, los flags de proxy y las plantillas de `systemd`/Nginx estan en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). En Docker el proceso escucha dentro del contenedor, pero el puerto del host permanece publicado en loopback; Nginx o una VPN controlan el acceso externo.
+El despliegue reproducible con una instancia nueva, importacion inicial y medios de solo lectura esta documentado en [docs/docker.md](docs/docker.md). El despliegue nativo, los flags de proxy y las plantillas de `systemd`/Nginx estan en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). La secuencia de versiones vive en [docs/roadmap.md](docs/roadmap.md) y el gate de busqueda de `v0.3.0` en [docs/search-quality.md](docs/search-quality.md). En Docker el proceso escucha dentro del contenedor, pero el puerto del host permanece publicado en loopback; Nginx o una VPN controlan el acceso externo.
 
 ## Limpiar titulos y linkear con Wikipedia
 

@@ -1,0 +1,433 @@
+{
+  "schema_version": 1,
+  "name": "movie-inbox-search-golden-v1",
+  "description": "Casos sinteticos y respuestas externas grabadas para medir el ranking productivo sin tocar catalogos reales.",
+  "thresholds": {
+    "precision_at_5": 0.9,
+    "mrr": 0.9,
+    "recall_at_5": 0.9,
+    "auto_match_precision": 1.0,
+    "forbidden_hits": 0,
+    "auto_match_false_positives": 0,
+    "expectation_failures": 0
+  },
+  "catalog_items": [
+    {
+      "id": "heat-1995",
+      "title": "Heat",
+      "year": "1995",
+      "kind": "pelicula",
+      "imdb_url": "https://www.imdb.com/title/tt0113277/"
+    },
+    {
+      "id": "different-film",
+      "title": "A Different Film",
+      "year": "2018",
+      "kind": "pelicula",
+      "cast": ["Heather Young"]
+    },
+    {
+      "id": "moonlight-2016",
+      "title": "Moonlight",
+      "year": "2016",
+      "kind": "pelicula",
+      "description": "Heat and humidity frame one short scene, but this is a different work."
+    },
+    {
+      "id": "it-2017",
+      "title": "It",
+      "year": "2017",
+      "kind": "pelicula",
+      "imdb_url": "https://www.imdb.com/title/tt1396484/"
+    },
+    {
+      "id": "it-1990",
+      "title": "It",
+      "year": "1990",
+      "kind": "serie"
+    },
+    {
+      "id": "up-2009",
+      "title": "Up",
+      "year": "2009",
+      "kind": "pelicula"
+    },
+    {
+      "id": "setup-2011",
+      "title": "Setup",
+      "year": "2011",
+      "kind": "pelicula"
+    },
+    {
+      "id": "us-2019",
+      "title": "Us",
+      "year": "2019",
+      "kind": "pelicula"
+    },
+    {
+      "id": "suspiria-1977",
+      "title": "Suspiria",
+      "year": "1977",
+      "kind": "pelicula"
+    },
+    {
+      "id": "the-fly-1958",
+      "title": "The Fly",
+      "year": "1958",
+      "kind": "pelicula"
+    },
+    {
+      "id": "the-fly-1986",
+      "title": "The Fly",
+      "year": "1986",
+      "kind": "pelicula",
+      "imdb_url": "https://www.imdb.com/title/tt0091064/"
+    },
+    {
+      "id": "crash-1996",
+      "title": "Crash",
+      "year": "1996",
+      "kind": "pelicula"
+    },
+    {
+      "id": "crash-2004",
+      "title": "Crash",
+      "year": "2004",
+      "kind": "pelicula"
+    },
+    {
+      "id": "beautiful-person-2008",
+      "title": "The Beautiful Person",
+      "original_title": "La Belle Personne",
+      "spanish_title": "La bella persona",
+      "english_title": "The Beautiful Person",
+      "alternative_titles": ["A Bela Junie"],
+      "year": "2008",
+      "kind": "pelicula"
+    },
+    {
+      "id": "evil-dead-burn-2026",
+      "title": "Evil Dead Burn",
+      "year": "2026",
+      "kind": "pelicula",
+      "wikipedia_url": "https://en.wikipedia.org/wiki/Evil_Dead_Burn"
+    },
+    {
+      "id": "evil-dead-rise-2023",
+      "title": "Evil Dead Rise",
+      "year": "2023",
+      "kind": "pelicula"
+    },
+    {
+      "id": "1917-2019",
+      "title": "1917",
+      "year": "2019",
+      "kind": "pelicula",
+      "imdb_url": "https://www.imdb.com/title/tt8579674/"
+    },
+    {
+      "id": "1917-legacy-bad-year",
+      "title": "1917",
+      "year": "1917",
+      "kind": "pelicula"
+    },
+    {
+      "id": "tantei-monogatari-1979",
+      "title": "Tantei Monogatari",
+      "english_title": "Detective Story",
+      "year": "1979",
+      "kind": "serie"
+    },
+    {
+      "id": "tantei-monogatari-1983",
+      "title": "Tantei Monogatari",
+      "english_title": "Detective Story",
+      "year": "1983",
+      "kind": "pelicula"
+    },
+    {
+      "id": "dune-1984",
+      "title": "Dune",
+      "year": "1984",
+      "kind": "pelicula"
+    },
+    {
+      "id": "dune-2021",
+      "title": "Dune",
+      "year": "2021",
+      "kind": "pelicula"
+    },
+    {
+      "id": "the-gift-2000",
+      "title": "The Gift",
+      "year": "2000",
+      "kind": "pelicula"
+    },
+    {
+      "id": "the-gift-2015",
+      "title": "The Gift",
+      "year": "2015",
+      "kind": "pelicula"
+    }
+  ],
+  "cases": [
+    {
+      "id": "catalog-heat",
+      "label": "Titulo exacto no debe arrastrar articulos ni descripcion",
+      "context": "catalog",
+      "query": "Heat",
+      "relevant_ids": ["heat-1995"],
+      "forbidden_ids": ["different-film", "moonlight-2016"]
+    },
+    {
+      "id": "catalog-it-remake",
+      "label": "Titulo corto con ano",
+      "context": "catalog",
+      "query": "It 2017",
+      "relevant_ids": ["it-2017"],
+      "forbidden_ids": ["it-1990", "different-film"]
+    },
+    {
+      "id": "catalog-up-substring",
+      "label": "Titulo corto no es sufijo",
+      "context": "catalog",
+      "query": "Up 2009",
+      "relevant_ids": ["up-2009"],
+      "forbidden_ids": ["setup-2011"]
+    },
+    {
+      "id": "catalog-us-substring",
+      "label": "Titulo corto no es parte de otra palabra",
+      "context": "catalog",
+      "query": "Us 2019",
+      "relevant_ids": ["us-2019"],
+      "forbidden_ids": ["suspiria-1977"]
+    },
+    {
+      "id": "catalog-original-title",
+      "label": "Titulo original multilingue",
+      "context": "catalog",
+      "query": "La Belle Personne",
+      "relevant_ids": ["beautiful-person-2008"],
+      "forbidden_ids": []
+    },
+    {
+      "id": "catalog-spanish-title",
+      "label": "Titulo espanol multilingue",
+      "context": "catalog",
+      "query": "La bella persona",
+      "relevant_ids": ["beautiful-person-2008"],
+      "forbidden_ids": []
+    },
+    {
+      "id": "catalog-english-title",
+      "label": "Titulo ingles multilingue",
+      "context": "catalog",
+      "query": "The Beautiful Person",
+      "relevant_ids": ["beautiful-person-2008"],
+      "forbidden_ids": []
+    },
+    {
+      "id": "catalog-recent-release",
+      "label": "Estreno reciente con ano",
+      "context": "catalog",
+      "query": "Evil Dead Burn 2026",
+      "relevant_ids": ["evil-dead-burn-2026"],
+      "forbidden_ids": ["evil-dead-rise-2023"]
+    },
+    {
+      "id": "catalog-numeric-title",
+      "label": "Titulo numerico separado de su ano",
+      "context": "catalog",
+      "query": "1917 2019",
+      "relevant_ids": ["1917-2019"],
+      "forbidden_ids": ["1917-legacy-bad-year"]
+    },
+    {
+      "id": "catalog-series-kind",
+      "label": "Serie japonesa por titulo y ano",
+      "context": "catalog",
+      "query": "Tantei Monogatari 1979",
+      "relevant_ids": ["tantei-monogatari-1979"],
+      "forbidden_ids": ["tantei-monogatari-1983"]
+    },
+    {
+      "id": "identity-heat-exact",
+      "label": "Merge exacto con ano",
+      "context": "identity",
+      "candidate": {"title": "Heat", "year": "1995", "kind": "pelicula"},
+      "relevant_ids": ["heat-1995"],
+      "forbidden_ids": ["different-film", "moonlight-2016"],
+      "expected_acceptance": {"heat-1995": true},
+      "required_reasons": {"heat-1995": ["exact_title_year"]}
+    },
+    {
+      "id": "identity-fly-remake",
+      "label": "Merge elige el remake correcto",
+      "context": "identity",
+      "candidate": {"title": "The Fly", "year": "1986", "kind": "pelicula"},
+      "relevant_ids": ["the-fly-1986"],
+      "forbidden_ids": ["the-fly-1958"],
+      "expected_acceptance": {"the-fly-1986": true},
+      "required_reasons": {"the-fly-1986": ["exact_title_year"]}
+    },
+    {
+      "id": "identity-fly-missing-year",
+      "label": "Sin ano ambos remakes requieren revision",
+      "context": "identity",
+      "candidate": {"title": "The Fly", "year": "", "kind": "pelicula"},
+      "relevant_ids": ["the-fly-1958", "the-fly-1986"],
+      "forbidden_ids": [],
+      "expected_acceptance": {"the-fly-1958": false, "the-fly-1986": false},
+      "required_reasons": {
+        "the-fly-1958": ["exact_title_missing_year"],
+        "the-fly-1986": ["exact_title_missing_year"]
+      }
+    },
+    {
+      "id": "identity-dune-remake",
+      "label": "Remake moderno no mezcla el original",
+      "context": "identity",
+      "candidate": {"title": "Dune", "year": "2021", "kind": "pelicula"},
+      "relevant_ids": ["dune-2021"],
+      "forbidden_ids": ["dune-1984"],
+      "expected_acceptance": {"dune-2021": true}
+    },
+    {
+      "id": "identity-gift-remake",
+      "label": "Titulos ambiguos exigen el ano correcto",
+      "context": "identity",
+      "candidate": {"title": "The Gift", "year": "2015", "kind": "pelicula"},
+      "relevant_ids": ["the-gift-2015"],
+      "forbidden_ids": ["the-gift-2000"],
+      "expected_acceptance": {"the-gift-2015": true}
+    },
+    {
+      "id": "external-wikipedia-recent",
+      "label": "Wikipedia grabada para un estreno reciente",
+      "context": "external",
+      "query": "Evil Dead Burn 2026",
+      "results": [
+        {
+          "id": "wiki-evil-dead-rise",
+          "source": "wikipedia",
+          "title": "Evil Dead Rise",
+          "year": "2023",
+          "url": "https://en.wikipedia.org/wiki/Evil_Dead_Rise"
+        },
+        {
+          "id": "wiki-evil-dead-burn",
+          "source": "wikipedia",
+          "title": "Evil Dead Burn",
+          "year": "2026",
+          "url": "https://en.wikipedia.org/wiki/Evil_Dead_Burn"
+        },
+        {
+          "id": "wiki-burn-film",
+          "source": "wikipedia",
+          "title": "Burn",
+          "year": "2019",
+          "url": "https://en.wikipedia.org/wiki/Burn_(2019_film)"
+        }
+      ],
+      "relevant_ids": ["wiki-evil-dead-burn"],
+      "forbidden_ids": ["wiki-evil-dead-rise", "wiki-burn-film"]
+    },
+    {
+      "id": "external-imdb-remake",
+      "label": "IMDb grabado conserva el remake correcto primero",
+      "context": "external",
+      "query": "The Fly 1986",
+      "results": [
+        {
+          "id": "imdb-fly-1958",
+          "source": "imdb",
+          "title": "The Fly",
+          "year": "1958",
+          "url": "https://www.imdb.com/title/tt0051622/"
+        },
+        {
+          "id": "imdb-fly-1986",
+          "source": "imdb",
+          "title": "The Fly",
+          "year": "1986",
+          "url": "https://www.imdb.com/title/tt0091064/"
+        },
+        {
+          "id": "imdb-fly-ii",
+          "source": "imdb",
+          "title": "The Fly II",
+          "year": "1989",
+          "url": "https://www.imdb.com/title/tt0097368/"
+        }
+      ],
+      "relevant_ids": ["imdb-fly-1986"],
+      "forbidden_ids": ["imdb-fly-1958", "imdb-fly-ii"]
+    },
+    {
+      "id": "external-filmaffinity-multilingual",
+      "label": "FilmAffinity grabado usa un alias espanol",
+      "context": "external",
+      "query": "La bella persona 2008",
+      "results": [
+        {
+          "id": "fa-beautiful-person",
+          "source": "filmaffinity",
+          "title": "La bella persona",
+          "original_title": "La belle personne",
+          "year": "2008",
+          "url": "https://www.filmaffinity.com/es/film123456.html"
+        },
+        {
+          "id": "fa-beautiful-mind",
+          "source": "filmaffinity",
+          "title": "Una mente maravillosa",
+          "year": "2001",
+          "url": "https://www.filmaffinity.com/es/film123457.html"
+        }
+      ],
+      "relevant_ids": ["fa-beautiful-person"],
+      "forbidden_ids": ["fa-beautiful-mind"]
+    },
+    {
+      "id": "scanner-1917",
+      "label": "Scanner vincula el titulo numerico correcto",
+      "context": "scanner",
+      "candidate": {"title": "1917", "year": "2019", "kind": "pelicula"},
+      "relevant_ids": ["1917-2019"],
+      "forbidden_ids": ["1917-legacy-bad-year"],
+      "expected_classification": "matched",
+      "expected_acceptance": {"1917-2019": true},
+      "required_reasons": {"1917-2019": ["exact_title_year"]}
+    },
+    {
+      "id": "scanner-fly-remake",
+      "label": "Scanner vincula el remake por ano",
+      "context": "scanner",
+      "candidate": {"title": "The Fly", "year": "1986", "kind": "pelicula"},
+      "relevant_ids": ["the-fly-1986"],
+      "forbidden_ids": ["the-fly-1958"],
+      "expected_classification": "matched",
+      "expected_acceptance": {"the-fly-1986": true}
+    },
+    {
+      "id": "scanner-series-kind",
+      "label": "Scanner conserva tipo serie",
+      "context": "scanner",
+      "candidate": {"title": "Tantei Monogatari", "year": "1979", "kind": "serie"},
+      "relevant_ids": ["tantei-monogatari-1979"],
+      "forbidden_ids": ["tantei-monogatari-1983"],
+      "expected_classification": "matched",
+      "expected_acceptance": {"tantei-monogatari-1979": true}
+    },
+    {
+      "id": "scanner-unknown-negative",
+      "label": "Scanner no inventa una candidata sin evidencia",
+      "context": "scanner",
+      "candidate": {"title": "An Entirely Unknown Work", "year": "2026", "kind": "pelicula"},
+      "relevant_ids": [],
+      "forbidden_ids": ["different-film", "heat-1995"],
+      "expected_classification": "new"
+    }
+  ]
+}

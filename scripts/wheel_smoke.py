@@ -16,6 +16,7 @@ from urllib.request import urlopen
 from movie_inbox import __version__
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
+from movie_inbox.search_lab import load_builtin_corpus
 from movie_inbox.web.assets import (
     render_html,
     render_login_html,
@@ -33,8 +34,24 @@ def main() -> int:
     assert static_asset("app.js") is not None
     assert static_asset("login.js") is not None
     assert static_asset("password-change.js") is not None
+    corpus = load_builtin_corpus()
+    assert corpus["schema_version"] == 1
+    assert len(corpus["cases"]) >= 20
 
     with tempfile.TemporaryDirectory() as temporary:
+        search_lab = subprocess.run(
+            [sys.executable, "-m", "movie_inbox.cli.main", "search-lab", "run"],
+            cwd=temporary,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        if search_lab.returncode != 0 or "Search Lab production baseline" not in search_lab.stdout:
+            raise RuntimeError(
+                f"Installed Search Lab failed ({search_lab.returncode}):\n"
+                f"{search_lab.stdout}\n{search_lab.stderr}"
+            )
         catalog = Path(temporary) / "catalog.json"
         JsonCatalogRepository(catalog, normalize_item).write(
             [normalize_item({"id": "wheel-smoke", "title": "Wheel Smoke", "kind": "pelicula"})]

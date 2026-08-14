@@ -6,6 +6,16 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
+- Inicio conserva por usuario las recomendaciones destacadas de hoy y ayer en
+  `instance.db`; un selector reemplaza la misma marquesina sin modificar el catalogo.
+
+- Primer incremento de Search Lab para `v0.3.0`: corpus dorado empaquetado, respuestas
+  externas grabadas y runner de Precision@5, MRR, Recall@5, resultados prohibidos y
+  precision de auto-match sobre los cuatro contextos productivos.
+- `movie-inbox search-lab inspect` permite revisar un export JSON en los modos catalogo,
+  identidad y Scanner, con reportes JSON/HTML, sin red, locks ni escrituras sobre el
+  catalogo inspeccionado. `--enforce` convierte los umbrales en un gate optativo.
+
 - La cola del Scanner permite separar casos para comparar de archivos sin coincidencia,
   buscar dentro de los pendientes y crear una obra en el catálogo personal antes de
   vincular su disponibilidad física.
@@ -14,6 +24,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   revisadas y registra la nueva pareja como `No son duplicados`.
 
 ### Corregido
+
+- `Estrenadas un dia como hoy` reserva sus obras sin ocupar el primer programa y se
+  presenta al final, como quinta seccion cuando la cartelera editorial esta completa.
 
 - Los títulos formados por años, como `1917`, `1984` y `2001: A Space Odyssey`, conservan
   una identidad válida durante el matching. Agregar desde el Scanner vuelve a comprobar

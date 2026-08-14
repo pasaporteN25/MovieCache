@@ -291,6 +291,71 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.json()["reason"], "invalid_home_date")
 
+    def test_saved_featured_recommendations_survive_catalog_changes(self) -> None:
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item({
+                    "id": "heat",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                    "status": "to_watch",
+                    "en_catalogo": True,
+                    "page_image": "https://upload.wikimedia.org/heat.jpg",
+                })
+            ]
+        )
+        headers = {"X-Movie-Inbox-Token": self.config.api_token}
+
+        initial = self.client.get("/api/home?date=2026-08-13", headers=headers)
+        self.assertEqual(initial.status_code, 200, initial.content)
+        self.assertEqual(initial.json()["featured"][0]["item"]["id"], "heat")
+        self.assertEqual(initial.json()["featured_source"], "live")
+
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item({
+                    "id": "heat",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                    "status": "watched",
+                    "en_catalogo": False,
+                    "page_image": "https://upload.wikimedia.org/heat.jpg",
+                }),
+                normalize_item({
+                    "id": "collateral",
+                    "title": "Collateral",
+                    "year": "2004",
+                    "kind": "pelicula",
+                    "status": "to_watch",
+                    "en_catalogo": True,
+                    "page_image": "https://upload.wikimedia.org/collateral.jpg",
+                }),
+            ]
+        )
+
+        saved = self.client.get(
+            "/api/home?date=2026-08-13&saved_featured=true",
+            headers=headers,
+        )
+        self.assertEqual(saved.status_code, 200, saved.content)
+        self.assertEqual(saved.json()["featured_source"], "saved")
+        self.assertEqual([row["item"]["id"] for row in saved.json()["featured"]], ["heat"])
+        self.assertEqual(saved.json()["featured"][0]["item"]["status"], "watched")
+
+        live = self.client.get("/api/home?date=2026-08-13", headers=headers)
+        self.assertEqual(live.status_code, 200, live.content)
+        self.assertEqual(live.json()["featured_source"], "live")
+        self.assertEqual(live.json()["featured"][0]["item"]["id"], "collateral")
+
+        still_saved = self.client.get(
+            "/api/home?date=2026-08-13&saved_featured=true",
+            headers=headers,
+        )
+        self.assertEqual(still_saved.status_code, 200, still_saved.content)
+        self.assertEqual(still_saved.json()["featured"][0]["item"]["id"], "heat")
+
     def test_personal_catalog_can_be_downloaded_as_json_or_csv(self) -> None:
         headers = {"X-Movie-Inbox-Token": self.config.api_token}
         json_export = self.client.get("/api/catalog/export?format=json", headers=headers)
@@ -943,6 +1008,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="memberDialog"', body)
         self.assertIn(b'id="temporaryPasswordDialog"', body)
         self.assertIn(b'id="homeDate"', body)
+        self.assertIn(b'id="homeDateToday"', body)
+        self.assertIn(b'id="homeDateYesterday"', body)
         self.assertIn(b'id="homeSections"', body)
         self.assertIn(b'id="homeFeedback"', body)
         self.assertIn(b'id="activeFilters"', body)

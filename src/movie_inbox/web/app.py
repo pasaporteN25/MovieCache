@@ -84,6 +84,10 @@ from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.infrastructure.export import catalog_csv_text
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
+from movie_inbox.infrastructure.home_snapshot_repository import (
+    HomeSnapshotRepositoryError,
+    SqliteHomeSnapshotRepository,
+)
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import (
     ImportParseError,
@@ -283,6 +287,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     )
     collection_service = CollectionService(collection_repository)
     home_service = EditorialHomeService()
+    home_snapshot_repository = SqliteHomeSnapshotRepository(config.instance_db)
     import_repository = SqliteImportDraftRepository(config.instance_db)
     import_service = ImportService(
         import_repository,
@@ -474,6 +479,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
         identity: AuthenticatedIdentity,
         rows: list[dict[str, Any]],
         local_date: str,
+        *,
+        saved_featured: bool = False,
     ) -> dict[str, Any]:
         warnings: list[str] = []
         try:
@@ -488,6 +495,33 @@ def create_app(config: ViewerConfig) -> FastAPI:
             followed,
             warnings=warnings,
         )
+        featured_source = "live"
+        try:
+            snapshot = (
+                home_snapshot_repository.get(identity.user.id, local_date)
+                if saved_featured
+                else None
+            )
+            if snapshot is not None:
+                featured = home_service.restore_featured_snapshot(snapshot, rows)
+                payload["featured"] = featured
+                payload["hero"] = featured[0] if featured else None
+                featured_source = "saved"
+            else:
+                home_snapshot_repository.save(
+                    identity.user.id,
+                    local_date,
+                    home_service.featured_snapshot(payload),
+                )
+                featured_source = "reconstructed" if saved_featured else "live"
+        except HomeSnapshotRepositoryError:
+            payload["warnings"] = list(
+                dict.fromkeys(
+                    [*payload.get("warnings", []), "home_history_unavailable"]
+                )
+            )
+            featured_source = "unavailable"
+        payload["featured_source"] = featured_source
         image_warmer.register_items(
             f"home:{identity.catalog.id}",
             home_image_items(payload),
@@ -1414,6 +1448,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     def editorial_home(
         request: Request,
         local_date: str = Query(default="", alias="date"),
+        saved_featured: bool = Query(default=False),
     ) -> JSONResponse:
         try:
             day = requested_home_date(local_date)
@@ -1422,7 +1457,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
         try:
             identity = require_ready_identity(request)
             _, _, rows = session_catalog_rows(identity)
-            return JSONResponse(editorial_home_payload(identity, rows, day))
+            return JSONResponse(
+                editorial_home_payload(
+                    identity,
+                    rows,
+                    day,
+                    saved_featured=saved_featured,
+                )
+            )
         except CatalogRepositoryError as error:
             return repository_error_response(error)
         except LibraryRepositoryError:

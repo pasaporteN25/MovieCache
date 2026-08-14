@@ -88,6 +88,73 @@ class EditorialHomeServiceTests(unittest.TestCase):
         self.assertEqual(section["items"][0]["reason"]["code"], "release_anniversary")
         self.assertEqual(section["action"]["filters"], {"release_day": ["08-10"]})
 
+    def test_release_anniversary_is_the_fifth_program_when_the_lineup_is_full(self) -> None:
+        anniversary = movie(
+            "anniversary",
+            release_dates=[
+                {
+                    "date": "1998-08-10",
+                    "precision": "day",
+                    "country": "",
+                    "release_type": "publication",
+                    "source": "wikidata",
+                    "source_url": "https://www.wikidata.org/wiki/Q1",
+                    "is_primary": True,
+                }
+            ],
+        )
+        available = [movie(f"available-{index}", en_catalogo=True) for index in range(8)]
+        memories = [movie(f"memory-{index}", status="watched") for index in range(2)]
+        routed = [
+            movie(
+                f"route-{index}",
+                directors=["Ada Directora"],
+                genres=["Misterio"],
+                rating=8,
+                review="Completa",
+            )
+            for index in range(4)
+        ]
+        followed = collection("followed", True, [movie("missing", title="Missing")])
+
+        payload = self.service.build(
+            "lucas",
+            "2026-08-10",
+            [anniversary, *available, *memories, *routed],
+            [followed],
+        )
+
+        self.assertEqual(
+            [section["id"] for section in payload["sections"]],
+            ["available", "followed", "memory", "route", "anniversary"],
+        )
+
+    def test_featured_snapshot_keeps_order_and_hydrates_current_metadata(self) -> None:
+        original = self.service.build(
+            "lucas",
+            "2026-08-10",
+            [
+                movie(
+                    "heat",
+                    title="Heat",
+                    en_catalogo=True,
+                    page_image="https://upload.wikimedia.org/heat.jpg",
+                )
+            ],
+        )
+
+        snapshot = self.service.featured_snapshot(original)
+        restored = self.service.restore_featured_snapshot(
+            snapshot,
+            [movie("heat", title="Fuego", status="watched", en_catalogo=False)],
+        )
+
+        self.assertEqual(snapshot[0]["item_id"], "heat")
+        self.assertNotIn("item", snapshot[0])
+        self.assertEqual(restored[0]["item"]["title"], "Fuego")
+        self.assertEqual(restored[0]["reason"], original["featured"][0]["reason"])
+        self.assertEqual(self.service.restore_featured_snapshot(snapshot, []), [])
+
     def test_followed_collections_only_offer_missing_deduplicated_works(self) -> None:
         catalog = [movie("present", title="Present")]
         followed = collection(

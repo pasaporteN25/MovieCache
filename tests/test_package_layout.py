@@ -40,9 +40,17 @@ class PackageLayoutTests(unittest.TestCase):
                 "match",
                 "migrate",
                 "scan",
+                "search-lab",
                 "serve",
             },
         )
+
+    def test_packaged_search_lab_corpus_is_loadable(self) -> None:
+        from movie_inbox.search_lab import load_builtin_corpus
+
+        corpus = load_builtin_corpus()
+        self.assertEqual(corpus["schema_version"], 1)
+        self.assertGreaterEqual(len(corpus["cases"]), 20)
 
     def test_external_clients_are_registered_independently(self) -> None:
         service = ExternalSourceService()
@@ -73,6 +81,8 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIn(b'/api/catalog/export?format=', app_js[0])
         self.assertIn(b'apiFetch("/api/image-cache/status")', app_js[0])
         self.assertIn(b'apiFetch(`/api/home?date=', app_js[0])
+        self.assertIn(b'"&saved_featured=true"', app_js[0])
+        self.assertIn(b'loadEditorialFeaturedDate(localDateOffset(-1))', app_js[0])
         self.assertIn(b'data-poster-image', app_js[0])
         self.assertIn(b'fetchpriority="${fetchPriority}"', app_js[0])
         self.assertIn(b'classList.add("is-loaded")', app_js[0])

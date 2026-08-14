@@ -59,7 +59,13 @@
               <span class="eyebrow">Programación personal</span>
               <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Cartelera del día</h2>
             </div>
-            <time id="homeDate" class="spotlight-date"></time>
+            <div class="spotlight-date-control">
+              <div class="spotlight-date-tabs" role="group" aria-label="Día de las recomendaciones">
+                <button id="homeDateToday" type="button" data-click="home-date-today" aria-pressed="true">Hoy</button>
+                <button id="homeDateYesterday" type="button" data-click="home-date-yesterday" aria-pressed="false">Ayer</button>
+              </div>
+              <time id="homeDate" class="spotlight-date"></time>
+            </div>
           </div>
           <div id="spotlightStage" class="spotlight-stage" aria-live="off">
             <div class="home-loading-hero" aria-hidden="true"></div>

@@ -12,7 +12,7 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 - `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
 
-## Base de instancia v5
+## Base de instancia v6
 
 La base de instancia contiene:
 
@@ -46,9 +46,9 @@ Los miembros nuevos reciben una base SQLite vacia en el directorio configurado c
 
 El servidor resuelve las fuentes desde la sesion autenticada. Las rutas absolutas permanecen en `instance.db`; el frontend recibe referencias opacas y no puede seleccionar otro catalogo enviando una ruta manual.
 
-Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad, overrides, colecciones, seguimientos ni inventario fisico. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados e `instance.db`; las raices permitidas se conservan en la configuracion del proceso. Para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
+Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad, overrides, colecciones, seguimientos, inventario fisico ni el historial de recomendaciones. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados e `instance.db`; las raices permitidas se conservan en la configuracion del proceso. Para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
 
-Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos; la v4 agrega borradores de importacion acotados; la v5 agrega bibliotecas administradas, recorridos e inventario compartido. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
+Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos; la v4 agrega borradores de importacion acotados; la v5 agrega bibliotecas administradas, recorridos e inventario compartido; la v6 agrega las dos selecciones destacadas mas recientes de cada usuario. La primera seleccion registrada para una fecha queda fija. Ese historial guarda referencias, orden y motivo, no copias de obras ni rutas. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
 
 ## Disponibilidad con procedencia
 
