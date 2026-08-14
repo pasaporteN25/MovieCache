@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-25T03:30:57.2277919-03:00",
+  "generatedAt": "2026-08-14T01:48:24.2745428-03:00",
   "title": "Design System: Movie Inbox",
   "extensions": {
     "colorMeta": {
@@ -58,11 +58,23 @@
         "canonical": "oklch(96.9% 0.016 293.8)",
         "tonalRamp": ["oklch(15% 0.016 293.8)", "oklch(27% 0.016 293.8)", "oklch(39% 0.016 293.8)", "oklch(51% 0.016 293.8)", "oklch(63% 0.016 293.8)", "oklch(75% 0.016 293.8)", "oklch(87% 0.016 293.8)", "oklch(95% 0.016 293.8)"]
       },
+      "ink-on-signal": {
+        "role": "accent-ink",
+        "displayName": "Ink on Signal",
+        "canonical": "oklch(15.1% 0.03 275.6)",
+        "tonalRamp": ["oklch(15% 0.03 275.6)", "oklch(27% 0.03 275.6)", "oklch(39% 0.03 275.6)", "oklch(51% 0.03 275.6)", "oklch(63% 0.03 275.6)", "oklch(75% 0.03 275.6)", "oklch(87% 0.03 275.6)", "oklch(95% 0.03 275.6)"]
+      },
       "dusty-lavender": {
         "role": "text-secondary",
         "displayName": "Dusty Lavender",
         "canonical": "oklch(74.5% 0.042 280.7)",
         "tonalRamp": ["oklch(15% 0.042 280.7)", "oklch(27% 0.042 280.7)", "oklch(39% 0.042 280.7)", "oklch(51% 0.042 280.7)", "oklch(63% 0.042 280.7)", "oklch(75% 0.042 280.7)", "oklch(87% 0.042 280.7)", "oklch(95% 0.042 280.7)"]
+      },
+      "action-violet": {
+        "role": "primary-gradient-end",
+        "displayName": "Action Violet",
+        "canonical": "oklch(64.8% 0.263 311.8)",
+        "tonalRamp": ["oklch(15% 0.263 311.8)", "oklch(27% 0.263 311.8)", "oklch(39% 0.263 311.8)", "oklch(51% 0.263 311.8)", "oklch(63% 0.263 311.8)", "oklch(75% 0.263 311.8)", "oklch(87% 0.263 311.8)", "oklch(95% 0.263 311.8)"]
       },
       "soft-signal-line": {
         "role": "divider",
@@ -111,6 +123,22 @@
       "body": {
         "displayName": "Body",
         "purpose": "Lectura operativa, controles y contenido."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Botones, selectores y acciones compactas."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Ayuda secundaria y texto compacto con lectura continua."
+      },
+      "meta": {
+        "displayName": "Metadata",
+        "purpose": "Año, tipo, fuente y procedencia dentro de fichas y resultados."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Etiquetas auxiliares, enlaces y estados de baja jerarquía."
       },
       "label": {
         "displayName": "Signal Label",
@@ -195,9 +223,9 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Accion principal unica dentro de un contexto operativo.",
+      "description": "Acción principal única dentro de un contexto operativo; la tinta oscura conserva contraste sobre la señal rosa-violeta.",
       "html": "<button class=\"ds-btn-primary\" type=\"button\">BUSCAR</button>",
-      "css": ".ds-btn-primary { background: linear-gradient(135deg, var(--red, #ff3ea5), #b62cff); border: 1px solid rgba(255,121,191,.65); border-radius: 3px; color: #fff; cursor: pointer; font: 700 16px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 14px; transition: filter 180ms ease, background 180ms ease; } .ds-btn-primary:hover { filter: brightness(.96); } .ds-btn-primary:active { background: var(--red-dark, #d92a91); } .ds-btn-primary:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+      "css": ".ds-btn-primary { background: linear-gradient(135deg, var(--red, #ff3ea5), var(--action-primary-end, #c247ff)); border: 1px solid rgba(255,121,191,.65); border-radius: 3px; color: var(--on-accent, #080a18); cursor: pointer; font: 700 16px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 14px; transition: filter 180ms ease, background 180ms ease; } .ds-btn-primary:hover { filter: brightness(.96); } .ds-btn-primary:active { background: var(--red-dark, #d92a91); } .ds-btn-primary:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
     },
     {
       "name": "Quiet Button",
@@ -219,16 +247,23 @@
       "name": "Primary Navigation",
       "kind": "nav",
       "refersTo": "navigation-active",
-      "description": "Navegacion rectangular compacta con una excepcion dorada para Random.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Principal\"><button class=\"ds-nav-active\" type=\"button\">INICIO</button><button type=\"button\">COLECCION</button><button class=\"ds-nav-random\" type=\"button\">RANDOM</button></nav>",
-      "css": ".ds-nav { background: rgba(8,10,24,.74); border: 1px solid rgba(120,92,255,.46); display: flex; gap: 3px; padding: 3px; } .ds-nav button { background: transparent; border: 0; border-radius: 0; color: var(--muted, #a7aac7); cursor: pointer; font: 700 14px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 32px; padding: 6px 10px; } .ds-nav .ds-nav-active { background: rgba(34,216,229,.12); color: var(--teal, #22d8e5); } .ds-nav .ds-nav-random { color: var(--gold, #ffbe55); } .ds-nav button:hover { background: rgba(120,92,255,.12); } .ds-nav button:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+      "description": "Grupo rectangular reservado para los cuatro destinos principales; los comandos viven fuera de esta navegación.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Principal\"><button class=\"ds-nav-active\" type=\"button\">INICIO</button><button type=\"button\">COLECCIÓN</button><button type=\"button\">BANDEJA <span class=\"ds-nav-count\">3</span></button><button type=\"button\">CLUB</button></nav>",
+      "css": ".ds-nav { background: rgba(8,10,24,.74); border: 1px solid rgba(120,92,255,.46); display: flex; gap: 3px; padding: 3px; } .ds-nav button { align-items: center; background: transparent; border: 0; border-radius: 0; color: var(--muted, #a7aac7); cursor: pointer; display: inline-flex; font: 700 14px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; gap: 6px; min-height: 44px; padding: 6px 10px; } .ds-nav .ds-nav-active { background: rgba(34,216,229,.12); color: var(--teal, #22d8e5); } .ds-nav-count { background: var(--red, #ff3ea5); border-radius: 999px; color: var(--on-accent, #080a18); font: 800 10px/1 \"Courier New\", monospace; min-width: 18px; padding: 4px 5px; text-align: center; } .ds-nav button:hover { background: rgba(120,92,255,.12); } .ds-nav button:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Header Command",
+      "kind": "button",
+      "description": "Comando dorado separado de los destinos para abrir una obra al azar con alcance visible.",
+      "html": "<button class=\"ds-header-command\" type=\"button\"><span>Al azar</span><small>Disponibles</small></button>",
+      "css": ".ds-header-command { align-items: start; background: rgba(255,190,85,.09); border: 1px solid rgba(255,190,85,.52); border-radius: 3px; color: var(--gold, #ffbe55); cursor: pointer; display: grid; font: 700 14px/1.05 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; gap: 2px; min-height: 44px; padding: 7px 12px; } .ds-header-command small { color: var(--muted, #a7aac7); font: 800 10px/1.2 \"Courier New\", monospace; text-transform: uppercase; } .ds-header-command:hover { background: rgba(255,190,85,.14); } .ds-header-command:active { filter: brightness(.92); } .ds-header-command:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
     },
     {
       "name": "Status Chip",
       "kind": "chip",
       "refersTo": "status-chip",
       "description": "Estado compacto; la variante cyan confirma y la dorada advierte o puntua.",
-      "html": "<div class=\"ds-chip-row\"><span class=\"ds-chip ds-chip-good\">EN CATALOGO</span><span class=\"ds-chip ds-chip-warning\">8 / 10</span></div>",
+      "html": "<div class=\"ds-chip-row\"><span class=\"ds-chip ds-chip-good\">DISPONIBLE</span><span class=\"ds-chip ds-chip-warning\">8 / 10</span></div>",
       "css": ".ds-chip-row { display: flex; flex-wrap: wrap; gap: 6px; } .ds-chip { border: 1px solid rgba(139,124,255,.34); border-radius: 999px; color: #d6d4e8; font: 700 11px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; padding: 3px 7px; } .ds-chip-good { background: rgba(34,216,229,.1); border-color: rgba(34,216,229,.52); color: #9bf8ff; } .ds-chip-warning { background: rgba(255,190,85,.11); border-color: rgba(255,190,85,.52); color: var(--gold, #ffbe55); }"
     },
     {
@@ -236,7 +271,7 @@
       "kind": "card",
       "refersTo": "dvd-case",
       "description": "Componente firma para explorar una obra como objeto fisico.",
-      "html": "<article class=\"ds-dvd\"><button class=\"ds-dvd-open\" type=\"button\" aria-label=\"Abrir Blade Runner\"></button><span class=\"ds-dvd-spine\"></span><span class=\"ds-dvd-sticker\">EN CATALOGO</span><div class=\"ds-dvd-cover\"><small>MOVIE INBOX</small><strong>BLADE RUNNER</strong><span>1982 · PELICULA</span></div></article>",
+      "html": "<article class=\"ds-dvd\"><button class=\"ds-dvd-open\" type=\"button\" aria-label=\"Abrir Blade Runner\"></button><span class=\"ds-dvd-spine\"></span><span class=\"ds-dvd-sticker\">DISPONIBLE</span><div class=\"ds-dvd-cover\"><small>MOVIE INBOX</small><strong>BLADE RUNNER</strong><span>1982 · PELÍCULA</span></div></article>",
       "css": ".ds-dvd { aspect-ratio: 2/3; background: linear-gradient(90deg,#030511 0 8px,#25294c 8px 12px,var(--case,#080a18) 12px 100%); border: 1px solid #343a68; border-radius: 4px 10px 10px 4px; box-shadow: 0 14px 28px rgba(0,0,0,.4),-2px 0 13px rgba(120,92,255,.12); color: #fff; max-width: 220px; overflow: hidden; padding: 7px 7px 7px 13px; position: relative; transition: box-shadow 180ms ease, transform 180ms ease; } .ds-dvd:hover { box-shadow: 0 18px 38px rgba(0,0,0,.5),0 0 25px rgba(34,216,229,.18); transform: translateY(-4px); } .ds-dvd-open { background: transparent; border: 0; border-radius: inherit; cursor: pointer; inset: 0; position: absolute; z-index: 4; } .ds-dvd-open:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: -6px; } .ds-dvd-spine { background: linear-gradient(90deg,#03040e,#262b52 55%,#090b1c); border-right: 1px solid rgba(34,216,229,.28); bottom: 8px; left: 4px; position: absolute; top: 8px; width: 6px; } .ds-dvd-sticker { background: var(--gold,#ffbe55); border: 1px solid #39240a; color: #24170b; font: 900 8px/1.2 \"Courier New\",monospace; padding: 4px 6px; position: absolute; right: 10px; top: 10px; transform: rotate(3deg); } .ds-dvd-cover { align-content: end; background: linear-gradient(155deg,var(--red,#ff3ea5),#76256f 50%,#0a0c1d); display: grid; gap: 5px; height: 100%; padding: 18px 14px; text-align: center; } .ds-dvd-cover small,.ds-dvd-cover span { font: 800 8px/1.2 \"Courier New\",monospace; letter-spacing: .12em; text-transform: uppercase; } .ds-dvd-cover strong { font: italic 900 30px/.92 \"Arial Narrow\",\"Trebuchet MS\",sans-serif; overflow-wrap: anywhere; text-shadow: 2px 3px 0 rgba(0,0,0,.28); } @media (prefers-reduced-motion: reduce) { .ds-dvd { transition: none; } .ds-dvd:hover { transform: none; } }"
     },
     {
@@ -245,15 +280,15 @@
       "refersTo": "button-primary",
       "description": "Accion cinematografica dentro de una seleccion destacada.",
       "html": "<button class=\"ds-spotlight-cta\" type=\"button\">VER FICHA</button>",
-      "css": ".ds-spotlight-cta { background: var(--red,#ff3ea5); border: 1px solid rgba(255,255,255,.52); border-radius: 3px; color: #fff; cursor: pointer; font: 800 12px/1.2 \"Space Grotesk\",\"Trebuchet MS\",sans-serif; min-height: 36px; padding: 7px 13px; text-transform: uppercase; } .ds-spotlight-cta:hover,.ds-spotlight-cta:active { background: var(--red-dark,#d92a91); } .ds-spotlight-cta:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: 2px; }"
+      "css": ".ds-spotlight-cta { background: var(--red,#ff3ea5); border: 1px solid rgba(255,255,255,.52); border-radius: 3px; color: var(--on-accent,#080a18); cursor: pointer; font: 800 12px/1.2 \"Space Grotesk\",\"Trebuchet MS\",sans-serif; min-height: 36px; padding: 7px 13px; text-transform: uppercase; } .ds-spotlight-cta:hover,.ds-spotlight-cta:active { background: var(--red-dark,#d92a91); } .ds-spotlight-cta:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: 2px; }"
     },
     {
-      "name": "Detail State",
-      "kind": "card",
+      "name": "Detail Status Strip",
+      "kind": "custom",
       "refersTo": "status-chip",
-      "description": "Resumen accionable de disponibilidad, visualizacion o puntuacion dentro de la ficha.",
-      "html": "<button class=\"ds-detail-state ds-detail-state-active\" type=\"button\"><span>MI CATALOGO</span><strong>Disponible</strong><small>Cambiar disponibilidad</small></button>",
-      "css": ".ds-detail-state { align-content: start; background: rgba(25,29,56,.72); border: 1px solid rgba(120,92,255,.4); border-radius: 0; color: var(--ink,#f5f3ff); cursor: pointer; display: grid; gap: 2px; min-height: 74px; padding: 10px; text-align: left; } .ds-detail-state span { color: var(--muted,#a7aac7); font: 800 10px/1.2 \"Courier New\",monospace; letter-spacing: .1em; text-transform: uppercase; } .ds-detail-state strong { font: 700 15px/1.3 \"Space Grotesk\",\"Trebuchet MS\",sans-serif; } .ds-detail-state small { color: var(--muted,#a7aac7); font-size: 10px; } .ds-detail-state-active { background: rgba(34,216,229,.1); border-color: rgba(34,216,229,.68); } .ds-detail-state:hover { filter: brightness(1.08); } .ds-detail-state:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: 2px; }"
+      "description": "Franja de estado personal: Vista y Puntuación son acciones, mientras Disponibilidad informa el resultado efectivo y su procedencia.",
+      "html": "<section class=\"ds-detail-strip\" aria-label=\"Estado y disponibilidad\"><button class=\"ds-detail-state ds-detail-state-active\" type=\"button\"><span>ESTADO</span><strong>Vista</strong><small>14/08/2026</small></button><div class=\"ds-detail-state ds-detail-state-active\"><span>DISPONIBILIDAD</span><strong>Disponible</strong><small>Inventario del servidor</small></div><button class=\"ds-detail-state ds-detail-rating\" type=\"button\"><span>PUNTUACIÓN</span><strong>8/10</strong><small>Editar registro</small></button></section>",
+      "css": ".ds-detail-strip { display: grid; gap: 8px; grid-template-columns: repeat(3,minmax(0,1fr)); } .ds-detail-state { align-content: start; background: rgba(25,29,56,.72); border: 1px solid rgba(120,92,255,.4); border-radius: 0; color: var(--ink,#f5f3ff); display: grid; gap: 2px; min-height: 74px; padding: 10px; text-align: left; } button.ds-detail-state { cursor: pointer; } .ds-detail-state span { color: var(--muted,#a7aac7); font: 800 10px/1.2 \"Courier New\",monospace; letter-spacing: .1em; text-transform: uppercase; } .ds-detail-state strong { font: 700 15px/1.3 \"Space Grotesk\",\"Trebuchet MS\",sans-serif; } .ds-detail-state small { color: var(--muted,#a7aac7); font-size: 10px; } .ds-detail-state-active { background: rgba(34,216,229,.1); border-color: rgba(34,216,229,.68); } .ds-detail-rating { background: rgba(255,190,85,.1); border-color: rgba(255,190,85,.68); } button.ds-detail-state:hover { filter: brightness(1.08); } button.ds-detail-state:focus-visible { outline: 3px solid var(--teal,#22d8e5); outline-offset: 2px; } @media (max-width:640px) { .ds-detail-strip { grid-template-columns: 1fr 1fr; } .ds-detail-rating { grid-column: 1 / -1; } }"
     }
   ],
   "narrative": {
