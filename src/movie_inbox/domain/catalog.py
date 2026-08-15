@@ -7,8 +7,8 @@ import hashlib
 import html
 import re
 import unicodedata
-from collections.abc import Mapping, MutableMapping
-from datetime import datetime, timezone
+from collections.abc import Mapping, MutableMapping, Sequence
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -21,15 +21,19 @@ from movie_inbox.domain.curation import (
 from movie_inbox.domain.metadata import (
     METADATA_FIELDS,
     merge_local_files,
-    normalize_locked_fields,
     normalize_local_files,
+    normalize_locked_fields,
     normalize_metadata_sources,
 )
 from movie_inbox.domain.models import CatalogItem
-from movie_inbox.domain.normalization import normalize_bool, normalize_kind, normalize_rating, normalize_status
+from movie_inbox.domain.normalization import (
+    normalize_bool,
+    normalize_kind,
+    normalize_rating,
+    normalize_status,
+)
 from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
 from movie_inbox.domain.titles import infer_kind_from_text, looks_like_external_id
-
 
 KNOWN_LINK_HOSTS = {
     "wikipedia": "wikipedia.org",
@@ -52,12 +56,18 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         item["local_path"] = item.get("local_path") or first_local_file.get("path", "")
     item["added_at"] = str(item.get("added_at") or item.get("addedAt") or "")
     item["tags"] = normalize_tags(item.get("tags"))
-    item["alternative_titles"] = normalize_tags(item.get("alternative_titles") or item.get("alternativeTitles"))
+    item["alternative_titles"] = normalize_tags(
+        item.get("alternative_titles") or item.get("alternativeTitles")
+    )
     item["genres"] = normalize_tags(item.get("genres") or item.get("genre"))
     item["directors"] = normalize_tags(item.get("directors") or item.get("director"))
-    item["writers"] = normalize_tags(item.get("writers") or item.get("writer") or item.get("screenwriters"))
+    item["writers"] = normalize_tags(
+        item.get("writers") or item.get("writer") or item.get("screenwriters")
+    )
     item["cast"] = normalize_tags(item.get("cast") or item.get("actors") or item.get("actor"))
-    item["release_dates"] = normalize_release_dates(item.get("release_dates") or item.get("releaseDates"))
+    item["release_dates"] = normalize_release_dates(
+        item.get("release_dates") or item.get("releaseDates")
+    )
     if not str(item.get("year") or "").strip() and item["release_dates"]:
         item["year"] = str(item["release_dates"][0]["date"])[:4]
     item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
@@ -143,12 +153,27 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
     )
     item["duplicate_decisions"] = normalize_duplicate_decisions(item.get("duplicate_decisions"))
     if not item["id"]:
-        seed = item["url"] or item["local_path"] or item["local_name"] or f"{item['title']} {item['year']}".strip()
+        seed = (
+            item["url"]
+            or item["local_path"]
+            or item["local_name"]
+            or f"{item['title']} {item['year']}".strip()
+        )
         item["id"] = stable_id(seed) if seed else ""
     item["metadata_sources"] = ensure_metadata_sources(item)
     for alias in (
-        "addedAt", "originalTitle", "spanishTitle", "englishTitle", "alternativeTitles",
-        "watchedAt", "genre", "director", "writer", "screenwriters", "actors", "actor",
+        "addedAt",
+        "originalTitle",
+        "spanishTitle",
+        "englishTitle",
+        "alternativeTitles",
+        "watchedAt",
+        "genre",
+        "director",
+        "writer",
+        "screenwriters",
+        "actors",
+        "actor",
         "releaseDates",
     ):
         item.pop(alias, None)
@@ -313,7 +338,11 @@ def title_values_for_item(item: Mapping[str, Any]) -> list[str]:
 
 
 def title_match_keys_for_item(item: Mapping[str, Any]) -> list[str]:
-    return list(dict.fromkeys(key for key in (title_match_key(value) for value in title_values_for_item(item)) if key))
+    return list(
+        dict.fromkeys(
+            key for key in (title_match_key(value) for value in title_values_for_item(item)) if key
+        )
+    )
 
 
 def title_similarity(left: str, right: str) -> float:
@@ -324,7 +353,9 @@ def title_similarity(left: str, right: str) -> float:
     return len(left_terms & right_terms) / max(len(left_terms), len(right_terms))
 
 
-def same_catalog_item(item: Mapping[str, Any], item_id: str, item_url: str, title: str, year: str, local_name: str) -> bool:
+def same_catalog_item(
+    item: Mapping[str, Any], item_id: str, item_url: str, title: str, year: str, local_name: str
+) -> bool:
     if item_id and str(item.get("id") or "") == item_id:
         return True
     target_url = canonical_url(item_url)
@@ -332,14 +363,20 @@ def same_catalog_item(item: Mapping[str, Any], item_id: str, item_url: str, titl
         return True
     target_title = title_match_key(title or local_name)
     item_year = str(item.get("year") or "")
-    if target_title and target_title in title_match_keys_for_item(item) and (not year or not item_year or item_year == year):
+    if (
+        target_title
+        and target_title in title_match_keys_for_item(item)
+        and (not year or not item_year or item_year == year)
+    ):
         return True
     item_local = normalize_path_text(str(item.get("local_name") or item.get("local_path") or ""))
     target_local = normalize_path_text(local_name)
     return bool(item_local and target_local and item_local == target_local)
 
 
-def possible_duplicate_candidates(items: list[Mapping[str, Any]], item: Mapping[str, Any]) -> list[dict[str, Any]]:
+def possible_duplicate_candidates(
+    items: list[Mapping[str, Any]], item: Mapping[str, Any]
+) -> list[dict[str, Any]]:
     item_titles = title_match_keys_for_item(item)
     item_year = str(item.get("year") or "")
     candidates: list[dict[str, Any]] = []
@@ -483,12 +520,14 @@ def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
             pending = [
                 items[other_index]
                 for other_index in indexes
-                if other_index != index and duplicate_decision_status(item, items[other_index]) == "pending"
+                if other_index != index
+                and duplicate_decision_status(item, items[other_index]) == "pending"
             ]
             deferred = [
                 items[other_index]
                 for other_index in indexes
-                if other_index != index and duplicate_decision_status(item, items[other_index]) == "deferred"
+                if other_index != index
+                and duplicate_decision_status(item, items[other_index]) == "deferred"
             ]
             if pending:
                 item["_duplicate_count"] = len(pending)
@@ -497,16 +536,20 @@ def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
             if deferred:
                 item["_duplicate_deferred_count"] = len(deferred)
                 item["_duplicate_deferred_ids"] = [str(other.get("id") or "") for other in deferred]
-                item["_duplicate_deferred_refs"] = [curation_item_reference(other) for other in deferred]
+                item["_duplicate_deferred_refs"] = [
+                    curation_item_reference(other) for other in deferred
+                ]
             if pending or deferred:
                 item["_duplicate_reason"] = "misma URL o titulo/ano"
 
 
-def metadata_source_record(source: str, url: str, inferred: bool, updated_at: str = "") -> dict[str, Any]:
+def metadata_source_record(
+    source: str, url: str, inferred: bool, updated_at: str = ""
+) -> dict[str, Any]:
     return {
         "source": source or "unknown",
         "url": url,
-        "updated_at": updated_at or datetime.now(timezone.utc).isoformat(),
+        "updated_at": updated_at or datetime.now(UTC).isoformat(),
         "inferred": inferred,
     }
 
@@ -535,11 +578,15 @@ def ensure_metadata_sources(item: Mapping[str, Any]) -> dict[str, dict[str, Any]
     for field in METADATA_FIELDS:
         value = item.get(field)
         if field not in sources and value not in (None, "", [], {}):
-            sources[field] = metadata_source_record(source, url, True, str(item.get("added_at") or ""))
+            sources[field] = metadata_source_record(
+                source, url, True, str(item.get("added_at") or "")
+            )
     return sources
 
 
-def merge_metadata_field(existing: MutableMapping[str, Any], incoming: Mapping[str, Any], field: str) -> None:
+def merge_metadata_field(
+    existing: MutableMapping[str, Any], incoming: Mapping[str, Any], field: str
+) -> None:
     if field in normalize_locked_fields(existing.get("locked_fields")):
         return
     before = existing.get(field)
@@ -547,7 +594,11 @@ def merge_metadata_field(existing: MutableMapping[str, Any], incoming: Mapping[s
     if field == "release_dates":
         after: Any = merge_release_dates(before, incoming_value)
     else:
-        after = merge_lists(normalize_tags(before), normalize_tags(incoming_value)) if field in LIST_FIELDS else before or incoming_value
+        after = (
+            merge_lists(normalize_tags(before), normalize_tags(incoming_value))
+            if field in LIST_FIELDS
+            else before or incoming_value
+        )
     if after == before:
         return
     existing[field] = after
@@ -569,7 +620,9 @@ def is_wikipedia_item(item: Mapping[str, Any]) -> bool:
     )
 
 
-def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping[str, Any], target_id: str) -> bool:
+def merge_into_existing(
+    items: Sequence[MutableMapping[str, Any]], incoming: Mapping[str, Any], target_id: str
+) -> bool:
     incoming_kind_explicit = bool(str(incoming.get("kind") or "").strip())
     incoming = normalize_item(incoming)
     for existing in items:
@@ -578,7 +631,11 @@ def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping
         incoming_url = str(incoming.get("url") or "")
         incoming_source_field = source_url_field(str(incoming.get("source") or ""), incoming_url)
         existing["url"] = existing.get("url") or incoming_url
-        existing["source"] = incoming.get("source") if existing.get("source") in {"", "local_files"} else existing.get("source")
+        existing["source"] = (
+            incoming.get("source")
+            if existing.get("source") in {"", "local_files"}
+            else existing.get("source")
+        )
         for field in METADATA_FIELDS:
             if field != "kind":
                 merge_metadata_field(existing, incoming, field)
@@ -598,10 +655,15 @@ def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping
             existing["metadata_sources"] = sources
         else:
             existing["kind"] = existing_kind
-        statuses = {normalize_status(existing.get("status")), normalize_status(incoming.get("status"))}
+        statuses = {
+            normalize_status(existing.get("status")),
+            normalize_status(incoming.get("status")),
+        }
         existing["status"] = "watched" if "watched" in statuses else "to_watch"
         existing["watched_at"] = existing.get("watched_at") or incoming.get("watched_at", "")
-        existing["rating"] = normalize_rating(existing.get("rating")) or normalize_rating(incoming.get("rating"))
+        existing["rating"] = normalize_rating(existing.get("rating")) or normalize_rating(
+            incoming.get("rating")
+        )
         if incoming_source_field and incoming_url:
             existing[incoming_source_field] = existing.get(incoming_source_field) or incoming_url
         for field in ("wikipedia_url", "imdb_url", "filmaffinity_url"):
@@ -609,15 +671,29 @@ def merge_into_existing(items: list[MutableMapping[str, Any]], incoming: Mapping
         if not existing.get("wikipedia_url") and is_wikipedia_item(incoming):
             existing["wikipedia_url"] = incoming_url
         if not existing.get("wikipedia_title") and is_wikipedia_item(incoming):
-            merge_metadata_field(existing, {**incoming, "wikipedia_title": incoming.get("title", "")}, "wikipedia_title")
+            merge_metadata_field(
+                existing,
+                {**incoming, "wikipedia_title": incoming.get("title", "")},
+                "wikipedia_title",
+            )
         existing["en_catalogo"] = bool(existing.get("en_catalogo") or incoming.get("en_catalogo"))
         existing["local_files"] = merge_local_files(
-            normalize_local_files(existing.get("local_files"), existing.get("local_name", ""), existing.get("local_path", "")),
-            normalize_local_files(incoming.get("local_files"), incoming.get("local_name", ""), incoming.get("local_path", "")),
+            normalize_local_files(
+                existing.get("local_files"),
+                existing.get("local_name", ""),
+                existing.get("local_path", ""),
+            ),
+            normalize_local_files(
+                incoming.get("local_files"),
+                incoming.get("local_name", ""),
+                incoming.get("local_path", ""),
+            ),
         )
         for field in ("local_name", "local_path", "notes", "review", "added_at"):
             existing[field] = existing.get(field) or incoming.get(field, "")
-        existing["tags"] = sorted(set(normalize_tags(existing.get("tags")) + normalize_tags(incoming.get("tags"))))
+        existing["tags"] = sorted(
+            set(normalize_tags(existing.get("tags")) + normalize_tags(incoming.get("tags")))
+        )
         existing["locked_fields"] = normalize_locked_fields(existing.get("locked_fields"))
         existing["metadata_sources"] = ensure_metadata_sources(existing)
         existing["link_curation_status"] = normalize_link_curation_status(

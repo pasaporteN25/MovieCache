@@ -5,6 +5,5 @@ ensure_src()
 
 from movie_inbox.cli.scan_library import *  # noqa: F401,F403,E402
 
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main())  # noqa: F405

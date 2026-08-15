@@ -7,7 +7,6 @@ from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
-
 RELEASE_DATE_PRECISIONS = {"year", "month", "day"}
 RELEASE_DATE_FIELDS = {
     "date",
@@ -21,18 +20,26 @@ RELEASE_DATE_FIELDS = {
 
 
 def normalize_release_dates(value: Any) -> list[dict[str, Any]]:
-    rows = value if isinstance(value, list) else [value] if isinstance(value, (str, Mapping)) else []
+    rows = (
+        value if isinstance(value, list) else [value] if isinstance(value, (str, Mapping)) else []
+    )
     normalized: list[dict[str, Any]] = []
     positions: dict[tuple[str, str, str], int] = {}
     for raw_row in rows:
-        row = {"date": raw_row} if isinstance(raw_row, str) else dict(raw_row) if isinstance(raw_row, Mapping) else {}
+        row = (
+            {"date": raw_row}
+            if isinstance(raw_row, str)
+            else dict(raw_row)
+            if isinstance(raw_row, Mapping)
+            else {}
+        )
         release_date, precision = normalize_release_date_value(
             row.get("date"),
             str(row.get("precision") or ""),
         )
         if not release_date:
             continue
-        normalized_row = {
+        normalized_row: dict[str, Any] = {
             "date": release_date,
             "precision": precision,
             "country": str(row.get("country") or "").strip(),
@@ -67,7 +74,9 @@ def normalize_release_dates(value: Any) -> list[dict[str, Any]]:
 
 
 def merge_release_dates(primary: Any, secondary: Any) -> list[dict[str, Any]]:
-    return normalize_release_dates([*normalize_release_dates(primary), *normalize_release_dates(secondary)])
+    return normalize_release_dates(
+        [*normalize_release_dates(primary), *normalize_release_dates(secondary)]
+    )
 
 
 def primary_release_date(value: Any) -> dict[str, Any] | None:
@@ -79,8 +88,10 @@ def normalize_release_date_value(value: Any, precision: str = "") -> tuple[str, 
     raw = str(value or "").strip().lstrip("+")
     requested_precision = precision.strip().casefold()
     if requested_precision not in RELEASE_DATE_PRECISIONS:
-        requested_precision = "day" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw) else (
-            "month" if re.fullmatch(r"\d{4}-\d{2}", raw) else "year"
+        requested_precision = (
+            "day"
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw)
+            else ("month" if re.fullmatch(r"\d{4}-\d{2}", raw) else "year")
         )
     match = re.match(r"^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?", raw)
     if not match:

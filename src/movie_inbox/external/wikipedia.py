@@ -16,7 +16,13 @@ from movie_inbox.domain.titles import (
     infer_kind_from_text,
     infer_year,
 )
-from movie_inbox.external.common import dedupe_results, fetch_json, fetch_json_safe, interleave_batches, result_index
+from movie_inbox.external.common import (
+    dedupe_results,
+    fetch_json,
+    fetch_json_safe,
+    interleave_batches,
+    result_index,
+)
 from movie_inbox.external.wikidata import (
     fetch_wikidata_article_url,
     fetch_wikidata_metadata,
@@ -48,7 +54,9 @@ class WikipediaAdapter:
         batches: dict[str, list[dict[str, Any]]] = {language: [] for language in languages}
         completed = 0
         errors: list[Exception] = []
-        with ThreadPoolExecutor(max_workers=len(languages), thread_name_prefix="wikipedia-search") as executor:
+        with ThreadPoolExecutor(
+            max_workers=len(languages), thread_name_prefix="wikipedia-search"
+        ) as executor:
             futures = {
                 executor.submit(self._search_language, search_title, language): language
                 for language in languages
@@ -80,7 +88,10 @@ class WikipediaAdapter:
             results = []
             search_error = error
         query_key = parse_search_query(query).title_key or search_key(query)
-        if any(parse_search_query(str(row.get("title") or "")).title_key == query_key for row in results):
+        if any(
+            parse_search_query(str(row.get("title") or "")).title_key == query_key
+            for row in results
+        ):
             return results
 
         try:
@@ -89,7 +100,7 @@ class WikipediaAdapter:
             if results:
                 return results
             if search_error is not None:
-                raise search_error
+                raise search_error from None
             raise
         return dedupe_results([*direct, *results])
 
@@ -164,18 +175,28 @@ def wikipedia_result_from_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
         "spanish_title": str(metadata.get("spanish_title") or ""),
         "english_title": str(metadata.get("english_title") or ""),
         "alternative_titles": (
-            metadata.get("alternative_titles") if isinstance(metadata.get("alternative_titles"), list) else []
+            metadata.get("alternative_titles")
+            if isinstance(metadata.get("alternative_titles"), list)
+            else []
         ),
         "kind": str(metadata.get("kind") or "pelicula"),
-        "year": str(metadata.get("year") or infer_year(str(metadata.get("wikipedia_extract") or ""))),
-        "release_dates": metadata.get("release_dates") if isinstance(metadata.get("release_dates"), list) else [],
+        "year": str(
+            metadata.get("year") or infer_year(str(metadata.get("wikipedia_extract") or ""))
+        ),
+        "release_dates": metadata.get("release_dates")
+        if isinstance(metadata.get("release_dates"), list)
+        else [],
         "url": page_url,
-        "description": str(metadata.get("description") or metadata.get("wikipedia_extract") or "")[:360],
+        "description": str(metadata.get("description") or metadata.get("wikipedia_extract") or "")[
+            :360
+        ],
         "wikipedia_url": page_url,
         "wikipedia_title": title,
         "wikidata_id": str(metadata.get("wikidata_id") or ""),
         "genres": metadata.get("genres") if isinstance(metadata.get("genres"), list) else [],
-        "directors": metadata.get("directors") if isinstance(metadata.get("directors"), list) else [],
+        "directors": metadata.get("directors")
+        if isinstance(metadata.get("directors"), list)
+        else [],
         "writers": metadata.get("writers") if isinstance(metadata.get("writers"), list) else [],
         "cast": metadata.get("cast") if isinstance(metadata.get("cast"), list) else [],
         "page_image": str(metadata.get("page_image") or ""),
@@ -193,7 +214,9 @@ def fetch_wikipedia_metadata(url: str) -> dict[str, Any]:
         return {}
 
     language = host.split(".")[0] if "." in host else "en"
-    summary_url = f"https://{language}.wikipedia.org/api/rest_v1/page/summary/{quote(page_title, safe='')}"
+    summary_url = (
+        f"https://{language}.wikipedia.org/api/rest_v1/page/summary/{quote(page_title, safe='')}"
+    )
     raw = fetch_json_safe(summary_url, timeout=5)
     if not raw:
         return fetch_wikipedia_metadata_action_api(language, page_title)
@@ -236,7 +259,10 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
     pages = query.get("pages") if isinstance(query, dict) else {}
     if not isinstance(pages, dict):
         return {}
-    page = next((value for value in pages.values() if isinstance(value, dict) and "missing" not in value), {})
+    page = next(
+        (value for value in pages.values() if isinstance(value, dict) and "missing" not in value),
+        {},
+    )
     if not page:
         return {}
 
@@ -275,7 +301,8 @@ def fetch_wikipedia_by_title(title: str, year: str = "") -> dict[str, Any]:
     for language in ["en", "es"]:
         for candidate in wikipedia_direct_candidates(query, year, language):
             metadata = fetch_wikipedia_metadata(
-                f"https://{language}.wikipedia.org/wiki/{quote(candidate.replace(' ', '_'), safe='')}"
+                f"https://{language}.wikipedia.org/wiki/"
+                f"{quote(candidate.replace(' ', '_'), safe='')}"
             )
             if wikipedia_match_score(query, year, candidate, "", metadata) >= 3:
                 return metadata
@@ -292,7 +319,8 @@ def fetch_wikipedia_by_title(title: str, year: str = "") -> dict[str, Any]:
                 page_title = str(result.get("title") or "")
                 snippet = clean_whitespace(strip_html(str(result.get("snippet") or "")))
                 metadata = fetch_wikipedia_metadata(
-                    f"https://{language}.wikipedia.org/wiki/{quote(page_title.replace(' ', '_'), safe='')}"
+                    f"https://{language}.wikipedia.org/wiki/"
+                    f"{quote(page_title.replace(' ', '_'), safe='')}"
                 )
                 score = wikipedia_match_score(query, year, page_title, snippet, metadata)
                 if score > best[0]:
@@ -321,7 +349,10 @@ def fetch_wikipedia_by_wikidata_title(title: str, year: str = "") -> dict[str, A
             article_url = fetch_wikidata_article_url(entity_id)
             if article_url:
                 metadata = fetch_wikipedia_metadata(article_url)
-                if metadata and wikipedia_match_score(title, year, label, description, metadata) >= 3:
+                if (
+                    metadata
+                    and wikipedia_match_score(title, year, label, description, metadata) >= 3
+                ):
                     return metadata
     return {}
 
@@ -385,7 +416,10 @@ def wikipedia_match_score(
         score += 2
     if any(marker in description for marker in ["film", "movie", "pelicula"]):
         score += 2
-    if any(marker in f"{extract} {snippet_key}" for marker in ["directed by", "starring", "film", "movie", "pelicula"]):
+    if any(
+        marker in f"{extract} {snippet_key}"
+        for marker in ["directed by", "starring", "film", "movie", "pelicula"]
+    ):
         score += 1
     return score
 
@@ -399,7 +433,8 @@ def normalize_match_text(value: str) -> str:
 
 def clean_search_title(value: str) -> str:
     value = re.sub(
-        r"\s*\((film|movie|pelicula|miniserie|tv series|serie de tv|video game|cortometraje)[^)]*\)?\s*$",
+        r"\s*\((film|movie|pelicula|miniserie|tv series|serie de tv|video game|cortometraje)"
+        r"[^)]*\)?\s*$",
         "",
         value,
         flags=re.IGNORECASE,

@@ -8,18 +8,21 @@ from pathlib import Path
 from movie_inbox.web.config import DEFAULT_IMAGE_CACHE_TOTAL_BYTES
 from movie_inbox.web.image_proxy import clear_image_cache, image_cache_info, prune_image_cache
 
-
 DEFAULT_CACHE_DIR = Path(".catalog-cache/images")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Inspect, prune or clear the Movie Inbox image cache.")
+    parser = argparse.ArgumentParser(
+        description="Inspect, prune or clear the Movie Inbox image cache."
+    )
     commands = parser.add_subparsers(dest="command", required=True)
 
     info_parser = commands.add_parser("info", help="Show cache path, file count and total size.")
     add_cache_dir(info_parser)
 
-    prune_parser = commands.add_parser("prune", help="Remove least-recently-used images above the size limit.")
+    prune_parser = commands.add_parser(
+        "prune", help="Remove least-recently-used images above the size limit."
+    )
     add_cache_dir(prune_parser)
     prune_parser.add_argument(
         "--max-total-mb",
@@ -38,7 +41,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "clear":
         info = clear_image_cache(args.cache_dir)
-        print(f"Cleared {info.removed_files} files ({format_bytes(info.removed_bytes)}) from {info.path}")
+        print(
+            f"Cleared {info.removed_files} files "
+            f"({format_bytes(info.removed_bytes)}) from {info.path}"
+        )
         return 0
     if args.max_total_mb <= 0:
         parser.error("--max-total-mb must be greater than zero")
@@ -59,7 +65,9 @@ def add_cache_dir(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def print_cache_info(path: Path, files: int, total_bytes: int, max_bytes: int | None = None) -> None:
+def print_cache_info(
+    path: Path, files: int, total_bytes: int, max_bytes: int | None = None
+) -> None:
     print("Image cache")
     print(f"- Path: {path.resolve()}")
     print(f"- Files: {files}")

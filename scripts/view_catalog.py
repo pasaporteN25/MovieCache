@@ -5,13 +5,12 @@ from _package_bootstrap import ensure_src
 
 ensure_src()
 
-from movie_inbox.web.assets import render_html  # noqa: E402
-from movie_inbox.web.app import create_app  # noqa: E402
+from movie_inbox.web.app import create_app  # noqa: F401,E402
+from movie_inbox.web.assets import render_html  # noqa: F401,E402
 from movie_inbox.web.catalog_api import *  # noqa: F401,F403,E402
-from movie_inbox.web.config import ViewerConfig  # noqa: E402
+from movie_inbox.web.config import ViewerConfig  # noqa: F401,E402
 from movie_inbox.web.image_proxy import *  # noqa: F401,F403,E402
 from movie_inbox.web.server import main  # noqa: E402
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

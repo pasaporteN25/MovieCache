@@ -5,9 +5,12 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field, fields
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, Self, TypedDict, cast
 
 from movie_inbox.domain.normalization import normalize_bool
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 
 
 class ModelMapping(MutableMapping[str, Any]):
@@ -15,7 +18,8 @@ class ModelMapping(MutableMapping[str, Any]):
 
     @classmethod
     def model_fields(cls) -> tuple[str, ...]:
-        return tuple(row.name for row in fields(cls) if row.name != "extra")
+        dataclass_cls = cast("type[DataclassInstance]", cls)
+        return tuple(row.name for row in fields(dataclass_cls) if row.name != "extra")
 
     def __getitem__(self, key: str) -> Any:
         if key in self.model_fields():
@@ -41,7 +45,9 @@ class ModelMapping(MutableMapping[str, Any]):
         yield from (key for key in self.extra if key not in self.model_fields())
 
     def __len__(self) -> int:
-        return len(self.model_fields()) + len([key for key in self.extra if key not in self.model_fields()])
+        return len(self.model_fields()) + len(
+            [key for key in self.extra if key not in self.model_fields()]
+        )
 
     def coerce_field(self, key: str, value: Any) -> Any:
         return value
@@ -52,7 +58,7 @@ class ModelMapping(MutableMapping[str, Any]):
         return payload
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]):
+    def from_mapping(cls, value: Mapping[str, Any]) -> Self:
         names = set(cls.model_fields())
         kwargs = {key: value[key] for key in names if key in value}
         instance = cls(**kwargs)
@@ -90,7 +96,16 @@ class LocalFile(ModelMapping):
     extra: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        for key in ("path", "name", "modified_at", "part", "library_id", "relative_path", "fingerprint", "last_seen_at"):
+        for key in (
+            "path",
+            "name",
+            "modified_at",
+            "part",
+            "library_id",
+            "relative_path",
+            "fingerprint",
+            "last_seen_at",
+        ):
             setattr(self, key, str(getattr(self, key) or ""))
         try:
             self.size_bytes = max(0, int(self.size_bytes or 0))
@@ -150,17 +165,25 @@ class CatalogItem(ModelMapping):
         self.release_dates = normalize_release_dates(self.release_dates)
         self.local_files = self.coerce_field("local_files", self.local_files)
         self.metadata_sources = self.coerce_field("metadata_sources", self.metadata_sources)
-        self.duplicate_decisions = self.coerce_field("duplicate_decisions", self.duplicate_decisions)
+        self.duplicate_decisions = self.coerce_field(
+            "duplicate_decisions", self.duplicate_decisions
+        )
 
     def coerce_field(self, key: str, value: Any) -> Any:
         if key == "local_files":
             rows = value if isinstance(value, list) else []
-            return [row if isinstance(row, LocalFile) else LocalFile.from_mapping(row) for row in rows if isinstance(row, Mapping)]
+            return [
+                row if isinstance(row, LocalFile) else LocalFile.from_mapping(row)
+                for row in rows
+                if isinstance(row, Mapping)
+            ]
         if key == "metadata_sources":
             if not isinstance(value, Mapping):
                 return {}
             return {
-                str(field_name): row if isinstance(row, MetadataSource) else MetadataSource.from_mapping(row)
+                str(field_name): row
+                if isinstance(row, MetadataSource)
+                else MetadataSource.from_mapping(row)
                 for field_name, row in value.items()
                 if isinstance(row, Mapping)
             }

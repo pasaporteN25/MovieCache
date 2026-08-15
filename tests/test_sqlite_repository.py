@@ -10,7 +10,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.repository import CatalogFormatError, CatalogRepositoryError
 from movie_inbox.cli.database import export_json, import_json, verify_catalog_round_trip
@@ -100,7 +99,8 @@ class SqliteRepositoryTests(unittest.TestCase):
             with closing(sqlite3.connect(path)) as connection:
                 connection.executescript(SCHEMA_V1)
                 connection.execute(
-                    "INSERT INTO schema_migrations(version, name, applied_at) VALUES (1, 'initial', '2026-07-01')"
+                    "INSERT INTO schema_migrations(version, name, applied_at) "
+                    "VALUES (1, 'initial', '2026-07-01')"
                 )
                 connection.commit()
 
@@ -108,8 +108,16 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(repository.database_version(), 4)
             with closing(sqlite3.connect(path)) as connection:
                 columns = {row[1] for row in connection.execute("PRAGMA table_info(catalog_items)")}
-                tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-            self.assertTrue({"backdrop_image", "tmdb_id", "link_curation_status", "curation_updated_at"} <= columns)
+                tables = {
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
+                }
+            self.assertTrue(
+                {"backdrop_image", "tmdb_id", "link_curation_status", "curation_updated_at"}
+                <= columns
+            )
             self.assertIn("duplicate_decisions", tables)
             self.assertIn("release_dates", tables)
 
@@ -129,7 +137,9 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.tmdb_id, "949")
             self.assertEqual(loaded.release_dates[0]["date"], "1995-12-15")
             self.assertEqual(loaded.link_curation_status, "resolved")
-            self.assertEqual(loaded.duplicate_decisions["other::catalog.json"]["status"], "not_duplicate")
+            self.assertEqual(
+                loaded.duplicate_decisions["other::catalog.json"]["status"], "not_duplicate"
+            )
             self.assertEqual(loaded.local_files[0].library_id, "movies-a")
             self.assertEqual(loaded.metadata_sources["title"].source, "imdb")
             self.assertEqual(loaded.extra["custom_field"], "preserved")
@@ -137,10 +147,20 @@ class SqliteRepositoryTests(unittest.TestCase):
             with closing(sqlite3.connect(path)) as connection:
                 tables = {
                     row[0]
-                    for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+                    for row in connection.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
                 }
             self.assertTrue(
-                {"catalog_items", "external_ids", "local_files", "seasons", "episodes", "duplicate_decisions", "release_dates"}
+                {
+                    "catalog_items",
+                    "external_ids",
+                    "local_files",
+                    "seasons",
+                    "episodes",
+                    "duplicate_decisions",
+                    "release_dates",
+                }
                 <= tables
             )
             self.assertEqual(repository.database_version(), 4)
@@ -149,7 +169,9 @@ class SqliteRepositoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
             repository.write([sample_item()])
-            updated, reason = CatalogService(repository).update_status("heat-1995", "watched", "2026-07-15")
+            updated, reason = CatalogService(repository).update_status(
+                "heat-1995", "watched", "2026-07-15"
+            )
             self.assertTrue(updated)
             self.assertEqual(reason, "updated")
             loaded = repository.read()[0]
@@ -173,10 +195,14 @@ class SqliteRepositoryTests(unittest.TestCase):
                 )
                 connection.commit()
 
-            updated, _ = CatalogService(repository).update_status("heat-1995", "watched", "2026-07-15")
+            updated, _ = CatalogService(repository).update_status(
+                "heat-1995", "watched", "2026-07-15"
+            )
             self.assertTrue(updated)
             with closing(sqlite3.connect(path)) as connection:
-                self.assertEqual(connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0)
+                self.assertEqual(
+                    connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0
+                )
 
     def test_metadata_update_only_rewrites_changed_relations(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -202,7 +228,9 @@ class SqliteRepositoryTests(unittest.TestCase):
             )
             self.assertTrue(updated)
             with closing(sqlite3.connect(path)) as connection:
-                self.assertEqual(connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0)
+                self.assertEqual(
+                    connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0
+                )
             self.assertEqual(repository.get("heat-1995").genres, ["Crime", "Thriller"])
 
     def test_batch_mutation_does_not_rewrite_unchanged_items(self) -> None:
@@ -228,7 +256,9 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertTrue(added)
             self.assertEqual(reason, "added")
             with closing(sqlite3.connect(path)) as connection:
-                self.assertEqual(connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0)
+                self.assertEqual(
+                    connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0
+                )
             self.assertEqual([item.id for item in repository.read()], ["arrival-2016", "heat-1995"])
 
     def test_scanner_item_is_created_once_and_reused_by_strong_identity(self) -> None:
@@ -252,14 +282,16 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(reused_result["item"]["id"], result["item"]["id"])
             self.assertEqual(len(repository.read()), 2)
             with self.assertRaisesRegex(ValueError, "four-digit year"):
-                service.ensure_scanner_item({"title": "Arrival", "year": "unknown", "kind": "pelicula"})
+                service.ensure_scanner_item(
+                    {"title": "Arrival", "year": "unknown", "kind": "pelicula"}
+                )
 
     def test_scanner_requires_the_current_review_token_to_keep_both_works(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
-            repository.write([
-                normalize_item({"id": "once-upon", "title": "Once Upon a Time", "year": "2020"})
-            ])
+            repository.write(
+                [normalize_item({"id": "once-upon", "title": "Once Upon a Time", "year": "2020"})]
+            )
             service = CatalogService(repository)
             payload = {
                 "title": "Once Upon Time",
@@ -269,25 +301,33 @@ class SqliteRepositoryTests(unittest.TestCase):
             }
 
             blocked, blocked_reason, review = service.ensure_scanner_item(payload)
-            blocked_without_intent, no_intent_reason, _ = service.ensure_scanner_item({
-                **payload,
-                "distinct_review_token": review["distinct_review_token"],
-            })
-            blocked_again, repeated_reason, repeated_review = service.ensure_scanner_item({
-                **payload,
-                "distinct_intent": True,
-                "distinct_review_token": "stale-token",
-            })
-            created, created_reason, created_result = service.ensure_scanner_item({
-                **payload,
-                "distinct_intent": True,
-                "distinct_review_token": repeated_review["distinct_review_token"],
-            })
-            retried, retry_reason, retry_result = service.ensure_scanner_item({
-                **payload,
-                "distinct_intent": True,
-                "distinct_review_token": repeated_review["distinct_review_token"],
-            })
+            blocked_without_intent, no_intent_reason, _ = service.ensure_scanner_item(
+                {
+                    **payload,
+                    "distinct_review_token": review["distinct_review_token"],
+                }
+            )
+            blocked_again, repeated_reason, repeated_review = service.ensure_scanner_item(
+                {
+                    **payload,
+                    "distinct_intent": True,
+                    "distinct_review_token": "stale-token",
+                }
+            )
+            created, created_reason, created_result = service.ensure_scanner_item(
+                {
+                    **payload,
+                    "distinct_intent": True,
+                    "distinct_review_token": repeated_review["distinct_review_token"],
+                }
+            )
+            retried, retry_reason, retry_result = service.ensure_scanner_item(
+                {
+                    **payload,
+                    "distinct_intent": True,
+                    "distinct_review_token": repeated_review["distinct_review_token"],
+                }
+            )
 
             self.assertFalse(blocked)
             self.assertEqual(blocked_reason, "possible_duplicate")
@@ -296,7 +336,9 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(no_intent_reason, "possible_duplicate")
             self.assertFalse(blocked_again)
             self.assertEqual(repeated_reason, "possible_duplicate")
-            self.assertEqual(review["distinct_review_token"], repeated_review["distinct_review_token"])
+            self.assertEqual(
+                review["distinct_review_token"], repeated_review["distinct_review_token"]
+            )
             self.assertTrue(created)
             self.assertEqual(created_reason, "created_distinct")
             self.assertEqual(created_result["reviewed_candidate_ids"], ["once-upon"])
@@ -311,9 +353,13 @@ class SqliteRepositoryTests(unittest.TestCase):
     def test_scanner_only_overrides_an_exact_match_after_distinct_review(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
-            repository.write([
-                normalize_item({"id": "heat-imdb", "title": "Heat", "year": "1995", "kind": "pelicula"})
-            ])
+            repository.write(
+                [
+                    normalize_item(
+                        {"id": "heat-imdb", "title": "Heat", "year": "1995", "kind": "pelicula"}
+                    )
+                ]
+            )
             service = CatalogService(repository)
             payload = {
                 "title": "Heat",
@@ -323,15 +369,19 @@ class SqliteRepositoryTests(unittest.TestCase):
             }
 
             reused, reused_reason, reused_result = service.ensure_scanner_item(payload)
-            blocked, blocked_reason, review = service.ensure_scanner_item({
-                **payload,
-                "distinct_intent": True,
-            })
-            created, created_reason, created_result = service.ensure_scanner_item({
-                **payload,
-                "distinct_intent": True,
-                "distinct_review_token": review["distinct_review_token"],
-            })
+            blocked, blocked_reason, review = service.ensure_scanner_item(
+                {
+                    **payload,
+                    "distinct_intent": True,
+                }
+            )
+            created, created_reason, created_result = service.ensure_scanner_item(
+                {
+                    **payload,
+                    "distinct_intent": True,
+                    "distinct_review_token": review["distinct_review_token"],
+                }
+            )
 
             self.assertFalse(reused)
             self.assertEqual(reused_reason, "existing")
@@ -346,15 +396,19 @@ class SqliteRepositoryTests(unittest.TestCase):
     def test_scanner_blocks_numeric_title_with_a_bad_legacy_year(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = SqliteCatalogRepository(Path(temporary) / "catalog.sqlite", normalize_item)
-            repository.write([
-                normalize_item({
-                    "id": "legacy-1917",
-                    "title": "1917",
-                    "year": "1917",
-                    "kind": "pelicula",
-                    "imdb_url": "https://www.imdb.com/title/tt8579674/",
-                })
-            ])
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "legacy-1917",
+                            "title": "1917",
+                            "year": "1917",
+                            "kind": "pelicula",
+                            "imdb_url": "https://www.imdb.com/title/tt8579674/",
+                        }
+                    )
+                ]
+            )
 
             created, reason, result = CatalogService(repository).ensure_scanner_item(
                 {"title": "1917", "year": "2019", "kind": "pelicula"}
@@ -419,14 +473,19 @@ class SqliteRepositoryTests(unittest.TestCase):
                     ("series-1-s1", "series-1", 1, "Season 1"),
                 )
                 connection.execute(
-                    "INSERT INTO episodes(id, season_id, episode_number, title) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO episodes(id, season_id, episode_number, title) "
+                    "VALUES (?, ?, ?, ?)",
                     ("series-1-s1-e1", "series-1-s1", 1, "Pilot"),
                 )
                 connection.commit()
             CatalogService(repository).update_catalog_status("series-1", False)
             with closing(sqlite3.connect(path)) as connection:
-                self.assertEqual(connection.execute("SELECT COUNT(*) FROM seasons").fetchone()[0], 1)
-                self.assertEqual(connection.execute("SELECT COUNT(*) FROM episodes").fetchone()[0], 1)
+                self.assertEqual(
+                    connection.execute("SELECT COUNT(*) FROM seasons").fetchone()[0], 1
+                )
+                self.assertEqual(
+                    connection.execute("SELECT COUNT(*) FROM episodes").fetchone()[0], 1
+                )
 
     def test_duplicate_item_ids_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -464,12 +523,16 @@ class SqliteRepositoryTests(unittest.TestCase):
                     raise OSError(30, "Read-only file system", str(path))
                 return original_open(path, flags, mode)
 
-            with patch("movie_inbox.infrastructure.json_repository.os.open", side_effect=reject_source_lock):
+            with patch(
+                "movie_inbox.infrastructure.json_repository.os.open", side_effect=reject_source_lock
+            ):
                 with redirect_stdout(StringIO()):
                     self.assertEqual(import_json(source, database), 0)
 
             self.assertFalse(lock_path.exists())
-            self.assertEqual(SqliteCatalogRepository(database, normalize_item).read()[0].id, "heat-1995")
+            self.assertEqual(
+                SqliteCatalogRepository(database, normalize_item).read()[0].id, "heat-1995"
+            )
 
     def test_read_only_json_repository_rejects_writes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -485,7 +548,9 @@ class SqliteRepositoryTests(unittest.TestCase):
         expected = sample_item()
         changed = sample_item()
         changed.review = "A changed review must fail verification"
-        with self.assertRaisesRegex(RuntimeError, r"canonical catalog documents differ at \$\.items\[0\]\.review"):
+        with self.assertRaisesRegex(
+            RuntimeError, r"canonical catalog documents differ at \$\.items\[0\]\.review"
+        ):
             verify_catalog_round_trip([expected], [changed], "test")
 
     def test_normalizing_an_item_does_not_duplicate_its_legacy_local_file(self) -> None:
@@ -505,7 +570,9 @@ class SqliteRepositoryTests(unittest.TestCase):
             with redirect_stdout(StringIO()):
                 self.assertEqual(import_json(source, database), 2)
 
-            self.assertEqual(SqliteCatalogRepository(database, normalize_item).read()[0].id, "existing-item")
+            self.assertEqual(
+                SqliteCatalogRepository(database, normalize_item).read()[0].id, "existing-item"
+            )
 
     def test_export_rejects_missing_database_and_non_json_destination(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -528,8 +595,14 @@ class SqliteRepositoryTests(unittest.TestCase):
     def test_repository_factory_uses_file_extension(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.assertIsInstance(open_catalog_repository(root / "catalog.json", normalize_item), JsonCatalogRepository)
-            self.assertIsInstance(open_catalog_repository(root / "catalog.db", normalize_item), SqliteCatalogRepository)
+            self.assertIsInstance(
+                open_catalog_repository(root / "catalog.json", normalize_item),
+                JsonCatalogRepository,
+            )
+            self.assertIsInstance(
+                open_catalog_repository(root / "catalog.db", normalize_item),
+                SqliteCatalogRepository,
+            )
             with self.assertRaises(ValueError):
                 open_catalog_repository(root / "catalog.txt", normalize_item)
 

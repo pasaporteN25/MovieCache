@@ -13,17 +13,26 @@ from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.infrastructure.schema import catalog_document
-from movie_inbox.infrastructure.sqlite_repository import DATABASE_SCHEMA_VERSION, SqliteCatalogRepository
+from movie_inbox.infrastructure.sqlite_repository import (
+    DATABASE_SCHEMA_VERSION,
+    SqliteCatalogRepository,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Manage Movie Inbox SQLite catalogs and JSON backups.")
+    parser = argparse.ArgumentParser(
+        description="Manage Movie Inbox SQLite catalogs and JSON backups."
+    )
     commands = parser.add_subparsers(dest="command", required=True)
 
     import_parser = commands.add_parser("import", help="Import a JSON catalog into SQLite.")
     import_parser.add_argument("catalog", type=Path, help="Input JSON catalog.")
-    import_parser.add_argument("--db", type=Path, required=True, help="Destination .db/.sqlite catalog.")
-    import_parser.add_argument("--replace", action="store_true", help="Replace a non-empty database after backing it up.")
+    import_parser.add_argument(
+        "--db", type=Path, required=True, help="Destination .db/.sqlite catalog."
+    )
+    import_parser.add_argument(
+        "--replace", action="store_true", help="Replace a non-empty database after backing it up."
+    )
 
     export_parser = commands.add_parser("export", help="Export SQLite to a versioned JSON backup.")
     export_parser.add_argument("database", type=Path, help="Input .db/.sqlite catalog.")
@@ -132,7 +141,9 @@ def first_document_difference(expected: Any, persisted: Any, path: str = "$") ->
     if isinstance(expected, list) and isinstance(persisted, list):
         if len(expected) != len(persisted):
             return f"{path}.length (expected={len(expected)!r}, persisted={len(persisted)!r})"
-        for index, (expected_row, persisted_row) in enumerate(zip(expected, persisted)):
+        for index, (expected_row, persisted_row) in enumerate(
+            zip(expected, persisted, strict=True)
+        ):
             if expected_row != persisted_row:
                 return first_document_difference(expected_row, persisted_row, f"{path}[{index}]")
         return path

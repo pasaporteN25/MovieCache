@@ -12,7 +12,6 @@ from typing import Any
 from movie_inbox.application.import_repository import ImportRepositoryError
 from movie_inbox.domain.imports import ImportDraft, ImportDraftItem
 
-
 STALE_APPLY_GRACE_SECONDS = 15 * 60
 
 
@@ -75,19 +74,24 @@ class SqliteImportDraftRepository:
             except ImportRepositoryError:
                 raise
             except sqlite3.Error as error:
-                raise ImportRepositoryError(f"Cannot create import draft in: {self.path}") from error
+                raise ImportRepositoryError(
+                    f"Cannot create import draft in: {self.path}"
+                ) from error
 
     def list_for_user(self, user_id: str) -> list[ImportDraft]:
         with self._thread_lock:
             try:
                 with closing(self._connect()) as connection:
                     rows = connection.execute(
-                        "SELECT * FROM import_drafts WHERE user_id = ? ORDER BY updated_at DESC, id",
+                        "SELECT * FROM import_drafts WHERE user_id = ? "
+                        "ORDER BY updated_at DESC, id",
                         (user_id,),
                     ).fetchall()
                     return [self._draft(connection, row, include_items=False) for row in rows]
             except sqlite3.Error as error:
-                raise ImportRepositoryError(f"Cannot list import drafts from: {self.path}") from error
+                raise ImportRepositoryError(
+                    f"Cannot list import drafts from: {self.path}"
+                ) from error
 
     def count_for_user(self, user_id: str) -> int:
         with self._thread_lock:
@@ -99,7 +103,9 @@ class SqliteImportDraftRepository:
                     ).fetchone()
                     return int(row["total"] if row else 0)
             except sqlite3.Error as error:
-                raise ImportRepositoryError(f"Cannot count import drafts from: {self.path}") from error
+                raise ImportRepositoryError(
+                    f"Cannot count import drafts from: {self.path}"
+                ) from error
 
     def get_for_user(self, user_id: str, draft_id: str) -> ImportDraft | None:
         with self._thread_lock:
@@ -111,9 +117,13 @@ class SqliteImportDraftRepository:
                     ).fetchone()
                     return self._draft(connection, row) if row else None
             except sqlite3.Error as error:
-                raise ImportRepositoryError(f"Cannot read import draft from: {self.path}") from error
+                raise ImportRepositoryError(
+                    f"Cannot read import draft from: {self.path}"
+                ) from error
 
-    def claim_for_apply(self, user_id: str, draft_id: str, now: int, stale_before: int) -> ImportDraft | None:
+    def claim_for_apply(
+        self, user_id: str, draft_id: str, now: int, stale_before: int
+    ) -> ImportDraft | None:
         with self._thread_lock:
             try:
                 with closing(self._connect()) as connection:
@@ -133,7 +143,8 @@ class SqliteImportDraftRepository:
                     )
                     if can_claim:
                         connection.execute(
-                            "UPDATE import_drafts SET status = 'applying', updated_at = ? WHERE id = ?",
+                            "UPDATE import_drafts SET status = 'applying', updated_at = ? "
+                            "WHERE id = ?",
                             (now, draft_id),
                         )
                         connection.commit()
@@ -160,7 +171,8 @@ class SqliteImportDraftRepository:
                 with closing(self._connect()) as connection:
                     cursor = connection.execute(
                         """UPDATE import_drafts
-                        SET status = 'applied', updated_at = ?, applied_at = ?, expires_at = ?, result_json = ?
+                        SET status = 'applied', updated_at = ?, applied_at = ?,
+                            expires_at = ?, result_json = ?
                         WHERE id = ? AND user_id = ? AND status = 'applying'""",
                         (now, now, expires_at, _json_dump(result), draft_id, user_id),
                     )
@@ -170,7 +182,9 @@ class SqliteImportDraftRepository:
             except ImportRepositoryError:
                 raise
             except sqlite3.Error as error:
-                raise ImportRepositoryError(f"Cannot complete import draft in: {self.path}") from error
+                raise ImportRepositoryError(
+                    f"Cannot complete import draft in: {self.path}"
+                ) from error
 
     def fail(self, user_id: str, draft_id: str, now: int) -> None:
         with self._thread_lock:
@@ -190,13 +204,16 @@ class SqliteImportDraftRepository:
             try:
                 with closing(self._connect()) as connection:
                     cursor = connection.execute(
-                        "DELETE FROM import_drafts WHERE id = ? AND user_id = ? AND status != 'applying'",
+                        "DELETE FROM import_drafts "
+                        "WHERE id = ? AND user_id = ? AND status != 'applying'",
                         (draft_id, user_id),
                     )
                     connection.commit()
                     return cursor.rowcount > 0
             except sqlite3.Error as error:
-                raise ImportRepositoryError(f"Cannot delete import draft from: {self.path}") from error
+                raise ImportRepositoryError(
+                    f"Cannot delete import draft from: {self.path}"
+                ) from error
 
     def purge_expired(self, now: int) -> int:
         with self._thread_lock:
@@ -211,7 +228,9 @@ class SqliteImportDraftRepository:
                     connection.commit()
                     return max(0, cursor.rowcount)
             except sqlite3.Error as error:
-                raise ImportRepositoryError(f"Cannot purge import drafts from: {self.path}") from error
+                raise ImportRepositoryError(
+                    f"Cannot purge import drafts from: {self.path}"
+                ) from error
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=self.busy_timeout, isolation_level=None)
@@ -301,7 +320,9 @@ def _json_array(value: object) -> list[dict[str, Any]]:
     try:
         decoded = json.loads(str(value or "[]"))
     except json.JSONDecodeError as error:
-        raise ImportRepositoryError("Stored import draft candidates contain invalid JSON") from error
+        raise ImportRepositoryError(
+            "Stored import draft candidates contain invalid JSON"
+        ) from error
     if not isinstance(decoded, list) or any(not isinstance(row, dict) for row in decoded):
         raise ImportRepositoryError("Stored import draft candidates are invalid")
     return decoded

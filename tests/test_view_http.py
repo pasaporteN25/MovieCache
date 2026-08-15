@@ -9,7 +9,6 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-
 from fastapi.testclient import TestClient
 
 from movie_inbox.application.auth_service import AuthService
@@ -68,7 +67,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.client_context.__exit__(None, None, None)
         self.temporary.cleanup()
 
-    def request(self, method: str, path: str, body: str = "", headers: dict[str, str] | None = None):
+    def request(
+        self, method: str, path: str, body: str = "", headers: dict[str, str] | None = None
+    ):
         response = self.client.request(method, path, content=body, headers=headers or {})
         return response.status_code, response.content
 
@@ -127,19 +128,35 @@ class ViewerHttpTests(unittest.TestCase):
 
     def test_search_returns_local_matches_and_external_results_grouped_by_source(self) -> None:
         JsonCatalogRepository(self.catalog_path, normalize_item).write(
-            [normalize_item({
-                "id": "beautiful-person",
-                "title": "The Beautiful Person",
-                "original_title": "La Belle Personne",
-                "spanish_title": "La bella persona",
-                "year": "2008",
-                "kind": "pelicula",
-            })]
+            [
+                normalize_item(
+                    {
+                        "id": "beautiful-person",
+                        "title": "The Beautiful Person",
+                        "original_title": "La Belle Personne",
+                        "spanish_title": "La bella persona",
+                        "year": "2008",
+                        "kind": "pelicula",
+                    }
+                )
+            ]
         )
         external = [
-            {"source": "wikipedia", "title": "La Belle Personne", "url": "https://en.wikipedia.org/wiki/The_Beautiful_Person"},
-            {"source": "imdb", "title": "The Beautiful Person", "url": "https://www.imdb.com/title/tt1263778/"},
-            {"source": "filmaffinity", "title": "La bella persona", "url": "https://www.filmaffinity.com/es/film123.html"},
+            {
+                "source": "wikipedia",
+                "title": "La Belle Personne",
+                "url": "https://en.wikipedia.org/wiki/The_Beautiful_Person",
+            },
+            {
+                "source": "imdb",
+                "title": "The Beautiful Person",
+                "url": "https://www.imdb.com/title/tt1263778/",
+            },
+            {
+                "source": "filmaffinity",
+                "title": "La bella persona",
+                "url": "https://www.filmaffinity.com/es/film123.html",
+            },
         ]
 
         with patch("movie_inbox.web.app.search_sources", return_value=external):
@@ -157,12 +174,14 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(payload["sources"]["filmaffinity"]["count"], 1)
 
     def test_progressive_external_search_can_skip_catalog_lookup(self) -> None:
-        external = [{
-            "source": "wikipedia",
-            "title": "Evil Dead Burn",
-            "year": "2026",
-            "url": "https://en.wikipedia.org/wiki/Evil_Dead_Burn",
-        }]
+        external = [
+            {
+                "source": "wikipedia",
+                "title": "Evil Dead Burn",
+                "year": "2026",
+                "url": "https://en.wikipedia.org/wiki/Evil_Dead_Burn",
+            }
+        ]
 
         with (
             patch("movie_inbox.web.app.search_catalog_items") as catalog_search,
@@ -200,13 +219,15 @@ class ViewerHttpTests(unittest.TestCase):
         ):
             response = self.client.post(
                 "/api/search/catalog-candidates",
-                content=json.dumps({
-                    "result": {
-                        "source": "imdb",
-                        "title": "tt0113277",
-                        "url": "https://www.imdb.com/title/tt0113277/",
+                content=json.dumps(
+                    {
+                        "result": {
+                            "source": "imdb",
+                            "title": "tt0113277",
+                            "url": "https://www.imdb.com/title/tt0113277/",
+                        }
                     }
-                }),
+                ),
                 headers=self.post_headers(),
             )
 
@@ -231,24 +252,28 @@ class ViewerHttpTests(unittest.TestCase):
     def test_editorial_home_is_explainable_stable_and_includes_followed_collections(self) -> None:
         JsonCatalogRepository(self.catalog_path, normalize_item).write(
             [
-                normalize_item({
-                    "id": "heat",
-                    "title": "Heat",
-                    "year": "1995",
-                    "kind": "pelicula",
-                    "status": "to_watch",
-                    "en_catalogo": True,
-                    "page_image": "https://upload.wikimedia.org/heat.jpg",
-                }),
-                normalize_item({
-                    "id": "memories",
-                    "title": "Memories of Murder",
-                    "year": "2003",
-                    "kind": "pelicula",
-                    "status": "watched",
-                    "rating": 0,
-                    "review": "",
-                }),
+                normalize_item(
+                    {
+                        "id": "heat",
+                        "title": "Heat",
+                        "year": "1995",
+                        "kind": "pelicula",
+                        "status": "to_watch",
+                        "en_catalogo": True,
+                        "page_image": "https://upload.wikimedia.org/heat.jpg",
+                    }
+                ),
+                normalize_item(
+                    {
+                        "id": "memories",
+                        "title": "Memories of Murder",
+                        "year": "2003",
+                        "kind": "pelicula",
+                        "status": "watched",
+                        "rating": 0,
+                        "review": "",
+                    }
+                ),
             ]
         )
         headers = {"X-Movie-Inbox-Token": self.config.api_token}
@@ -279,9 +304,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn("memory", section_ids)
         self.assertEqual(payload["warnings"], [])
         keys = [entry["key"] for entry in payload["featured"]] + [
-            entry["key"]
-            for section in payload["sections"]
-            for entry in section["items"]
+            entry["key"] for section in payload["sections"] for entry in section["items"]
         ]
         self.assertEqual(len(keys), len(set(keys)))
         self.assertNotIn(str(self.temporary.name), first.text)
@@ -294,15 +317,17 @@ class ViewerHttpTests(unittest.TestCase):
     def test_saved_featured_recommendations_survive_catalog_changes(self) -> None:
         JsonCatalogRepository(self.catalog_path, normalize_item).write(
             [
-                normalize_item({
-                    "id": "heat",
-                    "title": "Heat",
-                    "year": "1995",
-                    "kind": "pelicula",
-                    "status": "to_watch",
-                    "en_catalogo": True,
-                    "page_image": "https://upload.wikimedia.org/heat.jpg",
-                })
+                normalize_item(
+                    {
+                        "id": "heat",
+                        "title": "Heat",
+                        "year": "1995",
+                        "kind": "pelicula",
+                        "status": "to_watch",
+                        "en_catalogo": True,
+                        "page_image": "https://upload.wikimedia.org/heat.jpg",
+                    }
+                )
             ]
         )
         headers = {"X-Movie-Inbox-Token": self.config.api_token}
@@ -314,24 +339,28 @@ class ViewerHttpTests(unittest.TestCase):
 
         JsonCatalogRepository(self.catalog_path, normalize_item).write(
             [
-                normalize_item({
-                    "id": "heat",
-                    "title": "Heat",
-                    "year": "1995",
-                    "kind": "pelicula",
-                    "status": "watched",
-                    "en_catalogo": False,
-                    "page_image": "https://upload.wikimedia.org/heat.jpg",
-                }),
-                normalize_item({
-                    "id": "collateral",
-                    "title": "Collateral",
-                    "year": "2004",
-                    "kind": "pelicula",
-                    "status": "to_watch",
-                    "en_catalogo": True,
-                    "page_image": "https://upload.wikimedia.org/collateral.jpg",
-                }),
+                normalize_item(
+                    {
+                        "id": "heat",
+                        "title": "Heat",
+                        "year": "1995",
+                        "kind": "pelicula",
+                        "status": "watched",
+                        "en_catalogo": False,
+                        "page_image": "https://upload.wikimedia.org/heat.jpg",
+                    }
+                ),
+                normalize_item(
+                    {
+                        "id": "collateral",
+                        "title": "Collateral",
+                        "year": "2004",
+                        "kind": "pelicula",
+                        "status": "to_watch",
+                        "en_catalogo": True,
+                        "page_image": "https://upload.wikimedia.org/collateral.jpg",
+                    }
+                ),
             ]
         )
 
@@ -393,15 +422,17 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(api.status_code, 401)
         self.assertEqual(login.status_code, 200)
         self.assertIn(b'id="loginForm"', login.content)
-        self.assertIn(b'/static/login.js', login.content)
+        self.assertIn(b"/static/login.js", login.content)
 
     def test_member_must_change_password_and_catalog_is_isolated_by_session(self) -> None:
         created = self.client.post(
             "/api/members",
-            content=json.dumps({
-                "username": "maria",
-                "temporary_password": "a-temporary-password",
-            }),
+            content=json.dumps(
+                {
+                    "username": "maria",
+                    "temporary_password": "a-temporary-password",
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(created.status_code, 201, created.content)
@@ -412,9 +443,9 @@ class ViewerHttpTests(unittest.TestCase):
         member_catalog = identity_repository.default_catalog_for(member_payload["id"])
         self.assertIsNotNone(member_catalog)
         member_repository = open_catalog_repository(Path(member_catalog.write_path), normalize_item)
-        member_repository.write([
-            normalize_item({"id": "heat", "title": "Heat", "year": "1995", "status": "to_watch"})
-        ])
+        member_repository.write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "status": "to_watch"})]
+        )
 
         with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as member_client:
             login = member_client.post(
@@ -436,11 +467,13 @@ class ViewerHttpTests(unittest.TestCase):
 
             changed = member_client.post(
                 "/auth/change-password",
-                content=json.dumps({
-                    "current_password": "a-temporary-password",
-                    "new_password": "a-permanent-password",
-                    "confirm_password": "a-permanent-password",
-                }),
+                content=json.dumps(
+                    {
+                        "current_password": "a-temporary-password",
+                        "new_password": "a-permanent-password",
+                        "confirm_password": "a-permanent-password",
+                    }
+                ),
                 headers=self.post_headers(),
             )
             self.assertEqual(changed.status_code, 200, changed.content)
@@ -472,11 +505,13 @@ class ViewerHttpTests(unittest.TestCase):
 
             updated = member_client.post(
                 "/api/status",
-                content=json.dumps({
-                    "id": "heat",
-                    "status": "watched",
-                    "source_file": str(self.catalog_path),
-                }),
+                content=json.dumps(
+                    {
+                        "id": "heat",
+                        "status": "watched",
+                        "source_file": str(self.catalog_path),
+                    }
+                ),
                 headers=self.post_headers(),
             )
             forbidden_members = member_client.get(
@@ -623,26 +658,32 @@ class ViewerHttpTests(unittest.TestCase):
         restored_catalog = identity_repository.default_catalog_for(restored.json()["member"]["id"])
         self.assertIsNotNone(restored_catalog)
         self.assertEqual(Path(restored_catalog.write_path), original_catalog_path)
-        self.assertFalse(identity_repository.privacy_for(restored.json()["member"]["id"]).catalog_shared)
+        self.assertFalse(
+            identity_repository.privacy_for(restored.json()["member"]["id"]).catalog_shared
+        )
 
     def test_shared_catalog_respects_user_preferences_and_item_overrides(self) -> None:
         owner_id = self.login_response.json()["user"]["id"]
-        JsonCatalogRepository(self.catalog_path, normalize_item).write([
-            normalize_item({
-                "id": "heat",
-                "title": "Heat",
-                "year": "1995",
-                "kind": "pelicula",
-                "status": "watched",
-                "watched_at": "2026-07-31",
-                "rating": 9,
-                "review": "Una review que puede compartirse.",
-                "notes": "nota privada",
-                "local_path": "D:/private/Heat.mkv",
-                "local_files": [{"name": "Heat.mkv", "path": "D:/private/Heat.mkv"}],
-                "locked_fields": ["title"],
-            })
-        ])
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "heat",
+                        "title": "Heat",
+                        "year": "1995",
+                        "kind": "pelicula",
+                        "status": "watched",
+                        "watched_at": "2026-07-31",
+                        "rating": 9,
+                        "review": "Una review que puede compartirse.",
+                        "notes": "nota privada",
+                        "local_path": "D:/private/Heat.mkv",
+                        "local_files": [{"name": "Heat.mkv", "path": "D:/private/Heat.mkv"}],
+                        "locked_fields": ["title"],
+                    }
+                )
+            ]
+        )
         created = self.client.post(
             "/api/members",
             content=json.dumps({"username": "maria", "temporary_password": "a-temporary-password"}),
@@ -659,11 +700,13 @@ class ViewerHttpTests(unittest.TestCase):
             self.assertEqual(login.status_code, 200, login.content)
             changed = member_client.post(
                 "/auth/change-password",
-                content=json.dumps({
-                    "current_password": "a-temporary-password",
-                    "new_password": "a-permanent-password",
-                    "confirm_password": "a-permanent-password",
-                }),
+                content=json.dumps(
+                    {
+                        "current_password": "a-temporary-password",
+                        "new_password": "a-permanent-password",
+                        "confirm_password": "a-permanent-password",
+                    }
+                ),
                 headers=self.post_headers(),
             )
             self.assertEqual(changed.status_code, 200, changed.content)
@@ -676,14 +719,16 @@ class ViewerHttpTests(unittest.TestCase):
 
             preferences = self.client.post(
                 "/api/privacy",
-                content=json.dumps({
-                    "catalog_shared": True,
-                    "share_status": True,
-                    "share_watched_at": False,
-                    "share_history": False,
-                    "share_rating": False,
-                    "share_review": True,
-                }),
+                content=json.dumps(
+                    {
+                        "catalog_shared": True,
+                        "share_status": True,
+                        "share_watched_at": False,
+                        "share_history": False,
+                        "share_rating": False,
+                        "share_review": True,
+                    }
+                ),
                 headers=self.post_headers(),
             )
             override = self.client.post(
@@ -703,7 +748,9 @@ class ViewerHttpTests(unittest.TestCase):
                 headers={"X-Movie-Inbox-Token": self.config.api_token},
             )
             self.assertEqual(shared_list.status_code, 200, shared_list.content)
-            self.assertEqual([entry["user"]["id"] for entry in shared_list.json()["catalogs"]], [owner_id])
+            self.assertEqual(
+                [entry["user"]["id"] for entry in shared_list.json()["catalogs"]], [owner_id]
+            )
             self.assertNotIn(str(self.temporary.name), shared_list.text)
             self.assertEqual(shared_detail.status_code, 200, shared_detail.content)
             shared_item = shared_detail.json()["items"][0]
@@ -726,14 +773,16 @@ class ViewerHttpTests(unittest.TestCase):
 
             hidden = self.client.post(
                 "/api/privacy",
-                content=json.dumps({
-                    "catalog_shared": False,
-                    "share_status": True,
-                    "share_watched_at": False,
-                    "share_history": False,
-                    "share_rating": False,
-                    "share_review": True,
-                }),
+                content=json.dumps(
+                    {
+                        "catalog_shared": False,
+                        "share_status": True,
+                        "share_watched_at": False,
+                        "share_history": False,
+                        "share_rating": False,
+                        "share_review": True,
+                    }
+                ),
                 headers=self.post_headers(),
             )
             unavailable = member_client.get(
@@ -796,21 +845,27 @@ class ViewerHttpTests(unittest.TestCase):
         raw_private_path = "D:/Private/Ikiru.mkv"
         created = self.client.post(
             "/api/imports",
-            content=json.dumps({
-                "source_name": "watched.json",
-                "source_format": "json",
-                "content": json.dumps([{
-                    "title": "Ikiru",
-                    "year": "1952",
-                    "status": "watched",
-                    "watched_at": "2026-08-01",
-                    "rating": 10,
-                    "review": "Una obra enorme.",
-                    "en_catalogo": True,
-                    "local_path": raw_private_path,
-                    "local_files": [{"name": "Ikiru.mkv", "path": raw_private_path}],
-                }]),
-            }),
+            content=json.dumps(
+                {
+                    "source_name": "watched.json",
+                    "source_format": "json",
+                    "content": json.dumps(
+                        [
+                            {
+                                "title": "Ikiru",
+                                "year": "1952",
+                                "status": "watched",
+                                "watched_at": "2026-08-01",
+                                "rating": 10,
+                                "review": "Una obra enorme.",
+                                "en_catalogo": True,
+                                "local_path": raw_private_path,
+                                "local_files": [{"name": "Ikiru.mkv", "path": raw_private_path}],
+                            }
+                        ]
+                    ),
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(created.status_code, 201, created.content)
@@ -821,16 +876,18 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertNotIn(raw_private_path, created.text)
         self.assertNotIn(raw_private_path.encode("utf-8"), self.instance_path.read_bytes())
 
-        body = json.dumps({
-            "destination": "catalog",
-            "item_ids": [draft["items"][0]["id"]],
-            "personal_options": {
-                "include_status": True,
-                "include_watched_at": True,
-                "include_rating": True,
-                "include_review": True,
-            },
-        })
+        body = json.dumps(
+            {
+                "destination": "catalog",
+                "item_ids": [draft["items"][0]["id"]],
+                "personal_options": {
+                    "include_status": True,
+                    "include_watched_at": True,
+                    "include_rating": True,
+                    "include_review": True,
+                },
+            }
+        )
         first = self.client.post(
             f"/api/imports/{draft['id']}/apply",
             content=body,
@@ -856,11 +913,17 @@ class ViewerHttpTests(unittest.TestCase):
     def test_owner_can_turn_a_draft_into_a_private_collection_without_catalog_writes(self) -> None:
         created = self.client.post(
             "/api/imports",
-            content=json.dumps({
-                "source_name": "japanese.csv",
-                "source_format": "csv",
-                "content": "title,year,status,rating,review\nHeat,1995,watched,8,Great\nIkiru,1952,watched,10,Perfect\n",
-            }),
+            content=json.dumps(
+                {
+                    "source_name": "japanese.csv",
+                    "source_format": "csv",
+                    "content": (
+                        "title,year,status,rating,review\n"
+                        "Heat,1995,watched,8,Great\n"
+                        "Ikiru,1952,watched,10,Perfect\n"
+                    ),
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(created.status_code, 201, created.content)
@@ -870,12 +933,14 @@ class ViewerHttpTests(unittest.TestCase):
 
         applied = self.client.post(
             f"/api/imports/{draft['id']}/apply",
-            content=json.dumps({
-                "destination": "collection",
-                "item_ids": selected,
-                "collection_title": "Noches japonesas",
-                "collection_description": "Selección privada",
-            }),
+            content=json.dumps(
+                {
+                    "destination": "collection",
+                    "item_ids": selected,
+                    "collection_title": "Noches japonesas",
+                    "collection_description": "Selección privada",
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(applied.status_code, 200, applied.content)
@@ -892,7 +957,13 @@ class ViewerHttpTests(unittest.TestCase):
             self.assertNotIn("status", entry)
             self.assertNotIn("rating", entry)
             self.assertNotIn("review", entry)
-        self.assertEqual([item.title for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()], ["Heat"])
+        self.assertEqual(
+            [
+                item.title
+                for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()
+            ],
+            ["Heat"],
+        )
 
     def test_login_requires_token_origin_and_json(self) -> None:
         body = json.dumps({"username": "lucas", "password": self.owner_password})
@@ -931,7 +1002,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(invalid.json()["reason"], "invalid_credentials")
 
         logout = self.client.post("/auth/logout", content="{}", headers=self.post_headers())
-        after = self.client.get("/api/items", headers={"X-Movie-Inbox-Token": self.config.api_token})
+        after = self.client.get(
+            "/api/items", headers={"X-Movie-Inbox-Token": self.config.api_token}
+        )
         self.assertEqual(logout.status_code, 200)
         self.assertEqual(after.status_code, 401)
 
@@ -966,9 +1039,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("HttpOnly", self.login_response.headers.get("set-cookie", ""))
         self.assertIn("SameSite=strict", self.login_response.headers.get("set-cookie", ""))
-        self.assertIn(b'/static/style.css', body)
-        self.assertIn(b'/static/app.js', body)
-        self.assertIn(b'viewport-fit=cover', body)
+        self.assertIn(b"/static/style.css", body)
+        self.assertIn(b"/static/app.js", body)
+        self.assertIn(b"viewport-fit=cover", body)
         self.assertIn(b'<dialog id="detailDrawer"', body)
         self.assertIn(b'id="detailNavigation"', body)
         self.assertIn(b'id="detailFeedback"', body)
@@ -1038,141 +1111,141 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="catalogTitle" class="view-focus-target" tabindex="-1"', body)
         self.assertIn(b'id="adminTitle" class="view-focus-target" tabindex="-1"', body)
         self.assertNotIn(b'id="catalogSource"', body)
-        self.assertNotIn(b'<style>', body)
+        self.assertNotIn(b"<style>", body)
 
         status, css = self.request("GET", "/static/style.css")
         self.assertEqual(status, 200)
-        self.assertIn(b'.search-console', css)
-        self.assertIn(b'.dvd-case', css)
-        self.assertIn(b'.dvd-front-statuses', css)
-        self.assertIn(b'.home-program-grid', css)
-        self.assertIn(b'.spotlight-program', css)
-        self.assertIn(b'.collection-filter-toolbar', css)
-        self.assertIn(b'.filter-segments', css)
-        self.assertIn(b'.home-empty-state', css)
-        self.assertIn(b'.curation-workbench', css)
-        self.assertIn(b'.curation-queue-item', css)
-        self.assertIn(b'.curation-pair', css)
-        self.assertIn(b'.merge-comparator-dialog', css)
-        self.assertIn(b'.merge-field-options', css)
-        self.assertIn(b'.history-operation-mark', css)
-        self.assertIn(b'.admin-section-nav', css)
-        self.assertIn(b'.member-row', css)
-        self.assertIn(b'.member-dialog', css)
-        self.assertIn(b'.club-grid', css)
-        self.assertIn(b'.club-mode-tabs', css)
-        self.assertIn(b'.collection-card', css)
-        self.assertIn(b'.collection-mosaic', css)
-        self.assertIn(b'.collection-bulk-bar', css)
-        self.assertIn(b'.collection-item-actions', css)
-        self.assertIn(b'.privacy-fieldset', css)
-        self.assertIn(b'.personal-privacy-fields', css)
-        self.assertIn(b'.system-menu-panel', css)
-        self.assertIn(b'.active-filters', css)
-        self.assertIn(b'.collection-view.is-compare-mode #grid', css)
-        self.assertIn(b'.header-utilities', css)
-        self.assertIn(b'.system-menu-toggle', css)
-        self.assertIn(b'grid-template-columns: repeat(4, minmax(0, 1fr))', css)
-        self.assertIn(b'env(safe-area-inset-bottom', css)
-        self.assertIn(b'input, select, textarea, button', css)
-        self.assertIn(b'textarea:focus-visible', css)
-        self.assertIn(b'button:disabled', css)
+        self.assertIn(b".search-console", css)
+        self.assertIn(b".dvd-case", css)
+        self.assertIn(b".dvd-front-statuses", css)
+        self.assertIn(b".home-program-grid", css)
+        self.assertIn(b".spotlight-program", css)
+        self.assertIn(b".collection-filter-toolbar", css)
+        self.assertIn(b".filter-segments", css)
+        self.assertIn(b".home-empty-state", css)
+        self.assertIn(b".curation-workbench", css)
+        self.assertIn(b".curation-queue-item", css)
+        self.assertIn(b".curation-pair", css)
+        self.assertIn(b".merge-comparator-dialog", css)
+        self.assertIn(b".merge-field-options", css)
+        self.assertIn(b".history-operation-mark", css)
+        self.assertIn(b".admin-section-nav", css)
+        self.assertIn(b".member-row", css)
+        self.assertIn(b".member-dialog", css)
+        self.assertIn(b".club-grid", css)
+        self.assertIn(b".club-mode-tabs", css)
+        self.assertIn(b".collection-card", css)
+        self.assertIn(b".collection-mosaic", css)
+        self.assertIn(b".collection-bulk-bar", css)
+        self.assertIn(b".collection-item-actions", css)
+        self.assertIn(b".privacy-fieldset", css)
+        self.assertIn(b".personal-privacy-fields", css)
+        self.assertIn(b".system-menu-panel", css)
+        self.assertIn(b".active-filters", css)
+        self.assertIn(b".collection-view.is-compare-mode #grid", css)
+        self.assertIn(b".header-utilities", css)
+        self.assertIn(b".system-menu-toggle", css)
+        self.assertIn(b"grid-template-columns: repeat(4, minmax(0, 1fr))", css)
+        self.assertIn(b"env(safe-area-inset-bottom", css)
+        self.assertIn(b"input, select, textarea, button", css)
+        self.assertIn(b"textarea:focus-visible", css)
+        self.assertIn(b"button:disabled", css)
         self.assertIn(b'body[data-input-method="keyboard"] .view-focus-target:focus', css)
-        self.assertIn(b'.metadata-row textarea { font-size: var(--text-control); }', css)
-        self.assertIn(b'scroll-snap-type: x proximity', css)
-        self.assertIn(b'--ease-out: cubic-bezier', css)
-        self.assertIn(b'.section-kicker', css)
-        self.assertIn(b'@media (hover: hover) and (pointer: fine)', css)
-        self.assertIn(b'@media (hover: none) and (pointer: coarse)', css)
-        self.assertIn(b':has(.dvd-open-surface:focus-visible)', css)
-        self.assertIn(b'.drawer-accordion', css)
-        self.assertIn(b'.spotlight-stage', css)
-        self.assertIn(b'.detail-drawer[open]', css)
-        self.assertIn(b'.personal-record-read', css)
-        self.assertIn(b'.drawer-navigation', css)
-        self.assertIn(b'.unsaved-dialog', css)
-        self.assertIn(b'.search-source-feedback', css)
-        self.assertIn(b'.source-search-spinner', css)
-        self.assertIn(b'prefers-reduced-motion', css)
-        self.assertIn(b'@media (forced-colors: active)', css)
-        self.assertIn(b'--on-accent: #080a18', css)
-        self.assertIn(b'--text-label: 10px', css)
+        self.assertIn(b".metadata-row textarea { font-size: var(--text-control); }", css)
+        self.assertIn(b"scroll-snap-type: x proximity", css)
+        self.assertIn(b"--ease-out: cubic-bezier", css)
+        self.assertIn(b".section-kicker", css)
+        self.assertIn(b"@media (hover: hover) and (pointer: fine)", css)
+        self.assertIn(b"@media (hover: none) and (pointer: coarse)", css)
+        self.assertIn(b":has(.dvd-open-surface:focus-visible)", css)
+        self.assertIn(b".drawer-accordion", css)
+        self.assertIn(b".spotlight-stage", css)
+        self.assertIn(b".detail-drawer[open]", css)
+        self.assertIn(b".personal-record-read", css)
+        self.assertIn(b".drawer-navigation", css)
+        self.assertIn(b".unsaved-dialog", css)
+        self.assertIn(b".search-source-feedback", css)
+        self.assertIn(b".source-search-spinner", css)
+        self.assertIn(b"prefers-reduced-motion", css)
+        self.assertIn(b"@media (forced-colors: active)", css)
+        self.assertIn(b"--on-accent: #080a18", css)
+        self.assertIn(b"--text-label: 10px", css)
 
         status, javascript = self.request("GET", "/static/app.js")
         self.assertEqual(status, 200)
-        self.assertIn(b'const API_TOKEN', javascript)
+        self.assertIn(b"const API_TOKEN", javascript)
         self.assertIn(b'<article class="card dvd-card${', javascript)
         self.assertIn(b'class="dvd-back-statuses"', javascript)
         self.assertIn(b'class="dvd-front-statuses"', javascript)
         self.assertIn(b'class="dvd-open-surface"', javascript)
-        self.assertIn(b'0 pts', javascript)
-        self.assertIn(b'showModal()', javascript)
-        self.assertIn(b'SEARCH_TIMEOUT_MS', javascript)
-        self.assertIn(b'Promise.allSettled(tasks)', javascript)
-        self.assertIn(b'catalog=false', javascript)
-        self.assertIn(b'retry-external-source', javascript)
-        self.assertIn(b'function loadExternalSourceResults(', javascript)
-        self.assertIn(b'backdrop_image', javascript)
-        self.assertIn(b'spotlight-cta', javascript)
-        self.assertIn(b'function renderEditorialHome()', javascript)
-        self.assertNotIn(b'home-entry-reason', javascript)
-        self.assertIn(b'function applyCollectionFilterDescriptor(', javascript)
-        self.assertIn(b'function syncCollectionFilterControls()', javascript)
-        self.assertIn(b'function matchesYearFilters(', javascript)
-        self.assertIn(b'function moveSpotlight(', javascript)
-        self.assertIn(b'function openHomeCollectionDetail(', javascript)
-        self.assertIn(b'function refreshEditorialHome()', javascript)
-        self.assertIn(b'function openRandomDetail()', javascript)
-        self.assertIn(b'function randomCandidates()', javascript)
-        self.assertIn(b'function changeRandomScope(source)', javascript)
-        self.assertNotIn(b'mobileRandomCatalogOnly', javascript)
-        self.assertIn(b'function prepareCatalogViewModel()', javascript)
-        self.assertIn(b'function matchesNormalizedSearchText(', javascript)
-        self.assertIn(b'function restoreDescriptionFocus()', javascript)
-        self.assertIn(b'function focusViewHeading(view)', javascript)
-        self.assertIn(b'function loadIdentity()', javascript)
-        self.assertIn(b'function logout()', javascript)
-        self.assertIn(b'function loadMembers(', javascript)
-        self.assertIn(b'function createMember(', javascript)
-        self.assertIn(b'function handleMemberAction(', javascript)
-        self.assertIn(b'function handleKeyboardModality(event)', javascript)
-        self.assertIn(b'fields.detailBody.scrollTop = 0;', javascript)
-        self.assertIn(b'function retryMergeComparison()', javascript)
-        self.assertIn(b'invalid_comparison_payload', javascript)
-        self.assertIn(b'aria-busy', javascript)
-        self.assertIn(b'function personalRecordPanel(item)', javascript)
-        self.assertIn(b'function requestDetailTransition(action)', javascript)
-        self.assertIn(b'function saveDirtyDetailForms()', javascript)
-        self.assertIn(b'function navigateDetail(offset)', javascript)
-        self.assertIn(b'function openAnotherRandomDetail()', javascript)
-        self.assertIn(b'function showView(view', javascript)
-        self.assertIn(b'function goToCollectionRoot()', javascript)
+        self.assertIn(b"0 pts", javascript)
+        self.assertIn(b"showModal()", javascript)
+        self.assertIn(b"SEARCH_TIMEOUT_MS", javascript)
+        self.assertIn(b"Promise.allSettled(tasks)", javascript)
+        self.assertIn(b"catalog=false", javascript)
+        self.assertIn(b"retry-external-source", javascript)
+        self.assertIn(b"function loadExternalSourceResults(", javascript)
+        self.assertIn(b"backdrop_image", javascript)
+        self.assertIn(b"spotlight-cta", javascript)
+        self.assertIn(b"function renderEditorialHome()", javascript)
+        self.assertNotIn(b"home-entry-reason", javascript)
+        self.assertIn(b"function applyCollectionFilterDescriptor(", javascript)
+        self.assertIn(b"function syncCollectionFilterControls()", javascript)
+        self.assertIn(b"function matchesYearFilters(", javascript)
+        self.assertIn(b"function moveSpotlight(", javascript)
+        self.assertIn(b"function openHomeCollectionDetail(", javascript)
+        self.assertIn(b"function refreshEditorialHome()", javascript)
+        self.assertIn(b"function openRandomDetail()", javascript)
+        self.assertIn(b"function randomCandidates()", javascript)
+        self.assertIn(b"function changeRandomScope(source)", javascript)
+        self.assertNotIn(b"mobileRandomCatalogOnly", javascript)
+        self.assertIn(b"function prepareCatalogViewModel()", javascript)
+        self.assertIn(b"function matchesNormalizedSearchText(", javascript)
+        self.assertIn(b"function restoreDescriptionFocus()", javascript)
+        self.assertIn(b"function focusViewHeading(view)", javascript)
+        self.assertIn(b"function loadIdentity()", javascript)
+        self.assertIn(b"function logout()", javascript)
+        self.assertIn(b"function loadMembers(", javascript)
+        self.assertIn(b"function createMember(", javascript)
+        self.assertIn(b"function handleMemberAction(", javascript)
+        self.assertIn(b"function handleKeyboardModality(event)", javascript)
+        self.assertIn(b"fields.detailBody.scrollTop = 0;", javascript)
+        self.assertIn(b"function retryMergeComparison()", javascript)
+        self.assertIn(b"invalid_comparison_payload", javascript)
+        self.assertIn(b"aria-busy", javascript)
+        self.assertIn(b"function personalRecordPanel(item)", javascript)
+        self.assertIn(b"function requestDetailTransition(action)", javascript)
+        self.assertIn(b"function saveDirtyDetailForms()", javascript)
+        self.assertIn(b"function navigateDetail(offset)", javascript)
+        self.assertIn(b"function openAnotherRandomDetail()", javascript)
+        self.assertIn(b"function showView(view", javascript)
+        self.assertIn(b"function goToCollectionRoot()", javascript)
         self.assertIn(b'const query = requestedView === "catalog" ? rawQuery : "";', javascript)
-        self.assertIn(b'function collectionRouteValues()', javascript)
-        self.assertIn(b'function setCollectionSearchMode(', javascript)
-        self.assertIn(b'function collectionSearchMessage()', javascript)
-        self.assertIn(b'function editorialPersonalIds()', javascript)
-        self.assertIn(b'function renderCollectionDirectory()', javascript)
-        self.assertIn(b'function loadCollectionDetail(', javascript)
-        self.assertIn(b'function toggleCollectionFollow(', javascript)
-        self.assertIn(b'function addCollectionItems(', javascript)
-        self.assertIn(b'function loadCurationQueue(', javascript)
-        self.assertIn(b'function renderCuration()', javascript)
-        self.assertIn(b'function postCurationDecision(', javascript)
-        self.assertIn(b'function openInternalMergeComparator(', javascript)
-        self.assertIn(b'function submitReviewedMerge()', javascript)
-        self.assertIn(b'function undoCurationOperation(', javascript)
-        self.assertIn(b'function changeCurationHistoryMode()', javascript)
-        self.assertIn(b'function renderActiveFilters()', javascript)
-        self.assertIn(b'function sortItems(list)', javascript)
-        self.assertIn(b'editorialHome = normalizeEditorialHome(payload.home);', javascript)
-        self.assertNotIn(b'SPOTLIGHT_INTERVAL_MS', javascript)
-        self.assertNotIn(b'searchCatalogForMerge(activeQuery);', javascript)
+        self.assertIn(b"function collectionRouteValues()", javascript)
+        self.assertIn(b"function setCollectionSearchMode(", javascript)
+        self.assertIn(b"function collectionSearchMessage()", javascript)
+        self.assertIn(b"function editorialPersonalIds()", javascript)
+        self.assertIn(b"function renderCollectionDirectory()", javascript)
+        self.assertIn(b"function loadCollectionDetail(", javascript)
+        self.assertIn(b"function toggleCollectionFollow(", javascript)
+        self.assertIn(b"function addCollectionItems(", javascript)
+        self.assertIn(b"function loadCurationQueue(", javascript)
+        self.assertIn(b"function renderCuration()", javascript)
+        self.assertIn(b"function postCurationDecision(", javascript)
+        self.assertIn(b"function openInternalMergeComparator(", javascript)
+        self.assertIn(b"function submitReviewedMerge()", javascript)
+        self.assertIn(b"function undoCurationOperation(", javascript)
+        self.assertIn(b"function changeCurationHistoryMode()", javascript)
+        self.assertIn(b"function renderActiveFilters()", javascript)
+        self.assertIn(b"function sortItems(list)", javascript)
+        self.assertIn(b"editorialHome = normalizeEditorialHome(payload.home);", javascript)
+        self.assertNotIn(b"SPOTLIGHT_INTERVAL_MS", javascript)
+        self.assertNotIn(b"searchCatalogForMerge(activeQuery);", javascript)
         self.assertNotIn(b'data-click="toggle-flip"', javascript)
-        self.assertNotIn(b'onclick=', javascript)
-        self.assertNotIn(b'&token=', javascript)
-        self.assertNotIn(b'alert(', javascript)
-        self.assertNotIn(b'console.log(', javascript)
+        self.assertNotIn(b"onclick=", javascript)
+        self.assertNotIn(b"&token=", javascript)
+        self.assertNotIn(b"alert(", javascript)
+        self.assertNotIn(b"console.log(", javascript)
 
     def test_post_requires_same_origin_and_json(self) -> None:
         body = json.dumps({"id": "heat", "status": "watched"})
@@ -1205,11 +1278,13 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200, raw_payload)
         self.assertEqual(payload["counts"]["missing_link"], 1)
 
-        body = json.dumps({
-            "id": "heat",
-            "source_file": str(self.catalog_path),
-            "status": "deferred",
-        })
+        body = json.dumps(
+            {
+                "id": "heat",
+                "source_file": str(self.catalog_path),
+                "status": "deferred",
+            }
+        )
         status, raw_payload = self.request("POST", "/api/curation/link", body, self.post_headers())
         self.assertEqual(status, 200, raw_payload)
 
@@ -1226,10 +1301,12 @@ class ViewerHttpTests(unittest.TestCase):
 
     def test_duplicate_pair_can_be_dismissed_from_the_queue(self) -> None:
         repository = JsonCatalogRepository(self.catalog_path, normalize_item)
-        repository.write([
-            normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
-            normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
-        ])
+        repository.write(
+            [
+                normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
+                normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+            ]
+        )
         status, raw_payload = self.request(
             "GET",
             "/api/curation",
@@ -1240,13 +1317,17 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200, raw_payload)
         self.assertEqual(payload["counts"]["duplicates"], 1)
 
-        body = json.dumps({
-            "id": duplicate["primary"]["id"],
-            "source_file": duplicate["primary"]["source_file"],
-            "other_reference": duplicate["secondary"]["ref"],
-            "status": "not_duplicate",
-        })
-        status, raw_payload = self.request("POST", "/api/curation/duplicate", body, self.post_headers())
+        body = json.dumps(
+            {
+                "id": duplicate["primary"]["id"],
+                "source_file": duplicate["primary"]["source_file"],
+                "other_reference": duplicate["secondary"]["ref"],
+                "status": "not_duplicate",
+            }
+        )
+        status, raw_payload = self.request(
+            "POST", "/api/curation/duplicate", body, self.post_headers()
+        )
         self.assertEqual(status, 200, raw_payload)
 
         status, raw_payload = self.request(
@@ -1258,33 +1339,44 @@ class ViewerHttpTests(unittest.TestCase):
 
     def test_reviewed_duplicate_merge_is_recorded_and_undo_restores_both_items(self) -> None:
         repository = JsonCatalogRepository(self.catalog_path, normalize_item)
-        repository.write([
-            normalize_item({
-                "id": "heat-a",
-                "title": "Heat",
-                "year": "1995",
-                "status": "watched",
-                "rating": 8,
-                "en_catalogo": True,
-                "local_files": [{"path": "D:/Heat.mkv", "name": "Heat.mkv"}],
-            }),
-            normalize_item({
-                "id": "heat-b",
-                "title": "Heat",
-                "spanish_title": "Fuego contra fuego",
-                "year": "1995",
-                "status": "to_watch",
-                "imdb_url": "https://www.imdb.com/title/tt0113277/",
-                "url": "https://www.imdb.com/title/tt0113277/",
-                "source": "imdb",
-            }),
-        ])
-        reference = lambda item_id: {"id": item_id, "source_file": str(self.catalog_path)}
-        compare_body = json.dumps({
-            "left": reference("heat-a"),
-            "right": reference("heat-b"),
-            "survivor_side": "left",
-        })
+        repository.write(
+            [
+                normalize_item(
+                    {
+                        "id": "heat-a",
+                        "title": "Heat",
+                        "year": "1995",
+                        "status": "watched",
+                        "rating": 8,
+                        "en_catalogo": True,
+                        "local_files": [{"path": "D:/Heat.mkv", "name": "Heat.mkv"}],
+                    }
+                ),
+                normalize_item(
+                    {
+                        "id": "heat-b",
+                        "title": "Heat",
+                        "spanish_title": "Fuego contra fuego",
+                        "year": "1995",
+                        "status": "to_watch",
+                        "imdb_url": "https://www.imdb.com/title/tt0113277/",
+                        "url": "https://www.imdb.com/title/tt0113277/",
+                        "source": "imdb",
+                    }
+                ),
+            ]
+        )
+
+        def reference(item_id):
+            return {"id": item_id, "source_file": str(self.catalog_path)}
+
+        compare_body = json.dumps(
+            {
+                "left": reference("heat-a"),
+                "right": reference("heat-b"),
+                "survivor_side": "left",
+            }
+        )
         status, raw_payload = self.request(
             "POST",
             "/api/curation/compare",
@@ -1296,14 +1388,16 @@ class ViewerHttpTests(unittest.TestCase):
         status_field = next(field for field in comparison["fields"] if field["key"] == "status")
         self.assertTrue(status_field["required"])
 
-        merge_body = json.dumps({
-            "left": reference("heat-a"),
-            "right": reference("heat-b"),
-            "survivor_side": "left",
-            "review_id": comparison["review_id"],
-            "choices": {"status": "left"},
-            "history_mode": "persistent",
-        })
+        merge_body = json.dumps(
+            {
+                "left": reference("heat-a"),
+                "right": reference("heat-b"),
+                "survivor_side": "left",
+                "review_id": comparison["review_id"],
+                "choices": {"status": "left"},
+                "history_mode": "persistent",
+            }
+        )
         status, raw_payload = self.request(
             "POST",
             "/api/curation/merge",
@@ -1325,10 +1419,12 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(history["count"], 1)
         self.assertTrue(history["operations"][0]["can_undo"])
 
-        undo_body = json.dumps({
-            "operation_id": merged_payload["operation"]["id"],
-            "history_mode": "persistent",
-        })
+        undo_body = json.dumps(
+            {
+                "operation_id": merged_payload["operation"]["id"],
+                "history_mode": "persistent",
+            }
+        )
         status, raw_payload = self.request(
             "POST",
             "/api/curation/undo",
@@ -1363,7 +1459,9 @@ class ViewerHttpTests(unittest.TestCase):
 
     @patch("movie_inbox.web.app.background_enrich_catalog_item")
     @patch("movie_inbox.web.app.enrich_selected_result", side_effect=lambda result: result)
-    def test_add_schedules_title_enrichment_when_wikidata_is_missing(self, _, background_enrichment) -> None:
+    def test_add_schedules_title_enrichment_when_wikidata_is_missing(
+        self, _, background_enrichment
+    ) -> None:
         body = json.dumps(
             {
                 "title": "The Beautiful Person",
@@ -1387,12 +1485,14 @@ class ViewerHttpTests(unittest.TestCase):
         (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
         created = self.client.post(
             "/api/libraries",
-            content=json.dumps({
-                "name": "Peliculas principales",
-                "root_path": str(self.media_path),
-                "schedule": "manual",
-                "max_missing_ratio": 0.5,
-            }),
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                    "max_missing_ratio": 0.5,
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(created.status_code, 201, created.content)
@@ -1409,7 +1509,9 @@ class ViewerHttpTests(unittest.TestCase):
             headers={"X-Movie-Inbox-Token": self.config.api_token},
         )
         self.assertEqual(test_run.json()["run"]["status"], "completed")
-        self.assertEqual(test_run.json()["run"]["preview"][0]["relative_path"], "Heat.1995.1080p.mkv")
+        self.assertEqual(
+            test_run.json()["run"]["preview"][0]["relative_path"], "Heat.1995.1080p.mkv"
+        )
         self.assertEqual(test_run.json()["run"]["preview"][0]["state"], "matched")
 
         applied = self.client.post(
@@ -1428,15 +1530,19 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertTrue(items.json()["items"][0]["_availability"]["server"])
         self.assertNotIn(str(self.media_path), items.text)
 
-    def test_scheduled_scans_require_applied_inventory_and_manual_libraries_reject_activation(self) -> None:
+    def test_scheduled_scans_require_applied_inventory_and_manual_libraries_reject_activation(
+        self,
+    ) -> None:
         (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
         created = self.client.post(
             "/api/libraries",
-            content=json.dumps({
-                "name": "Peliculas programadas",
-                "root_path": str(self.media_path),
-                "schedule": "hourly",
-            }),
+            content=json.dumps(
+                {
+                    "name": "Peliculas programadas",
+                    "root_path": str(self.media_path),
+                    "schedule": "hourly",
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(created.status_code, 201, created.content)
@@ -1495,7 +1601,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertGreater(after_test.json()["library"]["verified_at"], 0)
         self.assertEqual(after_test.json()["library"]["counts"]["files"], 0)
         self.assertEqual(before_apply.status_code, 409, before_apply.content)
-        self.assertEqual(before_apply.json()["reason"], "Apply inventory before activating scheduled scans")
+        self.assertEqual(
+            before_apply.json()["reason"], "Apply inventory before activating scheduled scans"
+        )
         self.assertEqual(applied.status_code, 202, applied.content)
         self.assertEqual(after_apply.json()["library"]["counts"]["files"], 1)
         self.assertEqual(activated.status_code, 200, activated.content)
@@ -1504,17 +1612,21 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertFalse(switched_to_manual.json()["library"]["active"])
         self.assertEqual(switched_to_manual.json()["library"]["next_scan_at"], 0)
         self.assertEqual(manual_activation.status_code, 409, manual_activation.content)
-        self.assertEqual(manual_activation.json()["reason"], "Manual libraries do not use scheduled activation")
+        self.assertEqual(
+            manual_activation.json()["reason"], "Manual libraries do not use scheduled activation"
+        )
 
     def test_offline_library_run_keeps_previous_availability_over_http(self) -> None:
         (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
         created = self.client.post(
             "/api/libraries",
-            content=json.dumps({
-                "name": "Disco removible",
-                "root_path": str(self.media_path),
-                "schedule": "manual",
-            }),
+            content=json.dumps(
+                {
+                    "name": "Disco removible",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
             headers=self.post_headers(),
         )
         library_id = created.json()["library"]["id"]
@@ -1559,11 +1671,13 @@ class ViewerHttpTests(unittest.TestCase):
         (self.media_path / "Arrival.2016.mkv").write_bytes(b"arrival-video")
         created = self.client.post(
             "/api/libraries",
-            content=json.dumps({
-                "name": "Peliculas principales",
-                "root_path": str(self.media_path),
-                "schedule": "manual",
-            }),
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
             headers=self.post_headers(),
         )
         library_id = created.json()["library"]["id"]
@@ -1589,12 +1703,14 @@ class ViewerHttpTests(unittest.TestCase):
 
         reviewed = self.client.post(
             f"/api/scanner/queue/{queue_item['id']}",
-            content=json.dumps({
-                "action": "create",
-                "title": "Arrival",
-                "year": "2016",
-                "kind": "pelicula",
-            }),
+            content=json.dumps(
+                {
+                    "action": "create",
+                    "title": "Arrival",
+                    "year": "2016",
+                    "kind": "pelicula",
+                }
+            ),
             headers=self.post_headers(),
         )
         empty = self.client.get(
@@ -1612,31 +1728,41 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(reviewed.json()["catalog_action"], "created")
         self.assertEqual(empty.json()["count"], 0)
         self.assertFalse(arrival.en_catalogo)
-        self.assertTrue(next(item for item in items.json()["items"] if item["id"] == arrival.id)["_availability"]["server"])
+        self.assertTrue(
+            next(item for item in items.json()["items"] if item["id"] == arrival.id)[
+                "_availability"
+            ]["server"]
+        )
         enrich.assert_called_once()
 
     def test_scanner_blocks_duplicate_creation_and_can_link_the_existing_catalog_item(self) -> None:
         repository = JsonCatalogRepository(self.catalog_path, normalize_item)
-        repository.write([
-            normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}),
-            normalize_item({
-                "id": "legacy-1917",
-                "title": "1917",
-                "year": "1917",
-                "kind": "pelicula",
-                "source": "imdb",
-                "url": "https://www.imdb.com/title/tt8579674/",
-                "imdb_url": "https://www.imdb.com/title/tt8579674/",
-            }),
-        ])
+        repository.write(
+            [
+                normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}),
+                normalize_item(
+                    {
+                        "id": "legacy-1917",
+                        "title": "1917",
+                        "year": "1917",
+                        "kind": "pelicula",
+                        "source": "imdb",
+                        "url": "https://www.imdb.com/title/tt8579674/",
+                        "imdb_url": "https://www.imdb.com/title/tt8579674/",
+                    }
+                ),
+            ]
+        )
         (self.media_path / "1917.2019.1080p.BluRay.mkv").write_bytes(b"numeric-title")
         created = self.client.post(
             "/api/libraries",
-            content=json.dumps({
-                "name": "Peliculas principales",
-                "root_path": str(self.media_path),
-                "schedule": "manual",
-            }),
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
             headers=self.post_headers(),
         )
         library_id = created.json()["library"]["id"]
@@ -1658,12 +1784,14 @@ class ViewerHttpTests(unittest.TestCase):
 
         blocked = self.client.post(
             f"/api/scanner/queue/{queue_item['id']}",
-            content=json.dumps({
-                "action": "create",
-                "title": "1917",
-                "year": "2019",
-                "kind": "pelicula",
-            }),
+            content=json.dumps(
+                {
+                    "action": "create",
+                    "title": "1917",
+                    "year": "2019",
+                    "kind": "pelicula",
+                }
+            ),
             headers=self.post_headers(),
         )
 
@@ -1675,10 +1803,12 @@ class ViewerHttpTests(unittest.TestCase):
 
         linked = self.client.post(
             f"/api/scanner/queue/{queue_item['id']}",
-            content=json.dumps({
-                "action": "link_catalog",
-                "catalog_item_id": "legacy-1917",
-            }),
+            content=json.dumps(
+                {
+                    "action": "link_catalog",
+                    "catalog_item_id": "legacy-1917",
+                }
+            ),
             headers=self.post_headers(),
         )
         remaining = self.client.get(
@@ -1700,25 +1830,35 @@ class ViewerHttpTests(unittest.TestCase):
     def test_scanner_create_does_not_write_for_a_missing_queue_item(self) -> None:
         response = self.client.post(
             "/api/scanner/queue/missing-file",
-            content=json.dumps({
-                "action": "create",
-                "title": "Arrival",
-                "year": "2016",
-                "kind": "pelicula",
-            }),
+            content=json.dumps(
+                {
+                    "action": "create",
+                    "title": "Arrival",
+                    "year": "2016",
+                    "kind": "pelicula",
+                }
+            ),
             headers=self.post_headers(),
         )
 
         self.assertEqual(response.status_code, 404, response.content)
-        self.assertEqual([item.title for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()], ["Heat"])
+        self.assertEqual(
+            [
+                item.title
+                for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()
+            ],
+            ["Heat"],
+        )
 
     def test_scanner_candidates_do_not_reveal_a_private_member_catalog(self) -> None:
         created_member = self.client.post(
             "/api/members",
-            content=json.dumps({
-                "username": "maria",
-                "temporary_password": "a-temporary-password",
-            }),
+            content=json.dumps(
+                {
+                    "username": "maria",
+                    "temporary_password": "a-temporary-password",
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(created_member.status_code, 201, created_member.content)
@@ -1726,23 +1866,29 @@ class ViewerHttpTests(unittest.TestCase):
         identity_repository = SqliteIdentityRepository(self.instance_path)
         member_catalog = identity_repository.default_catalog_for(member_id)
         self.assertIsNotNone(member_catalog)
-        open_catalog_repository(Path(member_catalog.write_path), normalize_item).write([
-            normalize_item({
-                "id": "private-member-film",
-                "title": "Private Member Film",
-                "year": "2024",
-                "kind": "pelicula",
-            })
-        ])
+        open_catalog_repository(Path(member_catalog.write_path), normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "private-member-film",
+                        "title": "Private Member Film",
+                        "year": "2024",
+                        "kind": "pelicula",
+                    }
+                )
+            ]
+        )
         (self.media_path / "Private.Member.Film.2024.mkv").write_bytes(b"private-video")
 
         created_library = self.client.post(
             "/api/libraries",
-            content=json.dumps({
-                "name": "Peliculas principales",
-                "root_path": str(self.media_path),
-                "schedule": "manual",
-            }),
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
             headers=self.post_headers(),
         )
         library_id = created_library.json()["library"]["id"]

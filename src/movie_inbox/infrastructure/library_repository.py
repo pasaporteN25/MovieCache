@@ -8,7 +8,7 @@ import sqlite3
 import threading
 from contextlib import closing
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from movie_inbox.application.library_repository import (
     LibraryNotFound,
@@ -21,7 +21,6 @@ from movie_inbox.domain.libraries import (
     ManagedLibrary,
     work_identity_key,
 )
-
 
 RUN_HISTORY_LIMIT = 100
 
@@ -64,7 +63,9 @@ class SqliteLibraryRepository:
             except sqlite3.IntegrityError as error:
                 raise LibraryRepositoryError("A managed library already uses that path") from error
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot create managed library in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot create managed library in: {self.path}"
+                ) from error
 
     def list_libraries(self) -> list[ManagedLibrary]:
         with self._thread_lock:
@@ -75,7 +76,9 @@ class SqliteLibraryRepository:
                     ).fetchall()
                     return [_library(row) for row in rows]
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot list managed libraries from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot list managed libraries from: {self.path}"
+                ) from error
 
     def get_library(self, library_id: str) -> ManagedLibrary | None:
         with self._thread_lock:
@@ -87,7 +90,9 @@ class SqliteLibraryRepository:
                     ).fetchone()
                     return _library(row) if row else None
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot read managed library from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot read managed library from: {self.path}"
+                ) from error
 
     def update_library(self, library: ManagedLibrary) -> ManagedLibrary:
         with self._thread_lock:
@@ -132,7 +137,9 @@ class SqliteLibraryRepository:
             except sqlite3.IntegrityError as error:
                 raise LibraryRepositoryError("A managed library already uses that path") from error
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot update managed library in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot update managed library in: {self.path}"
+                ) from error
 
     def delete_library(self, library_id: str) -> bool:
         with self._thread_lock:
@@ -147,13 +154,17 @@ class SqliteLibraryRepository:
                     if running:
                         connection.rollback()
                         raise LibraryRunBusy("The library is currently being scanned")
-                    cursor = connection.execute("DELETE FROM media_libraries WHERE id = ?", (library_id,))
+                    cursor = connection.execute(
+                        "DELETE FROM media_libraries WHERE id = ?", (library_id,)
+                    )
                     connection.commit()
                     return cursor.rowcount > 0
             except LibraryRunBusy:
                 raise
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot delete managed library from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot delete managed library from: {self.path}"
+                ) from error
 
     def create_run(self, run: LibraryScanRun) -> LibraryScanRun:
         with self._thread_lock:
@@ -179,7 +190,8 @@ class SqliteLibraryRepository:
                         ),
                     )
                     connection.execute(
-                        "UPDATE media_libraries SET status = 'scanning', updated_at = ? WHERE id = ?",
+                        "UPDATE media_libraries SET status = 'scanning', updated_at = ? "
+                        "WHERE id = ?",
                         (run.created_at, run.library_id),
                     )
                     connection.commit()
@@ -189,7 +201,9 @@ class SqliteLibraryRepository:
                     raise LibraryRunBusy("A scan is already queued or running") from error
                 raise LibraryRepositoryError("Cannot queue scan for the managed library") from error
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot queue library scan in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot queue library scan in: {self.path}"
+                ) from error
 
     def claim_run(self, run_id: str, started_at: int) -> LibraryScanRun | None:
         with self._thread_lock:
@@ -204,11 +218,13 @@ class SqliteLibraryRepository:
                         connection.rollback()
                         return None
                     connection.execute(
-                        "UPDATE library_scan_runs SET status = 'running', started_at = ? WHERE id = ?",
+                        "UPDATE library_scan_runs SET status = 'running', started_at = ? "
+                        "WHERE id = ?",
                         (started_at, run_id),
                     )
                     connection.execute(
-                        "UPDATE media_libraries SET status = 'scanning', updated_at = ? WHERE id = ?",
+                        "UPDATE media_libraries SET status = 'scanning', updated_at = ? "
+                        "WHERE id = ?",
                         (started_at, str(row["library_id"])),
                     )
                     connection.commit()
@@ -218,7 +234,9 @@ class SqliteLibraryRepository:
                     ).fetchone()
                     return _run(claimed)
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot claim library scan in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot claim library scan in: {self.path}"
+                ) from error
 
     def get_run(self, run_id: str) -> LibraryScanRun | None:
         with self._thread_lock:
@@ -230,7 +248,9 @@ class SqliteLibraryRepository:
                     ).fetchone()
                     return _run(row) if row else None
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot read library scan from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot read library scan from: {self.path}"
+                ) from error
 
     def list_runs(self, library_id: str, limit: int = 20) -> list[LibraryScanRun]:
         with self._thread_lock:
@@ -243,7 +263,9 @@ class SqliteLibraryRepository:
                     ).fetchall()
                     return [_run(row) for row in rows]
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot list library scans from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot list library scans from: {self.path}"
+                ) from error
 
     def previous_files(self, library_id: str) -> list[LibraryFile]:
         with self._thread_lock:
@@ -255,7 +277,9 @@ class SqliteLibraryRepository:
                     ).fetchall()
                     return [_file(row) for row in rows]
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot read library inventory from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot read library inventory from: {self.path}"
+                ) from error
 
     def complete_run(
         self,
@@ -319,7 +343,9 @@ class SqliteLibraryRepository:
                     )
                     connection.commit()
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot complete library scan in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot complete library scan in: {self.path}"
+                ) from error
 
     def recover_interrupted_runs(self, finished_at: int) -> int:
         with self._thread_lock:
@@ -327,7 +353,8 @@ class SqliteLibraryRepository:
                 with closing(self._connect()) as connection:
                     connection.execute("BEGIN IMMEDIATE")
                     rows = connection.execute(
-                        "SELECT id, library_id FROM library_scan_runs WHERE status IN ('queued', 'running')"
+                        "SELECT id, library_id FROM library_scan_runs "
+                        "WHERE status IN ('queued', 'running')"
                     ).fetchall()
                     if rows:
                         connection.execute(
@@ -345,7 +372,9 @@ class SqliteLibraryRepository:
                     connection.commit()
                     return len(rows)
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot recover interrupted scans in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot recover interrupted scans in: {self.path}"
+                ) from error
 
     def due_libraries(self, now: int) -> list[ManagedLibrary]:
         with self._thread_lock:
@@ -360,7 +389,9 @@ class SqliteLibraryRepository:
                     ).fetchall()
                     return [_library(row) for row in rows]
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot read due library scans from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot read due library scans from: {self.path}"
+                ) from error
 
     def review_queue(self) -> list[LibraryFile]:
         with self._thread_lock:
@@ -373,7 +404,9 @@ class SqliteLibraryRepository:
                     ).fetchall()
                     return [_file(row) for row in rows]
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot read scanner review queue from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot read scanner review queue from: {self.path}"
+                ) from error
 
     def review_file(
         self,
@@ -391,7 +424,9 @@ class SqliteLibraryRepository:
         identity: dict[str, Any] | None,
         updated_at: int,
     ) -> list[LibraryFile]:
-        unique_ids = list(dict.fromkeys(str(file_id or "") for file_id in file_ids if str(file_id or "")))
+        unique_ids = list(
+            dict.fromkeys(str(file_id or "") for file_id in file_ids if str(file_id or ""))
+        )
         if not unique_ids:
             raise LibraryNotFound("Scanner queue item was not found")
         with self._thread_lock:
@@ -413,7 +448,9 @@ class SqliteLibraryRepository:
                         work_key = work_identity_key(payload)
                         if not work_key:
                             connection.rollback()
-                            raise ValueError("A confirmed scanner item requires a recognizable identity")
+                            raise ValueError(
+                                "A confirmed scanner item requires a recognizable identity"
+                            )
                         state = "matched"
                     else:
                         connection.rollback()
@@ -421,19 +458,24 @@ class SqliteLibraryRepository:
                     connection.execute(
                         """UPDATE library_files SET state = ?, work_key = ?, identity_json = ?,
                             candidates_json = '[]', updated_at = ?
-                            WHERE id IN (""" + placeholders + ")",
+                            WHERE id IN ("""
+                        + placeholders
+                        + ")",
                         (state, work_key, _json_dump(payload), updated_at, *unique_ids),
                     )
                     connection.commit()
                     updated_rows = connection.execute(
-                        f"SELECT * FROM library_files WHERE id IN ({placeholders}) ORDER BY relative_key",
+                        f"SELECT * FROM library_files WHERE id IN ({placeholders}) "
+                        "ORDER BY relative_key",
                         unique_ids,
                     ).fetchall()
                     return [_file(row) for row in updated_rows]
             except (LibraryNotFound, ValueError):
                 raise
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot update scanner review queue in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot update scanner review queue in: {self.path}"
+                ) from error
 
     def availability_records(self) -> list[dict[str, Any]]:
         with self._thread_lock:
@@ -459,7 +501,9 @@ class SqliteLibraryRepository:
                         for row in rows
                     ]
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot read shared availability from: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot read shared availability from: {self.path}"
+                ) from error
 
     def counts(self, library_id: str) -> dict[str, int]:
         with self._thread_lock:
@@ -478,7 +522,9 @@ class SqliteLibraryRepository:
                         counts["files"] += total
                     return counts
             except sqlite3.Error as error:
-                raise LibraryRepositoryError(f"Cannot count library inventory in: {self.path}") from error
+                raise LibraryRepositoryError(
+                    f"Cannot count library inventory in: {self.path}"
+                ) from error
 
     def _upsert_file(self, connection: sqlite3.Connection, item: LibraryFile) -> None:
         connection.execute(
@@ -570,7 +616,9 @@ def _run(row: sqlite3.Row) -> LibraryScanRun:
         finished_at=int(row["finished_at"]),
         summary=_json_object(row["summary_json"]),
         errors=tuple(str(value) for value in _json_list(row["errors_json"])),
-        preview=tuple(value for value in _json_list(row["preview_json"]) if isinstance(value, dict)),
+        preview=tuple(
+            value for value in _json_list(row["preview_json"]) if isinstance(value, dict)
+        ),
     )
 
 
@@ -590,7 +638,9 @@ def _file(row: sqlite3.Row) -> LibraryFile:
         state=str(row["state"]),
         work_key=str(row["work_key"]),
         identity=_json_object(row["identity_json"]),
-        candidates=tuple(value for value in _json_list(row["candidates_json"]) if isinstance(value, dict)),
+        candidates=tuple(
+            value for value in _json_list(row["candidates_json"]) if isinstance(value, dict)
+        ),
         available=bool(row["available"]),
         first_seen_at=int(row["first_seen_at"]),
         last_seen_at=int(row["last_seen_at"]),

@@ -19,15 +19,23 @@ from movie_inbox.domain.curation import (
 )
 from movie_inbox.domain.metadata import (
     METADATA_FIELDS,
-    merge_local_files,
     normalize_local_files,
     normalize_locked_fields,
     normalize_metadata_sources,
     normalize_non_negative_int,
 )
-from movie_inbox.domain.normalization import VALID_KINDS, VALID_STATUSES, normalize_bool, normalize_kind, normalize_status
-from movie_inbox.domain.releases import RELEASE_DATE_FIELDS, RELEASE_DATE_PRECISIONS, normalize_release_dates
-
+from movie_inbox.domain.normalization import (
+    VALID_KINDS,
+    VALID_STATUSES,
+    normalize_bool,
+    normalize_kind,
+    normalize_status,
+)
+from movie_inbox.domain.releases import (
+    RELEASE_DATE_FIELDS,
+    RELEASE_DATE_PRECISIONS,
+    normalize_release_dates,
+)
 
 SCHEMA_VERSION = 6
 BACKUP_LIMIT = 1
@@ -76,17 +84,51 @@ CATALOG_FIELDS = [
 ]
 
 REQUIRED_ITEM_FIELDS = {
-    "id", "title", "kind", "status", "en_catalogo", "local_files",
-    "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions", "release_dates",
+    "id",
+    "title",
+    "kind",
+    "status",
+    "en_catalogo",
+    "local_files",
+    "metadata_sources",
+    "locked_fields",
+    "link_curation_status",
+    "duplicate_decisions",
+    "release_dates",
 }
 LOCAL_FILE_FIELDS = {
-    "path", "name", "size_bytes", "modified_at", "part", "library_id",
-    "relative_path", "fingerprint", "last_seen_at", "available",
+    "path",
+    "name",
+    "size_bytes",
+    "modified_at",
+    "part",
+    "library_id",
+    "relative_path",
+    "fingerprint",
+    "last_seen_at",
+    "available",
 }
-LIST_ITEM_FIELDS = {"alternative_titles", "genres", "directors", "writers", "cast", "tags", "locked_fields"}
-STRING_ITEM_FIELDS = set(CATALOG_FIELDS) - LIST_ITEM_FIELDS - {
-    "rating", "en_catalogo", "local_files", "metadata_sources", "duplicate_decisions", "release_dates",
+LIST_ITEM_FIELDS = {
+    "alternative_titles",
+    "genres",
+    "directors",
+    "writers",
+    "cast",
+    "tags",
+    "locked_fields",
 }
+STRING_ITEM_FIELDS = (
+    set(CATALOG_FIELDS)
+    - LIST_ITEM_FIELDS
+    - {
+        "rating",
+        "en_catalogo",
+        "local_files",
+        "metadata_sources",
+        "duplicate_decisions",
+        "release_dates",
+    }
+)
 
 
 class CatalogSchemaError(ValueError):
@@ -114,12 +156,18 @@ def extract_catalog_items(raw: Any) -> list[dict[str, Any]]:
 
 def migrate_catalog_document(raw: Any) -> dict[str, Any]:
     if isinstance(raw, list):
-        document: dict[str, Any] = {"schema_version": 1, "items": copy_item_rows(raw, "legacy list")}
+        document: dict[str, Any] = {
+            "schema_version": 1,
+            "items": copy_item_rows(raw, "legacy list"),
+        }
     elif isinstance(raw, Mapping):
         if "schema_version" not in raw:
             if "items" not in raw:
                 raise CatalogSchemaError("Legacy catalog object must contain an 'items' array")
-            document = {"schema_version": 1, "items": copy_item_rows(raw.get("items"), "legacy object")}
+            document = {
+                "schema_version": 1,
+                "items": copy_item_rows(raw.get("items"), "legacy object"),
+            }
         else:
             version = raw.get("schema_version")
             if not isinstance(version, int) or isinstance(version, bool):
@@ -133,9 +181,13 @@ def migrate_catalog_document(raw: Any) -> dict[str, Any]:
             extra = set(raw) - {"schema_version", "items"}
             if extra:
                 raise CatalogSchemaError(
-                    f"Catalog v{version} contains unsupported root fields: {', '.join(sorted(extra))}"
+                    f"Catalog v{version} contains unsupported root fields: "
+                    f"{', '.join(sorted(extra))}"
                 )
-            document = {"schema_version": version, "items": copy_item_rows(raw.get("items"), f"v{version}")}
+            document = {
+                "schema_version": version,
+                "items": copy_item_rows(raw.get("items"), f"v{version}"),
+            }
     else:
         raise CatalogSchemaError("Catalog root must be an object or a legacy array")
 
@@ -173,7 +225,9 @@ def v2_to_v3(document: dict[str, Any]) -> dict[str, Any]:
     for row in copy_item_rows(document.get("items"), "v2"):
         item = normalize_legacy_item(row)
         item["local_files"] = normalize_local_files(
-            item.get("local_files"), str(item.get("local_name") or ""), str(item.get("local_path") or "")
+            item.get("local_files"),
+            str(item.get("local_name") or ""),
+            str(item.get("local_path") or ""),
         )
         item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
         item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
@@ -186,7 +240,9 @@ def v3_to_v4(document: dict[str, Any]) -> dict[str, Any]:
     for row in copy_item_rows(document.get("items"), "v3"):
         item = normalize_legacy_item(row)
         item["local_files"] = normalize_local_files(
-            item.get("local_files"), str(item.get("local_name") or ""), str(item.get("local_path") or "")
+            item.get("local_files"),
+            str(item.get("local_name") or ""),
+            str(item.get("local_path") or ""),
         )
         item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
         item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
@@ -199,7 +255,9 @@ def v4_to_v5(document: dict[str, Any]) -> dict[str, Any]:
     for row in copy_item_rows(document.get("items"), "v4"):
         item = normalize_legacy_item(row)
         item["local_files"] = normalize_local_files(
-            item.get("local_files"), str(item.get("local_name") or ""), str(item.get("local_path") or "")
+            item.get("local_files"),
+            str(item.get("local_name") or ""),
+            str(item.get("local_path") or ""),
         )
         item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
         item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
@@ -213,7 +271,9 @@ def v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
         item = normalize_legacy_item(row)
         item["release_dates"] = normalize_release_dates(item.get("release_dates"))
         item["local_files"] = normalize_local_files(
-            item.get("local_files"), str(item.get("local_name") or ""), str(item.get("local_path") or "")
+            item.get("local_files"),
+            str(item.get("local_name") or ""),
+            str(item.get("local_path") or ""),
         )
         item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
         item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
@@ -224,7 +284,9 @@ def v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
 def validate_catalog_document(document: Mapping[str, Any]) -> None:
     extra = set(document) - {"schema_version", "items"}
     if extra:
-        raise CatalogSchemaError(f"Catalog root contains unsupported fields: {', '.join(sorted(extra))}")
+        raise CatalogSchemaError(
+            f"Catalog root contains unsupported fields: {', '.join(sorted(extra))}"
+        )
     if document.get("schema_version") != SCHEMA_VERSION:
         raise CatalogSchemaError(f"Catalog must use schema_version {SCHEMA_VERSION}")
     rows = document.get("items")
@@ -258,8 +320,12 @@ def validate_catalog_item(row: Any, index: int = 0) -> None:
         if field in row and any(not isinstance(value, str) for value in row.get(field, [])):
             raise CatalogSchemaError(f"items[{index}].{field} must contain only strings")
     locked_fields = row.get("locked_fields", [])
-    if len(locked_fields) != len(set(locked_fields)) or any(field not in METADATA_FIELDS for field in locked_fields):
-        raise CatalogSchemaError(f"items[{index}].locked_fields contains invalid or duplicate values")
+    if len(locked_fields) != len(set(locked_fields)) or any(
+        field not in METADATA_FIELDS for field in locked_fields
+    ):
+        raise CatalogSchemaError(
+            f"items[{index}].locked_fields contains invalid or duplicate values"
+        )
     if row.get("link_curation_status") not in LINK_CURATION_STATUSES:
         raise CatalogSchemaError(f"items[{index}].link_curation_status is invalid")
     duplicate_decisions = row.get("duplicate_decisions")
@@ -267,15 +333,21 @@ def validate_catalog_item(row: Any, index: int = 0) -> None:
         raise CatalogSchemaError(f"items[{index}].duplicate_decisions must be an object")
     for reference, decision in duplicate_decisions.items():
         if not isinstance(reference, str) or not reference or not isinstance(decision, Mapping):
-            raise CatalogSchemaError(f"items[{index}].duplicate_decisions contains an invalid decision")
+            raise CatalogSchemaError(
+                f"items[{index}].duplicate_decisions contains an invalid decision"
+            )
         if set(decision) != {"status", "updated_at"}:
             raise CatalogSchemaError(
                 f"items[{index}].duplicate_decisions.{reference} must contain status and updated_at"
             )
         if decision.get("status") not in DUPLICATE_DECISION_STATUSES:
-            raise CatalogSchemaError(f"items[{index}].duplicate_decisions.{reference}.status is invalid")
+            raise CatalogSchemaError(
+                f"items[{index}].duplicate_decisions.{reference}.status is invalid"
+            )
         if not isinstance(decision.get("updated_at"), str):
-            raise CatalogSchemaError(f"items[{index}].duplicate_decisions.{reference}.updated_at must be string")
+            raise CatalogSchemaError(
+                f"items[{index}].duplicate_decisions.{reference}.updated_at must be string"
+            )
     validate_local_files(row.get("local_files"), index)
     validate_release_dates(row.get("release_dates"), index)
     validate_metadata_sources(row.get("metadata_sources"), index)
@@ -288,14 +360,22 @@ def validate_release_dates(value: Any, item_index: int) -> None:
         raise CatalogSchemaError(f"items[{item_index}].release_dates must be canonical")
     for date_index, row in enumerate(value):
         if not isinstance(row, Mapping) or set(row) != RELEASE_DATE_FIELDS:
-            raise CatalogSchemaError(f"items[{item_index}].release_dates[{date_index}] has an invalid shape")
+            raise CatalogSchemaError(
+                f"items[{item_index}].release_dates[{date_index}] has an invalid shape"
+            )
         if row.get("precision") not in RELEASE_DATE_PRECISIONS:
-            raise CatalogSchemaError(f"items[{item_index}].release_dates[{date_index}].precision is invalid")
+            raise CatalogSchemaError(
+                f"items[{item_index}].release_dates[{date_index}].precision is invalid"
+            )
         for field in RELEASE_DATE_FIELDS - {"is_primary"}:
             if not isinstance(row.get(field), str):
-                raise CatalogSchemaError(f"items[{item_index}].release_dates[{date_index}].{field} must be string")
+                raise CatalogSchemaError(
+                    f"items[{item_index}].release_dates[{date_index}].{field} must be string"
+                )
         if not isinstance(row.get("is_primary"), bool):
-            raise CatalogSchemaError(f"items[{item_index}].release_dates[{date_index}].is_primary must be boolean")
+            raise CatalogSchemaError(
+                f"items[{item_index}].release_dates[{date_index}].is_primary must be boolean"
+            )
 
 
 def validate_local_files(value: Any, item_index: int) -> None:
@@ -303,11 +383,14 @@ def validate_local_files(value: Any, item_index: int) -> None:
         raise CatalogSchemaError(f"items[{item_index}].local_files must be an array")
     for file_index, row in enumerate(value):
         if not isinstance(row, Mapping):
-            raise CatalogSchemaError(f"items[{item_index}].local_files[{file_index}] must be an object")
+            raise CatalogSchemaError(
+                f"items[{item_index}].local_files[{file_index}] must be an object"
+            )
         extra = sorted(set(row) - LOCAL_FILE_FIELDS)
         if extra:
             raise CatalogSchemaError(
-                f"items[{item_index}].local_files[{file_index}] contains unsupported fields: {', '.join(extra)}"
+                f"items[{item_index}].local_files[{file_index}] contains "
+                f"unsupported fields: {', '.join(extra)}"
             )
         missing = sorted(LOCAL_FILE_FIELDS - set(row))
         if missing:
@@ -320,13 +403,18 @@ def validate_local_files(value: Any, item_index: int) -> None:
             or row.get("size_bytes", 0) < 0
         ):
             raise CatalogSchemaError(
-                f"items[{item_index}].local_files[{file_index}].size_bytes must be a non-negative integer"
+                f"items[{item_index}].local_files[{file_index}].size_bytes "
+                "must be a non-negative integer"
             )
         if not isinstance(row.get("available"), bool):
-            raise CatalogSchemaError(f"items[{item_index}].local_files[{file_index}].available must be boolean")
+            raise CatalogSchemaError(
+                f"items[{item_index}].local_files[{file_index}].available must be boolean"
+            )
         for field in LOCAL_FILE_FIELDS - {"size_bytes", "available"}:
             if not isinstance(row.get(field), str):
-                raise CatalogSchemaError(f"items[{item_index}].local_files[{file_index}].{field} must be string")
+                raise CatalogSchemaError(
+                    f"items[{item_index}].local_files[{file_index}].{field} must be string"
+                )
 
 
 def validate_metadata_sources(value: Any, item_index: int) -> None:
@@ -338,17 +426,22 @@ def validate_metadata_sources(value: Any, item_index: int) -> None:
         required = {"source", "url", "updated_at", "inferred"}
         if set(row) != required:
             raise CatalogSchemaError(
-                f"items[{item_index}].metadata_sources.{field} must contain source, url, updated_at and inferred"
+                f"items[{item_index}].metadata_sources.{field} must contain "
+                "source, url, updated_at and inferred"
             )
         if not isinstance(row.get("source"), str) or not row.get("source"):
-            raise CatalogSchemaError(f"items[{item_index}].metadata_sources.{field}.source is required")
+            raise CatalogSchemaError(
+                f"items[{item_index}].metadata_sources.{field}.source is required"
+            )
         for string_field in ("url", "updated_at"):
             if not isinstance(row.get(string_field), str):
                 raise CatalogSchemaError(
                     f"items[{item_index}].metadata_sources.{field}.{string_field} must be string"
                 )
         if not isinstance(row.get("inferred"), bool):
-            raise CatalogSchemaError(f"items[{item_index}].metadata_sources.{field}.inferred must be boolean")
+            raise CatalogSchemaError(
+                f"items[{item_index}].metadata_sources.{field}.inferred must be boolean"
+            )
 
 
 def plain_value(value: Any) -> Any:
@@ -369,7 +462,9 @@ def normalize_legacy_item(row: Mapping[str, Any]) -> dict[str, Any]:
     item["status"] = normalize_status(item.get("status"))
     item["en_catalogo"] = normalize_bool(item.get("en_catalogo"), default=False)
     item["rating"] = min(10, normalize_non_negative_int(item.get("rating")))
-    item["release_dates"] = normalize_release_dates(item.get("release_dates") or item.get("releaseDates"))
+    item["release_dates"] = normalize_release_dates(
+        item.get("release_dates") or item.get("releaseDates")
+    )
     for field in ("watched_at", "review", "original_title", "spanish_title", "english_title"):
         item[field] = str(item.get(field) or "")
     for field in ("alternative_titles", "genres", "directors", "writers", "cast", "tags"):

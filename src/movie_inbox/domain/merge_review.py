@@ -16,7 +16,11 @@ from movie_inbox.domain.catalog import (
     normalize_item,
 )
 from movie_inbox.domain.curation import curation_timestamp, normalize_duplicate_decisions
-from movie_inbox.domain.metadata import merge_local_files, normalize_locked_fields, normalize_local_files
+from movie_inbox.domain.metadata import (
+    merge_local_files,
+    normalize_local_files,
+    normalize_locked_fields,
+)
 from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
 
 
@@ -294,7 +298,7 @@ def _equivalent(definition: MergeField, left: Any, right: Any) -> bool:
         return _local_file_keys(left) == _local_file_keys(right)
     if definition.strategy == "release_dates":
         return normalize_release_dates(left) == normalize_release_dates(right)
-    return left == right
+    return bool(left == right)
 
 
 def _meaningful(key: str, value: Any) -> bool:
