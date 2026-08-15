@@ -9,11 +9,12 @@ from movie_inbox.domain.models import ExternalSearchResult
 from movie_inbox.external.metadata import fetch_metadata, fetch_metadata_by_title
 from movie_inbox.external.registry import EXTERNAL_SOURCES
 
-
 EXTERNAL_CATALOG = ExternalCatalogService(EXTERNAL_SOURCES, fetch_metadata)
 
 
-def search_external_sources(query: str, source: str = "all") -> tuple[list[ExternalSearchResult], dict[str, Any]]:
+def search_external_sources(
+    query: str, source: str = "all"
+) -> tuple[list[ExternalSearchResult], dict[str, Any]]:
     return EXTERNAL_CATALOG.search(query, source)
 
 

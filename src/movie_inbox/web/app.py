@@ -6,7 +6,7 @@ import json
 import secrets
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -16,28 +16,24 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from movie_inbox.application.auth_service import (
-    AuthService,
     AuthenticationError,
+    AuthService,
     PasswordPolicyError,
 )
-from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.collection_repository import CollectionRepositoryError
 from movie_inbox.application.collection_service import (
     CollectionItemNotFound,
     CollectionNotFound,
     CollectionService,
 )
+from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.curation_workflow import (
     CatalogPointer,
     CurationConflict,
     CurationItemNotFound,
     CurationWorkflowError,
 )
-from movie_inbox.application.repository import (
-    CatalogBusyError,
-    CatalogFormatError,
-    CatalogRepositoryError,
-)
+from movie_inbox.application.home_service import EditorialHomeService, home_image_items
 from movie_inbox.application.identity_repository import (
     IdentityConflict,
     IdentityMemberActive,
@@ -54,7 +50,6 @@ from movie_inbox.application.import_service import (
     ImportPermissionError,
     ImportService,
 )
-from movie_inbox.application.home_service import EditorialHomeService, home_image_items
 from movie_inbox.application.library_repository import (
     LibraryNotFound,
     LibraryRepositoryError,
@@ -66,32 +61,37 @@ from movie_inbox.application.library_service import (
     ManagedLibraryScheduler,
     ManagedLibraryService,
 )
-from movie_inbox.application.search_service import (
-    group_external_results,
-    rank_catalog_candidates,
-    search_catalog_items,
-)
 from movie_inbox.application.member_service import (
     ManagedMember,
     MemberAuthorizationError,
     MemberService,
 )
 from movie_inbox.application.privacy_service import PrivacyService, SharedCatalogUnavailable
+from movie_inbox.application.repository import (
+    CatalogBusyError,
+    CatalogFormatError,
+    CatalogRepositoryError,
+)
+from movie_inbox.application.search_service import (
+    group_external_results,
+    rank_catalog_candidates,
+    search_catalog_items,
+)
 from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity
 from movie_inbox.domain.libraries import LibraryValidationError, work_identity
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.domain.privacy import ItemPrivacyOverride
-from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
-from movie_inbox.infrastructure.export import catalog_csv_text
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
+from movie_inbox.infrastructure.export import catalog_csv_text
+from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.infrastructure.home_snapshot_repository import (
     HomeSnapshotRepositoryError,
     SqliteHomeSnapshotRepository,
 )
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import (
-    ImportParseError,
     MAX_IMPORT_CONTENT_BYTES,
+    ImportParseError,
     parse_import_content,
 )
 from movie_inbox.infrastructure.import_repository import SqliteImportDraftRepository
@@ -114,8 +114,8 @@ from movie_inbox.web.catalog_api import (
     background_enrich_catalog_item,
     build_curation_payload,
     catalog_service,
-    curation_workflow,
     curation_counts,
+    curation_workflow,
     delete_item_anywhere,
     enrich_selected_result,
     has_external_link,
@@ -141,7 +141,6 @@ from movie_inbox.web.security import (
     viewer_allowed_hosts,
     viewer_allowed_origins,
 )
-
 
 MAX_JSON_BODY_BYTES = 2 * 1024 * 1024
 # JSON escaping can nearly double a valid text source without increasing its
@@ -177,17 +176,15 @@ class SessionCatalog:
     write_name: str
 
     @classmethod
-    def from_identity(cls, base: ViewerConfig, identity: AuthenticatedIdentity) -> "SessionCatalog":
+    def from_identity(cls, base: ViewerConfig, identity: AuthenticatedIdentity) -> SessionCatalog:
         source_paths = [source.path for source in identity.catalog.sources]
         if not source_paths or not identity.catalog.write_path:
             raise ApiRequestError("catalog_unavailable", 503)
         references = {
-            f"source-{position}": path
-            for position, path in enumerate(source_paths, start=1)
+            f"source-{position}": path for position, path in enumerate(source_paths, start=1)
         }
         references_by_path = {
-            _resolved_path(path): reference
-            for reference, path in references.items()
+            _resolved_path(path): reference for reference, path in references.items()
         }
         runtime = replace(
             base,
@@ -241,7 +238,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
         identity_repository,
         session_ttl_seconds=config.session_ttl_seconds,
     )
-    member_catalog_dir = Path(config.member_catalog_dir or Path(config.instance_db).parent / "catalogs")
+    member_catalog_dir = Path(
+        config.member_catalog_dir or Path(config.instance_db).parent / "catalogs"
+    )
     member_service = MemberService(
         identity_repository,
         SqlitePersonalCatalogProvisioner(member_catalog_dir),
@@ -332,7 +331,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.availability_service = availability_service
     app.state.library_scheduler = library_scheduler
     app.state.image_warmer = image_warmer
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin))
+    app.add_middleware(
+        TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin)
+    )
 
     @app.middleware("http")
     async def security_and_authentication(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -352,7 +353,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
             response = RedirectResponse(destination, status_code=303)
         elif path == "/password-change" and identity is None:
             response = RedirectResponse("/login", status_code=303)
-        elif path == "/password-change" and identity is not None and not identity.user.must_change_password:
+        elif (
+            path == "/password-change"
+            and identity is not None
+            and not identity.user.must_change_password
+        ):
             response = RedirectResponse("/", status_code=303)
         elif path == "/" and identity is None:
             response = RedirectResponse("/login", status_code=303)
@@ -516,9 +521,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 featured_source = "reconstructed" if saved_featured else "live"
         except HomeSnapshotRepositoryError:
             payload["warnings"] = list(
-                dict.fromkeys(
-                    [*payload.get("warnings", []), "home_history_unavailable"]
-                )
+                dict.fromkeys([*payload.get("warnings", []), "home_history_unavailable"])
             )
             featured_source = "unavailable"
         payload["featured_source"] = featured_source
@@ -529,7 +532,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         return payload
 
     def requested_home_date(value: str) -> str:
-        requested = str(value or "").strip() or datetime.now(timezone.utc).date().isoformat()
+        requested = str(value or "").strip() or datetime.now(UTC).date().isoformat()
         return home_service.validate_date(requested)
 
     def request_workflow(request: Request):  # type: ignore[no-untyped-def]
@@ -621,7 +624,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return error_response(str(error), 400)
         except IdentityRepositoryError:
             return error_response("identity_store_unavailable", 503)
-        response = JSONResponse({"ok": True, "reason": "password_changed", **identity_payload(identity)})
+        response = JSONResponse(
+            {"ok": True, "reason": "password_changed", **identity_payload(identity)}
+        )
         set_auth_cookie(response, token)
         return response
 
@@ -647,7 +652,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
         response = HTMLResponse(render_html(config.title, config.api_token))
-        history_session_id = str(request.cookies.get(HISTORY_SESSION_COOKIE) or secrets.token_urlsafe(24))
+        history_session_id = str(
+            request.cookies.get(HISTORY_SESSION_COOKIE) or secrets.token_urlsafe(24)
+        )
         response.set_cookie(
             HISTORY_SESSION_COOKIE,
             history_session_id,
@@ -818,7 +825,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 confirmed_username=str(body.get("confirmed_username") or ""),
             )
             return JSONResponse(
-                {"ok": True, "reason": "member_archived", "archived": archived_member_payload(archived)}
+                {
+                    "ok": True,
+                    "reason": "member_archived",
+                    "archived": archived_member_payload(archived),
+                }
             )
         except IdentityMemberActive:
             return error_response("member_must_be_inactive", 409)
@@ -900,7 +911,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
     ) -> JSONResponse:
         require_owner(request)
         try:
-            return JSONResponse({"ok": True, **library_service.check_path(str(body.get("path") or ""))})
+            return JSONResponse(
+                {"ok": True, **library_service.check_path(str(body.get("path") or ""))}
+            )
         except LibraryPathError as error:
             return error_response(str(error), 400)
 
@@ -913,7 +926,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
         try:
             library = library_service.create_library(identity.user.id, body)
             return JSONResponse(
-                {"ok": True, "reason": "library_created", "library": library_service.library_payload(library)},
+                {
+                    "ok": True,
+                    "reason": "library_created",
+                    "library": library_service.library_payload(library),
+                },
                 status_code=201,
             )
         except (ValueError, LibraryValidationError, LibraryPathError) as error:
@@ -941,7 +958,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
         try:
             library = library_service.update_library(library_id, body)
             return JSONResponse(
-                {"ok": True, "reason": "library_updated", "library": library_service.library_payload(library)}
+                {
+                    "ok": True,
+                    "reason": "library_updated",
+                    "library": library_service.library_payload(library),
+                }
             )
         except LibraryNotFound:
             return error_response("library_not_found", 404)
@@ -964,7 +985,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
         try:
             library = library_service.set_active(library_id, body["active"])
             return JSONResponse(
-                {"ok": True, "reason": "library_status_updated", "library": library_service.library_payload(library)}
+                {
+                    "ok": True,
+                    "reason": "library_status_updated",
+                    "library": library_service.library_payload(library),
+                }
             )
         except LibraryNotFound:
             return error_response("library_not_found", 404)
@@ -1005,7 +1030,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
             run = library_service.queue_scan(library_id, str(body.get("mode") or "dry_run"))
             background_tasks.add_task(library_service.execute_run, run.id)
             return JSONResponse(
-                {"ok": True, "reason": "library_scan_queued", "run": library_service.run_payload(run)},
+                {
+                    "ok": True,
+                    "reason": "library_scan_queued",
+                    "run": library_service.run_payload(run),
+                },
                 status_code=202,
             )
         except LibraryNotFound:
@@ -1086,7 +1115,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
                     raise LibraryNotFound("Scanner queue item was not found")
                 catalog = session_catalog(request)
                 write_path = write_path_for(catalog.config, "")
-                created, catalog_reason, catalog_result = catalog_service(write_path).ensure_scanner_item(
+                created, catalog_reason, catalog_result = catalog_service(
+                    write_path
+                ).ensure_scanner_item(
                     {**body, "scanner_reference": file_id},
                     comparison_items=load_items(catalog.config.patterns),
                 )
@@ -1095,7 +1126,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
                         {
                             "ok": False,
                             "reason": catalog_reason,
-                            "candidates": catalog.public_payload(catalog_result.get("candidates", [])),
+                            "candidates": catalog.public_payload(
+                                catalog_result.get("candidates", [])
+                            ),
                             "distinct_review_token": str(
                                 catalog_result.get("distinct_review_token") or ""
                             ),
@@ -1113,7 +1146,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
                     },
                 )
                 background_enrichment = "not_needed"
-                if catalog_result.get("writable") and needs_background_title_enrichment(catalog_item):
+                if catalog_result.get("writable") and needs_background_title_enrichment(
+                    catalog_item
+                ):
                     background_tasks.add_task(
                         background_enrich_catalog_item,
                         write_path,
@@ -1124,7 +1159,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 return JSONResponse(
                     {
                         "ok": True,
-                        "reason": "scanner_item_created_and_linked" if created else "scanner_item_reused_and_linked",
+                        "reason": "scanner_item_created_and_linked"
+                        if created
+                        else "scanner_item_reused_and_linked",
                         "item": item,
                         "catalog_action": catalog_reason,
                         "catalog_item": catalog.public_payload(catalog_item),
@@ -1255,7 +1292,10 @@ def create_app(config: ViewerConfig) -> FastAPI:
         column_map = body.get("column_map")
         if column_map is not None and (
             not isinstance(column_map, dict)
-            or any(not isinstance(key, str) or not isinstance(value, str) for key, value in column_map.items())
+            or any(
+                not isinstance(key, str) or not isinstance(value, str)
+                for key, value in column_map.items()
+            )
         ):
             return error_response("column_map_must_be_an_object_of_strings", 400)
         try:
@@ -1371,7 +1411,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
     def collections(request: Request) -> JSONResponse:
         identity = require_ready_identity(request)
         try:
-            return JSONResponse({"collections": collection_service.list_collections(identity.user.id)})
+            return JSONResponse(
+                {"collections": collection_service.list_collections(identity.user.id)}
+            )
         except CollectionRepositoryError:
             return error_response("collection_store_unavailable", 503)
 
@@ -1549,7 +1591,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         except CatalogRepositoryError as error:
             return repository_error_response(error)
 
-        stamp = datetime.now(timezone.utc).date().isoformat()
+        stamp = datetime.now(UTC).date().isoformat()
         filename = f"movie-inbox-{identity.user.username.casefold()}-{stamp}.{export_format}"
         headers = {
             "Cache-Control": "no-store",
@@ -1581,7 +1623,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
     @app.get("/api/curation/history", dependencies=[Depends(require_token)])
     def curation_history(request: Request, mode: str = "persistent") -> JSONResponse:
         try:
-            return JSONResponse(request_workflow(request).history(mode, history_session_id(request)))
+            return JSONResponse(
+                request_workflow(request).history(mode, history_session_id(request))
+            )
         except (ValueError, CurationHistoryError) as error:
             return curation_application_error_response(error)
 
@@ -1736,7 +1780,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
             return error_response("missing_image_url", 400)
         if not config.image_cache:
             try:
-                validated_url = validate_public_http_url(url, allowed_hosts=config.image_allowed_hosts)
+                validated_url = validate_public_http_url(
+                    url, allowed_hosts=config.image_allowed_hosts
+                )
             except UnsafeRemoteUrl:
                 return error_response("invalid_image_url", 400)
             return RedirectResponse(validated_url, status_code=302)
@@ -2021,7 +2067,8 @@ def archived_member_payload(member: ArchivedMember) -> dict[str, Any]:
         "username": member.username,
         "catalog": {"name": member.catalog_name},
         "archived_at": member.archived_at,
-        "catalog_available": bool(member.sources) and all(Path(source.path).exists() for source in member.sources),
+        "catalog_available": bool(member.sources)
+        and all(Path(source.path).exists() for source in member.sources),
     }
 
 
@@ -2029,7 +2076,9 @@ async def read_json_object(
     request: Request,
     max_bytes: int = MAX_JSON_BODY_BYTES,
 ) -> dict[str, Any]:
-    content_type = str(request.headers.get("Content-Type") or "").split(";", 1)[0].strip().casefold()
+    content_type = (
+        str(request.headers.get("Content-Type") or "").split(";", 1)[0].strip().casefold()
+    )
     if content_type != "application/json":
         raise ApiRequestError("Content-Type must be application/json")
     content_length = str(request.headers.get("Content-Length") or "").strip()

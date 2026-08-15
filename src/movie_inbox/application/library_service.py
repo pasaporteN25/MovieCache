@@ -8,9 +8,10 @@ import threading
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from movie_inbox.application.library_repository import (
     LibraryNotFound,
@@ -35,7 +36,6 @@ from movie_inbox.domain.libraries import (
 from movie_inbox.domain.matching import decide_match, explicit_kind
 from movie_inbox.domain.titles import detect_media_part
 
-
 CatalogUniverseProvider = Callable[[], list[dict[str, Any]]]
 FilesystemScanner = Callable[..., tuple[list[dict[str, Any]], list[str]]]
 PREVIEW_LIMIT = 100
@@ -53,7 +53,7 @@ class _CatalogMatchIndex:
     by_term: Mapping[str, frozenset[int]]
 
     @classmethod
-    def build(cls, items: list[dict[str, Any]]) -> "_CatalogMatchIndex":
+    def build(cls, items: list[dict[str, Any]]) -> _CatalogMatchIndex:
         by_title: dict[str, set[int]] = defaultdict(set)
         by_term: dict[str, set[int]] = defaultdict(set)
         for position, item in enumerate(items):
@@ -92,7 +92,9 @@ class ManagedLibraryService:
         clock: Callable[[], float] = time.time,
     ) -> None:
         self.repository = repository
-        self.allowed_roots = tuple(_resolved_root(value) for value in allowed_roots if str(value or "").strip())
+        self.allowed_roots = tuple(
+            _resolved_root(value) for value in allowed_roots if str(value or "").strip()
+        )
         self.catalog_universe = catalog_universe
         self.scanner = scanner
         self.clock = clock
@@ -137,7 +139,9 @@ class ManagedLibraryService:
             next_scan_at=(
                 _next_scan(self._now(), schedule)
                 if active and schedule != library.schedule
-                else library.next_scan_at if active else 0
+                else library.next_scan_at
+                if active
+                else 0
             ),
             updated_at=self._now(),
         )
@@ -150,7 +154,9 @@ class ManagedLibraryService:
         if active and library.schedule == "manual":
             raise LibraryValidationError("Manual libraries do not use scheduled activation")
         if active and not library.verified_at:
-            raise LibraryValidationError("Run a successful test scan before activating this library")
+            raise LibraryValidationError(
+                "Run a successful test scan before activating this library"
+            )
         if active and not library.last_scan_at:
             raise LibraryValidationError("Apply inventory before activating scheduled scans")
         now = self._now()
@@ -281,7 +287,9 @@ class ManagedLibraryService:
         payloads: list[dict[str, Any]] = []
         for grouped in groups.values():
             ordered = sorted(grouped, key=_multipart_sort_key)
-            payloads.append(self.file_payload(ordered[0], libraries.get(ordered[0].library_id), ordered))
+            payloads.append(
+                self.file_payload(ordered[0], libraries.get(ordered[0].library_id), ordered)
+            )
         return payloads
 
     def review_file(self, file_id: str, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -296,7 +304,11 @@ class ManagedLibraryService:
             candidate_key = str(payload.get("candidate_key") or "").strip()
             if candidate_key:
                 candidate = next(
-                    (dict(value) for value in item.candidates if str(value.get("key") or "") == candidate_key),
+                    (
+                        dict(value)
+                        for value in item.candidates
+                        if str(value.get("key") or "") == candidate_key
+                    ),
                     None,
                 )
                 if candidate is None:
@@ -328,9 +340,7 @@ class ManagedLibraryService:
                     raise ValueError("Confirm the year or choose an existing candidate")
         group_key = _multipart_group_key(item)
         siblings = [
-            value
-            for value in queue_items
-            if group_key and _multipart_group_key(value) == group_key
+            value for value in queue_items if group_key and _multipart_group_key(value) == group_key
         ] or [item]
         updated = self.repository.review_files(
             [value.id for value in siblings],
@@ -513,8 +523,7 @@ class ManagedLibraryService:
         match_index = _CatalogMatchIndex.build(self.catalog_universe())
         previous_by_path = {_relative_path_key(item.relative_path): item for item in previous}
         current_path_keys = {
-            _relative_path_key(str(row.get("relative_path") or ""))
-            for row in scanned
+            _relative_path_key(str(row.get("relative_path") or "")) for row in scanned
         }
         fingerprint_index: dict[str, list[LibraryFile]] = defaultdict(list)
         for item in previous:
@@ -598,16 +607,15 @@ class ManagedLibraryService:
         classified = _propagate_multipart_identity(classified)
         for state in ("matched", "new", "review", "ignored"):
             counts[state] = sum(1 for item in classified if item.state == state)
-        classified_by_path = {
-            _relative_path_key(item.relative_path): item
-            for item in classified
-        }
+        classified_by_path = {_relative_path_key(item.relative_path): item for item in classified}
         for row in preview:
             item = classified_by_path.get(_relative_path_key(str(row.get("relative_path") or "")))
             if item is not None:
                 row["state"] = item.state
                 row["candidate_count"] = len(item.candidates)
-        counts["missing"] = len([item for item in previous if item.available and item.id not in claimed_ids])
+        counts["missing"] = len(
+            [item for item in previous if item.available and item.id not in claimed_ids]
+        )
         return classified, counts, preview
 
     @staticmethod
@@ -621,7 +629,11 @@ class ManagedLibraryService:
             and existing.state in {"matched", "ignored"}
             and existing.fingerprint == str(row.get("fingerprint") or "")
         ):
-            return existing.state, dict(existing.identity), [dict(value) for value in existing.candidates]
+            return (
+                existing.state,
+                dict(existing.identity),
+                [dict(value) for value in existing.candidates],
+            )
         detected = detected_work_identity(
             str(row.get("title") or ""),
             str(row.get("year") or ""),
@@ -641,9 +653,16 @@ class ManagedLibraryService:
             prior = groups.get(key)
             if prior is None or float(candidate["score"]) > float(prior.get("score") or 0):
                 groups[key] = candidate
-            if decision.reason == "exact_title_missing_year" and _has_legacy_inventory_evidence(catalog_item):
+            if decision.reason == "exact_title_missing_year" and _has_legacy_inventory_evidence(
+                catalog_item
+            ):
                 legacy_inventory_keys.add(key)
-        accepted = [value for value in groups.values() if str(value.get("reason") or "") in {"shared_external_url", "shared_wikidata_id", "exact_title_year"}]
+        accepted = [
+            value
+            for value in groups.values()
+            if str(value.get("reason") or "")
+            in {"shared_external_url", "shared_wikidata_id", "exact_title_year"}
+        ]
         if len(accepted) == 1:
             identity = dict(accepted[0])
             for key in ("key", "score", "reason"):
@@ -656,7 +675,9 @@ class ManagedLibraryService:
                 for field in ("key", "score", "reason"):
                     identity.pop(field, None)
                 return "matched", identity, []
-        candidates = sorted(groups.values(), key=lambda value: float(value.get("score") or 0), reverse=True)[:8]
+        candidates = sorted(
+            groups.values(), key=lambda value: float(value.get("score") or 0), reverse=True
+        )[:8]
         if candidates:
             return "review", {}, candidates
         return "new", {}, []
@@ -910,10 +931,7 @@ def _removal_guard(
     previous_paths = {_relative_path_key(item.relative_path) for item in previous if item.available}
     if not previous_paths:
         return ""
-    current_paths = {
-        _relative_path_key(str(item.get("relative_path") or ""))
-        for item in scanned
-    }
+    current_paths = {_relative_path_key(str(item.get("relative_path") or "")) for item in scanned}
     missing = len(previous_paths - current_paths)
     ratio = missing / len(previous_paths)
     if ratio <= maximum:

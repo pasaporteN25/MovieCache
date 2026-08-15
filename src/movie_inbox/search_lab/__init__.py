@@ -6,7 +6,6 @@ import json
 from importlib.resources import files
 from typing import Any
 
-
 BUILTIN_CORPUS_NAME = "v1.json"
 
 

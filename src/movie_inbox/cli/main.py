@@ -19,7 +19,6 @@ from movie_inbox.cli import (
 )
 from movie_inbox.web import server
 
-
 Command = Callable[[list[str] | None], int]
 COMMANDS: dict[str, tuple[Command, str]] = {
     "account": (account.main, "Bootstrap the local owner account."),

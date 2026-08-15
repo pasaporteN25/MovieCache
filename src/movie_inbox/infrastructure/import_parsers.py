@@ -31,11 +31,10 @@ from movie_inbox.domain.titles import (
     looks_like_external_id,
 )
 from movie_inbox.infrastructure.schema import (
-    CatalogSchemaError,
     SCHEMA_VERSION,
+    CatalogSchemaError,
     extract_catalog_items,
 )
-
 
 MAX_IMPORT_CONTENT_BYTES = 8 * 1024 * 1024
 MAX_IMPORT_ROWS = 10_000
@@ -65,7 +64,12 @@ CSV_ALIASES = {
     "original_title": {"original_title", "originaltitle", "titulo_original"},
     "spanish_title": {"spanish_title", "spanishtitle", "titulo_espanol", "titulo_en_espanol"},
     "english_title": {"english_title", "englishtitle", "titulo_ingles", "titulo_en_ingles"},
-    "alternative_titles": {"alternative_titles", "alternativetitles", "aliases", "titulos_alternativos"},
+    "alternative_titles": {
+        "alternative_titles",
+        "alternativetitles",
+        "aliases",
+        "titulos_alternativos",
+    },
     "kind": {"kind", "type", "tipo"},
     "status": {"status", "estado"},
     "watched_at": {"watched_at", "watchedat", "fecha_vista"},
@@ -123,7 +127,9 @@ def parse_import_content(
 
 def sanitize_source_name(value: str) -> str:
     normalized = str(value or "importacion").replace("\\", "/").split("/")[-1]
-    normalized = "".join(character for character in normalized if character >= " " and character != "\x7f")
+    normalized = "".join(
+        character for character in normalized if character >= " " and character != "\x7f"
+    )
     return clean_whitespace(normalized)[:160] or "importacion"
 
 
@@ -160,7 +166,9 @@ def _parse_txt(content: str) -> list[ParsedImportItem]:
         urls = [url for url in urls if url]
         if urls:
             for url in urls:
-                items.append(_parsed_mapping(len(items), {"url": url}, f"Linea {line_number}: {url}"))
+                items.append(
+                    _parsed_mapping(len(items), {"url": url}, f"Linea {line_number}: {url}")
+                )
         else:
             items.append(_parsed_title(len(items), line, line_number))
         if len(items) > MAX_IMPORT_ROWS:
@@ -230,7 +238,11 @@ def _parse_json(content: str) -> list[ParsedImportItem]:
             raise ImportParseError("JSON catalog must contain an items array")
         if "schema_version" in raw:
             version = raw.get("schema_version")
-            if not isinstance(version, int) or isinstance(version, bool) or not 1 <= version <= SCHEMA_VERSION:
+            if (
+                not isinstance(version, int)
+                or isinstance(version, bool)
+                or not 1 <= version <= SCHEMA_VERSION
+            ):
                 raise ImportParseError("JSON catalog schema version is not supported")
     else:
         raise ImportParseError("JSON catalog root must be an object or array")
@@ -244,7 +256,11 @@ def _parse_json(content: str) -> list[ParsedImportItem]:
             items.append(_invalid_item(position, label, "json_item_not_object"))
             continue
         try:
-            envelope: Any = [dict(row)] if version is None else {"schema_version": version, "items": [dict(row)]}
+            envelope: Any = (
+                [dict(row)]
+                if version is None
+                else {"schema_version": version, "items": [dict(row)]}
+            )
             migrated = extract_catalog_items(envelope)[0]
         except (CatalogSchemaError, IndexError):
             items.append(_invalid_item(position, label, "invalid_catalog_item"))
@@ -266,7 +282,9 @@ def _csv_mapping(headers: list[str], requested: Mapping[str, str]) -> dict[str, 
         if field not in CSV_FIELDS or header not in headers:
             raise ImportParseError("CSV column mapping is invalid")
         mapping[field] = header
-    if "title" not in mapping and not ({"url", "wikipedia_url", "imdb_url", "filmaffinity_url"} & set(mapping)):
+    if "title" not in mapping and not (
+        {"url", "wikipedia_url", "imdb_url", "filmaffinity_url"} & set(mapping)
+    ):
         raise ImportParseError("CSV import needs a title or URL column")
     return mapping
 
@@ -300,7 +318,9 @@ def _parsed_mapping(position: int, raw: Mapping[str, Any], label: str) -> Parsed
         return _invalid_item(position, label, "invalid_item")
     if not item.get("id") or not str(item.get("title") or "").strip():
         return _invalid_item(position, label, "title_not_recognized")
-    return ParsedImportItem(uuid.uuid4().hex, position, _safe_label(item.get("title") or label), item)
+    return ParsedImportItem(
+        uuid.uuid4().hex, position, _safe_label(item.get("title") or label), item
+    )
 
 
 def _normalize_import_item(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -311,7 +331,9 @@ def _normalize_import_item(raw: Mapping[str, Any]) -> dict[str, Any]:
         str(item.get("imdb_url") or item.get("imdb") or ""),
         str(item.get("filmaffinity_url") or item.get("filmaffinity") or ""),
     ]
-    primary_url = next((canonical_url(value) for value in candidate_urls if canonical_url(value)), "")
+    primary_url = next(
+        (canonical_url(value) for value in candidate_urls if canonical_url(value)), ""
+    )
     if any(value for value in candidate_urls) and not primary_url:
         raise ValueError("Invalid URL")
     source = str(item.get("source") or external_source_name(primary_url) or "").strip().casefold()
@@ -384,7 +406,9 @@ def _safe_label(value: Any) -> str:
 
 
 def _mapping_label(value: Mapping[str, Any]) -> str:
-    return _safe_label(value.get("title") or value.get("name") or value.get("url") or "Entrada sin titulo")
+    return _safe_label(
+        value.get("title") or value.get("name") or value.get("url") or "Entrada sin titulo"
+    )
 
 
 def _header_key(value: str) -> str:

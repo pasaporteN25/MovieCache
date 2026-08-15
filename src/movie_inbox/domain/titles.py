@@ -7,7 +7,6 @@ import html
 import re
 import unicodedata
 
-
 _MEDIA_PART_PATTERN = re.compile(r"\b(?:cd|disc|disk|part)[ ._-]?(\d{1,2})\b", re.IGNORECASE)
 _DISC_PART_PATTERN = re.compile(r"\b(?:cd|disc|disk)\s*\d{1,2}\b", re.IGNORECASE)
 
@@ -36,7 +35,12 @@ def clean_release_title(value: str) -> str:
         value,
         flags=re.IGNORECASE,
     )
-    value = re.sub(r"\s+(x264|x265|h264|h265|hevc|avc|aac|dts|ac3|yify|rarbg)\b.*$", "", value, flags=re.IGNORECASE)
+    value = re.sub(
+        r"\s+(x264|x265|h264|h265|hevc|avc|aac|dts|ac3|yify|rarbg)\b.*$",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
     year_match = re.search(r"\b(19\d{2}|20\d{2})\b", value)
     if year_match:
         value = value[: year_match.end()]

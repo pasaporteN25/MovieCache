@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from movie_inbox.domain.catalog import canonical_url, normalize_local_files, normalize_tags
 from movie_inbox.domain.matching import decide_match
 from movie_inbox.domain.search import SearchIntent, parse_search_query, search_key, text_match_score
-
 
 SEARCH_RESULT_LIMIT = 60
 
@@ -70,7 +70,9 @@ def rank_catalog_candidates(
             "score": round(max(search_score, match_score * 100), 1),
             "reason": str(decision.get("reason") or "insufficient_evidence"),
             "accepted": bool(decision.get("accepted")),
-            "evidence": decision.get("evidence") if isinstance(decision.get("evidence"), dict) else {},
+            "evidence": decision.get("evidence")
+            if isinstance(decision.get("evidence"), dict)
+            else {},
         }
         ranked.append(
             (
@@ -129,7 +131,11 @@ def _search_values(item: Mapping[str, Any]) -> list[tuple[str, str, float]]:
     local_values = [
         str(value or "").strip()
         for local_file in normalize_local_files(item.get("local_files"))
-        for value in (local_file.get("name"), local_file.get("path"), local_file.get("relative_path"))
+        for value in (
+            local_file.get("name"),
+            local_file.get("path"),
+            local_file.get("relative_path"),
+        )
         if str(value or "").strip()
     ]
     local_values.extend(

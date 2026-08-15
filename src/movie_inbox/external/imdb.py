@@ -26,7 +26,12 @@ class ImdbAdapter:
         rows = raw.get("d") if isinstance(raw.get("d"), list) else []
         results: list[dict[str, Any]] = []
         for row in rows[:8]:
-            if not isinstance(row, dict) or row.get("qid") not in {"movie", "tvSeries", "tvMiniSeries", "tvMovie"}:
+            if not isinstance(row, dict) or row.get("qid") not in {
+                "movie",
+                "tvSeries",
+                "tvMiniSeries",
+                "tvMovie",
+            }:
                 continue
             imdb_id = str(row.get("id") or "")
             title = str(row.get("l") or "")
@@ -41,7 +46,9 @@ class ImdbAdapter:
                     "spanish_title": "",
                     "english_title": title,
                     "alternative_titles": [],
-                    "kind": "serie" if row.get("qid") in {"tvSeries", "tvMiniSeries"} else "pelicula",
+                    "kind": "serie"
+                    if row.get("qid") in {"tvSeries", "tvMiniSeries"}
+                    else "pelicula",
                     "year": str(row.get("y") or ""),
                     "url": f"https://www.imdb.com/title/{imdb_id}/",
                     "description": str(row.get("s") or ""),
@@ -64,7 +71,9 @@ def fetch_wikipedia_by_imdb_id(imdb_id: str) -> dict[str, Any]:
   ?article schema:about ?item ; schema:isPartOf ?site.
   VALUES ?site {{ <https://en.wikipedia.org/> <https://es.wikipedia.org/> }}
 }} LIMIT 1'''
-    raw = fetch_json_safe("https://query.wikidata.org/sparql?format=json&query=" + quote(query), timeout=5)
+    raw = fetch_json_safe(
+        "https://query.wikidata.org/sparql?format=json&query=" + quote(query), timeout=5
+    )
     results = raw.get("results") if isinstance(raw.get("results"), dict) else {}
     bindings = results.get("bindings") if isinstance(results, dict) else []
     if not isinstance(bindings, list) or not bindings:

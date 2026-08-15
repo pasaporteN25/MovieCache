@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from movie_inbox.application.library_service import ManagedLibraryService, _CatalogMatchIndex
 from movie_inbox.application.search_service import rank_catalog_candidates, search_catalog_items
@@ -13,7 +14,6 @@ from movie_inbox.domain.catalog import canonical_url
 from movie_inbox.domain.libraries import work_identity, work_identity_key
 from movie_inbox.domain.matching import decide_match
 from movie_inbox.domain.search import external_result_score
-
 
 CORPUS_SCHEMA_VERSION = 1
 SUPPORTED_CONTEXTS = {"catalog", "identity", "external", "scanner"}
@@ -102,12 +102,18 @@ def validate_search_corpus(corpus: Mapping[str, Any]) -> None:
     if not isinstance(corpus, Mapping):
         raise SearchCorpusError("Search Lab corpus root must be an object")
     if corpus.get("schema_version") != CORPUS_SCHEMA_VERSION:
-        raise SearchCorpusError(f"Search Lab corpus must use schema_version {CORPUS_SCHEMA_VERSION}")
+        raise SearchCorpusError(
+            f"Search Lab corpus must use schema_version {CORPUS_SCHEMA_VERSION}"
+        )
     items = corpus.get("catalog_items")
     cases = corpus.get("cases")
     if not isinstance(items, list) or any(not isinstance(row, Mapping) for row in items):
         raise SearchCorpusError("catalog_items must be an array of objects")
-    if not isinstance(cases, list) or not cases or any(not isinstance(row, Mapping) for row in cases):
+    if (
+        not isinstance(cases, list)
+        or not cases
+        or any(not isinstance(row, Mapping) for row in cases)
+    ):
         raise SearchCorpusError("cases must be a non-empty array of objects")
     item_ids = [str(row.get("id") or "").strip() for row in items]
     if any(not item_id for item_id in item_ids) or len(item_ids) != len(set(item_ids)):
@@ -121,29 +127,44 @@ def validate_search_corpus(corpus: Mapping[str, Any]) -> None:
             raise SearchCorpusError(f"cases[{index}] must have a unique non-empty id")
         case_ids.add(case_id)
         if context not in SUPPORTED_CONTEXTS:
-            raise SearchCorpusError(f"cases[{index}].context must be one of {sorted(SUPPORTED_CONTEXTS)}")
+            raise SearchCorpusError(
+                f"cases[{index}].context must be one of {sorted(SUPPORTED_CONTEXTS)}"
+            )
         if context in {"catalog", "external"} and not str(case.get("query") or "").strip():
             raise SearchCorpusError(f"cases[{index}].query is required")
         if context in {"identity", "scanner"} and not isinstance(case.get("candidate"), Mapping):
             raise SearchCorpusError(f"cases[{index}].candidate must be an object")
-        if context in {"identity", "scanner"} and not str(case["candidate"].get("title") or "").strip():
+        if (
+            context in {"identity", "scanner"}
+            and not str(case["candidate"].get("title") or "").strip()
+        ):
             raise SearchCorpusError(f"cases[{index}].candidate.title is required")
         allowed_result_ids = catalog_ids
         if context == "external":
             results = case.get("results")
-            if not isinstance(results, list) or any(not isinstance(row, Mapping) for row in results):
+            if not isinstance(results, list) or any(
+                not isinstance(row, Mapping) for row in results
+            ):
                 raise SearchCorpusError(f"cases[{index}].results must be an array of objects")
             external_ids = [_result_key(row) for row in results]
-            if any(not result_id for result_id in external_ids) or len(external_ids) != len(set(external_ids)):
-                raise SearchCorpusError(f"cases[{index}].results must have unique stable ids or URLs")
+            if any(not result_id for result_id in external_ids) or len(external_ids) != len(
+                set(external_ids)
+            ):
+                raise SearchCorpusError(
+                    f"cases[{index}].results must have unique stable ids or URLs"
+                )
             allowed_result_ids = set(external_ids)
         relevant = _string_list(case.get("relevant_ids"), f"cases[{index}].relevant_ids")
         forbidden = _string_list(case.get("forbidden_ids"), f"cases[{index}].forbidden_ids")
         if set(relevant) & set(forbidden):
-            raise SearchCorpusError(f"cases[{index}] cannot mark the same result relevant and forbidden")
+            raise SearchCorpusError(
+                f"cases[{index}] cannot mark the same result relevant and forbidden"
+            )
         unknown_ids = (set(relevant) | set(forbidden)) - allowed_result_ids
         if unknown_ids:
-            raise SearchCorpusError(f"cases[{index}] references unknown result ids: {', '.join(sorted(unknown_ids))}")
+            raise SearchCorpusError(
+                f"cases[{index}] references unknown result ids: {', '.join(sorted(unknown_ids))}"
+            )
         top_k = case.get("top_k", DEFAULT_TOP_K)
         if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
             raise SearchCorpusError(f"cases[{index}].top_k must be a positive integer")
@@ -152,7 +173,9 @@ def validate_search_corpus(corpus: Mapping[str, Any]) -> None:
             str(key) not in allowed_result_ids or not isinstance(value, bool)
             for key, value in expected_acceptance.items()
         ):
-            raise SearchCorpusError(f"cases[{index}].expected_acceptance must map known ids to booleans")
+            raise SearchCorpusError(
+                f"cases[{index}].expected_acceptance must map known ids to booleans"
+            )
         required_reasons = case.get("required_reasons", {})
         if not isinstance(required_reasons, Mapping) or any(
             str(key) not in allowed_result_ids
@@ -161,9 +184,13 @@ def validate_search_corpus(corpus: Mapping[str, Any]) -> None:
             or any(not isinstance(reason, str) or not reason for reason in value)
             for key, value in required_reasons.items()
         ):
-            raise SearchCorpusError(f"cases[{index}].required_reasons must map known ids to reason arrays")
+            raise SearchCorpusError(
+                f"cases[{index}].required_reasons must map known ids to reason arrays"
+            )
         expected_classification = str(case.get("expected_classification") or "")
-        if expected_classification and (context != "scanner" or expected_classification not in {"matched", "review", "new"}):
+        if expected_classification and (
+            context != "scanner" or expected_classification not in {"matched", "review", "new"}
+        ):
             raise SearchCorpusError(f"cases[{index}].expected_classification is invalid")
     thresholds = corpus.get("thresholds", {})
     if not isinstance(thresholds, Mapping):
@@ -171,9 +198,15 @@ def validate_search_corpus(corpus: Mapping[str, Any]) -> None:
     for name, value in thresholds.items():
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise SearchCorpusError(f"thresholds.{name} must be numeric")
-        if name in {"precision_at_5", "mrr", "recall_at_5", "auto_match_precision"} and not 0 <= value <= 1:
+        if (
+            name in {"precision_at_5", "mrr", "recall_at_5", "auto_match_precision"}
+            and not 0 <= value <= 1
+        ):
             raise SearchCorpusError(f"thresholds.{name} must be between zero and one")
-        if name in {"forbidden_hits", "auto_match_false_positives", "expectation_failures"} and value < 0:
+        if (
+            name in {"forbidden_hits", "auto_match_false_positives", "expectation_failures"}
+            and value < 0
+        ):
             raise SearchCorpusError(f"thresholds.{name} cannot be negative")
 
 
@@ -182,7 +215,9 @@ def _evaluate_case(case: Mapping[str, Any], items: list[dict[str, Any]]) -> dict
     context = str(case["context"])
     classification = ""
     if context == "catalog":
-        ranked = search_catalog_items(items, str(case["query"]), limit=max(60, int(case.get("top_k", 5))))
+        ranked = search_catalog_items(
+            items, str(case["query"]), limit=max(60, int(case.get("top_k", 5)))
+        )
         results = [_result_summary(row) for row in ranked]
     elif context == "identity":
         ranked = rank_catalog_candidates(
@@ -215,7 +250,9 @@ def _evaluate_case(case: Mapping[str, Any], items: list[dict[str, Any]]) -> dict
 
     accepted = [row for row in results if bool(row.get("accepted"))]
     accepted_true = [str(row["key"]) for row in accepted if str(row.get("key") or "") in relevant]
-    accepted_false = [str(row["key"]) for row in accepted if str(row.get("key") or "") not in relevant]
+    accepted_false = [
+        str(row["key"]) for row in accepted if str(row.get("key") or "") not in relevant
+    ]
     expectation_failures = _expectation_failures(case, results, classification)
     passed = (
         precision == 1.0
@@ -254,7 +291,9 @@ def _evaluate_case(case: Mapping[str, Any], items: list[dict[str, Any]]) -> dict
 
 def _external_results(query: str, raw_results: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     rows = _dedupe_recorded_external_results(raw_results)
-    ranked = sorted(enumerate(rows), key=lambda row: (-external_result_score(query, row[1]), row[0]))
+    ranked = sorted(
+        enumerate(rows), key=lambda row: (-external_result_score(query, row[1]), row[0])
+    )
     results: list[dict[str, Any]] = []
     for _, row in ranked:
         score = external_result_score(query, row)
@@ -293,7 +332,9 @@ def _scanner_results(
 ) -> tuple[list[dict[str, Any]], str]:
     rows = [dict(item) for item in items]
     index = _CatalogMatchIndex.build(rows)
-    state, selected_identity, classified_candidates = ManagedLibraryService._classification(None, candidate, index)
+    state, selected_identity, classified_candidates = ManagedLibraryService._classification(
+        None, candidate, index
+    )
     grouped: dict[str, tuple[dict[str, Any], Any]] = {}
     for item in index.candidates(candidate):
         decision = decide_match(item, candidate)
@@ -324,7 +365,8 @@ def _scanner_results(
                 **_result_summary(item),
                 "score": round(decision.score * 100, 1),
                 "reason": decision.reason,
-                "accepted": state == "matched" and identity_key == work_identity_key(selected_identity),
+                "accepted": state == "matched"
+                and identity_key == work_identity_key(selected_identity),
                 "evidence": dict(decision.evidence),
             }
         )
@@ -334,7 +376,11 @@ def _scanner_results(
 def _result_summary(row: Mapping[str, Any]) -> dict[str, Any]:
     search = row.get("_search") if isinstance(row.get("_search"), Mapping) else {}
     match = row.get("_match") if isinstance(row.get("_match"), Mapping) else {}
-    evidence = search.get("evidence") if isinstance(search.get("evidence"), Mapping) else match.get("evidence", {})
+    evidence = (
+        search.get("evidence")
+        if isinstance(search.get("evidence"), Mapping)
+        else match.get("evidence", {})
+    )
     return {
         "key": _result_key(row),
         "id": str(row.get("id") or ""),
@@ -380,7 +426,9 @@ def _expectation_failures(
     failures: list[str] = []
     expected_classification = str(case.get("expected_classification") or "")
     if expected_classification and classification != expected_classification:
-        failures.append(f"classification expected {expected_classification}, got {classification or 'none'}")
+        failures.append(
+            f"classification expected {expected_classification}, got {classification or 'none'}"
+        )
     for key, expected in dict(case.get("expected_acceptance") or {}).items():
         row = by_key.get(str(key))
         actual = bool(row and row.get("accepted"))
@@ -412,9 +460,15 @@ def _metric_summary(cases: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return {
         "case_count": count,
         "passed_cases": sum(1 for case in cases if case.get("passed")),
-        "precision_at_5": round(sum(float(row["precision_at_k"]) for row in metrics) / count, 4) if count else 0.0,
-        "mrr": round(sum(float(row["reciprocal_rank"]) for row in metrics) / count, 4) if count else 0.0,
-        "recall_at_5": round(sum(float(row["recall_at_k"]) for row in metrics) / count, 4) if count else 0.0,
+        "precision_at_5": round(sum(float(row["precision_at_k"]) for row in metrics) / count, 4)
+        if count
+        else 0.0,
+        "mrr": round(sum(float(row["reciprocal_rank"]) for row in metrics) / count, 4)
+        if count
+        else 0.0,
+        "recall_at_5": round(sum(float(row["recall_at_k"]) for row in metrics) / count, 4)
+        if count
+        else 0.0,
         "forbidden_hits": sum(int(row["forbidden_hits"]) for row in metrics),
         "auto_match_true_positives": accepted_true,
         "auto_match_false_positives": accepted_false,
@@ -431,7 +485,9 @@ def _evaluate_gate(metrics: Mapping[str, Any], thresholds: Mapping[str, Any]) ->
         if metric not in minimums | maximums:
             raise SearchCorpusError(f"Unsupported Search Lab threshold: {metric}")
         actual = metrics.get(metric)
-        passed = float(actual) >= float(target) if metric in minimums else float(actual) <= float(target)
+        passed = (
+            float(actual) >= float(target) if metric in minimums else float(actual) <= float(target)
+        )
         checks.append({"metric": metric, "actual": actual, "target": target, "passed": passed})
     return {"passed": all(check["passed"] for check in checks), "checks": checks}
 
@@ -439,7 +495,9 @@ def _evaluate_gate(metrics: Mapping[str, Any], thresholds: Mapping[str, Any]) ->
 def _string_list(value: Any, field: str) -> list[str]:
     if value is None:
         return []
-    if not isinstance(value, list) or any(not isinstance(row, str) or not row.strip() for row in value):
+    if not isinstance(value, list) or any(
+        not isinstance(row, str) or not row.strip() for row in value
+    ):
         raise SearchCorpusError(f"{field} must be an array of non-empty strings")
     return [row.strip() for row in value]
 

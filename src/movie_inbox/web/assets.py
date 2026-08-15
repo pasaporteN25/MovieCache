@@ -5,7 +5,6 @@ from __future__ import annotations
 import html
 from importlib.resources import files
 
-
 _STATIC_TYPES = {
     "style.css": "text/css; charset=utf-8",
     "app.js": "text/javascript; charset=utf-8",
@@ -16,25 +15,22 @@ _STATIC_TYPES = {
 
 def render_html(title: str, api_token: str) -> str:
     template = _asset("index.html").decode("utf-8")
-    return (
-        template.replace("__MOVIE_INBOX_TITLE__", html.escape(title, quote=True))
-        .replace("__MOVIE_INBOX_TOKEN__", html.escape(api_token, quote=True))
+    return template.replace("__MOVIE_INBOX_TITLE__", html.escape(title, quote=True)).replace(
+        "__MOVIE_INBOX_TOKEN__", html.escape(api_token, quote=True)
     )
 
 
 def render_login_html(title: str, api_token: str) -> str:
     template = _asset("login.html").decode("utf-8")
-    return (
-        template.replace("__MOVIE_INBOX_TITLE__", html.escape(title, quote=True))
-        .replace("__MOVIE_INBOX_TOKEN__", html.escape(api_token, quote=True))
+    return template.replace("__MOVIE_INBOX_TITLE__", html.escape(title, quote=True)).replace(
+        "__MOVIE_INBOX_TOKEN__", html.escape(api_token, quote=True)
     )
 
 
 def render_password_change_html(title: str, api_token: str) -> str:
     template = _asset("password-change.html").decode("utf-8")
-    return (
-        template.replace("__MOVIE_INBOX_TITLE__", html.escape(title, quote=True))
-        .replace("__MOVIE_INBOX_TOKEN__", html.escape(api_token, quote=True))
+    return template.replace("__MOVIE_INBOX_TITLE__", html.escape(title, quote=True)).replace(
+        "__MOVIE_INBOX_TOKEN__", html.escape(api_token, quote=True)
     )
 
 

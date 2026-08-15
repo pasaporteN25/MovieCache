@@ -22,7 +22,9 @@ class ImportDraftRepository(Protocol):
 
     def get_for_user(self, user_id: str, draft_id: str) -> ImportDraft | None: ...
 
-    def claim_for_apply(self, user_id: str, draft_id: str, now: int, stale_before: int) -> ImportDraft | None: ...
+    def claim_for_apply(
+        self, user_id: str, draft_id: str, now: int, stale_before: int
+    ) -> ImportDraft | None: ...
 
     def complete(
         self,

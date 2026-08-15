@@ -5,14 +5,21 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol
 
-from movie_inbox.domain.catalog import canonical_url, external_source_name, merge_lists, normalize_tags
+from movie_inbox.domain.catalog import (
+    canonical_url,
+    external_source_name,
+    merge_lists,
+    normalize_tags,
+)
 from movie_inbox.domain.models import ExternalSearchResult
 from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
 from movie_inbox.domain.titles import looks_like_external_id
 
 
 class ExternalSourceGateway(Protocol):
-    def search(self, query: str, source: str = "all") -> tuple[list[dict[str, Any]], dict[str, Any]]: ...
+    def search(
+        self, query: str, source: str = "all"
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]: ...
 
     def selected_metadata(
         self,
@@ -32,7 +39,9 @@ class ExternalCatalogService:
         self.gateway = gateway
         self.metadata_loader = metadata_loader
 
-    def search(self, query: str, source: str = "all") -> tuple[list[ExternalSearchResult], dict[str, Any]]:
+    def search(
+        self, query: str, source: str = "all"
+    ) -> tuple[list[ExternalSearchResult], dict[str, Any]]:
         results, state = self.gateway.search(query, source)
         return results, state
 
@@ -51,17 +60,34 @@ class ExternalCatalogService:
         if source not in {"wikipedia", "imdb", "filmaffinity"} or source != detected_source:
             return enriched
         cache_key = canonical_url(result_url) or result_url
-        metadata, _ = self.gateway.selected_metadata(cache_key, lambda _: self.metadata_loader(result_url))
+        metadata, _ = self.gateway.selected_metadata(
+            cache_key, lambda _: self.metadata_loader(result_url)
+        )
         if not metadata:
             return enriched
         for field in (
-            "title", "original_title", "spanish_title", "english_title", "kind", "year",
-            "description", "wikipedia_title", "wikidata_id", "page_image", "backdrop_image", "tmdb_id",
+            "title",
+            "original_title",
+            "spanish_title",
+            "english_title",
+            "kind",
+            "year",
+            "description",
+            "wikipedia_title",
+            "wikidata_id",
+            "page_image",
+            "backdrop_image",
+            "tmdb_id",
             "wikipedia_extract",
         ):
             if metadata.get(field):
                 value = str(metadata[field])
-                if field in {"title", "original_title", "spanish_title", "english_title"} and looks_like_external_id(value):
+                if field in {
+                    "title",
+                    "original_title",
+                    "spanish_title",
+                    "english_title",
+                } and looks_like_external_id(value):
                     continue
                 enriched[field] = value
         for field in ("alternative_titles", "genres", "directors", "writers", "cast"):
@@ -70,7 +96,9 @@ class ExternalCatalogService:
                 enriched[field] = merge_lists(normalize_tags(enriched.get(field)), values)
         release_dates = normalize_release_dates(metadata.get("release_dates"))
         if release_dates:
-            enriched["release_dates"] = merge_release_dates(enriched.get("release_dates"), release_dates)
+            enriched["release_dates"] = merge_release_dates(
+                enriched.get("release_dates"), release_dates
+            )
         for field in ("wikipedia_url", "imdb_url", "filmaffinity_url"):
             if metadata.get(field):
                 enriched[field] = str(metadata[field])

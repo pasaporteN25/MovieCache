@@ -93,12 +93,15 @@ class CurationTests(unittest.TestCase):
 
             service.update_link_curation("heat", "deferred")
             deferred = build_curation_payload(curation_rows(repository.read()))
-            self.assertEqual(deferred["counts"], {
-                "pending": 0,
-                "duplicates": 0,
-                "missing_link": 0,
-                "deferred": 1,
-            })
+            self.assertEqual(
+                deferred["counts"],
+                {
+                    "pending": 0,
+                    "duplicates": 0,
+                    "missing_link": 0,
+                    "deferred": 1,
+                },
+            )
 
             service.update_link_curation("heat", "pending")
             pending = build_curation_payload(curation_rows(repository.read()))

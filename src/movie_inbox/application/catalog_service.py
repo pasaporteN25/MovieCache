@@ -7,16 +7,10 @@ import hashlib
 import hmac
 import json
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from movie_inbox.application.repository import CatalogRepository
-from movie_inbox.domain.curation import (
-    apply_duplicate_curation_decision,
-    apply_link_curation_decision,
-)
-from movie_inbox.domain.models import CatalogItem
-from movie_inbox.domain.metadata import normalize_local_files, normalize_locked_fields, normalize_metadata_sources
 from movie_inbox.domain.catalog import (
     external_urls,
     has_external_link,
@@ -34,8 +28,17 @@ from movie_inbox.domain.catalog import (
     title_match_keys_for_item,
     today_date,
 )
+from movie_inbox.domain.curation import (
+    apply_duplicate_curation_decision,
+    apply_link_curation_decision,
+)
 from movie_inbox.domain.matching import decide_match
-
+from movie_inbox.domain.metadata import (
+    normalize_local_files,
+    normalize_locked_fields,
+    normalize_metadata_sources,
+)
+from movie_inbox.domain.models import CatalogItem
 
 EDITABLE_METADATA_FIELDS = {
     "title",
@@ -99,7 +102,8 @@ class CatalogService:
             for candidate in normalized_items:
                 item_urls = external_urls(candidate)
                 exact = any(
-                    candidate.id == existing.id or (item_urls and item_urls & external_urls(existing))
+                    candidate.id == existing.id
+                    or (item_urls and item_urls & external_urls(existing))
                     for existing in items
                 )
                 if exact:
@@ -145,7 +149,7 @@ class CatalogService:
             raise ValueError("Confirm the year before creating a catalog item")
         if not year.isdigit() or not 1800 <= int(year) <= 2199:
             raise ValueError("Scanner item requires a valid four-digit year")
-        added_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        added_at = datetime.now(UTC).replace(microsecond=0).isoformat()
         candidate = normalize_item(
             {
                 "id": stable_id(f"scanner:{title_key}|{year}|{kind}"),
@@ -175,7 +179,11 @@ class CatalogService:
                 if item.id:
                     known_ids.add(item.id)
             generated_match = next(
-                (existing for existing in match_items if existing.id and existing.id == candidate.id),
+                (
+                    existing
+                    for existing in match_items
+                    if existing.id and existing.id == candidate.id
+                ),
                 None,
             )
             if generated_match is not None and not distinct_intent:
@@ -193,7 +201,9 @@ class CatalogService:
                         "writable": generated_match.id in writable_ids,
                     },
                 )
-            distinct_candidate_id = _scanner_distinct_id(candidate, scanner_reference) if scanner_reference else ""
+            distinct_candidate_id = (
+                _scanner_distinct_id(candidate, scanner_reference) if scanner_reference else ""
+            )
             distinct_match = next(
                 (
                     existing
@@ -233,14 +243,18 @@ class CatalogService:
                         "writable": existing.id in writable_ids,
                     },
                 )
-            candidates = [
-                {
-                    **_scanner_catalog_candidate(item),
-                    "reason": decision.reason,
-                    "score": decision.score,
-                }
-                for item, decision in accepted[:5]
-            ] if accepted else possible_duplicate_candidates(match_items, candidate)[:5]
+            candidates = (
+                [
+                    {
+                        **_scanner_catalog_candidate(item),
+                        "reason": decision.reason,
+                        "score": decision.score,
+                    }
+                    for item, decision in accepted[:5]
+                ]
+                if accepted
+                else possible_duplicate_candidates(match_items, candidate)[:5]
+            )
             if candidates:
                 review_token = _scanner_distinct_review_token(
                     candidate,
@@ -318,7 +332,9 @@ class CatalogService:
         if status not in {"to_watch", "watched"}:
             raise ValueError("Invalid status")
 
-        effective_watched_at = (normalize_date(watched_at) or today_date()) if status == "watched" else None
+        effective_watched_at = (
+            (normalize_date(watched_at) or today_date()) if status == "watched" else None
+        )
         updated = self.repository.update_status(item_id, status, effective_watched_at)
         return updated, "updated" if updated else "not_found"
 
@@ -329,7 +345,9 @@ class CatalogService:
 
         def update(item: dict[str, Any]) -> None:
             item["kind"] = kind
-            item["locked_fields"] = normalize_locked_fields([*normalize_locked_fields(item.get("locked_fields")), "kind"])
+            item["locked_fields"] = normalize_locked_fields(
+                [*normalize_locked_fields(item.get("locked_fields")), "kind"]
+            )
             sources = normalize_metadata_sources(item.get("metadata_sources"))
             sources["kind"] = metadata_source_record("manual", "", False)
             item["metadata_sources"] = sources
@@ -339,9 +357,13 @@ class CatalogService:
     def update_catalog_status(self, item_id: str, en_catalogo: Any) -> tuple[bool, str]:
         if not item_id:
             raise ValueError("Missing item id")
-        return self._update_item(item_id, lambda item: item.__setitem__("en_catalogo", normalize_bool(en_catalogo)))
+        return self._update_item(
+            item_id, lambda item: item.__setitem__("en_catalogo", normalize_bool(en_catalogo))
+        )
 
-    def update_personal(self, item_id: str, watched_at: str, rating: Any, review: str) -> tuple[bool, str]:
+    def update_personal(
+        self, item_id: str, watched_at: str, rating: Any, review: str
+    ) -> tuple[bool, str]:
         if not item_id:
             raise ValueError("Missing item id")
 
@@ -453,11 +475,15 @@ class CatalogService:
             consumed_fingerprints: set[str] = set()
 
             for item in items:
-                local_files = normalize_local_files(item.get("local_files"), item.get("local_name", ""), item.get("local_path", ""))
+                local_files = normalize_local_files(
+                    item.get("local_files"), item.get("local_name", ""), item.get("local_path", "")
+                )
                 item["local_files"] = local_files
                 local_files = item["local_files"]
                 for local_file in local_files:
-                    relative = _relative_key(local_file.get("relative_path") or local_file.get("path"))
+                    relative = _relative_key(
+                        local_file.get("relative_path") or local_file.get("path")
+                    )
                     owner_library = str(local_file.get("library_id") or "").casefold()
                     if relative:
                         path_index[(owner_library, relative)] = (item, local_file)
@@ -529,7 +555,9 @@ class CatalogService:
                 ]
                 if len(accepted_matches) == 1:
                     owner, decision = accepted_matches[0]
-                    owner["local_files"] = normalize_local_files([*owner.get("local_files", []), scanned_file])
+                    owner["local_files"] = normalize_local_files(
+                        [*owner.get("local_files", []), scanned_file]
+                    )
                     owner["local_name"] = owner.get("local_name") or scanned_file.get("name", "")
                     owner["local_path"] = owner.get("local_path") or scanned_file.get("path", "")
                     owner["en_catalogo"] = True
@@ -565,7 +593,13 @@ class CatalogService:
                     )
                     continue
 
-                new_item = _new_local_item(library_id, scanned_file, candidate, scanned_at, str(raw_file.get("kind") or "pelicula"))
+                new_item = _new_local_item(
+                    library_id,
+                    scanned_file,
+                    candidate,
+                    scanned_at,
+                    str(raw_file.get("kind") or "pelicula"),
+                )
                 items.insert(0, new_item)
                 path_index[current_key] = (new_item, new_item["local_files"][0])
                 report["created"] += 1
@@ -575,15 +609,24 @@ class CatalogService:
                 for item in items:
                     item_changed = False
                     for local_file in item.get("local_files", []):
-                        if str(local_file.get("library_id") or "").casefold() != library_id.casefold():
+                        if (
+                            str(local_file.get("library_id") or "").casefold()
+                            != library_id.casefold()
+                        ):
                             continue
-                        key = (library_id.casefold(), _relative_key(local_file.get("relative_path")))
+                        key = (
+                            library_id.casefold(),
+                            _relative_key(local_file.get("relative_path")),
+                        )
                         if key not in seen_keys and local_file.get("available", True):
                             local_file["available"] = False
                             report["unavailable"] += 1
                             item_changed = True
                     if item_changed:
-                        available = any(bool(local_file.get("available", True)) for local_file in item.get("local_files", []))
+                        available = any(
+                            bool(local_file.get("available", True))
+                            for local_file in item.get("local_files", [])
+                        )
                         item["en_catalogo"] = available
                         changed = True
 

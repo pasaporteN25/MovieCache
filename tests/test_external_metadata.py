@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 import unittest
-from urllib.error import URLError
 from unittest.mock import patch
+from urllib.error import URLError
 
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.metadata import fetch_metadata_by_title
-from movie_inbox.external.wikipedia import WikipediaAdapter
 from movie_inbox.external.wikidata import wikidata_kind
+from movie_inbox.external.wikipedia import WikipediaAdapter
 
 
 class ExternalMetadataTests(unittest.TestCase):
     @patch("movie_inbox.external.metadata.fetch_wikipedia_by_title")
     @patch("movie_inbox.external.metadata.fetch_wikipedia_by_wikidata_title")
-    def test_title_lookup_prefers_richer_wikidata_metadata(self, wikidata_lookup, wikipedia_lookup) -> None:
+    def test_title_lookup_prefers_richer_wikidata_metadata(
+        self, wikidata_lookup, wikipedia_lookup
+    ) -> None:
         wikidata_lookup.return_value = {
             "title": "La Belle Personne",
             "year": "2008",
@@ -30,7 +32,9 @@ class ExternalMetadataTests(unittest.TestCase):
         metadata = fetch_metadata_by_title("The Beautiful Person", "2008")
 
         self.assertEqual(metadata["wikidata_id"], "Q3209193")
-        self.assertEqual(metadata["alternative_titles"], ["The Beautiful Person", "La bella persona"])
+        self.assertEqual(
+            metadata["alternative_titles"], ["The Beautiful Person", "La bella persona"]
+        )
 
     @patch("movie_inbox.external.imdb.fetch_json")
     def test_imdb_results_propagate_series_kind(self, fetch_json) -> None:
@@ -73,7 +77,9 @@ class ExternalMetadataTests(unittest.TestCase):
         self.assertEqual(results[0]["url"], "https://en.wikipedia.org/wiki/Evil_Dead_Burn")
 
     @patch("movie_inbox.external.wikipedia.fetch_json")
-    def test_wikipedia_search_keeps_alternatives_when_the_exact_film_is_present(self, fetch_json) -> None:
+    def test_wikipedia_search_keeps_alternatives_when_the_exact_film_is_present(
+        self, fetch_json
+    ) -> None:
         fetch_json.return_value = {
             "query": {
                 "pages": [

@@ -133,15 +133,19 @@ class ImportServiceTests(unittest.TestCase):
         self.assertEqual(self.service.list_drafts("another-user"), [])
 
     def test_preview_candidates_do_not_persist_existing_local_file_names(self) -> None:
-        self.catalog_repository.write([
-            normalize_item({
-                "id": "heat-existing",
-                "title": "Heat",
-                "year": "1995",
-                "local_name": "Heat.private.mkv",
-                "local_path": "D:/Private/Heat.private.mkv",
-            })
-        ])
+        self.catalog_repository.write(
+            [
+                normalize_item(
+                    {
+                        "id": "heat-existing",
+                        "title": "Heat",
+                        "year": "1995",
+                        "local_name": "Heat.private.mkv",
+                        "local_path": "D:/Private/Heat.private.mkv",
+                    }
+                )
+            ]
+        )
         draft = self.service.create_draft(
             self.owner.id,
             "movies.txt",

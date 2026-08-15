@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.privacy import SHARED_CATALOG_FIELDS
-
 
 COLLECTION_VISIBILITIES = {"private", "published"}
 COLLECTION_SOURCE_KINDS = {"builtin", "import", "user"}
@@ -52,11 +52,7 @@ class CuratedCollection:
 def normalize_collection_item(value: Mapping[str, Any]) -> dict[str, Any]:
     """Keep shareable work identity and metadata, never personal state."""
     normalized = normalize_item(value).to_dict()
-    item = {
-        key: normalized[key]
-        for key in COLLECTION_ITEM_FIELDS
-        if key in normalized
-    }
+    item = {key: normalized[key] for key in COLLECTION_ITEM_FIELDS if key in normalized}
     if not str(item.get("id") or "") or not str(item.get("title") or "").strip():
         raise ValueError("Collection items require an id and title")
     return item

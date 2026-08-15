@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import socket
 import unittest
-from urllib.error import HTTPError
 from unittest.mock import patch
-
+from urllib.error import HTTPError
 
 from movie_inbox.web.security import (
     InvalidPublicOrigin,
@@ -39,15 +38,21 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(limiter.retry_after("client:owner"), 0)
 
     def test_public_origin_is_normalized_for_proxy_validation(self) -> None:
-        self.assertEqual(normalize_public_origin("HTTPS://Movies.Example.com:443/"), "https://movies.example.com")
+        self.assertEqual(
+            normalize_public_origin("HTTPS://Movies.Example.com:443/"), "https://movies.example.com"
+        )
         self.assertIn("movies.example.com", viewer_allowed_hosts("https://movies.example.com"))
-        self.assertIn("https://movies.example.com", viewer_allowed_origins(8765, "https://movies.example.com"))
+        self.assertIn(
+            "https://movies.example.com", viewer_allowed_origins(8765, "https://movies.example.com")
+        )
         with self.assertRaises(InvalidPublicOrigin):
             normalize_public_origin("https://movies.example.com/path")
 
     def test_public_destination_is_allowed(self) -> None:
         self.assertEqual(
-            validate_public_http_url("https://images.example.com/poster.jpg", resolver_for("8.8.8.8")),
+            validate_public_http_url(
+                "https://images.example.com/poster.jpg", resolver_for("8.8.8.8")
+            ),
             "https://images.example.com/poster.jpg",
         )
 
@@ -73,9 +78,13 @@ class HttpSecurityTests(unittest.TestCase):
     def test_private_and_nonstandard_destinations_are_blocked(self) -> None:
         for address in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "::1"):
             with self.subTest(address=address), self.assertRaises(UnsafeRemoteUrl):
-                validate_public_http_url("https://images.example.com/poster.jpg", resolver_for(address))
+                validate_public_http_url(
+                    "https://images.example.com/poster.jpg", resolver_for(address)
+                )
         with self.assertRaises(UnsafeRemoteUrl):
-            validate_public_http_url("https://images.example.com:8443/poster.jpg", resolver_for("8.8.8.8"))
+            validate_public_http_url(
+                "https://images.example.com:8443/poster.jpg", resolver_for("8.8.8.8")
+            )
 
     def test_redirect_target_is_validated_again(self) -> None:
         class RedirectingOpener:
@@ -94,7 +103,9 @@ class HttpSecurityTests(unittest.TestCase):
 
         with patch("movie_inbox.web.security.build_opener", return_value=RedirectingOpener()):
             with self.assertRaises(UnsafeRemoteUrl):
-                open_public_url("https://images.example.com/a.jpg", headers={}, timeout=1, resolver=resolver)
+                open_public_url(
+                    "https://images.example.com/a.jpg", headers={}, timeout=1, resolver=resolver
+                )
 
     def test_redirect_cannot_leave_the_image_allowlist(self) -> None:
         class RedirectingOpener:

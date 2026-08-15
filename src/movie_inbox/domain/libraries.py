@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 from movie_inbox.domain.catalog import (
     canonical_url,
@@ -14,7 +15,6 @@ from movie_inbox.domain.catalog import (
     title_match_keys_for_item,
 )
 from movie_inbox.domain.matching import explicit_kind
-
 
 LIBRARY_SCHEDULES = {"manual", "hourly", "daily"}
 LIBRARY_STATUSES = {

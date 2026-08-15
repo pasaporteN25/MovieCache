@@ -12,14 +12,19 @@ from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
 from movie_inbox.domain.catalog import external_source_name, normalize_tags, source_url_field
-from movie_inbox.domain.titles import clean_title, clean_whitespace, infer_kind_from_text, looks_like_external_id
+from movie_inbox.domain.titles import (
+    clean_title,
+    clean_whitespace,
+    infer_kind_from_text,
+    looks_like_external_id,
+)
 from movie_inbox.external.imdb import fetch_wikipedia_by_imdb_id, imdb_id_from_text
+from movie_inbox.external.wikidata import fetch_wikidata_metadata
 from movie_inbox.external.wikipedia import (
     fetch_wikipedia_by_title,
     fetch_wikipedia_by_wikidata_title,
     fetch_wikipedia_metadata,
 )
-from movie_inbox.external.wikidata import fetch_wikidata_metadata
 
 
 class MetadataParser(HTMLParser):
@@ -83,7 +88,12 @@ def fetch_metadata(url: str) -> dict[str, Any]:
 
     parser = MetadataParser()
     parser.feed(raw)
-    title = parser.meta.get("og:title") or parser.meta.get("twitter:title") or parser.page_title or guess_title_from_url(url)
+    title = (
+        parser.meta.get("og:title")
+        or parser.meta.get("twitter:title")
+        or parser.page_title
+        or guess_title_from_url(url)
+    )
     description = parser.meta.get("og:description") or parser.meta.get("description") or ""
     link_field = source_url_field(source_name(urlparse(url).netloc), url)
     metadata: dict[str, Any] = {

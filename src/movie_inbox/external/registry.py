@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable
+from typing import Any
 
 from movie_inbox.domain.search import external_result_score, parse_search_query
 from movie_inbox.external.base import SourceAdapter
@@ -13,7 +14,6 @@ from movie_inbox.external.common import clean_text, dedupe_results, utc_now
 from movie_inbox.external.filmaffinity import FilmAffinityAdapter
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.wikipedia import WikipediaAdapter
-
 
 SEARCH_CACHE_TTL_SECONDS = 15 * 60
 EMPTY_SEARCH_CACHE_TTL_SECONDS = 30
@@ -31,7 +31,9 @@ class ExternalSourceService:
         self._cache_misses = 0
         self._health = {adapter.name: self._initial_health(adapter) for adapter in selected}
 
-    def search(self, query: str, source: str = "all") -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def search(
+        self, query: str, source: str = "all"
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         query = query.strip()
         if len(query) < 2:
             return [], self.snapshot()
@@ -42,7 +44,10 @@ class ExternalSourceService:
             selected = [source]
         else:
             selected = list(self.adapters)
-        cache_key = (" ".join(query.casefold().split()), source if source in self.adapters else "all")
+        cache_key = (
+            " ".join(query.casefold().split()),
+            source if source in self.adapters else "all",
+        )
         cached = self._get_search_cache(cache_key)
         if cached is not None:
             return cached, self.snapshot(cache_hit=True)
@@ -51,7 +56,9 @@ class ExternalSourceService:
             self._cache_misses += 1
         batches: dict[str, list[dict[str, Any]]] = {name: [] for name in selected}
         succeeded: dict[str, bool] = {name: False for name in selected}
-        with ThreadPoolExecutor(max_workers=len(selected), thread_name_prefix="catalog-search") as executor:
+        with ThreadPoolExecutor(
+            max_workers=len(selected), thread_name_prefix="catalog-search"
+        ) as executor:
             futures = {executor.submit(self._run_adapter, name, query): name for name in selected}
             for future in as_completed(futures):
                 name = futures[future]
@@ -68,7 +75,9 @@ class ExternalSourceService:
             self._set_search_cache(cache_key, results)
         return [dict(result) for result in results], self.snapshot(cache_hit=False)
 
-    def selected_metadata(self, url: str, loader: Callable[[str], dict[str, Any]]) -> tuple[dict[str, Any], bool]:
+    def selected_metadata(
+        self, url: str, loader: Callable[[str], dict[str, Any]]
+    ) -> tuple[dict[str, Any], bool]:
         now = time.monotonic()
         with self._lock:
             cached = self._metadata_cache.get(url)
@@ -156,7 +165,9 @@ class ExternalSourceService:
             if now - created_at > ttl:
                 del self._search_cache[key]
         while len(self._search_cache) > SEARCH_CACHE_MAX_ENTRIES:
-            del self._search_cache[min(self._search_cache, key=lambda key: self._search_cache[key][0])]
+            del self._search_cache[
+                min(self._search_cache, key=lambda key: self._search_cache[key][0])
+            ]
 
     @staticmethod
     def _rank_batch(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -170,7 +181,11 @@ class ExternalSourceService:
     @staticmethod
     def _prune_cache(cache: dict[Any, tuple[float, Any]]) -> None:
         now = time.monotonic()
-        for key in [key for key, (created_at, _) in cache.items() if now - created_at > SEARCH_CACHE_TTL_SECONDS]:
+        for key in [
+            key
+            for key, (created_at, _) in cache.items()
+            if now - created_at > SEARCH_CACHE_TTL_SECONDS
+        ]:
             del cache[key]
         while len(cache) > SEARCH_CACHE_MAX_ENTRIES:
             del cache[min(cache, key=lambda key: cache[key][0])]

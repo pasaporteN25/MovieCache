@@ -11,7 +11,6 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-
 HOME_SNAPSHOT_LIMIT = 2
 
 
@@ -35,7 +34,9 @@ class SqliteHomeSnapshotRepository:
                         (user_id, local_date),
                     ).fetchone()
             except sqlite3.Error as error:
-                raise HomeSnapshotRepositoryError(f"Cannot read home history from: {self.path}") from error
+                raise HomeSnapshotRepositoryError(
+                    f"Cannot read home history from: {self.path}"
+                ) from error
         if row is None:
             return None
         return _decode_entries(str(row["entries_json"] or "[]"))
@@ -79,7 +80,9 @@ class SqliteHomeSnapshotRepository:
             except HomeSnapshotRepositoryError:
                 raise
             except sqlite3.Error as error:
-                raise HomeSnapshotRepositoryError(f"Cannot save home history to: {self.path}") from error
+                raise HomeSnapshotRepositoryError(
+                    f"Cannot save home history to: {self.path}"
+                ) from error
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=self.busy_timeout)
@@ -99,10 +102,7 @@ def _encode_entries(entries: Sequence[Mapping[str, Any]]) -> str:
         clean.append(
             {
                 "item_id": item_id,
-                "reason": {
-                    key: str(reason.get(key) or "")
-                    for key in ("code", "label", "detail")
-                },
+                "reason": {key: str(reason.get(key) or "") for key in ("code", "label", "detail")},
             }
         )
     return json.dumps(clean, ensure_ascii=False, separators=(",", ":"))
@@ -126,10 +126,7 @@ def _decode_entries(value: str) -> list[dict[str, Any]]:
         entries.append(
             {
                 "item_id": item_id,
-                "reason": {
-                    key: str(reason.get(key) or "")
-                    for key in ("code", "label", "detail")
-                },
+                "reason": {key: str(reason.get(key) or "") for key in ("code", "label", "detail")},
             }
         )
     return entries

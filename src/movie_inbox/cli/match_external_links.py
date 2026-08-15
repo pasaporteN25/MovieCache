@@ -15,25 +15,44 @@ import time
 from pathlib import Path
 from typing import Any
 
-from movie_inbox.domain.deduplication import deduplicate_items
 from movie_inbox.domain.catalog import (
     has_external_link,
     merge_into_existing,
     normalize_item,
 )
-from movie_inbox.infrastructure.external_catalog import enrich_external_result, search_external_sources
-from movie_inbox.domain.models import CatalogItem
+from movie_inbox.domain.deduplication import deduplicate_items
 from movie_inbox.domain.matching import rank_candidates
+from movie_inbox.domain.models import CatalogItem
+from movie_inbox.infrastructure.external_catalog import (
+    enrich_external_result,
+    search_external_sources,
+)
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Match catalog entries with Wikipedia, IMDb or FilmAffinity links.")
+    parser = argparse.ArgumentParser(
+        description="Match catalog entries with Wikipedia, IMDb or FilmAffinity links."
+    )
     parser.add_argument("catalog", type=Path, help="Input JSON or SQLite catalog.")
-    parser.add_argument("--json", "--output", dest="json_path", type=Path, required=True, help="Output JSON or SQLite catalog.")
-    parser.add_argument("--limit", type=int, default=0, help="Maximum unlinked entries to search. 0 means all.")
+    parser.add_argument(
+        "--json",
+        "--output",
+        dest="json_path",
+        type=Path,
+        required=True,
+        help="Output JSON or SQLite catalog.",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Maximum unlinked entries to search. 0 means all."
+    )
     parser.add_argument("--delay", type=float, default=0.4, help="Delay between searches.")
-    parser.add_argument("--min-score", type=float, default=0.0, help="Minimum ranking score included in review reports.")
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        default=0.0,
+        help="Minimum ranking score included in review reports.",
+    )
     parser.add_argument("--report", type=Path, help="Optional JSON report path.")
     parser.add_argument("--dry-run", action="store_true", help="Do not write output JSON.")
     args = parser.parse_args(argv)
@@ -60,7 +79,11 @@ def main(argv: list[str] | None = None) -> int:
 
         searched += 1
         results, _ = search_external_sources(query, "all")
-        candidates = [candidate for candidate in rank_candidates(item, results) if candidate["score"] >= args.min_score]
+        candidates = [
+            candidate
+            for candidate in rank_candidates(item, results)
+            if candidate["score"] >= args.min_score
+        ]
         if candidates and candidates[0]["decision"]["accepted"]:
             best = enrich_external_result(candidates[0]["result"])
             merge_into_existing(items, best, str(item.get("id") or ""))
@@ -85,7 +108,12 @@ def main(argv: list[str] | None = None) -> int:
                 }
             )
         else:
-            report["unmatched"].append({"id": item.get("id", ""), "title": item.get("title") or item.get("local_name") or ""})
+            report["unmatched"].append(
+                {
+                    "id": item.get("id", ""),
+                    "title": item.get("title") or item.get("local_name") or "",
+                }
+            )
 
         if args.delay:
             time.sleep(args.delay)
@@ -118,5 +146,7 @@ def search_query(item: CatalogItem) -> str:
     title = str(item.get("title") or item.get("local_name") or "").strip()
     year = str(item.get("year") or "").strip()
     return " ".join(part for part in [title, year] if part)
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import unittest
 import tempfile
 import tomllib
+import unittest
 from pathlib import Path
 
 from movie_inbox import __version__
@@ -78,12 +78,12 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIn(b'apiFetch("/api/imports")', app_js[0])
         self.assertIn(b'apiFetch("/api/libraries")', app_js[0])
         self.assertIn(b'apiFetch("/api/scanner/queue")', app_js[0])
-        self.assertIn(b'/api/catalog/export?format=', app_js[0])
+        self.assertIn(b"/api/catalog/export?format=", app_js[0])
         self.assertIn(b'apiFetch("/api/image-cache/status")', app_js[0])
-        self.assertIn(b'apiFetch(`/api/home?date=', app_js[0])
+        self.assertIn(b"apiFetch(`/api/home?date=", app_js[0])
         self.assertIn(b'"&saved_featured=true"', app_js[0])
-        self.assertIn(b'loadEditorialFeaturedDate(localDateOffset(-1))', app_js[0])
-        self.assertIn(b'data-poster-image', app_js[0])
+        self.assertIn(b"loadEditorialFeaturedDate(localDateOffset(-1))", app_js[0])
+        self.assertIn(b"data-poster-image", app_js[0])
         self.assertIn(b'fetchpriority="${fetchPriority}"', app_js[0])
         self.assertIn(b'classList.add("is-loaded")', app_js[0])
         self.assertIn(b'"Probar recorrido"', app_js[0])

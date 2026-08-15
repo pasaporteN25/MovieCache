@@ -5,14 +5,14 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any
 
 from movie_inbox.domain.catalog import catalog_membership, external_urls, title_match_key
 from movie_inbox.domain.collections import CuratedCollection
 from movie_inbox.domain.normalization import normalize_bool, normalize_rating
 from movie_inbox.domain.releases import normalize_release_dates
-
 
 HOME_SECTION_LIMIT = 6
 HOME_SECTION_COUNT = 5
@@ -119,7 +119,9 @@ class EditorialHomeService:
                     "reason": {
                         key: str((reason or {}).get(key) or "")
                         for key in ("code", "label", "detail")
-                    } if isinstance(reason, Mapping) else {},
+                    }
+                    if isinstance(reason, Mapping)
+                    else {},
                 }
             )
         return snapshot
@@ -131,9 +133,7 @@ class EditorialHomeService:
     ) -> list[dict[str, Any]]:
         """Hydrate a saved order with current catalog metadata and availability."""
         by_id = {
-            str(item.get("id") or ""): item
-            for item in catalog_items
-            if str(item.get("id") or "")
+            str(item.get("id") or ""): item for item in catalog_items if str(item.get("id") or "")
         }
         restored: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -146,10 +146,7 @@ class EditorialHomeService:
             restored.append(
                 _catalog_entry(
                     item,
-                    {
-                        key: str(reason.get(key) or "")
-                        for key in ("code", "label", "detail")
-                    },
+                    {key: str(reason.get(key) or "") for key in ("code", "label", "detail")},
                 )
             )
             seen.add(item_id)
@@ -163,12 +160,16 @@ class EditorialHomeService:
     ) -> list[dict[str, Any]]:
         available = [item for item in catalog if normalize_bool(item.get("en_catalogo"))]
         pending = [item for item in available if str(item.get("status") or "") != "watched"]
-        illustrated = [item for item in available if item.get("backdrop_image") or item.get("page_image")]
+        illustrated = [
+            item for item in available if item.get("backdrop_image") or item.get("page_image")
+        ]
         if not illustrated:
             return []
         pending_ids = {_catalog_key(item) for item in pending}
         pending_illustrated = [item for item in illustrated if _catalog_key(item) in pending_ids]
-        revisit_illustrated = [item for item in illustrated if _catalog_key(item) not in pending_ids]
+        revisit_illustrated = [
+            item for item in illustrated if _catalog_key(item) not in pending_ids
+        ]
         selected = (
             self._stable_order(pending_illustrated, f"{seed}|featured|pending", _catalog_key)
             + self._stable_order(revisit_illustrated, f"{seed}|featured|revisit", _catalog_key)
@@ -346,7 +347,10 @@ class EditorialHomeService:
             item
             for item in catalog
             if str(item.get("status") or "") == "watched"
-            and (normalize_rating(item.get("rating")) == 0 or not str(item.get("review") or "").strip())
+            and (
+                normalize_rating(item.get("rating")) == 0
+                or not str(item.get("review") or "").strip()
+            )
             and _catalog_key(item) not in used_ids
         ]
         selected = self._take(candidates, f"{seed}|memory", _catalog_key)
@@ -482,7 +486,7 @@ class EditorialHomeService:
         return sorted(
             values,
             key=lambda value: (
-                hashlib.sha256(f"{seed}|{identity(value)}".encode("utf-8")).hexdigest(),
+                hashlib.sha256(f"{seed}|{identity(value)}".encode()).hexdigest(),
                 identity(value),
             ),
         )
@@ -661,14 +665,27 @@ def _anniversary_release(item: Mapping[str, Any], day: date) -> dict[str, Any] |
         if release["precision"] != "day":
             continue
         release_day = date.fromisoformat(str(release["date"]))
-        if release_day.year <= day.year and (release_day.month, release_day.day) == (day.month, day.day):
+        if release_day.year <= day.year and (release_day.month, release_day.day) == (
+            day.month,
+            day.day,
+        ):
             return release
     return None
 
 
 def _spanish_day_month(value: date) -> str:
     months = (
-        "enero", "febrero", "marzo", "abril", "mayo", "junio",
-        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre",
     )
     return f"{value.day} de {months[value.month - 1]}"

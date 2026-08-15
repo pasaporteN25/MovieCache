@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 LINK_CURATION_STATUSES = {"pending", "deferred", "not_required", "resolved"}
 DUPLICATE_DECISION_STATUSES = {"deferred", "not_duplicate"}
 
 
 def curation_timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def normalize_link_curation_status(value: Any, *, linked: bool = False) -> str:

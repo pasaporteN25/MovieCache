@@ -221,7 +221,10 @@ class EditorialHomeServiceTests(unittest.TestCase):
         route = next(row for row in payload["sections"] if row["id"] == "route")
         self.assertGreaterEqual(len(route["items"]), 3)
         self.assertTrue(
-            all(entry["reason"]["code"] in {"shared_director", "shared_genre"} for entry in route["items"])
+            all(
+                entry["reason"]["code"] in {"shared_director", "shared_genre"}
+                for entry in route["items"]
+            )
         )
         route_reason = route["items"][0]["reason"]["code"]
         expected_filter = "director" if route_reason == "shared_director" else "genre"
@@ -274,9 +277,14 @@ class EditorialHomeServiceTests(unittest.TestCase):
             ],
         )
 
-        self.assertEqual([entry["item"]["id"] for entry in payload["featured"]], ["watched-with-image"])
+        self.assertEqual(
+            [entry["item"]["id"] for entry in payload["featured"]], ["watched-with-image"]
+        )
         self.assertTrue(
-            all(entry["item"].get("page_image") or entry["item"].get("backdrop_image") for entry in payload["featured"])
+            all(
+                entry["item"].get("page_image") or entry["item"].get("backdrop_image")
+                for entry in payload["featured"]
+            )
         )
 
         empty = self.service.build(

@@ -7,9 +7,8 @@ import hashlib
 import os
 import tarfile
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
-
 
 BACKUP_PREFIX = "movie-inbox-instance"
 REQUIRED_FILES = ("instance.db", "movie-inbox.db")
@@ -40,7 +39,9 @@ def main(argv: list[str] | None = None) -> int:
 
     create_parser = commands.add_parser("create", help="Create an atomic, verified .tar.gz backup.")
     create_parser.add_argument("source", type=Path, help="Persistent instance directory.")
-    create_parser.add_argument("--output-dir", type=Path, required=True, help="Directory for backup archives.")
+    create_parser.add_argument(
+        "--output-dir", type=Path, required=True, help="Directory for backup archives."
+    )
     create_parser.add_argument(
         "--retention-days",
         type=int,
@@ -53,7 +54,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Include the reproducible image cache in the archive.",
     )
 
-    verify_parser = commands.add_parser("verify", help="Read an archive and validate its checksum and contents.")
+    verify_parser = commands.add_parser(
+        "verify", help="Read an archive and validate its checksum and contents."
+    )
     verify_parser.add_argument("archive", type=Path, help="Backup .tar.gz archive.")
 
     args = parser.parse_args(argv)
@@ -94,7 +97,7 @@ def create_backup(
         raise FileNotFoundError(f"Instance backup is missing required files: {', '.join(missing)}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    timestamp = (now or datetime.now(UTC)).astimezone(UTC)
     filename = f"{BACKUP_PREFIX}-{timestamp.strftime('%Y%m%d-%H%M%SZ')}.tar.gz"
     archive = output_dir / filename
     checksum = archive.with_name(f"{archive.name}.sha256")

@@ -121,7 +121,11 @@ class CollectionTests(unittest.TestCase):
             self.seed.id,
             [rashomon["collection_item_id"]],
             CatalogService(self.catalog_repository),
-            [normalize_item({"id": "legacy-rashomon", "title": "Rashomon", "year": "1950"}).to_dict()],
+            [
+                normalize_item(
+                    {"id": "legacy-rashomon", "title": "Rashomon", "year": "1950"}
+                ).to_dict()
+            ],
         )
 
         self.assertEqual(result["summary"]["review"], 1)

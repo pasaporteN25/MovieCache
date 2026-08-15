@@ -17,11 +17,21 @@ def deduplicate_items(items: list[CatalogItem]) -> tuple[list[CatalogItem], list
             unique.append(item)
             continue
         merge_into_existing(unique, item, str(target.get("id") or ""))
-        merged.append(str(item.get("title") or item.get("local_name") or item.get("url") or item.get("id") or ""))
+        merged.append(
+            str(
+                item.get("title")
+                or item.get("local_name")
+                or item.get("url")
+                or item.get("id")
+                or ""
+            )
+        )
     return unique, merged
 
 
-def merge_catalogs(existing: list[CatalogItem], incoming: list[CatalogItem]) -> tuple[list[CatalogItem], list[str]]:
+def merge_catalogs(
+    existing: list[CatalogItem], incoming: list[CatalogItem]
+) -> tuple[list[CatalogItem], list[str]]:
     output = list(existing)
     merged: list[str] = []
     for item in incoming:
@@ -30,6 +40,13 @@ def merge_catalogs(existing: list[CatalogItem], incoming: list[CatalogItem]) -> 
             output.append(item)
             continue
         merge_into_existing(output, item, str(target.get("id") or ""))
-        merged.append(str(item.get("title") or item.get("local_name") or item.get("url") or item.get("id") or ""))
+        merged.append(
+            str(
+                item.get("title")
+                or item.get("local_name")
+                or item.get("url")
+                or item.get("id")
+                or ""
+            )
+        )
     return output, merged
-

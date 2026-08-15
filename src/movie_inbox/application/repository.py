@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from movie_inbox.domain.models import CatalogItem
-
 
 T = TypeVar("T")
 CatalogNormalizer = Callable[[dict[str, object]], CatalogItem]

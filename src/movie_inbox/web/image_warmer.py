@@ -6,12 +6,12 @@ import heapq
 import threading
 import time
 from collections import deque
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.error import HTTPError, URLError
 
 from movie_inbox.web.config import ViewerConfig
@@ -24,7 +24,6 @@ from movie_inbox.web.image_proxy import (
     image_is_cached,
 )
 from movie_inbox.web.security import UnsafeRemoteUrl, validate_http_url
-
 
 ImageFetcher = Callable[[ViewerConfig, str], tuple[bytes, str]]
 FETCH_ERRORS = (UnsafeRemoteUrl, ValueError, HTTPError, URLError, TimeoutError, OSError)
@@ -412,4 +411,4 @@ class ImageCacheWarmer:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")

@@ -8,6 +8,7 @@ from contextlib import closing
 from pathlib import Path
 
 from movie_inbox.application.auth_service import AuthService
+from movie_inbox.application.library_repository import LibraryRunBusy
 from movie_inbox.application.library_service import (
     AvailabilityService,
     LibraryPathError,
@@ -15,7 +16,6 @@ from movie_inbox.application.library_service import (
     ManagedLibraryService,
     _CatalogMatchIndex,
 )
-from movie_inbox.application.library_repository import LibraryRunBusy
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
@@ -31,7 +31,9 @@ class ManagedLibraryTests(unittest.TestCase):
         self.media.mkdir()
         self.catalog = self.root / "catalog.json"
         self.catalog_items = [
-            normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}).to_dict()
+            normalize_item(
+                {"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}
+            ).to_dict()
         ]
         JsonCatalogRepository(self.catalog, normalize_item).write(self.catalog_items)
         self.instance = self.root / "instance.db"
@@ -83,7 +85,9 @@ class ManagedLibraryTests(unittest.TestCase):
                 {"name": "Relative", "root_path": "media", "schedule": "manual"},
             )
 
-    def test_allowed_paths_can_be_browsed_and_checked_without_exposing_outside_directories(self) -> None:
+    def test_allowed_paths_can_be_browsed_and_checked_without_exposing_outside_directories(
+        self,
+    ) -> None:
         films = self.media / "Peliculas"
         films.mkdir()
         outside = self.root / "outside"
@@ -127,7 +131,9 @@ class ManagedLibraryTests(unittest.TestCase):
 
     def test_numeric_title_matches_an_existing_catalog_item(self) -> None:
         self.catalog_items = [
-            normalize_item({"id": "1917", "title": "1917", "year": "2019", "kind": "pelicula"}).to_dict()
+            normalize_item(
+                {"id": "1917", "title": "1917", "year": "2019", "kind": "pelicula"}
+            ).to_dict()
         ]
         (self.media / "1917.2019.1080p.BluRay.mkv").write_bytes(b"numeric-title")
         library = self.create_library()
@@ -140,15 +146,17 @@ class ManagedLibraryTests(unittest.TestCase):
 
     def test_unique_legacy_inventory_title_can_reconcile_a_missing_year(self) -> None:
         self.catalog_items = [
-            normalize_item({
-                "id": "heat-legacy",
-                "title": "Heat",
-                "year": "1995",
-                "kind": "pelicula",
-                "source": "local_files",
-                "en_catalogo": True,
-                "local_name": "Heat 1995 1080p.mkv",
-            }).to_dict()
+            normalize_item(
+                {
+                    "id": "heat-legacy",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                    "source": "local_files",
+                    "en_catalogo": True,
+                    "local_name": "Heat 1995 1080p.mkv",
+                }
+            ).to_dict()
         ]
         (self.media / "Heat.1080p.mkv").write_bytes(b"heat")
         library = self.create_library()
@@ -170,15 +178,17 @@ class ManagedLibraryTests(unittest.TestCase):
 
     def test_ambiguous_legacy_inventory_titles_still_require_review(self) -> None:
         self.catalog_items = [
-            normalize_item({
-                "id": f"crash-{year}",
-                "title": "Crash",
-                "year": year,
-                "kind": "pelicula",
-                "source": "local_files",
-                "en_catalogo": True,
-                "local_name": f"Crash {year}.mkv",
-            }).to_dict()
+            normalize_item(
+                {
+                    "id": f"crash-{year}",
+                    "title": "Crash",
+                    "year": year,
+                    "kind": "pelicula",
+                    "source": "local_files",
+                    "en_catalogo": True,
+                    "local_name": f"Crash {year}.mkv",
+                }
+            ).to_dict()
             for year in ("1996", "2004")
         ]
         (self.media / "Crash.1080p.mkv").write_bytes(b"crash")
@@ -197,15 +207,17 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(self.service.library_detail(library.id)["counts"]["review"], 1)
 
         self.catalog_items = [
-            normalize_item({
-                "id": "heat-legacy",
-                "title": "Heat",
-                "year": "1995",
-                "kind": "pelicula",
-                "source": "local_files",
-                "en_catalogo": True,
-                "local_name": "Heat 1995 1080p.mkv",
-            }).to_dict()
+            normalize_item(
+                {
+                    "id": "heat-legacy",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                    "source": "local_files",
+                    "en_catalogo": True,
+                    "local_name": "Heat 1995 1080p.mkv",
+                }
+            ).to_dict()
         ]
         rerun = self.execute(library.id, "apply")
         counts = self.service.library_detail(library.id)["counts"]
@@ -229,7 +241,15 @@ class ManagedLibraryTests(unittest.TestCase):
         self.execute(library.id, "apply")
 
         decorated = AvailabilityService(self.repository).decorate_items(
-            [{"id": "heat-member", "title": "Heat", "year": "1995", "kind": "pelicula", "en_catalogo": False}],
+            [
+                {
+                    "id": "heat-member",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                    "en_catalogo": False,
+                }
+            ],
             include_sources=False,
         )[0]
 
@@ -297,13 +317,15 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertTrue(decorated["_availability"]["server"])
 
     def test_catalog_identity_can_link_a_year_mismatch_but_an_unrelated_work_cannot(self) -> None:
-        legacy = normalize_item({
-            "id": "legacy-1917",
-            "title": "1917",
-            "year": "1917",
-            "kind": "pelicula",
-            "imdb_url": "https://www.imdb.com/title/tt8579674/",
-        }).to_dict()
+        legacy = normalize_item(
+            {
+                "id": "legacy-1917",
+                "title": "1917",
+                "year": "1917",
+                "kind": "pelicula",
+                "imdb_url": "https://www.imdb.com/title/tt8579674/",
+            }
+        ).to_dict()
         self.catalog_items = [legacy]
         (self.media / "1917.2019.1080p.BluRay.mkv").write_bytes(b"numeric-title")
         library = self.create_library()
@@ -358,7 +380,14 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(reviewed["file_count"], 2)
         self.assertEqual(self.service.review_queue(), [])
         decorated = AvailabilityService(self.repository).decorate_items(
-            [{"id": "ouatia", "title": "Once Upon a Time in America", "year": "1984", "kind": "pelicula"}]
+            [
+                {
+                    "id": "ouatia",
+                    "title": "Once Upon a Time in America",
+                    "year": "1984",
+                    "kind": "pelicula",
+                }
+            ]
         )[0]
         self.assertEqual(decorated["_availability"]["file_count"], 2)
 
@@ -386,7 +415,14 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(applied.summary["matched"], 2)
         self.assertEqual(self.service.review_queue(), [])
         decorated = AvailabilityService(self.repository).decorate_items(
-            [{"id": "ouatia", "title": "Once Upon a Time in America", "year": "1984", "kind": "pelicula"}]
+            [
+                {
+                    "id": "ouatia",
+                    "title": "Once Upon a Time in America",
+                    "year": "1984",
+                    "kind": "pelicula",
+                }
+            ]
         )[0]
         self.assertEqual(decorated["_availability"]["file_count"], 2)
 

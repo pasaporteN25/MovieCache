@@ -13,8 +13,8 @@ from movie_inbox.web.image_proxy import (
     cached_image_keys,
     clear_image_cache,
     download_image,
-    image_cache_key,
     image_cache_info,
+    image_cache_key,
     image_is_cached,
     prune_image_cache,
 )
@@ -38,16 +38,28 @@ class ImageCacheTests(unittest.TestCase):
             )
             png = b"\x89PNG\r\n\x1a\n" + b"content"
             with (
-                patch("movie_inbox.web.image_proxy.validate_http_url", side_effect=lambda url, *_: url),
-                patch("movie_inbox.web.image_proxy.download_image", return_value=(png, "image/png")) as download,
+                patch(
+                    "movie_inbox.web.image_proxy.validate_http_url", side_effect=lambda url, *_: url
+                ),
+                patch(
+                    "movie_inbox.web.image_proxy.download_image", return_value=(png, "image/png")
+                ) as download,
             ):
-                self.assertEqual(cached_image(config, "https://images.example.com/a.png"), (png, "image/png"))
-                self.assertEqual(cached_image(config, "https://images.example.com/a.png"), (png, "image/png"))
+                self.assertEqual(
+                    cached_image(config, "https://images.example.com/a.png"), (png, "image/png")
+                )
+                self.assertEqual(
+                    cached_image(config, "https://images.example.com/a.png"), (png, "image/png")
+                )
             self.assertEqual(download.call_count, 1)
             self.assertEqual(len(list(cache_dir.glob("*.png"))), 1)
             self.assertEqual(list(cache_dir.glob("*.tmp")), [])
-            self.assertIn(image_cache_key("https://images.example.com/a.png"), cached_image_keys(cache_dir))
-            with patch("movie_inbox.web.image_proxy.validate_http_url", side_effect=lambda url, *_: url):
+            self.assertIn(
+                image_cache_key("https://images.example.com/a.png"), cached_image_keys(cache_dir)
+            )
+            with patch(
+                "movie_inbox.web.image_proxy.validate_http_url", side_effect=lambda url, *_: url
+            ):
                 self.assertTrue(image_is_cached(config, "https://images.example.com/a.png"))
 
     def test_lru_prune_removes_oldest_files_first(self) -> None:
@@ -101,7 +113,9 @@ class ImageCacheTests(unittest.TestCase):
 
         with patch("movie_inbox.web.image_proxy.open_public_url", return_value=Response()):
             with self.assertRaisesRegex(ValueError, "supported raster image"):
-                download_image("https://images.example.com/poster.svg", 1024, ("images.example.com",))
+                download_image(
+                    "https://images.example.com/poster.svg", 1024, ("images.example.com",)
+                )
 
 
 if __name__ == "__main__":

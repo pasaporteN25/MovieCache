@@ -10,8 +10,12 @@ import time
 from collections.abc import Callable
 
 from movie_inbox.application.identity_repository import IdentityRepository
-from movie_inbox.domain.identity import AuthenticatedIdentity, PersonalCatalog, UserAccount, normalize_username
-
+from movie_inbox.domain.identity import (
+    AuthenticatedIdentity,
+    PersonalCatalog,
+    UserAccount,
+    normalize_username,
+)
 
 PASSWORD_MIN_LENGTH = 12
 PASSWORD_MAX_LENGTH = 1024
@@ -120,12 +124,11 @@ class AuthService:
         encoded = credentials[1] if credentials else self._dummy_hash
         password_value = str(password or "")
         password_in_bounds = len(password_value) <= PASSWORD_MAX_LENGTH
-        valid = self.hasher.verify(password_value if password_in_bounds else "", encoded) and password_in_bounds
-        if (
-            not credentials
-            or not valid
-            or not credentials[0].active
-        ):
+        valid = (
+            self.hasher.verify(password_value if password_in_bounds else "", encoded)
+            and password_in_bounds
+        )
+        if not credentials or not valid or not credentials[0].active:
             raise AuthenticationError("invalid_credentials")
 
         user = credentials[0]
@@ -192,7 +195,9 @@ class AuthService:
 def validate_password(password: str) -> str:
     value = str(password or "")
     if len(value) < PASSWORD_MIN_LENGTH:
-        raise PasswordPolicyError(f"Password must contain at least {PASSWORD_MIN_LENGTH} characters")
+        raise PasswordPolicyError(
+            f"Password must contain at least {PASSWORD_MIN_LENGTH} characters"
+        )
     if len(value) > PASSWORD_MAX_LENGTH:
         raise PasswordPolicyError("Password is too long")
     return value
