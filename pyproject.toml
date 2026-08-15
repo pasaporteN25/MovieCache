@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 test = ["httpx2>=2,<3"]
 browser-test = ["playwright>=1.48,<2"]
+dev = ["ruff>=0.6,<1", "mypy>=1.11,<2"]
 
 [project.scripts]
 movie-inbox = "movie_inbox.cli.main:main"
@@ -28,3 +29,25 @@ where = ["src"]
 [tool.setuptools.package-data]
 "movie_inbox.web" = ["static/*.html", "static/*.css", "static/*.js"]
 "movie_inbox.search_lab" = ["corpus/*.json"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's Depends(...) is idiomatic in argument defaults.
+"src/movie_inbox/web/app.py" = ["B008"]
+# Compatibility-only viewer with an embedded HTML/CSS/JS template; wrapping the
+# JS template literals would risk introducing a syntax error for no real benefit.
+"scripts/build_viewer.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "movie_inbox.domain.*"
+strict = true
