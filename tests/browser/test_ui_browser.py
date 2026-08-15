@@ -39,7 +39,9 @@ class BrowserInterfaceTests(unittest.TestCase):
                         "title": "Heat",
                         "year": "1995",
                         "kind": "pelicula",
-                        "description": "Un detective y un ladrón profesional se enfrentan en Los Ángeles.",
+                        "description": (
+                            "Un detective y un ladrón profesional se enfrentan en Los Ángeles."
+                        ),
                         "en_catalogo": True,
                     }
                 ),
@@ -112,7 +114,9 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.get_by_label("Contraseña").fill(self.owner_password)
             page.get_by_role("button", name="Entrar").click()
             page.wait_for_selector("#homeView:not([hidden])")
-            page.wait_for_function("document.querySelector('#stats').textContent.includes('2 obras')")
+            page.wait_for_function(
+                "document.querySelector('#stats').textContent.includes('2 obras')"
+            )
 
             self.assertEqual(page.locator(".primary-nav > .nav-action").count(), 4)
             self.assertEqual(page.locator(".primary-nav #randomButton").count(), 0)
@@ -136,7 +140,13 @@ class BrowserInterfaceTests(unittest.TestCase):
                 page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
             )
             self.assertEqual(page.locator(".primary-nav > .nav-action").count(), 4)
-            for selector in ("#homeButton", "#catalogButton", "#inboxButton", "#clubButton", "#randomButton"):
+            for selector in (
+                "#homeButton",
+                "#catalogButton",
+                "#inboxButton",
+                "#clubButton",
+                "#randomButton",
+            ):
                 box = page.locator(selector).bounding_box()
                 self.assertIsNotNone(box, selector)
                 self.assertGreaterEqual(box["height"], 44, selector)

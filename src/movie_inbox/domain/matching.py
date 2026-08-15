@@ -3,15 +3,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
-from typing import Any, Mapping, TypedDict
+from typing import Any, TypedDict
 
 from movie_inbox.domain.catalog import (
     external_urls,
-    normalize_kind,
     title_match_keys_for_item,
     title_similarity,
 )
+from movie_inbox.domain.normalization import normalize_kind
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,13 @@ def decide_match(existing: Mapping[str, Any], incoming: Mapping[str, Any]) -> Ma
         "incoming_kind": incoming_kind,
     }
 
-    if shared_titles and existing_year and incoming_year and existing_year == incoming_year and kinds_compatible:
+    if (
+        shared_titles
+        and existing_year
+        and incoming_year
+        and existing_year == incoming_year
+        and kinds_compatible
+    ):
         return MatchDecision(True, "exact_title_year", 1.0, evidence)
     if shared_titles and (not existing_year or not incoming_year):
         return MatchDecision(False, "exact_title_missing_year", score, evidence)
@@ -71,7 +78,9 @@ def decide_match(existing: Mapping[str, Any], incoming: Mapping[str, Any]) -> Ma
     return MatchDecision(False, "insufficient_evidence", score, evidence)
 
 
-def rank_candidates(existing: Mapping[str, Any], results: list[dict[str, Any]]) -> list[RankedCandidate]:
+def rank_candidates(
+    existing: Mapping[str, Any], results: list[dict[str, Any]]
+) -> list[RankedCandidate]:
     ranked: list[RankedCandidate] = []
     for result in results:
         if not external_urls(result):
@@ -86,10 +95,14 @@ def rank_candidates(existing: Mapping[str, Any], results: list[dict[str, Any]]) 
                 "result": result,
             }
         )
-    return sorted(ranked, key=lambda entry: (entry["decision"]["accepted"], entry["score"]), reverse=True)
+    return sorted(
+        ranked, key=lambda entry: (entry["decision"]["accepted"], entry["score"]), reverse=True
+    )
 
 
-def find_strong_duplicate(items: list[Mapping[str, Any]], candidate: Mapping[str, Any]) -> Mapping[str, Any] | None:
+def find_strong_duplicate(
+    items: Sequence[Mapping[str, Any]], candidate: Mapping[str, Any]
+) -> Mapping[str, Any] | None:
     for item in items:
         if decide_match(item, candidate).accepted:
             return item
@@ -116,4 +129,3 @@ def candidate_score(
 def explicit_kind(item: Mapping[str, Any]) -> str:
     raw = str(item.get("kind") or "").strip()
     return normalize_kind(raw) if raw else ""
-

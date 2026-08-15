@@ -14,10 +14,10 @@ import csv
 import json
 import re
 import time
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 from urllib.parse import urlparse
 
 from movie_inbox.domain.catalog import (
@@ -27,33 +27,42 @@ from movie_inbox.domain.catalog import (
     normalize_kind,
     normalize_rating,
     normalize_status,
-    normalize_tags as normalize_list,
     source_url_field,
     stable_id,
     title_match_key,
 )
+from movie_inbox.domain.catalog import (
+    normalize_tags as normalize_list,
+)
 from movie_inbox.domain.deduplication import deduplicate_items, merge_catalogs
-from movie_inbox.infrastructure.export import write_catalog_csv as write_csv
+from movie_inbox.domain.models import CatalogItem, MetadataSource
+from movie_inbox.domain.titles import (
+    clean_release_title,
+    clean_whitespace,
+    infer_year,
+    looks_like_external_id,
+)
 from movie_inbox.external.metadata import (
     fetch_metadata,
     fetch_wikipedia_by_title,
     guess_title_from_url,
     source_name,
 )
-from movie_inbox.domain.models import CatalogItem, MetadataSource
+from movie_inbox.infrastructure.export import write_catalog_csv as write_csv
+from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.infrastructure.schema import (
     METADATA_FIELDS,
     atomic_write_json,
-    backup_json_file as create_json_backup,
     catalog_document,
     extract_catalog_items,
     normalize_bool,
-    normalize_locked_fields,
     normalize_local_files,
+    normalize_locked_fields,
     normalize_metadata_sources,
 )
-from movie_inbox.infrastructure.repositories import open_catalog_repository
-from movie_inbox.domain.titles import clean_release_title, clean_whitespace, infer_year
+from movie_inbox.infrastructure.schema import (
+    backup_json_file as create_json_backup,
+)
 
 URL_RE = re.compile(r"https?://[^\s<>\"]+", re.IGNORECASE)
 
@@ -75,14 +84,20 @@ class ImportStats:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Convert and merge movie/show URL/title catalogs.")
-    parser.add_argument("input", type=Path, help="TXT, JSON or CSV file containing movie/show URLs or titles.")
+    parser.add_argument(
+        "input", type=Path, help="TXT, JSON or CSV file containing movie/show URLs or titles."
+    )
     parser.add_argument("--json", dest="json_path", type=Path, help="Output JSON path.")
     parser.add_argument("--db", dest="db_path", type=Path, help="Output SQLite path.")
     parser.add_argument("--csv", dest="csv_path", type=Path, help="Output CSV path.")
-    parser.add_argument("--merge", type=Path, help="Existing JSON/CSV/SQLite catalog to merge into.")
+    parser.add_argument(
+        "--merge", type=Path, help="Existing JSON/CSV/SQLite catalog to merge into."
+    )
     parser.add_argument("--log-json", type=Path, help="Write import stats to a JSON log file.")
     parser.add_argument("--fetch", action="store_true", help="Fetch page metadata when possible.")
-    parser.add_argument("--delay", type=float, default=0.4, help="Delay between fetches in seconds.")
+    parser.add_argument(
+        "--delay", type=float, default=0.4, help="Delay between fetches in seconds."
+    )
     parser.add_argument("--status", default="to_watch", help="Default status for imported items.")
     args = parser.parse_args(argv)
 
@@ -90,7 +105,9 @@ def main(argv: list[str] | None = None) -> int:
         args.json_path = Path("catalog.json")
 
     imported_rows = read_items_or_urls(args.input, status=args.status)
-    imported_items = materialize_items(imported_rows.urls, imported_rows.items, args.fetch, args.delay, args.status)
+    imported_items = materialize_items(
+        imported_rows.urls, imported_rows.items, args.fetch, args.delay, args.status
+    )
     input_items, input_duplicate_urls = deduplicate_items(imported_items)
 
     existing_items: list[CatalogItem] = []
@@ -218,7 +235,7 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
     if not url and not title and not local_name:
         return None
     tags = normalize_list(row.get("tags"))
-    added_at = str(row.get("added_at") or row.get("addedAt") or datetime.now(timezone.utc).isoformat())
+    added_at = str(row.get("added_at") or row.get("addedAt") or datetime.now(UTC).isoformat())
     link_field = source_url_field(str(row.get("source") or source_name(urlparse(url).netloc)), url)
     wikipedia_url = str(row.get("wikipedia_url") or "")
     imdb_url = str(row.get("imdb_url") or "")
@@ -229,43 +246,49 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
         imdb_url = imdb_url or url
     elif link_field == "filmaffinity_url":
         filmaffinity_url = filmaffinity_url or url
-    return normalize_item(CatalogItem(
-        id=str(row.get("id") or stable_id(url or local_path or local_name or title)),
-        url=url,
-        source=str(row.get("source") or source_name(urlparse(url).netloc)),
-        title=title,
-        original_title=str(row.get("original_title") or row.get("originalTitle") or ""),
-        spanish_title=str(row.get("spanish_title") or row.get("spanishTitle") or ""),
-        english_title=str(row.get("english_title") or row.get("englishTitle") or ""),
-        alternative_titles=normalize_list(row.get("alternative_titles") or row.get("alternativeTitles")),
-        kind=normalize_kind(row.get("kind")),
-        status=normalize_status(row.get("status") or default_status),
-        watched_at=normalize_date(row.get("watched_at") or row.get("watchedAt")),
-        rating=normalize_rating(row.get("rating")),
-        year=str(row.get("year") or infer_year(title, local_name, local_path)),
-        description=str(row.get("description") or ""),
-        wikipedia_url=wikipedia_url,
-        imdb_url=imdb_url,
-        filmaffinity_url=filmaffinity_url,
-        wikipedia_title=str(row.get("wikipedia_title") or ""),
-        wikidata_id=str(row.get("wikidata_id") or ""),
-        genres=normalize_list(row.get("genres") or row.get("genre")),
-        directors=normalize_list(row.get("directors") or row.get("director")),
-        writers=normalize_list(row.get("writers") or row.get("writer") or row.get("screenwriters")),
-        cast=normalize_list(row.get("cast") or row.get("actors") or row.get("actor")),
-        page_image=str(row.get("page_image") or ""),
-        wikipedia_extract=str(row.get("wikipedia_extract") or ""),
-        en_catalogo=normalize_bool(row.get("en_catalogo"), default=False),
-        local_files=local_files,
-        local_name=local_name,
-        local_path=local_path,
-        tags=tags,
-        notes=str(row.get("notes") or ""),
-        review=str(row.get("review") or ""),
-        added_at=added_at,
-        metadata_sources=normalize_metadata_sources(row.get("metadata_sources")),
-        locked_fields=normalize_locked_fields(row.get("locked_fields")),
-    ))
+    return normalize_item(
+        CatalogItem(
+            id=str(row.get("id") or stable_id(url or local_path or local_name or title)),
+            url=url,
+            source=str(row.get("source") or source_name(urlparse(url).netloc)),
+            title=title,
+            original_title=str(row.get("original_title") or row.get("originalTitle") or ""),
+            spanish_title=str(row.get("spanish_title") or row.get("spanishTitle") or ""),
+            english_title=str(row.get("english_title") or row.get("englishTitle") or ""),
+            alternative_titles=normalize_list(
+                row.get("alternative_titles") or row.get("alternativeTitles")
+            ),
+            kind=normalize_kind(row.get("kind")),
+            status=normalize_status(row.get("status") or default_status),
+            watched_at=normalize_date(row.get("watched_at") or row.get("watchedAt")),
+            rating=normalize_rating(row.get("rating")),
+            year=str(row.get("year") or infer_year(title, local_name, local_path)),
+            description=str(row.get("description") or ""),
+            wikipedia_url=wikipedia_url,
+            imdb_url=imdb_url,
+            filmaffinity_url=filmaffinity_url,
+            wikipedia_title=str(row.get("wikipedia_title") or ""),
+            wikidata_id=str(row.get("wikidata_id") or ""),
+            genres=normalize_list(row.get("genres") or row.get("genre")),
+            directors=normalize_list(row.get("directors") or row.get("director")),
+            writers=normalize_list(
+                row.get("writers") or row.get("writer") or row.get("screenwriters")
+            ),
+            cast=normalize_list(row.get("cast") or row.get("actors") or row.get("actor")),
+            page_image=str(row.get("page_image") or ""),
+            wikipedia_extract=str(row.get("wikipedia_extract") or ""),
+            en_catalogo=normalize_bool(row.get("en_catalogo"), default=False),
+            local_files=local_files,
+            local_name=local_name,
+            local_path=local_path,
+            tags=tags,
+            notes=str(row.get("notes") or ""),
+            review=str(row.get("review") or ""),
+            added_at=added_at,
+            metadata_sources=normalize_metadata_sources(row.get("metadata_sources")),
+            locked_fields=normalize_locked_fields(row.get("locked_fields")),
+        )
+    )
 
 
 def item_from_text_title(raw_title: str, default_status: str) -> CatalogItem | None:
@@ -278,41 +301,43 @@ def item_from_text_title(raw_title: str, default_status: str) -> CatalogItem | N
     if not title or looks_like_external_id(title):
         return None
 
-    return normalize_item(CatalogItem(
-        id=stable_id(f"txt:{title_match_key(title)}:{year}"),
-        url="",
-        source="txt",
-        title=title,
-        original_title="",
-        spanish_title="",
-        english_title="",
-        alternative_titles=[],
-        kind="pelicula",
-        status=normalize_status(default_status),
-        watched_at="",
-        rating=0,
-        year=year,
-        description="",
-        wikipedia_url="",
-        imdb_url="",
-        filmaffinity_url="",
-        wikipedia_title="",
-        wikidata_id="",
-        genres=[],
-        directors=[],
-        writers=[],
-        cast=[],
-        page_image="",
-        wikipedia_extract="",
-        en_catalogo=False,
-        local_files=[],
-        local_name="",
-        local_path="",
-        tags=[],
-        notes="",
-        review="",
-        added_at=datetime.now(timezone.utc).isoformat(),
-    ))
+    return normalize_item(
+        CatalogItem(
+            id=stable_id(f"txt:{title_match_key(title)}:{year}"),
+            url="",
+            source="txt",
+            title=title,
+            original_title="",
+            spanish_title="",
+            english_title="",
+            alternative_titles=[],
+            kind="pelicula",
+            status=normalize_status(default_status),
+            watched_at="",
+            rating=0,
+            year=year,
+            description="",
+            wikipedia_url="",
+            imdb_url="",
+            filmaffinity_url="",
+            wikipedia_title="",
+            wikidata_id="",
+            genres=[],
+            directors=[],
+            writers=[],
+            cast=[],
+            page_image="",
+            wikipedia_extract="",
+            en_catalogo=False,
+            local_files=[],
+            local_name="",
+            local_path="",
+            tags=[],
+            notes="",
+            review="",
+            added_at=datetime.now(UTC).isoformat(),
+        )
+    )
 
 
 def materialize_items(
@@ -355,7 +380,7 @@ def normalize_url(url: str) -> str:
 
 
 def build_catalog(urls: list[str], fetch: bool, delay: float, status: str) -> list[CatalogItem]:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     items: list[CatalogItem] = []
 
     for index, url in enumerate(urls):
@@ -367,7 +392,8 @@ def build_catalog(urls: list[str], fetch: bool, delay: float, status: str) -> li
         kind = infer_kind(url, metadata)
         year = infer_year(title, description)
 
-        item = normalize_item(CatalogItem(
+        item = normalize_item(
+            CatalogItem(
                 id=stable_id(url),
                 url=url,
                 source=source,
@@ -384,7 +410,9 @@ def build_catalog(urls: list[str], fetch: bool, delay: float, status: str) -> li
                 description=description,
                 wikipedia_url=url if source == "wikipedia" else metadata.get("wikipedia_url", ""),
                 imdb_url=url if source == "imdb" else metadata.get("imdb_url", ""),
-                filmaffinity_url=url if source == "filmaffinity" else metadata.get("filmaffinity_url", ""),
+                filmaffinity_url=url
+                if source == "filmaffinity"
+                else metadata.get("filmaffinity_url", ""),
                 wikipedia_title=metadata.get("wikipedia_title", ""),
                 wikidata_id=metadata.get("wikidata_id", ""),
                 genres=normalize_list(metadata.get("genres")),
@@ -401,7 +429,8 @@ def build_catalog(urls: list[str], fetch: bool, delay: float, status: str) -> li
                 notes="",
                 review="",
                 added_at=now,
-            ))
+            )
+        )
         origin_url = str(metadata.get("url") or url)
         origin_source = source_name(urlparse(origin_url).netloc) or source
         item["metadata_sources"] = {
@@ -446,13 +475,15 @@ def apply_fetched_metadata(
     item.metadata_sources[field_name] = MetadataSource(
         source=source_name(urlparse(origin_url).netloc) or item.source or "external",
         url=origin_url,
-        updated_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(UTC).isoformat(),
         inferred=False,
     )
 
 
 def enrich_item(item: CatalogItem) -> CatalogItem:
-    metadata = fetch_metadata(item.url) if item.url else fetch_wikipedia_by_title(item.title, item.year)
+    metadata = (
+        fetch_metadata(item.url) if item.url else fetch_wikipedia_by_title(item.title, item.year)
+    )
     if not metadata:
         return item
 
@@ -471,17 +502,29 @@ def enrich_item(item: CatalogItem) -> CatalogItem:
     apply_fetched_metadata(item, metadata, "original_title", metadata.get("original_title", ""))
     apply_fetched_metadata(item, metadata, "spanish_title", metadata.get("spanish_title", ""))
     apply_fetched_metadata(item, metadata, "english_title", metadata.get("english_title", ""))
-    apply_fetched_metadata(item, metadata, "alternative_titles", metadata.get("alternative_titles", []), merge_values=True)
+    apply_fetched_metadata(
+        item,
+        metadata,
+        "alternative_titles",
+        metadata.get("alternative_titles", []),
+        merge_values=True,
+    )
     apply_fetched_metadata(item, metadata, "description", metadata.get("description", ""))
     apply_fetched_metadata(item, metadata, "kind", infer_kind(item.url, metadata))
-    fetched_year = metadata.get("year", "") or infer_year(item.title, item.description, str(metadata.get("wikipedia_extract", "")))
+    fetched_year = metadata.get("year", "") or infer_year(
+        item.title, item.description, str(metadata.get("wikipedia_extract", ""))
+    )
     apply_fetched_metadata(item, metadata, "year", fetched_year)
     apply_fetched_metadata(item, metadata, "wikipedia_title", metadata.get("wikipedia_title", ""))
     apply_fetched_metadata(item, metadata, "wikidata_id", metadata.get("wikidata_id", ""))
     for field_name in ("genres", "directors", "writers", "cast"):
-        apply_fetched_metadata(item, metadata, field_name, metadata.get(field_name, []), merge_values=True)
+        apply_fetched_metadata(
+            item, metadata, field_name, metadata.get(field_name, []), merge_values=True
+        )
     apply_fetched_metadata(item, metadata, "page_image", metadata.get("page_image", ""))
-    apply_fetched_metadata(item, metadata, "wikipedia_extract", metadata.get("wikipedia_extract", ""))
+    apply_fetched_metadata(
+        item, metadata, "wikipedia_extract", metadata.get("wikipedia_extract", "")
+    )
     return item
 
 

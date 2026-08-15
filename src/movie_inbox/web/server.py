@@ -27,11 +27,23 @@ from movie_inbox.web.security import InvalidPublicOrigin, normalize_public_origi
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="View JSON or SQLite movie catalogs in a local browser UI.")
-    parser.add_argument("inputs", nargs="+", help="JSON/SQLite catalogs or glob patterns, for example catalog.json or movie-inbox.db.")
-    parser.add_argument("--host", default="127.0.0.1", help="Bind address. Keep 127.0.0.1 when using Nginx.")
+    parser = argparse.ArgumentParser(
+        description="View JSON or SQLite movie catalogs in a local browser UI."
+    )
+    parser.add_argument(
+        "inputs",
+        nargs="+",
+        help="JSON/SQLite catalogs or glob patterns, for example catalog.json or movie-inbox.db.",
+    )
+    parser.add_argument(
+        "--host", default="127.0.0.1", help="Bind address. Keep 127.0.0.1 when using Nginx."
+    )
     parser.add_argument("--port", type=int, default=8765, help="Application server port.")
-    parser.add_argument("--public-origin", default="", help="External origin, for example https://movies.example.com.")
+    parser.add_argument(
+        "--public-origin",
+        default="",
+        help="External origin, for example https://movies.example.com.",
+    )
     parser.add_argument(
         "--forwarded-allow-ips",
         default="127.0.0.1",
@@ -41,14 +53,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--instance-db",
         type=Path,
-        help="Private account/session database. Defaults to .movie-inbox/instance.db next to the writable catalog.",
+        help=(
+            "Private account/session database. Defaults to .movie-inbox/instance.db "
+            "next to the writable catalog."
+        ),
     )
     parser.add_argument(
         "--member-catalog-dir",
         type=Path,
-        help="Directory for automatically provisioned member catalogs. Defaults next to the instance database.",
+        help=(
+            "Directory for automatically provisioned member catalogs. "
+            "Defaults next to the instance database."
+        ),
     )
-    parser.add_argument("--owner-username", default="owner", help="Username created on the first server start.")
+    parser.add_argument(
+        "--owner-username", default="owner", help="Username created on the first server start."
+    )
     parser.add_argument(
         "--owner-password-file",
         type=Path,
@@ -61,13 +81,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Absolute login session lifetime in days.",
     )
     parser.add_argument(
-        "--write-catalog", "--write-json",
+        "--write-catalog",
+        "--write-json",
         dest="write_catalog",
         help="Catalog file to update when adding items. Defaults to the first viewed catalog.",
     )
-    parser.add_argument("--no-image-cache", action="store_true", help="Use remote image URLs directly instead of local image cache.")
-    parser.add_argument("--image-cache-dir", type=Path, help="Directory for cached images. Defaults to .catalog-cache/images next to the writable catalog.")
-    parser.add_argument("--image-cache-max-mb", type=float, default=5.0, help="Maximum size per cached image.")
+    parser.add_argument(
+        "--no-image-cache",
+        action="store_true",
+        help="Use remote image URLs directly instead of local image cache.",
+    )
+    parser.add_argument(
+        "--image-cache-dir",
+        type=Path,
+        help=(
+            "Directory for cached images. Defaults to .catalog-cache/images "
+            "next to the writable catalog."
+        ),
+    )
+    parser.add_argument(
+        "--image-cache-max-mb", type=float, default=5.0, help="Maximum size per cached image."
+    )
     parser.add_argument(
         "--image-cache-total-mb",
         type=float,
@@ -78,7 +112,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--image-cache-warm-mode",
         choices=("after-access", "off"),
         default="after-access",
-        help="Warm images gradually after an authenticated catalog is opened, or disable background warming.",
+        help=(
+            "Warm images gradually after an authenticated catalog is opened, "
+            "or disable background warming."
+        ),
     )
     parser.add_argument(
         "--image-cache-warm-interval-seconds",
@@ -102,7 +139,9 @@ def build_parser() -> argparse.ArgumentParser:
             "Can be repeated; no managed paths are accepted when omitted."
         ),
     )
-    parser.add_argument("--no-open", action="store_true", help="Do not open the browser automatically.")
+    parser.add_argument(
+        "--no-open", action="store_true", help="Do not open the browser automatically."
+    )
     return parser
 
 
@@ -130,9 +169,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--public-origin is required when binding to a non-loopback host")
     write_catalog = args.write_catalog or first_catalog_file(args.inputs)
     ensure_catalog_exists(Path(write_catalog))
-    instance_db = args.instance_db or (Path(write_catalog).resolve().parent / ".movie-inbox" / "instance.db")
+    instance_db = args.instance_db or (
+        Path(write_catalog).resolve().parent / ".movie-inbox" / "instance.db"
+    )
     member_catalog_dir = args.member_catalog_dir or (instance_db.resolve().parent / "catalogs")
-    image_cache_dir = args.image_cache_dir or (Path(write_catalog).resolve().parent / ".catalog-cache" / "images")
+    image_cache_dir = args.image_cache_dir or (
+        Path(write_catalog).resolve().parent / ".catalog-cache" / "images"
+    )
     config = ViewerConfig(
         patterns=args.inputs,
         title=args.title,
@@ -186,16 +229,20 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Personal catalog: {personal_catalog.name}")
     print(
         f"Image cache: {config.image_cache_dir} (max {args.image_cache_total_mb:g} MB)"
-        if config.image_cache else "Image cache: disabled"
+        if config.image_cache
+        else "Image cache: disabled"
     )
     if config.image_cache:
         print(
-            f"Image cache warming: after access, every {config.image_cache_warm_interval_seconds:g}s"
-            if config.image_cache_warm else "Image cache warming: disabled"
+            f"Image cache warming: after access, every "
+            f"{config.image_cache_warm_interval_seconds:g}s"
+            if config.image_cache_warm
+            else "Image cache warming: disabled"
         )
     print(
         f"Managed scanner roots: {', '.join(config.library_allowed_roots)}"
-        if config.library_allowed_roots else "Managed scanner: disabled (no --library-root)"
+        if config.library_allowed_roots
+        else "Managed scanner: disabled (no --library-root)"
     )
     print(f"Open {url}")
     print("Press Ctrl+C to stop.")

@@ -7,17 +7,21 @@ import re
 import time
 import unicodedata
 import uuid
+from collections.abc import Callable, Mapping
 from dataclasses import replace
-from datetime import datetime, timezone
-from typing import Any, Callable, Mapping
+from datetime import UTC, datetime
+from typing import Any
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
 from movie_inbox.application.import_repository import ImportDraftRepository
 from movie_inbox.domain.catalog import catalog_membership, normalize_item
-from movie_inbox.domain.collections import CollectionItem, CuratedCollection, normalize_collection_item
+from movie_inbox.domain.collections import (
+    CollectionItem,
+    CuratedCollection,
+    normalize_collection_item,
+)
 from movie_inbox.domain.imports import ImportDraft, ImportDraftItem, ParsedImport
-
 
 IMPORT_DRAFT_TTL_SECONDS = 48 * 60 * 60
 IMPORT_APPLY_STALE_SECONDS = 5 * 60
@@ -84,7 +88,8 @@ class ImportService:
         self.repository.purge_expired(now)
         if self.repository.count_for_user(user_id) >= self.max_drafts:
             raise ImportDraftLimit(
-                f"Import draft limit reached ({self.max_drafts}); delete a draft before creating another"
+                f"Import draft limit reached ({self.max_drafts}); "
+                "delete a draft before creating another"
             )
         parsed = self.parser(source_name, source_format, content, column_map)
         draft = ImportDraft(
@@ -155,7 +160,11 @@ class ImportService:
         if destination == "collection" and not can_create_collection:
             raise ImportPermissionError("Only the owner can create imported collections")
 
-        requested = list(dict.fromkeys(str(value or "").strip() for value in item_ids if str(value or "").strip()))
+        requested = list(
+            dict.fromkeys(
+                str(value or "").strip() for value in item_ids if str(value or "").strip()
+            )
+        )
         if not requested:
             raise ValueError("Select at least one import item")
         if len(requested) > MAX_IMPORT_SELECTION:
@@ -171,7 +180,11 @@ class ImportService:
 
         options = self._personal_options(personal_options or {})
         title = self._collection_title(collection_title) if destination == "collection" else ""
-        description = self._collection_description(collection_description) if destination == "collection" else ""
+        description = (
+            self._collection_description(collection_description)
+            if destination == "collection"
+            else ""
+        )
         claimed = self.repository.claim_for_apply(
             user_id,
             draft_id,
@@ -333,7 +346,9 @@ class ImportService:
                         parsed_entry.id,
                         parsed_entry.position,
                         state,
-                        "duplicate_in_source" if state == "present" else "possible_duplicate_in_source",
+                        "duplicate_in_source"
+                        if state == "present"
+                        else "possible_duplicate_in_source",
                         parsed_entry.label,
                         parsed_entry.item,
                         _import_candidates(source_membership.get("candidates") or []),
@@ -400,7 +415,9 @@ class ImportService:
         item["local_name"] = ""
         item["local_path"] = ""
         item["added_at"] = str(item.get("added_at") or _iso_time(now))
-        provenance = item.get("import_sources") if isinstance(item.get("import_sources"), list) else []
+        provenance = (
+            item.get("import_sources") if isinstance(item.get("import_sources"), list) else []
+        )
         item["import_sources"] = [
             *provenance,
             {
@@ -511,4 +528,4 @@ def _slug(value: str) -> str:
 
 
 def _iso_time(value: int) -> str:
-    return datetime.fromtimestamp(value, timezone.utc).isoformat()
+    return datetime.fromtimestamp(value, UTC).isoformat()

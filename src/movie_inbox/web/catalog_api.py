@@ -4,31 +4,35 @@ from __future__ import annotations
 
 import glob
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from movie_inbox.application.catalog_service import CatalogService
-from movie_inbox.application.curation_service import build_curation_payload, curation_counts
-from movie_inbox.application.curation_workflow import CurationWorkflowService
-from movie_inbox.infrastructure.external_catalog import (
-    enrich_external_result,
-    external_metadata_by_title,
-    search_external_sources,
+from movie_inbox.application.curation_service import (
+    build_curation_payload as build_curation_payload,
 )
-from movie_inbox.domain import catalog as domain
-from movie_inbox.domain.models import CatalogItem
+from movie_inbox.application.curation_service import (
+    curation_counts as curation_counts,
+)
+from movie_inbox.application.curation_workflow import CurationWorkflowService
 from movie_inbox.application.repository import CatalogRepositoryError
-from movie_inbox.infrastructure.repositories import CATALOG_SUFFIXES, open_catalog_repository
+from movie_inbox.domain import catalog as domain
+from movie_inbox.domain.metadata import METADATA_FIELDS
+from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.curation_history import (
     JsonCurationHistoryRepository,
     MemoryCurationHistoryRepository,
     curation_history_path,
 )
-from movie_inbox.domain.metadata import METADATA_FIELDS
+from movie_inbox.infrastructure.external_catalog import (
+    enrich_external_result,
+    external_metadata_by_title,
+    search_external_sources,
+)
+from movie_inbox.infrastructure.repositories import CATALOG_SUFFIXES, open_catalog_repository
 from movie_inbox.web.config import ViewerConfig
-
 
 _CATALOG_SERVICES: dict[str, CatalogService] = {}
 _CURATION_WORKFLOWS: dict[str, CurationWorkflowService] = {}
@@ -65,7 +69,9 @@ def resolved_files(patterns: list[str]) -> list[str]:
             files.extend(matches)
         else:
             files.append(pattern)
-    return sorted(str(Path(file)) for file in files if Path(file).suffix.lower() in CATALOG_SUFFIXES)
+    return sorted(
+        str(Path(file)) for file in files if Path(file).suffix.lower() in CATALOG_SUFFIXES
+    )
 
 
 def load_items(patterns: list[str]) -> list[dict[str, Any]]:
@@ -81,7 +87,9 @@ def load_items(patterns: list[str]) -> list[dict[str, Any]]:
             row["_source_file"] = str(file)
             items.append(row)
     annotate_duplicate_items(items)
-    return sorted(items, key=lambda item: str(item.get("added_at") or item.get("addedAt") or ""), reverse=True)
+    return sorted(
+        items, key=lambda item: str(item.get("added_at") or item.get("addedAt") or ""), reverse=True
+    )
 
 
 def read_json_items(path: Path) -> list[CatalogItem]:
@@ -98,7 +106,9 @@ def catalog_service(path: Path) -> CatalogService:
     except OSError:
         key = str(path.absolute())
     if key not in _CATALOG_SERVICES:
-        _CATALOG_SERVICES[key] = CatalogService(open_catalog_repository(Path(key), domain.normalize_item))
+        _CATALOG_SERVICES[key] = CatalogService(
+            open_catalog_repository(Path(key), domain.normalize_item)
+        )
     return _CATALOG_SERVICES[key]
 
 
@@ -168,7 +178,8 @@ def background_enrich_catalog_item(path: Path, item_id: str, seed: dict[str, Any
         ]
     )[:3]
     print(
-        f"[catalog-viewer] background enrichment start item_id={item_id} titles={titles!r} year={year}",
+        f"[catalog-viewer] background enrichment start item_id={item_id} "
+        f"titles={titles!r} year={year}",
         flush=True,
     )
     try:
@@ -197,7 +208,10 @@ def background_enrich_catalog_item(path: Path, item_id: str, seed: dict[str, Any
         if not updated:
             return
     except (CatalogRepositoryError, ValueError, OSError) as error:
-        print(f"[catalog-viewer] background enrichment error item_id={item_id} error={error}", flush=True)
+        print(
+            f"[catalog-viewer] background enrichment error item_id={item_id} error={error}",
+            flush=True,
+        )
 
 
 def delete_item_anywhere(
@@ -236,7 +250,9 @@ def delete_item(
     return catalog_service(path).delete_item(item_id, item_url, title, year, local_name, confirmed)
 
 
-def update_item_status(path: Path, item_id: str, status: str, watched_at: str = "") -> tuple[bool, str]:
+def update_item_status(
+    path: Path, item_id: str, status: str, watched_at: str = ""
+) -> tuple[bool, str]:
     return catalog_service(path).update_status(item_id, status, watched_at)
 
 
@@ -248,7 +264,9 @@ def update_item_catalog_status(path: Path, item_id: str, en_catalogo: Any) -> tu
     return catalog_service(path).update_catalog_status(item_id, en_catalogo)
 
 
-def update_item_personal(path: Path, item_id: str, watched_at: str, rating: Any, review: str) -> tuple[bool, str]:
+def update_item_personal(
+    path: Path, item_id: str, watched_at: str, rating: Any, review: str
+) -> tuple[bool, str]:
     return catalog_service(path).update_personal(item_id, watched_at, rating, review)
 
 
@@ -318,10 +336,14 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "watched_at": normalize_date(result.get("watched_at")),
         "rating": normalize_rating(result.get("rating")),
         "year": str(result.get("year") or ""),
-        "release_dates": result.get("release_dates") if isinstance(result.get("release_dates"), list) else [],
+        "release_dates": result.get("release_dates")
+        if isinstance(result.get("release_dates"), list)
+        else [],
         "description": str(result.get("description") or ""),
         **source_links,
-        "wikipedia_title": str(result.get("wikipedia_title") or (title if source == "wikipedia" else "")),
+        "wikipedia_title": str(
+            result.get("wikipedia_title") or (title if source == "wikipedia" else "")
+        ),
         "wikidata_id": str(result.get("wikidata_id") or ""),
         "genres": normalize_tags(result.get("genres")),
         "directors": normalize_tags(result.get("directors")),
@@ -340,7 +362,7 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "review": "",
         "metadata_sources": {},
         "locked_fields": [],
-        "added_at": datetime.now(timezone.utc).isoformat(),
+        "added_at": datetime.now(UTC).isoformat(),
     }
     item["metadata_sources"] = {
         field: metadata_source_record(source, url, inferred=False)

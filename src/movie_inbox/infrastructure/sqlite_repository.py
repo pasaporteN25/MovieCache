@@ -7,7 +7,7 @@ import re
 import sqlite3
 import threading
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,12 +20,11 @@ from movie_inbox.application.repository import (
     CatalogRepositoryError,
     T,
 )
+from movie_inbox.domain.catalog import possible_duplicate_candidates
 from movie_inbox.domain.metadata import normalize_local_files
 from movie_inbox.domain.models import CatalogItem
-from movie_inbox.domain.catalog import possible_duplicate_candidates
 from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.infrastructure.schema import CATALOG_FIELDS, CatalogSchemaError, catalog_document
-
 
 DATABASE_SCHEMA_VERSION = 4
 LIST_METADATA_FIELDS = ("genres", "directors", "writers", "cast")
@@ -173,7 +172,8 @@ MIGRATIONS = {
     3: (
         "persistent curation decisions",
         (
-            "ALTER TABLE catalog_items ADD COLUMN link_curation_status TEXT NOT NULL DEFAULT 'pending'",
+            "ALTER TABLE catalog_items ADD COLUMN link_curation_status "
+            "TEXT NOT NULL DEFAULT 'pending'",
             "ALTER TABLE catalog_items ADD COLUMN curation_updated_at TEXT NOT NULL DEFAULT ''",
             """CREATE TABLE duplicate_decisions (
                 item_id TEXT NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
@@ -344,11 +344,15 @@ class SqliteCatalogRepository:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
                     connection.execute("BEGIN IMMEDIATE")
-                    row = connection.execute("SELECT position FROM catalog_items WHERE id = ?", (item_id,)).fetchone()
+                    row = connection.execute(
+                        "SELECT position FROM catalog_items WHERE id = ?", (item_id,)
+                    ).fetchone()
                     if row is None:
                         connection.commit()
                         return False
-                    cursor = connection.execute("DELETE FROM catalog_items WHERE id = ?", (item_id,))
+                    cursor = connection.execute(
+                        "DELETE FROM catalog_items WHERE id = ?", (item_id,)
+                    )
                     connection.execute(
                         "UPDATE catalog_items SET position = position - 1 WHERE position > ?",
                         (int(row["position"]),),
@@ -384,13 +388,20 @@ class SqliteCatalogRepository:
                                 library_id = ? AND relative_path != '' AND relative_path = ?
                             )
                         )""",
-                        (item_id, row["path"], row["path"], row["library_id"], row["relative_path"]),
+                        (
+                            item_id,
+                            row["path"],
+                            row["path"],
+                            row["library_id"],
+                            row["relative_path"],
+                        ),
                     ).fetchone()
                     if existing_file is not None:
                         connection.commit()
                         return True
                     position_row = connection.execute(
-                        "SELECT COALESCE(MAX(position), -1) + 1 AS position FROM local_files WHERE item_id = ?",
+                        "SELECT COALESCE(MAX(position), -1) + 1 AS position "
+                        "FROM local_files WHERE item_id = ?",
                         (item_id,),
                     ).fetchone()
                     position = int(position_row["position"] if position_row else 0)
@@ -443,7 +454,9 @@ class SqliteCatalogRepository:
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
             ).fetchone()
             if has_tables:
-                raise CatalogFormatError(f"SQLite catalog has tables but no migration history: {self.path}")
+                raise CatalogFormatError(
+                    f"SQLite catalog has tables but no migration history: {self.path}"
+                )
             try:
                 connection.executescript("BEGIN IMMEDIATE;\n" + SCHEMA_V1)
                 connection.execute(
@@ -457,7 +470,8 @@ class SqliteCatalogRepository:
         version = self._current_version(connection)
         if version > DATABASE_SCHEMA_VERSION:
             raise CatalogFormatError(
-                f"SQLite schema v{version} is newer than supported v{DATABASE_SCHEMA_VERSION}: {self.path}"
+                f"SQLite schema v{version} is newer than supported "
+                f"v{DATABASE_SCHEMA_VERSION}: {self.path}"
             )
         for target_version in range(version + 1, DATABASE_SCHEMA_VERSION + 1):
             migration = MIGRATIONS.get(target_version)
@@ -479,14 +493,18 @@ class SqliteCatalogRepository:
 
     @staticmethod
     def _current_version(connection: sqlite3.Connection) -> int:
-        row = connection.execute("SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations").fetchone()
+        row = connection.execute(
+            "SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations"
+        ).fetchone()
         return int(row["version"] if row else 0)
 
     def _validated_rows(self, items: list[CatalogItem]) -> list[dict[str, Any]]:
         try:
             rows = [dict(row) for row in catalog_document(items)["items"]]
         except CatalogSchemaError as error:
-            raise CatalogFormatError(f"Cannot write invalid catalog: {self.path} ({error})") from error
+            raise CatalogFormatError(
+                f"Cannot write invalid catalog: {self.path} ({error})"
+            ) from error
         ids = [str(row.get("id") or "") for row in rows]
         if len(ids) != len(set(ids)):
             raise CatalogFormatError(f"Cannot write catalog with duplicate item ids: {self.path}")
@@ -539,7 +557,9 @@ class SqliteCatalogRepository:
             "notes": row["notes"],
             "review": row["review"],
             "metadata_sources": self._metadata_sources(connection, item_id),
-            "locked_fields": self._values(connection, "locked_fields", item_id, "field", order="field"),
+            "locked_fields": self._values(
+                connection, "locked_fields", item_id, "field", order="field"
+            ),
             "link_curation_status": row["link_curation_status"],
             "duplicate_decisions": self._duplicate_decisions(connection, item_id),
             "curation_updated_at": row["curation_updated_at"],
@@ -627,7 +647,9 @@ class SqliteCatalogRepository:
         )
 
     @staticmethod
-    def _metadata_sources(connection: sqlite3.Connection, item_id: str) -> dict[str, dict[str, Any]]:
+    def _metadata_sources(
+        connection: sqlite3.Connection, item_id: str
+    ) -> dict[str, dict[str, Any]]:
         rows = connection.execute(
             "SELECT * FROM metadata_provenance WHERE item_id = ? ORDER BY field",
             (item_id,),
@@ -643,7 +665,9 @@ class SqliteCatalogRepository:
         }
 
     @staticmethod
-    def _duplicate_decisions(connection: sqlite3.Connection, item_id: str) -> dict[str, dict[str, str]]:
+    def _duplicate_decisions(
+        connection: sqlite3.Connection, item_id: str
+    ) -> dict[str, dict[str, str]]:
         rows = connection.execute(
             "SELECT other_reference, status, updated_at FROM duplicate_decisions WHERE item_id = ?",
             (item_id,),
@@ -680,7 +704,9 @@ class SqliteCatalogRepository:
         existing: list[dict[str, Any]],
         incoming: list[dict[str, Any]],
     ) -> None:
-        existing_by_id = {str(item["id"]): (position, item) for position, item in enumerate(existing)}
+        existing_by_id = {
+            str(item["id"]): (position, item) for position, item in enumerate(existing)
+        }
         incoming_ids = {str(item["id"]) for item in incoming}
         for removed_id in set(existing_by_id) - incoming_ids:
             connection.execute("DELETE FROM catalog_items WHERE id = ?", (removed_id,))
@@ -691,7 +717,9 @@ class SqliteCatalogRepository:
             elif previous[1] != item:
                 self._sync_item(connection, previous[1], item, position)
             elif previous[0] != position:
-                connection.execute("UPDATE catalog_items SET position = ? WHERE id = ?", (position, item["id"]))
+                connection.execute(
+                    "UPDATE catalog_items SET position = ? WHERE id = ?", (position, item["id"])
+                )
 
     def _sync_item(
         self,
@@ -707,13 +735,17 @@ class SqliteCatalogRepository:
             if key not in CATALOG_FIELDS and not str(key).startswith("_")
         }
         connection.execute(
-                """INSERT INTO catalog_items(
-                    id, position, primary_url, source, title, original_title, spanish_title, english_title,
-                    kind, status, watched_at, rating, year, description, page_image, backdrop_image, tmdb_id,
+            """INSERT INTO catalog_items(
+                    id, position, primary_url, source, title, original_title,
+                    spanish_title, english_title,
+                    kind, status, watched_at, rating, year, description, page_image,
+                    backdrop_image, tmdb_id,
                     wikipedia_extract,
                     en_catalogo, local_name, local_path, notes, review, link_curation_status,
                     curation_updated_at, added_at, extra_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
                 ON CONFLICT(id) DO UPDATE SET
                     position = excluded.position,
                     primary_url = excluded.primary_url,
@@ -741,28 +773,55 @@ class SqliteCatalogRepository:
                     curation_updated_at = excluded.curation_updated_at,
                     added_at = excluded.added_at,
                     extra_json = excluded.extra_json""",
-                (
-                    item_id, position, item.get("url", ""), item.get("source", ""), item.get("title", ""),
-                    item.get("original_title", ""), item.get("spanish_title", ""), item.get("english_title", ""),
-                    item.get("kind", "pelicula"), item.get("status", "to_watch"), item.get("watched_at", ""),
-                    int(item.get("rating") or 0), item.get("year", ""), item.get("description", ""),
-                    item.get("page_image", ""), item.get("backdrop_image", ""), item.get("tmdb_id", ""),
-                    item.get("wikipedia_extract", ""),
-                    int(bool(item.get("en_catalogo"))), item.get("local_name", ""), item.get("local_path", ""),
-                    item.get("notes", ""), item.get("review", ""), item.get("link_curation_status", "pending"),
-                    item.get("curation_updated_at", ""), item.get("added_at", ""), _json_dump(extra),
-                ),
-            )
+            (
+                item_id,
+                position,
+                item.get("url", ""),
+                item.get("source", ""),
+                item.get("title", ""),
+                item.get("original_title", ""),
+                item.get("spanish_title", ""),
+                item.get("english_title", ""),
+                item.get("kind", "pelicula"),
+                item.get("status", "to_watch"),
+                item.get("watched_at", ""),
+                int(item.get("rating") or 0),
+                item.get("year", ""),
+                item.get("description", ""),
+                item.get("page_image", ""),
+                item.get("backdrop_image", ""),
+                item.get("tmdb_id", ""),
+                item.get("wikipedia_extract", ""),
+                int(bool(item.get("en_catalogo"))),
+                item.get("local_name", ""),
+                item.get("local_path", ""),
+                item.get("notes", ""),
+                item.get("review", ""),
+                item.get("link_curation_status", "pending"),
+                item.get("curation_updated_at", ""),
+                item.get("added_at", ""),
+                _json_dump(extra),
+            ),
+        )
 
         if previous is None or previous.get("alternative_titles") != item.get("alternative_titles"):
             connection.execute("DELETE FROM alternative_titles WHERE item_id = ?", (item_id,))
-            self._insert_positioned(connection, "alternative_titles", "title", item_id, item.get("alternative_titles", []))
+            self._insert_positioned(
+                connection,
+                "alternative_titles",
+                "title",
+                item_id,
+                item.get("alternative_titles", []),
+            )
         for field in LIST_METADATA_FIELDS:
             if previous is None or previous.get(field) != item.get(field):
-                connection.execute("DELETE FROM metadata_values WHERE item_id = ? AND field = ?", (item_id, field))
+                connection.execute(
+                    "DELETE FROM metadata_values WHERE item_id = ? AND field = ?", (item_id, field)
+                )
                 for value_position, value in enumerate(item.get(field, [])):
                     connection.execute(
-                        "INSERT INTO metadata_values(item_id, field, position, value) VALUES (?, ?, ?, ?)",
+                        "INSERT INTO metadata_values(item_id, field, position, value) "
+                        "VALUES (?, ?, ?, ?)",
                         (item_id, field, value_position, str(value)),
                     )
         if previous is None or previous.get("tags") != item.get("tags"):
@@ -775,7 +834,9 @@ class SqliteCatalogRepository:
                     "INSERT INTO locked_fields(item_id, field) VALUES (?, ?)",
                     (item_id, str(field)),
                 )
-        if previous is None or previous.get("duplicate_decisions") != item.get("duplicate_decisions"):
+        if previous is None or previous.get("duplicate_decisions") != item.get(
+            "duplicate_decisions"
+        ):
             connection.execute("DELETE FROM duplicate_decisions WHERE item_id = ?", (item_id,))
             for other_reference, decision in item.get("duplicate_decisions", {}).items():
                 connection.execute(
@@ -788,8 +849,16 @@ class SqliteCatalogRepository:
                         str(decision.get("updated_at") or ""),
                     ),
                 )
-        external_fields = ("wikipedia_url", "wikipedia_title", "imdb_url", "filmaffinity_url", "wikidata_id")
-        if previous is None or any(previous.get(field) != item.get(field) for field in external_fields):
+        external_fields = (
+            "wikipedia_url",
+            "wikipedia_title",
+            "imdb_url",
+            "filmaffinity_url",
+            "wikidata_id",
+        )
+        if previous is None or any(
+            previous.get(field) != item.get(field) for field in external_fields
+        ):
             connection.execute("DELETE FROM external_ids WHERE item_id = ?", (item_id,))
             self._insert_external_ids(connection, item)
         if previous is None or previous.get("local_files") != item.get("local_files"):
@@ -797,7 +866,9 @@ class SqliteCatalogRepository:
             self._insert_local_files(connection, item_id, item.get("local_files", []))
         if previous is None or previous.get("release_dates") != item.get("release_dates"):
             connection.execute("DELETE FROM release_dates WHERE item_id = ?", (item_id,))
-            for release_position, release in enumerate(normalize_release_dates(item.get("release_dates"))):
+            for release_position, release in enumerate(
+                normalize_release_dates(item.get("release_dates"))
+            ):
                 connection.execute(
                     """INSERT INTO release_dates(
                         item_id, position, release_date, precision, country,
@@ -839,15 +910,26 @@ class SqliteCatalogRepository:
     def _insert_external_ids(connection: sqlite3.Connection, item: dict[str, Any]) -> None:
         records = [
             ("wikipedia", "", item.get("wikipedia_url", ""), item.get("wikipedia_title", "")),
-            ("imdb", _external_id(item.get("imdb_url", ""), r"\btt\d{7,9}\b"), item.get("imdb_url", ""), ""),
-            ("filmaffinity", _external_id(item.get("filmaffinity_url", ""), r"film(\d+)"), item.get("filmaffinity_url", ""), ""),
+            (
+                "imdb",
+                _external_id(item.get("imdb_url", ""), r"\btt\d{7,9}\b"),
+                item.get("imdb_url", ""),
+                "",
+            ),
+            (
+                "filmaffinity",
+                _external_id(item.get("filmaffinity_url", ""), r"film(\d+)"),
+                item.get("filmaffinity_url", ""),
+                "",
+            ),
             ("wikidata", item.get("wikidata_id", ""), "", ""),
         ]
         for source, external_id, url, title in records:
             if not any([external_id, url, title]):
                 continue
             connection.execute(
-                "INSERT INTO external_ids(item_id, source, external_id, url, title) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO external_ids(item_id, source, external_id, url, title) "
+                "VALUES (?, ?, ?, ?, ?)",
                 (item["id"], source, str(external_id), str(url), str(title)),
             )
 
@@ -866,15 +948,25 @@ class SqliteCatalogRepository:
                     relative_path, fingerprint, last_seen_at, available
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    item_id, position, row.get("path", ""), row.get("name", ""), int(row.get("size_bytes") or 0),
-                    row.get("modified_at", ""), row.get("part", ""), row.get("library_id", ""),
-                    row.get("relative_path", ""), row.get("fingerprint", ""), row.get("last_seen_at", ""),
+                    item_id,
+                    position,
+                    row.get("path", ""),
+                    row.get("name", ""),
+                    int(row.get("size_bytes") or 0),
+                    row.get("modified_at", ""),
+                    row.get("part", ""),
+                    row.get("library_id", ""),
+                    row.get("relative_path", ""),
+                    row.get("fingerprint", ""),
+                    row.get("last_seen_at", ""),
                     int(bool(row.get("available", True))),
                 ),
             )
 
     @staticmethod
-    def _insert_metadata_sources(connection: sqlite3.Connection, item_id: str, sources: Any) -> None:
+    def _insert_metadata_sources(
+        connection: sqlite3.Connection, item_id: str, sources: Any
+    ) -> None:
         if not isinstance(sources, dict):
             return
         for field, row in sources.items():
@@ -883,8 +975,12 @@ class SqliteCatalogRepository:
                     item_id, field, source, url, updated_at, inferred
                 ) VALUES (?, ?, ?, ?, ?, ?)""",
                 (
-                    item_id, str(field), row.get("source", ""), row.get("url", ""),
-                    row.get("updated_at", ""), int(bool(row.get("inferred"))),
+                    item_id,
+                    str(field),
+                    row.get("source", ""),
+                    row.get("url", ""),
+                    row.get("updated_at", ""),
+                    int(bool(row.get("inferred"))),
                 ),
             )
 
@@ -917,4 +1013,4 @@ def _json_object(value: Any) -> dict[str, Any]:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

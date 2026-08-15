@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import unquote, urlparse
 
 from movie_inbox.domain.catalog import canonical_url, external_source_name
 
-
 _YEAR_PATTERN = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b")
 _MEDIA_QUALIFIER_PATTERN = re.compile(
-    r"\s*\((?:\d{4}\s+)?(?:film|movie|pelicula|tv series|series|miniseries|anime|documentary)[^)]*\)\s*$",
+    r"\s*\((?:\d{4}\s+)?(?:film|movie|pelicula|tv series|series|miniseries|anime|documentary)"
+    r"[^)]*\)\s*$",
     flags=re.IGNORECASE,
 )
 _EXTERNAL_ID_PATTERN = re.compile(r"\b(?:tt\d{7,9}|q\d+|film\d+)\b", flags=re.IGNORECASE)
@@ -93,16 +94,22 @@ def external_result_score(query: str | SearchIntent, result: Mapping[str, Any]) 
 
     title_query = intent.title_key or search_key(intent.external_id) or intent.key
     title_terms = tuple(title_query.split())
+    alternative_titles = result.get("alternative_titles")
+    extra_titles = alternative_titles if isinstance(alternative_titles, list) else []
     titles = [
         result.get("title"),
         result.get("original_title"),
         result.get("spanish_title"),
         result.get("english_title"),
         result.get("wikipedia_title"),
-        *(result.get("alternative_titles") if isinstance(result.get("alternative_titles"), list) else []),
+        *extra_titles,
     ]
     score = max(
-        (text_match_score(search_key(value), title_query, title_terms) for value in titles if str(value or "").strip()),
+        (
+            text_match_score(search_key(value), title_query, title_terms)
+            for value in titles
+            if str(value or "").strip()
+        ),
         default=0.0,
     )
     result_year = str(result.get("year") or "").strip()

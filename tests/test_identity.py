@@ -7,8 +7,8 @@ from contextlib import closing
 from pathlib import Path
 
 from movie_inbox.application.auth_service import (
-    AuthService,
     AuthenticationError,
+    AuthService,
     PasswordHasher,
     PasswordPolicyError,
     session_token_hash,
@@ -21,7 +21,10 @@ from movie_inbox.application.identity_repository import (
 from movie_inbox.application.member_service import MemberService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
-from movie_inbox.infrastructure.identity_repository import INSTANCE_SCHEMA_V1, SqliteIdentityRepository
+from movie_inbox.infrastructure.identity_repository import (
+    INSTANCE_SCHEMA_V1,
+    SqliteIdentityRepository,
+)
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -73,7 +76,9 @@ class IdentityTests(unittest.TestCase):
             token, identity = service.login("LUCAS", password)
             self.assertEqual(identity.user.id, user.id)
             with closing(sqlite3.connect(database)) as connection:
-                stored_password = connection.execute("SELECT password_hash FROM users").fetchone()[0]
+                stored_password = connection.execute("SELECT password_hash FROM users").fetchone()[
+                    0
+                ]
                 stored_token = connection.execute("SELECT token_hash FROM sessions").fetchone()[0]
             self.assertNotEqual(stored_password, password)
             self.assertTrue(stored_password.startswith("scrypt$"))
@@ -166,7 +171,9 @@ class IdentityTests(unittest.TestCase):
             self.assertEqual(member.user.role, "member")
             self.assertTrue(member_path.exists())
             self.assertEqual(open_catalog_repository(member_path, normalize_item).read(), [])
-            self.assertEqual([record.user.username for record in members.list_members(owner)], ["maria"])
+            self.assertEqual(
+                [record.user.username for record in members.list_members(owner)], ["maria"]
+            )
 
             old_token, temporary_identity = auth.login("maria", "a-temporary-password")
             self.assertTrue(temporary_identity.user.must_change_password)
@@ -206,7 +213,8 @@ class IdentityTests(unittest.TestCase):
             with closing(sqlite3.connect(database)) as connection:
                 connection.executescript(INSTANCE_SCHEMA_V1)
                 connection.execute(
-                    "INSERT INTO instance_migrations(version, name, applied_at) VALUES (1, 'v1', 'now')"
+                    "INSERT INTO instance_migrations(version, name, applied_at) "
+                    "VALUES (1, 'v1', 'now')"
                 )
                 connection.commit()
 
@@ -214,12 +222,18 @@ class IdentityTests(unittest.TestCase):
             repository.initialize()
 
             with closing(sqlite3.connect(database)) as connection:
-                versions = [row[0] for row in connection.execute(
-                    "SELECT version FROM instance_migrations ORDER BY version"
-                )]
-                tables = {row[0] for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                )}
+                versions = [
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT version FROM instance_migrations ORDER BY version"
+                    )
+                ]
+                tables = {
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT name FROM sqlite_master WHERE type = 'table'"
+                    )
+                }
             self.assertEqual(versions, [1, 2, 3, 4, 5, 6])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
@@ -248,14 +262,18 @@ class IdentityTests(unittest.TestCase):
                 source_paths=[str(owner_catalog)],
                 write_path=str(owner_catalog),
             )
-            members = MemberService(repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs"))
+            members = MemberService(
+                repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs")
+            )
             provisioned = members.create_member(
                 owner,
                 "maria",
                 temporary_password="a-temporary-password",
             )
             member = provisioned.member
-            member_repository = open_catalog_repository(Path(member.catalog.write_path), normalize_item)
+            member_repository = open_catalog_repository(
+                Path(member.catalog.write_path), normalize_item
+            )
             member_repository.write([normalize_item({"id": "heat", "title": "Heat", "rating": 9})])
 
             preferences = PrivacyPreferences(catalog_shared=True, share_rating=True)
@@ -306,11 +324,15 @@ class IdentityTests(unittest.TestCase):
                 source_paths=[str(owner_catalog)],
                 write_path=str(owner_catalog),
             )
-            members = MemberService(repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs"))
+            members = MemberService(
+                repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs")
+            )
             member = members.create_member(owner, "maria").member
             members.set_active(owner, member.user.id, False)
             with closing(sqlite3.connect(database)) as connection:
-                connection.execute("DELETE FROM catalog_sources WHERE catalog_id = ?", (member.catalog.id,))
+                connection.execute(
+                    "DELETE FROM catalog_sources WHERE catalog_id = ?", (member.catalog.id,)
+                )
                 connection.commit()
 
             with self.assertRaises(IdentityNotFound):

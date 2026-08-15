@@ -8,10 +8,11 @@ import os
 import threading
 import time
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from movie_inbox.application.repository import (
     CatalogBusyError,
@@ -22,10 +23,15 @@ from movie_inbox.application.repository import (
     CatalogRepositoryError,
     T,
 )
+from movie_inbox.domain.catalog import possible_duplicate_candidates
 from movie_inbox.domain.metadata import normalize_local_files
 from movie_inbox.domain.models import CatalogItem
-from movie_inbox.domain.catalog import possible_duplicate_candidates
-from movie_inbox.infrastructure.schema import CatalogSchemaError, atomic_write_json, catalog_document, extract_catalog_items
+from movie_inbox.infrastructure.schema import (
+    CatalogSchemaError,
+    atomic_write_json,
+    catalog_document,
+    extract_catalog_items,
+)
 
 
 class JsonCatalogRepository:
@@ -168,7 +174,9 @@ class JsonCatalogRepository:
         try:
             atomic_write_json(self.path, catalog_document(items))
         except CatalogSchemaError as error:
-            raise CatalogFormatError(f"Cannot write invalid catalog: {self.path} ({error})") from error
+            raise CatalogFormatError(
+                f"Cannot write invalid catalog: {self.path} ({error})"
+            ) from error
         except OSError as error:
             raise CatalogRepositoryError(f"Cannot write catalog: {self.path}") from error
 
@@ -179,7 +187,7 @@ class JsonCatalogRepository:
             {
                 "token": token,
                 "pid": os.getpid(),
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             },
             ensure_ascii=True,
         ).encode("utf-8")
@@ -189,7 +197,7 @@ class JsonCatalogRepository:
             except FileExistsError:
                 self._remove_stale_lock()
                 if time.monotonic() - started >= self.lock_timeout:
-                    raise CatalogBusyError(f"Catalog is busy: {self.path}")
+                    raise CatalogBusyError(f"Catalog is busy: {self.path}") from None
                 time.sleep(0.05)
                 continue
             try:

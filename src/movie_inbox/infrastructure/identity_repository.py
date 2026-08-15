@@ -7,7 +7,7 @@ import sqlite3
 import threading
 import uuid
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from movie_inbox.application.identity_repository import (
@@ -28,7 +28,6 @@ from movie_inbox.domain.identity import (
     username_key,
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
-
 
 INSTANCE_SCHEMA_VERSION = 6
 INSTANCE_SCHEMA_V1 = """
@@ -211,8 +210,11 @@ CREATE TABLE media_libraries (
     schedule TEXT NOT NULL DEFAULT 'manual' CHECK (schedule IN ('manual', 'hourly', 'daily')),
     active INTEGER NOT NULL DEFAULT 0 CHECK (active IN (0, 1)),
     status TEXT NOT NULL DEFAULT 'unverified'
-        CHECK (status IN ('unverified', 'ready', 'scanning', 'paused', 'offline', 'warning', 'error')),
-    max_missing_ratio REAL NOT NULL DEFAULT 0.5 CHECK (max_missing_ratio >= 0 AND max_missing_ratio <= 1),
+        CHECK (status IN (
+            'unverified', 'ready', 'scanning', 'paused', 'offline', 'warning', 'error'
+        )),
+    max_missing_ratio REAL NOT NULL DEFAULT 0.5
+        CHECK (max_missing_ratio >= 0 AND max_missing_ratio <= 1),
     verified_at INTEGER NOT NULL DEFAULT 0,
     last_scan_at INTEGER NOT NULL DEFAULT 0,
     next_scan_at INTEGER NOT NULL DEFAULT 0,
@@ -228,7 +230,8 @@ CREATE TABLE library_scan_runs (
     library_id TEXT NOT NULL REFERENCES media_libraries(id) ON DELETE CASCADE,
     mode TEXT NOT NULL CHECK (mode IN ('dry_run', 'apply')),
     trigger TEXT NOT NULL CHECK (trigger IN ('manual', 'scheduled')),
-    status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'partial', 'blocked', 'failed')),
+    status TEXT NOT NULL
+        CHECK (status IN ('queued', 'running', 'completed', 'partial', 'blocked', 'failed')),
     created_at INTEGER NOT NULL,
     started_at INTEGER NOT NULL DEFAULT 0,
     finished_at INTEGER NOT NULL DEFAULT 0,
@@ -306,7 +309,9 @@ class SqliteIdentityRepository:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot initialize instance database: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot initialize instance database: {self.path}"
+                ) from error
 
     def has_users(self) -> bool:
         with self._thread_lock:
@@ -315,7 +320,9 @@ class SqliteIdentityRepository:
                     self._initialize(connection)
                     return connection.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot inspect instance database: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot inspect instance database: {self.path}"
+                ) from error
 
     def create_owner(
         self,
@@ -336,7 +343,9 @@ class SqliteIdentityRepository:
                     connection.execute("BEGIN IMMEDIATE")
                     if connection.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None:
                         connection.rollback()
-                        raise IdentityAlreadyInitialized("The instance already has an owner account")
+                        raise IdentityAlreadyInitialized(
+                            "The instance already has an owner account"
+                        )
                     connection.execute(
                         """INSERT INTO users(
                             id, username, username_key, password_hash, role, active,
@@ -351,7 +360,8 @@ class SqliteIdentityRepository:
                     )
                     for position, path in enumerate(sources):
                         connection.execute(
-                            """INSERT INTO catalog_sources(catalog_id, position, storage_path, writable)
+                            """INSERT INTO catalog_sources
+                            (catalog_id, position, storage_path, writable)
                             VALUES (?, ?, ?, ?)""",
                             (catalog_id, position, path, int(path == writable_path)),
                         )
@@ -359,7 +369,9 @@ class SqliteIdentityRepository:
             except IdentityAlreadyInitialized:
                 raise
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot create owner account in: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot create owner account in: {self.path}"
+                ) from error
         user = UserAccount(user_id, username, "owner", True, False, now)
         catalog = PersonalCatalog(
             catalog_id,
@@ -401,7 +413,8 @@ class SqliteIdentityRepository:
                     )
                     for position, path in enumerate(sources):
                         connection.execute(
-                            """INSERT INTO catalog_sources(catalog_id, position, storage_path, writable)
+                            """INSERT INTO catalog_sources
+                            (catalog_id, position, storage_path, writable)
                             VALUES (?, ?, ?, ?)""",
                             (catalog_id, position, path, int(path == writable_path)),
                         )
@@ -409,7 +422,9 @@ class SqliteIdentityRepository:
             except sqlite3.IntegrityError as error:
                 raise IdentityConflict("Username is already in use") from error
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot create member account in: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot create member account in: {self.path}"
+                ) from error
         user = UserAccount(user_id, username, "member", True, True, now)
         catalog = PersonalCatalog(
             catalog_id,
@@ -447,7 +462,9 @@ class SqliteIdentityRepository:
             try:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
-                    row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    row = connection.execute(
+                        "SELECT * FROM users WHERE id = ?", (user_id,)
+                    ).fetchone()
                     return _user(row) if row else None
             except sqlite3.Error as error:
                 raise IdentityRepositoryError(f"Cannot read account from: {self.path}") from error
@@ -458,7 +475,9 @@ class SqliteIdentityRepository:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
                     connection.execute("BEGIN IMMEDIATE")
-                    row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    row = connection.execute(
+                        "SELECT * FROM users WHERE id = ?", (user_id,)
+                    ).fetchone()
                     if row is None:
                         connection.rollback()
                         raise IdentityNotFound("Member account was not found")
@@ -471,7 +490,9 @@ class SqliteIdentityRepository:
                     )
                     if not active:
                         connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-                    updated = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    updated = connection.execute(
+                        "SELECT * FROM users WHERE id = ?", (user_id,)
+                    ).fetchone()
                     connection.commit()
                     return _user(updated)
             except (IdentityNotFound, IdentityOwnerProtected):
@@ -491,15 +512,20 @@ class SqliteIdentityRepository:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
                     connection.execute("BEGIN IMMEDIATE")
-                    row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    row = connection.execute(
+                        "SELECT * FROM users WHERE id = ?", (user_id,)
+                    ).fetchone()
                     if row is None:
                         connection.rollback()
                         raise IdentityNotFound("Member account was not found")
                     if str(row["role"]) == "owner":
                         connection.rollback()
-                        raise IdentityOwnerProtected("The owner account cannot be edited as a member")
+                        raise IdentityOwnerProtected(
+                            "The owner account cannot be edited as a member"
+                        )
                     connection.execute(
-                        "UPDATE users SET username = ?, username_key = ?, updated_at = ? WHERE id = ?",
+                        "UPDATE users SET username = ?, username_key = ?, updated_at = ? "
+                        "WHERE id = ?",
                         (username, username_key(username), now, user_id),
                     )
                     cursor = connection.execute(
@@ -509,7 +535,9 @@ class SqliteIdentityRepository:
                     if cursor.rowcount != 1:
                         connection.rollback()
                         raise IdentityNotFound("Member personal catalog was not found")
-                    updated = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    updated = connection.execute(
+                        "SELECT * FROM users WHERE id = ?", (user_id,)
+                    ).fetchone()
                     catalog = self._catalog(connection, user_id)
                     connection.commit()
                     if catalog is None:
@@ -530,7 +558,9 @@ class SqliteIdentityRepository:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
                     connection.execute("BEGIN IMMEDIATE")
-                    user_row = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    user_row = connection.execute(
+                        "SELECT * FROM users WHERE id = ?", (user_id,)
+                    ).fetchone()
                     if user_row is None:
                         connection.rollback()
                         raise IdentityNotFound("Member account was not found")
@@ -539,7 +569,9 @@ class SqliteIdentityRepository:
                         raise IdentityOwnerProtected("The owner account cannot be archived")
                     if bool(user_row["active"]):
                         connection.rollback()
-                        raise IdentityMemberActive("Deactivate the member before archiving the account")
+                        raise IdentityMemberActive(
+                            "Deactivate the member before archiving the account"
+                        )
                     catalog_row = connection.execute(
                         "SELECT * FROM catalogs WHERE owner_user_id = ? AND is_default = 1",
                         (user_id,),
@@ -606,7 +638,9 @@ class SqliteIdentityRepository:
                     ).fetchall()
                     return [self._archived_member(connection, row) for row in rows]
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot list archived members from: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot list archived members from: {self.path}"
+                ) from error
 
     def restore_archived_member(
         self,
@@ -630,7 +664,8 @@ class SqliteIdentityRepository:
                         connection.rollback()
                         raise IdentityNotFound("Archived member was not found")
                     source_rows = connection.execute(
-                        "SELECT * FROM archived_catalog_sources WHERE archive_id = ? ORDER BY position",
+                        "SELECT * FROM archived_catalog_sources "
+                        "WHERE archive_id = ? ORDER BY position",
                         (archive_id,),
                     ).fetchall()
                     if not source_rows:
@@ -650,7 +685,8 @@ class SqliteIdentityRepository:
                     )
                     for source in source_rows:
                         connection.execute(
-                            """INSERT INTO catalog_sources(catalog_id, position, storage_path, writable)
+                            """INSERT INTO catalog_sources
+                            (catalog_id, position, storage_path, writable)
                             VALUES (?, ?, ?, ?)""",
                             (
                                 catalog_id,
@@ -702,7 +738,9 @@ class SqliteIdentityRepository:
                         connection.rollback()
                         raise IdentityNotFound("Account was not found")
                     connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-                    updated = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+                    updated = connection.execute(
+                        "SELECT * FROM users WHERE id = ?", (user_id,)
+                    ).fetchone()
                     connection.commit()
                     return _user(updated)
             except IdentityNotFound:
@@ -736,7 +774,9 @@ class SqliteIdentityRepository:
                     self._initialize(connection)
                     return self._catalog(connection, user_id)
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot read personal catalog from: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot read personal catalog from: {self.path}"
+                ) from error
 
     def privacy_for(self, user_id: str) -> PrivacyPreferences:
         with self._thread_lock:
@@ -749,7 +789,9 @@ class SqliteIdentityRepository:
                     ).fetchone()
                     return _privacy(row)
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot read privacy preferences from: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot read privacy preferences from: {self.path}"
+                ) from error
 
     def update_privacy(self, user_id: str, preferences: PrivacyPreferences) -> PrivacyPreferences:
         with self._thread_lock:
@@ -757,7 +799,12 @@ class SqliteIdentityRepository:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
                     connection.execute("BEGIN IMMEDIATE")
-                    if connection.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone() is None:
+                    if (
+                        connection.execute(
+                            "SELECT 1 FROM users WHERE id = ?", (user_id,)
+                        ).fetchone()
+                        is None
+                    ):
                         connection.rollback()
                         raise IdentityNotFound("Account was not found")
                     connection.execute(
@@ -789,7 +836,9 @@ class SqliteIdentityRepository:
             except IdentityNotFound:
                 raise
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot update privacy preferences in: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot update privacy preferences in: {self.path}"
+                ) from error
 
     def item_privacy_overrides(
         self,
@@ -808,7 +857,9 @@ class SqliteIdentityRepository:
                     ).fetchall()
                     values: dict[str, dict[str, str]] = {}
                     for row in rows:
-                        values.setdefault(str(row["item_id"]), {})[str(row["field"])] = str(row["visibility"])
+                        values.setdefault(str(row["item_id"]), {})[str(row["field"])] = str(
+                            row["visibility"]
+                        )
                     return {
                         item_id: ItemPrivacyOverride(
                             rating=fields.get("rating", "inherit"),
@@ -819,7 +870,9 @@ class SqliteIdentityRepository:
             except IdentityNotFound:
                 raise
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot read item privacy from: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot read item privacy from: {self.path}"
+                ) from error
 
     def set_item_privacy(
         self,
@@ -839,7 +892,8 @@ class SqliteIdentityRepository:
                         if visibility == "inherit":
                             connection.execute(
                                 """DELETE FROM item_privacy_overrides
-                                WHERE user_id = ? AND catalog_id = ? AND item_id = ? AND field = ?""",
+                                WHERE user_id = ? AND catalog_id = ? AND item_id = ?
+                                    AND field = ?""",
                                 (user_id, catalog_id, item_id, field),
                             )
                         else:
@@ -857,7 +911,9 @@ class SqliteIdentityRepository:
             except IdentityNotFound:
                 raise
             except sqlite3.Error as error:
-                raise IdentityRepositoryError(f"Cannot update item privacy in: {self.path}") from error
+                raise IdentityRepositoryError(
+                    f"Cannot update item privacy in: {self.path}"
+                ) from error
 
     def save_session(self, token_hash: str, user_id: str, created_at: int, expires_at: int) -> None:
         with self._thread_lock:
@@ -867,7 +923,8 @@ class SqliteIdentityRepository:
                     connection.execute("BEGIN IMMEDIATE")
                     connection.execute("DELETE FROM sessions WHERE expires_at <= ?", (created_at,))
                     connection.execute(
-                        """INSERT INTO sessions(token_hash, user_id, created_at, expires_at, last_seen_at)
+                        """INSERT INTO sessions
+                        (token_hash, user_id, created_at, expires_at, last_seen_at)
                         VALUES (?, ?, ?, ?, ?)""",
                         (token_hash, user_id, created_at, expires_at, created_at),
                     )
@@ -886,7 +943,8 @@ class SqliteIdentityRepository:
                             sessions.expires_at AS session_expires_at
                         FROM sessions
                         JOIN users ON users.id = sessions.user_id
-                        WHERE sessions.token_hash = ? AND sessions.expires_at > ? AND users.active = 1""",
+                        WHERE sessions.token_hash = ? AND sessions.expires_at > ?
+                            AND users.active = 1""",
                         (token_hash, now),
                     ).fetchone()
                     if row is None:
@@ -932,7 +990,9 @@ class SqliteIdentityRepository:
             try:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
-                    cursor = connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+                    cursor = connection.execute(
+                        "DELETE FROM sessions WHERE user_id = ?", (user_id,)
+                    )
                     connection.commit()
                     return max(0, cursor.rowcount)
             except sqlite3.Error as error:
@@ -959,9 +1019,13 @@ class SqliteIdentityRepository:
             raise IdentityRepositoryError("The owner does not have a personal catalog")
         configured_sources, configured_write = _catalog_paths(source_paths, write_path)
         stored_sources = [source.path for source in catalog.sources]
-        if configured_sources != stored_sources or _normalized_path(catalog.write_path) != configured_write:
+        if (
+            configured_sources != stored_sources
+            or _normalized_path(catalog.write_path) != configured_write
+        ):
             raise IdentityCatalogMismatch(
-                "Configured catalog files do not match the personal catalog registered for the owner"
+                "Configured catalog files do not match the personal catalog "
+                "registered for the owner"
             )
         return catalog
 
@@ -1017,7 +1081,8 @@ class SqliteIdentityRepository:
         version = int(row["version"] if row else 0)
         if version < 1 or version > INSTANCE_SCHEMA_VERSION:
             raise IdentityRepositoryError(
-                f"Unsupported instance schema v{version}; latest is v{INSTANCE_SCHEMA_VERSION}: {self.path}"
+                f"Unsupported instance schema v{version}; "
+                f"latest is v{INSTANCE_SCHEMA_VERSION}: {self.path}"
             )
         for target_version in range(version + 1, INSTANCE_SCHEMA_VERSION + 1):
             migration = INSTANCE_MIGRATIONS.get(target_version)
@@ -1054,7 +1119,10 @@ class SqliteIdentityRepository:
             str(row["id"]),
             str(row["owner_user_id"]),
             str(row["name"]),
-            tuple(CatalogSource(str(source["storage_path"]), bool(source["writable"])) for source in sources),
+            tuple(
+                CatalogSource(str(source["storage_path"]), bool(source["writable"]))
+                for source in sources
+            ),
             str(row["created_at"]),
         )
 
@@ -1070,7 +1138,10 @@ class SqliteIdentityRepository:
             str(row["former_user_id"]),
             str(row["username"]),
             str(row["catalog_name"]),
-            tuple(CatalogSource(str(source["storage_path"]), bool(source["writable"])) for source in sources),
+            tuple(
+                CatalogSource(str(source["storage_path"]), bool(source["writable"]))
+                for source in sources
+            ),
             str(row["archived_at"]),
         )
 
@@ -1136,4 +1207,4 @@ def _normalized_path(value: str) -> str:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

@@ -9,7 +9,11 @@ from contextlib import closing
 from pathlib import Path
 
 from movie_inbox.application.collection_repository import CollectionRepositoryError
-from movie_inbox.domain.collections import CollectionItem, CuratedCollection, normalize_collection_item
+from movie_inbox.domain.collections import (
+    CollectionItem,
+    CuratedCollection,
+    normalize_collection_item,
+)
 
 
 class SqliteCollectionRepository:
@@ -29,10 +33,13 @@ class SqliteCollectionRepository:
                     ).fetchone():
                         connection.rollback()
                         return False
-                    if connection.execute(
-                        "SELECT 1 FROM users WHERE id = ? AND active = 1",
-                        (collection.owner_user_id,),
-                    ).fetchone() is None:
+                    if (
+                        connection.execute(
+                            "SELECT 1 FROM users WHERE id = ? AND active = 1",
+                            (collection.owner_user_id,),
+                        ).fetchone()
+                        is None
+                    ):
                         connection.rollback()
                         raise CollectionRepositoryError("Collection seed owner is unavailable")
                     self._insert_collection(connection, collection)
@@ -45,10 +52,16 @@ class SqliteCollectionRepository:
             except CollectionRepositoryError:
                 raise
             except sqlite3.Error as error:
-                raise CollectionRepositoryError(f"Cannot install collection seed in: {self.path}") from error
+                raise CollectionRepositoryError(
+                    f"Cannot install collection seed in: {self.path}"
+                ) from error
 
     def create_private(self, collection: CuratedCollection) -> bool:
-        if collection.visibility != "private" or collection.built_in or collection.source_kind != "import":
+        if (
+            collection.visibility != "private"
+            or collection.built_in
+            or collection.source_kind != "import"
+        ):
             raise ValueError("Imported collections must be private, non-built-in collections")
         with self._thread_lock:
             try:
@@ -79,7 +92,9 @@ class SqliteCollectionRepository:
             except CollectionRepositoryError:
                 raise
             except sqlite3.Error as error:
-                raise CollectionRepositoryError(f"Cannot create collection in: {self.path}") from error
+                raise CollectionRepositoryError(
+                    f"Cannot create collection in: {self.path}"
+                ) from error
 
     def list_accessible(self, user_id: str) -> list[CuratedCollection]:
         with self._thread_lock:
@@ -99,7 +114,9 @@ class SqliteCollectionRepository:
                     ).fetchall()
                     return [self._collection(connection, row) for row in rows]
             except sqlite3.Error as error:
-                raise CollectionRepositoryError(f"Cannot list collections from: {self.path}") from error
+                raise CollectionRepositoryError(
+                    f"Cannot list collections from: {self.path}"
+                ) from error
 
     def get_accessible(self, user_id: str, collection_id: str) -> CuratedCollection | None:
         with self._thread_lock:
@@ -118,7 +135,9 @@ class SqliteCollectionRepository:
                     ).fetchone()
                     return self._collection(connection, row) if row else None
             except sqlite3.Error as error:
-                raise CollectionRepositoryError(f"Cannot read collection from: {self.path}") from error
+                raise CollectionRepositoryError(
+                    f"Cannot read collection from: {self.path}"
+                ) from error
 
     def set_following(self, user_id: str, collection_id: str, following: bool) -> bool:
         with self._thread_lock:
@@ -135,19 +154,23 @@ class SqliteCollectionRepository:
                         return False
                     if following:
                         cursor = connection.execute(
-                            """INSERT OR IGNORE INTO collection_follows(collection_id, user_id, followed_at)
+                            """INSERT OR IGNORE INTO collection_follows
+                            (collection_id, user_id, followed_at)
                             VALUES (?, ?, CURRENT_TIMESTAMP)""",
                             (collection_id, user_id),
                         )
                     else:
                         cursor = connection.execute(
-                            "DELETE FROM collection_follows WHERE collection_id = ? AND user_id = ?",
+                            "DELETE FROM collection_follows "
+                            "WHERE collection_id = ? AND user_id = ?",
                             (collection_id, user_id),
                         )
                     connection.commit()
                     return cursor.rowcount > 0
             except sqlite3.Error as error:
-                raise CollectionRepositoryError(f"Cannot update collection follow in: {self.path}") from error
+                raise CollectionRepositoryError(
+                    f"Cannot update collection follow in: {self.path}"
+                ) from error
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=self.busy_timeout, isolation_level=None)
