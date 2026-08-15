@@ -13,8 +13,12 @@ from movie_inbox.application.identity_repository import (
     IdentityOwnerProtected,
     IdentityRepository,
 )
-from movie_inbox.domain.identity import ArchivedMember, PersonalCatalog, UserAccount, normalize_username
-
+from movie_inbox.domain.identity import (
+    ArchivedMember,
+    PersonalCatalog,
+    UserAccount,
+    normalize_username,
+)
 
 CATALOG_NAME_MAX_LENGTH = 120
 
@@ -156,7 +160,11 @@ class MemberService:
     ) -> ProvisionedMember:
         _require_owner(actor)
         archive = next(
-            (row for row in self.repository.list_archived_members() if row.id == str(archive_id or "")),
+            (
+                row
+                for row in self.repository.list_archived_members()
+                if row.id == str(archive_id or "")
+            ),
             None,
         )
         if archive is None:

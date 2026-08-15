@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -17,7 +16,7 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("USER movie-inbox:movie-inbox", dockerfile)
         self.assertIn('install -d "/media/library/disco${slot}"', dockerfile)
         self.assertIn("HEALTHCHECK ", dockerfile)
-        self.assertIn("ENTRYPOINT [\"movie-inbox\"]", dockerfile)
+        self.assertIn('ENTRYPOINT ["movie-inbox"]', dockerfile)
 
     def test_compose_keeps_state_persistent_and_media_read_only(self) -> None:
         compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
@@ -59,7 +58,9 @@ class DockerPackagingTests(unittest.TestCase):
 
     def test_scheduled_backup_stops_restarts_and_health_checks_the_service(self) -> None:
         script = (ROOT / "scripts" / "docker-backup.sh").read_text(encoding="utf-8")
-        service = (ROOT / "deploy" / "movie-inbox-backup.service.example").read_text(encoding="utf-8")
+        service = (ROOT / "deploy" / "movie-inbox-backup.service.example").read_text(
+            encoding="utf-8"
+        )
         timer = (ROOT / "deploy" / "movie-inbox-backup.timer.example").read_text(encoding="utf-8")
 
         self.assertIn("flock -n", script)

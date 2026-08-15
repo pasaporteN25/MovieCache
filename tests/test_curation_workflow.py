@@ -39,31 +39,37 @@ class CurationWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             catalog_path = Path(temporary) / "catalog.json"
             repository = JsonCatalogRepository(catalog_path, normalize_item)
-            repository.write([
-                normalize_item({
-                    "id": "heat-local",
-                    "title": "Heat",
-                    "year": "1995",
-                    "source": "local_files",
-                    "status": "watched",
-                    "watched_at": "2026-07-01",
-                    "rating": 8,
-                    "review": "Mi registro",
-                    "en_catalogo": True,
-                    "local_files": [{"path": "D:/Heat.mkv", "name": "Heat.mkv"}],
-                }),
-                normalize_item({
-                    "id": "heat-imdb",
-                    "title": "Heat",
-                    "spanish_title": "Fuego contra fuego",
-                    "year": "1995",
-                    "source": "imdb",
-                    "url": "https://www.imdb.com/title/tt0113277/",
-                    "imdb_url": "https://www.imdb.com/title/tt0113277/",
-                    "status": "to_watch",
-                    "local_files": [{"path": "E:/Heat-alt.mkv", "name": "Heat-alt.mkv"}],
-                }),
-            ])
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat-local",
+                            "title": "Heat",
+                            "year": "1995",
+                            "source": "local_files",
+                            "status": "watched",
+                            "watched_at": "2026-07-01",
+                            "rating": 8,
+                            "review": "Mi registro",
+                            "en_catalogo": True,
+                            "local_files": [{"path": "D:/Heat.mkv", "name": "Heat.mkv"}],
+                        }
+                    ),
+                    normalize_item(
+                        {
+                            "id": "heat-imdb",
+                            "title": "Heat",
+                            "spanish_title": "Fuego contra fuego",
+                            "year": "1995",
+                            "source": "imdb",
+                            "url": "https://www.imdb.com/title/tt0113277/",
+                            "imdb_url": "https://www.imdb.com/title/tt0113277/",
+                            "status": "to_watch",
+                            "local_files": [{"path": "E:/Heat-alt.mkv", "name": "Heat-alt.mkv"}],
+                        }
+                    ),
+                ]
+            )
             workflow, history_path = self.workflow(catalog_path)
             left = CatalogPointer(catalog_path, "heat-local")
             right = CatalogPointer(catalog_path, "heat-imdb")
@@ -120,7 +126,9 @@ class CurationWorkflowTests(unittest.TestCase):
                 history_mode="persistent",
                 session_id="session-a",
             )
-            repository.update_item("heat", lambda item: item.__setitem__("review", "Cambio posterior"))
+            repository.update_item(
+                "heat", lambda item: item.__setitem__("review", "Cambio posterior")
+            )
 
             with self.assertRaises(CurationConflict):
                 workflow.undo(
@@ -156,15 +164,19 @@ class CurationWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             catalog_path = Path(temporary) / "catalog.json"
             repository = JsonCatalogRepository(catalog_path, normalize_item)
-            repository.write([
-                normalize_item({
-                    "id": "heat",
-                    "title": "Heat",
-                    "status": "watched",
-                    "watched_at": "2026-07-01",
-                    "rating": 9,
-                })
-            ])
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat",
+                            "title": "Heat",
+                            "status": "watched",
+                            "watched_at": "2026-07-01",
+                            "rating": 9,
+                        }
+                    )
+                ]
+            )
             workflow, _ = self.workflow(catalog_path)
             review = workflow.compare(
                 CatalogPointer(catalog_path, "heat"),
@@ -186,16 +198,20 @@ class CurationWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             catalog_path = Path(temporary) / "catalog.json"
             repository = JsonCatalogRepository(catalog_path, normalize_item)
-            repository.write([
-                normalize_item({
-                    "id": "heat-local",
-                    "title": "Heat",
-                    "status": "watched",
-                    "rating": 9,
-                    "review": "Una favorita",
-                    "en_catalogo": True,
-                })
-            ])
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat-local",
+                            "title": "Heat",
+                            "status": "watched",
+                            "rating": 9,
+                            "review": "Una favorita",
+                            "en_catalogo": True,
+                        }
+                    )
+                ]
+            )
             workflow, _ = self.workflow(catalog_path)
             pointer = CatalogPointer(catalog_path, "heat-local")
             incoming = {

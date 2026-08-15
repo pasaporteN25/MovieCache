@@ -9,10 +9,9 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable, Collection
+from urllib.error import HTTPError
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
-from urllib.error import HTTPError
-
 
 MAX_REDIRECTS = 3
 Resolver = Callable[..., list[tuple[object, ...]]]
@@ -144,7 +143,9 @@ def validate_public_http_url(
         except ValueError as error:
             raise UnsafeRemoteUrl("Remote hostname resolved to an invalid address") from error
         if not ip.is_global:
-            raise UnsafeRemoteUrl("Private, loopback, link-local and reserved destinations are blocked")
+            raise UnsafeRemoteUrl(
+                "Private, loopback, link-local and reserved destinations are blocked"
+            )
     return validated_url
 
 
@@ -206,5 +207,7 @@ def open_public_url(
             error.close()
             if not location or redirect_count >= MAX_REDIRECTS:
                 raise UnsafeRemoteUrl("Remote image redirected too many times") from error
-            current_url = validate_public_http_url(urljoin(current_url, location), resolver, allowed_hosts)
+            current_url = validate_public_http_url(
+                urljoin(current_url, location), resolver, allowed_hosts
+            )
     raise UnsafeRemoteUrl("Remote image redirect could not be resolved")

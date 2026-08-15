@@ -14,7 +14,6 @@ from movie_inbox.application.curation_history import (
     CurationHistoryError,
 )
 
-
 HISTORY_DOCUMENT_VERSION = 1
 
 

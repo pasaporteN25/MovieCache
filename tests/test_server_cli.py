@@ -7,7 +7,6 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.web import server
@@ -24,18 +23,20 @@ class ServerCliTests(unittest.TestCase):
             JsonCatalogRepository(catalog, normalize_item).write([])
 
             with patch("movie_inbox.web.server.uvicorn.run") as run, redirect_stdout(StringIO()):
-                result = server.main([
-                    str(catalog),
-                    "--owner-username",
-                    "lucas",
-                    "--owner-password-file",
-                    str(password_file),
-                    "--library-root",
-                    str(media),
-                    "--image-cache-warm-interval-seconds",
-                    "4",
-                    "--no-open",
-                ])
+                result = server.main(
+                    [
+                        str(catalog),
+                        "--owner-username",
+                        "lucas",
+                        "--owner-password-file",
+                        str(password_file),
+                        "--library-root",
+                        str(media),
+                        "--image-cache-warm-interval-seconds",
+                        "4",
+                        "--no-open",
+                    ]
+                )
 
             self.assertEqual(result, 0)
             app = run.call_args.args[0]
@@ -61,12 +62,14 @@ class ServerCliTests(unittest.TestCase):
 
     def test_image_cache_warm_interval_is_bounded(self) -> None:
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:
-            server.main([
-                "catalog.json",
-                "--image-cache-warm-interval-seconds",
-                "0.1",
-                "--no-open",
-            ])
+            server.main(
+                [
+                    "catalog.json",
+                    "--image-cache-warm-interval-seconds",
+                    "0.1",
+                    "--no-open",
+                ]
+            )
         self.assertEqual(raised.exception.code, 2)
 
 

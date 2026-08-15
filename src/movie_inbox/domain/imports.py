@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
-
+from typing import Any
 
 IMPORT_FORMATS = {"txt", "csv", "json"}
 IMPORT_DRAFT_STATUSES = {"ready", "applying", "applied", "failed"}

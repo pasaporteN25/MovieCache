@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity, PersonalCatalog, UserAccount
+from movie_inbox.domain.identity import (
+    ArchivedMember,
+    AuthenticatedIdentity,
+    PersonalCatalog,
+    UserAccount,
+)
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
 
@@ -99,7 +104,9 @@ class IdentityRepository(Protocol):
 
     def privacy_for(self, user_id: str) -> PrivacyPreferences: ...
 
-    def update_privacy(self, user_id: str, preferences: PrivacyPreferences) -> PrivacyPreferences: ...
+    def update_privacy(
+        self, user_id: str, preferences: PrivacyPreferences
+    ) -> PrivacyPreferences: ...
 
     def item_privacy_overrides(
         self,
@@ -133,4 +140,6 @@ class IdentityRepository(Protocol):
 
     def owner(self) -> UserAccount | None: ...
 
-    def validate_owner_catalog(self, source_paths: list[str], write_path: str) -> PersonalCatalog: ...
+    def validate_owner_catalog(
+        self, source_paths: list[str], write_path: str
+    ) -> PersonalCatalog: ...

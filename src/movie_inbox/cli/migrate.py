@@ -12,9 +12,18 @@ from movie_inbox.infrastructure.schema import SCHEMA_VERSION
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Migrate a movie catalog between supported storage formats.")
+    parser = argparse.ArgumentParser(
+        description="Migrate a movie catalog between supported storage formats."
+    )
     parser.add_argument("catalog", type=Path, help="Input JSON or SQLite catalog.")
-    parser.add_argument("--json", "--output", dest="output", type=Path, required=True, help="Output JSON or SQLite path.")
+    parser.add_argument(
+        "--json",
+        "--output",
+        dest="output",
+        type=Path,
+        required=True,
+        help="Output JSON or SQLite path.",
+    )
     args = parser.parse_args(argv)
 
     source = open_catalog_repository(args.catalog, normalize_item)

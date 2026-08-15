@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import quote
 
-from movie_inbox.domain.collections import CollectionItem, CuratedCollection, normalize_collection_item
-
+from movie_inbox.domain.collections import (
+    CollectionItem,
+    CuratedCollection,
+    normalize_collection_item,
+)
 
 AKIRA_KUROSAWA_SEED_KEY = "starter-akira-kurosawa-v1"
 
@@ -14,7 +17,12 @@ _AKIRA_KUROSAWA_FILMS = (
     ("Sanshiro Sugata", "Sugata Sanshiro", "1943", "Sanshiro Sugata"),
     ("The Most Beautiful", "Ichiban utsukushiku", "1944", "The Most Beautiful"),
     ("Sanshiro Sugata Part II", "Zoku Sugata Sanshiro", "1945", "Sanshiro Sugata Part II"),
-    ("The Men Who Tread on the Tiger's Tail", "Tora no o wo fumu otokotachi", "1945", "The Men Who Tread on the Tiger's Tail"),
+    (
+        "The Men Who Tread on the Tiger's Tail",
+        "Tora no o wo fumu otokotachi",
+        "1945",
+        "The Men Who Tread on the Tiger's Tail",
+    ),
     ("Those Who Make Tomorrow", "Asu o tsukuru hitobito", "1946", "Those Who Make Tomorrow"),
     ("No Regrets for Our Youth", "Waga seishun ni kuinashi", "1946", "No Regrets for Our Youth"),
     ("One Wonderful Sunday", "Subarashiki nichiyobi", "1947", "One Wonderful Sunday"),
@@ -46,10 +54,12 @@ _AKIRA_KUROSAWA_FILMS = (
 
 
 def akira_kurosawa_collection(owner_user_id: str) -> CuratedCollection:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     entries = []
     for position, (title, original_title, year, page) in enumerate(_AKIRA_KUROSAWA_FILMS):
-        wikipedia_url = "https://en.wikipedia.org/wiki/" + quote(page.replace(" ", "_"), safe="()_-")
+        wikipedia_url = "https://en.wikipedia.org/wiki/" + quote(
+            page.replace(" ", "_"), safe="()_-"
+        )
         item = normalize_collection_item(
             {
                 "url": wikipedia_url,

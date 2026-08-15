@@ -85,7 +85,9 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(title_match_key("1917 2019"), "1917")
         self.assertEqual(title_match_key("Heat 1995"), "heat")
         self.assertTrue(
-            work_identity_key({"title": "1917", "year": "2019", "kind": "pelicula"}).startswith("work:")
+            work_identity_key({"title": "1917", "year": "2019", "kind": "pelicula"}).startswith(
+                "work:"
+            )
         )
 
 

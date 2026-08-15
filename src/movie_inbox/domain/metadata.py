@@ -9,7 +9,6 @@ from typing import Any
 
 from movie_inbox.domain.normalization import normalize_bool
 
-
 METADATA_FIELDS = (
     "title",
     "original_title",
@@ -33,7 +32,9 @@ METADATA_FIELDS = (
 )
 
 
-def normalize_local_files(value: Any, legacy_name: str = "", legacy_path: str = "") -> list[dict[str, Any]]:
+def normalize_local_files(
+    value: Any, legacy_name: str = "", legacy_path: str = ""
+) -> list[dict[str, Any]]:
     if isinstance(value, str) and value.strip():
         try:
             value = json.loads(value)
@@ -50,7 +51,9 @@ def normalize_local_files(value: Any, legacy_name: str = "", legacy_path: str = 
         if not isinstance(row, Mapping):
             continue
         path = str(row.get("path") or row.get("local_path") or "").strip()
-        name = str(row.get("name") or row.get("local_name") or (Path(path).name if path else "")).strip()
+        name = str(
+            row.get("name") or row.get("local_name") or (Path(path).name if path else "")
+        ).strip()
         library_id = str(row.get("library_id") or "").strip()
         relative_path = str(row.get("relative_path") or path).strip().replace("\\", "/")
         if not path and not name:
@@ -84,7 +87,9 @@ def normalize_local_files(value: Any, legacy_name: str = "", legacy_path: str = 
         )
     else:
         legacy_key = legacy_name.casefold()
-        legacy_exists = any(str(row.get("name") or "").casefold() == legacy_key for row in normalized)
+        legacy_exists = any(
+            str(row.get("name") or "").casefold() == legacy_key for row in normalized
+        )
     if legacy_key and not legacy_exists:
         normalized.append(
             {

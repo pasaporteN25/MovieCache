@@ -2,5 +2,4 @@
 
 from movie_inbox.cli.main import main
 
-
 raise SystemExit(main())

@@ -26,7 +26,6 @@ from movie_inbox.domain.merge_review import (
     build_merge_review,
 )
 
-
 RepositoryFactory = Callable[[Path], CatalogRepository]
 
 
@@ -159,11 +158,7 @@ class CurationWorkflowService:
         if loser_state is not None:
             after.append(_state_with_item(loser_state, None))
 
-        changed_fields = [
-            field["key"]
-            for field in review["fields"]
-            if field["different"]
-        ]
+        changed_fields = [field["key"] for field in review["fields"] if field["different"]]
         operation = self._commit_operation(
             action="merge",
             label=f"Combinacion: {_state_title(left_state)} + {_item_title(right_item)}",
@@ -414,19 +409,10 @@ class CurationWorkflowService:
                     raise CurationConflict("catalog_changed_since_operation")
 
             affected_ids = {
-                str(state.get("item_id") or "")
-                for state in [*expected_states, *target_states]
+                str(state.get("item_id") or "") for state in [*expected_states, *target_states]
             }
-            items[:] = [
-                item
-                for item in items
-                if str(item.get("id") or "") not in affected_ids
-            ]
-            inserts = [
-                state
-                for state in target_states
-                if isinstance(state.get("item"), Mapping)
-            ]
+            items[:] = [item for item in items if str(item.get("id") or "") not in affected_ids]
+            inserts = [state for state in target_states if isinstance(state.get("item"), Mapping)]
             for state in sorted(inserts, key=lambda row: int(row.get("position") or 0)):
                 position = max(0, min(int(state.get("position") or 0), len(items)))
                 items.insert(position, normalize_item(state["item"]))

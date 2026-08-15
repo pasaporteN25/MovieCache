@@ -6,21 +6,45 @@ import hashlib
 import os
 import re
 import stat as stat_module
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from movie_inbox.domain.titles import detect_media_part, strip_disc_part_marker
 
-
 DEFAULT_EXTENSIONS = {
-    ".3g2", ".3gp", ".asf", ".avi", ".divx", ".flv", ".m2ts", ".m4v",
-    ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".mts", ".ogm", ".ogv",
-    ".rmvb", ".ts", ".vob", ".webm", ".wmv",
+    ".3g2",
+    ".3gp",
+    ".asf",
+    ".avi",
+    ".divx",
+    ".flv",
+    ".m2ts",
+    ".m4v",
+    ".mkv",
+    ".mov",
+    ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".mts",
+    ".ogm",
+    ".ogv",
+    ".rmvb",
+    ".ts",
+    ".vob",
+    ".webm",
+    ".wmv",
 }
 DEFAULT_EXCLUDED_DIRS = {
-    "$recycle.bin", "system volume information", ".catalog-cache", ".catalog-state",
-    "extra", "extras", "sample", "samples",
+    "$recycle.bin",
+    "system volume information",
+    ".catalog-cache",
+    ".catalog-state",
+    "extra",
+    "extras",
+    "sample",
+    "samples",
 }
 SAMPLE_BYTES = 128 * 1024
 
@@ -76,7 +100,11 @@ def scan_media_files(
                     and int(old.get("modified_ns") or -1) == stat.st_mtime_ns
                     and bool(old.get("fingerprint"))
                 )
-                fingerprint = str(old.get("fingerprint")) if unchanged else sampled_fingerprint(path, stat.st_size)
+                fingerprint = (
+                    str(old.get("fingerprint"))
+                    if unchanged
+                    else sampled_fingerprint(path, stat.st_size)
+                )
                 title, year, kind = parse_release_name(name)
                 rows.append(
                     {
@@ -84,7 +112,7 @@ def scan_media_files(
                         "name": name,
                         "size_bytes": stat.st_size,
                         "modified_ns": stat.st_mtime_ns,
-                        "modified_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+                        "modified_at": datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(),
                         "fingerprint": fingerprint,
                         "last_seen_at": int(scanned_at),
                         "title": title,
@@ -131,7 +159,7 @@ def parse_release_name(name: str) -> tuple[str, str, str]:
     if year_matches and value != year_matches[-1].group(1):
         match = year_matches[-1]
         year = match.group(1)
-        value = f"{value[:match.start()]} {value[match.end():]}".strip()
+        value = f"{value[: match.start()]} {value[match.end() :]}".strip()
     title = re.sub(r"\s+", " ", value).strip() or Path(name).stem
     return title, year, kind
 

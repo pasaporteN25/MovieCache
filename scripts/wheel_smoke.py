@@ -29,7 +29,9 @@ def main() -> int:
     assert version("movie-inbox") == __version__
     assert "Movie Inbox wheel smoke" in render_html("Movie Inbox wheel smoke", "token")
     assert "Movie Inbox wheel smoke" in render_login_html("Movie Inbox wheel smoke", "token")
-    assert "Movie Inbox wheel smoke" in render_password_change_html("Movie Inbox wheel smoke", "token")
+    assert "Movie Inbox wheel smoke" in render_password_change_html(
+        "Movie Inbox wheel smoke", "token"
+    )
     assert static_asset("style.css") is not None
     assert static_asset("app.js") is not None
     assert static_asset("login.js") is not None

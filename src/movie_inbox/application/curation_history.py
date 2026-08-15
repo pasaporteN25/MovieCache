@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-
 HISTORY_MODES = {"persistent", "session"}
 HISTORY_LIMIT = 50
 

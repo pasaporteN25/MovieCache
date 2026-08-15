@@ -16,7 +16,9 @@ from pathlib import Path
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build a browsable HTML view from catalog.json.")
     parser.add_argument("catalog", type=Path, help="Merged catalog JSON.")
-    parser.add_argument("--html", type=Path, default=Path("catalog-view.html"), help="Output HTML path.")
+    parser.add_argument(
+        "--html", type=Path, default=Path("catalog-view.html"), help="Output HTML path."
+    )
     args = parser.parse_args()
 
     items = read_catalog(args.catalog)

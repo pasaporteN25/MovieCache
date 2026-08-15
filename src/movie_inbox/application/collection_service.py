@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Mapping
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import Any
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
@@ -27,7 +28,9 @@ class CollectionService:
         self.repository = repository
 
     def list_collections(self, user_id: str) -> list[dict[str, Any]]:
-        return [self._summary(collection) for collection in self.repository.list_accessible(user_id)]
+        return [
+            self._summary(collection) for collection in self.repository.list_accessible(user_id)
+        ]
 
     def followed_collections(self, user_id: str) -> list[CuratedCollection]:
         return [
@@ -73,9 +76,7 @@ class CollectionService:
         collection = self._require_collection(user_id, collection_id)
         requested = list(
             dict.fromkeys(
-                str(value or "").strip()
-                for value in item_ids
-                if str(value or "").strip()
+                str(value or "").strip() for value in item_ids if str(value or "").strip()
             )
         )
         if not requested:
@@ -97,9 +98,11 @@ class CollectionService:
             if membership["state"] == "present":
                 added, reason, extra = False, "duplicate", {}
             elif membership["state"] == "review":
-                added, reason, extra = False, "possible_duplicate", {
-                    "candidates": possible_duplicate_candidates(known_items, item)[:5]
-                }
+                added, reason, extra = (
+                    False,
+                    "possible_duplicate",
+                    {"candidates": possible_duplicate_candidates(known_items, item)[:5]},
+                )
             else:
                 added, reason, extra = catalog.append_item(item, action="check")
             outcome = "added" if added else "present" if reason == "duplicate" else "review"
@@ -152,5 +155,7 @@ class CollectionService:
             "counts": {"total": len(collection.items)},
             "preview": [entry.item for entry in collection.items[:4]],
         }
+
+
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

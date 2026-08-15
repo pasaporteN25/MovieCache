@@ -4,7 +4,7 @@ import os
 import tarfile
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from movie_inbox.cli.backup import BACKUP_PREFIX, create_backup, sha256_file, verify_backup
@@ -26,7 +26,7 @@ class BackupTests(unittest.TestCase):
             result = create_backup(
                 source,
                 output,
-                now=datetime(2026, 8, 11, 3, 30, tzinfo=timezone.utc),
+                now=datetime(2026, 8, 11, 3, 30, tzinfo=UTC),
             )
 
             self.assertEqual(result.archive.name, f"{BACKUP_PREFIX}-20260811-033000Z.tar.gz")
@@ -56,14 +56,14 @@ class BackupTests(unittest.TestCase):
             old.write_bytes(b"old")
             old_checksum = old.with_name(f"{old.name}.sha256")
             old_checksum.write_text("old", encoding="ascii")
-            old_epoch = datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp()
+            old_epoch = datetime(2026, 1, 1, tzinfo=UTC).timestamp()
             os.utime(old, (old_epoch, old_epoch))
 
             result = create_backup(
                 source,
                 output,
                 retention_days=14,
-                now=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                now=datetime(2026, 8, 11, tzinfo=UTC),
             )
 
             self.assertEqual(result.removed, 1)

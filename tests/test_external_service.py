@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import unittest
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from movie_inbox.application.external_service import ExternalCatalogService
 from movie_inbox.external.registry import ExternalSourceService
@@ -11,7 +12,9 @@ class FakeGateway:
     def __init__(self) -> None:
         self.loader_calls = 0
 
-    def search(self, query: str, source: str = "all") -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def search(
+        self, query: str, source: str = "all"
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         return ([{"title": query, "source": source, "url": ""}], {"ok": True})
 
     def selected_metadata(
@@ -63,8 +66,18 @@ class RelevanceAdapter:
 
     def search(self, query: str) -> list[dict[str, Any]]:
         return [
-            {"title": "Evil Dead Rise", "year": "2023", "source": self.name, "url": "https://example.test/1"},
-            {"title": "Evil Dead Burn", "year": "2026", "source": self.name, "url": "https://example.test/2"},
+            {
+                "title": "Evil Dead Rise",
+                "year": "2023",
+                "source": self.name,
+                "url": "https://example.test/1",
+            },
+            {
+                "title": "Evil Dead Burn",
+                "year": "2026",
+                "source": self.name,
+                "url": "https://example.test/2",
+            },
         ]
 
 

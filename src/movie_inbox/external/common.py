@@ -5,8 +5,7 @@ from __future__ import annotations
 import html
 import json
 import re
-import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -20,7 +19,7 @@ def fetch_json(url: str, timeout: float = 8) -> dict[str, Any]:
 def fetch_json_safe(url: str, timeout: float = 5) -> dict[str, Any]:
     try:
         return fetch_json(url, timeout=timeout)
-    except (HTTPError, URLError, TimeoutError, socket.timeout, OSError, ValueError, json.JSONDecodeError):
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
         return {}
 
 
@@ -75,4 +74,4 @@ def clean_text(value: str) -> str:
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()

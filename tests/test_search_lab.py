@@ -25,7 +25,9 @@ class SearchLabTests(unittest.TestCase):
 
         self.assertEqual(report["algorithm"], "production-baseline")
         self.assertEqual(report["corpus"]["case_count"], 22)
-        self.assertEqual(set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"})
+        self.assertEqual(
+            set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"}
+        )
         self.assertGreater(report["metrics"]["forbidden_hits"], 0)
         self.assertEqual(report["metrics"]["auto_match_precision"], 1.0)
         self.assertFalse(report["gate"]["passed"])
@@ -62,8 +64,12 @@ class SearchLabTests(unittest.TestCase):
 
             self.assertEqual(status, 0)
             self.assertEqual(corpus_path.read_text(encoding="utf-8"), original)
-            self.assertEqual(json.loads(json_report.read_text(encoding="utf-8"))["report_type"], "search_corpus")
-            self.assertIn("Movie Inbox / lectura solamente", html_report.read_text(encoding="utf-8"))
+            self.assertEqual(
+                json.loads(json_report.read_text(encoding="utf-8"))["report_type"], "search_corpus"
+            )
+            self.assertIn(
+                "Movie Inbox / lectura solamente", html_report.read_text(encoding="utf-8")
+            )
             self.assertFalse((root / ".corpus.json.lock").exists())
 
     def test_report_target_cannot_overwrite_the_read_only_input(self) -> None:
@@ -100,7 +106,9 @@ class SearchLabTests(unittest.TestCase):
                 )
 
             self.assertEqual(status, 0)
-            self.assertEqual(json.loads(report_path.read_text(encoding="utf-8"))["results"][0]["id"], "heat")
+            self.assertEqual(
+                json.loads(report_path.read_text(encoding="utf-8"))["results"][0]["id"], "heat"
+            )
             self.assertFalse((root / ".catalog.json.lock").exists())
 
     def test_identity_and_scanner_inspection_expose_current_evidence(self) -> None:
@@ -121,7 +129,9 @@ class SearchLabTests(unittest.TestCase):
         with self.assertRaises(SearchCorpusError):
             validate_search_corpus({"schema_version": 99, "catalog_items": [], "cases": []})
 
-        report = inspect_catalog_search([{"id": "x", "title": "<script>alert(1)</script>"}], "script")
+        report = inspect_catalog_search(
+            [{"id": "x", "title": "<script>alert(1)</script>"}], "script"
+        )
         markup = render_html_report(report)
         self.assertNotIn("<script>alert(1)</script>", markup)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", markup)

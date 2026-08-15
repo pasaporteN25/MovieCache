@@ -8,7 +8,6 @@ from movie_inbox.application.repository import CatalogNormalizer, CatalogReposit
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.sqlite_repository import SqliteCatalogRepository
 
-
 JSON_SUFFIXES = {".json"}
 SQLITE_SUFFIXES = {".db", ".sqlite", ".sqlite3"}
 CATALOG_SUFFIXES = JSON_SUFFIXES | SQLITE_SUFFIXES
@@ -22,4 +21,6 @@ def open_catalog_repository(path: Path, normalizer: CatalogNormalizer) -> Catalo
     if suffix in SQLITE_SUFFIXES:
         return SqliteCatalogRepository(path, normalizer)
     supported = ", ".join(sorted(CATALOG_SUFFIXES))
-    raise ValueError(f"Unsupported catalog extension '{suffix or '<none>'}'. Use one of: {supported}")
+    raise ValueError(
+        f"Unsupported catalog extension '{suffix or '<none>'}'. Use one of: {supported}"
+    )

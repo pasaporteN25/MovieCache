@@ -15,8 +15,12 @@ from movie_inbox.infrastructure.repositories import CATALOG_SUFFIXES, open_catal
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Manage the local Movie Inbox owner account.")
     commands = parser.add_subparsers(dest="command", required=True)
-    bootstrap = commands.add_parser("bootstrap", help="Create the first owner and adopt a personal catalog.")
-    bootstrap.add_argument("--instance-db", type=Path, required=True, help="Private SQLite instance database.")
+    bootstrap = commands.add_parser(
+        "bootstrap", help="Create the first owner and adopt a personal catalog."
+    )
+    bootstrap.add_argument(
+        "--instance-db", type=Path, required=True, help="Private SQLite instance database."
+    )
     bootstrap.add_argument(
         "--catalog",
         type=Path,
@@ -24,10 +28,16 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help="Catalog source owned by this account. Can be repeated.",
     )
-    bootstrap.add_argument("--write-catalog", type=Path, help="Writable catalog source. Defaults to the first catalog.")
+    bootstrap.add_argument(
+        "--write-catalog", type=Path, help="Writable catalog source. Defaults to the first catalog."
+    )
     bootstrap.add_argument("--username", default="owner", help="Initial owner username.")
-    bootstrap.add_argument("--catalog-name", default="Mi catalogo", help="Personal catalog display name.")
-    bootstrap.add_argument("--password-file", type=Path, help="Read the initial password from this file.")
+    bootstrap.add_argument(
+        "--catalog-name", default="Mi catalogo", help="Personal catalog display name."
+    )
+    bootstrap.add_argument(
+        "--password-file", type=Path, help="Read the initial password from this file."
+    )
     args = parser.parse_args(argv)
     try:
         return bootstrap_owner(

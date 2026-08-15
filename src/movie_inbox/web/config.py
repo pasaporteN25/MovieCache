@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 DEFAULT_IMAGE_CACHE_TOTAL_BYTES = 512 * 1024 * 1024
 DEFAULT_IMAGE_CACHE_WARM_INTERVAL_SECONDS = 3.0
 DEFAULT_SESSION_TTL_SECONDS = 14 * 24 * 60 * 60

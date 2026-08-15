@@ -27,7 +27,13 @@ class ReleaseDateTests(unittest.TestCase):
     def test_merge_deduplicates_the_same_release_event(self) -> None:
         rows = merge_release_dates(
             [{"date": "2001-05-18", "release_type": "theatrical", "source": "wikidata"}],
-            [{"date": "2001-05-18", "release_type": "theatrical", "source_url": "https://example.test"}],
+            [
+                {
+                    "date": "2001-05-18",
+                    "release_type": "theatrical",
+                    "source_url": "https://example.test",
+                }
+            ],
         )
 
         self.assertEqual(len(rows), 1)
@@ -37,8 +43,18 @@ class ReleaseDateTests(unittest.TestCase):
     def test_wikidata_precision_is_not_invented(self) -> None:
         claims = {
             "P577": [
-                {"rank": "preferred", "mainsnak": {"datavalue": {"value": {"time": "+1988-04-16T00:00:00Z", "precision": 11}}}},
-                {"rank": "normal", "mainsnak": {"datavalue": {"value": {"time": "+1988-00-00T00:00:00Z", "precision": 9}}}},
+                {
+                    "rank": "preferred",
+                    "mainsnak": {
+                        "datavalue": {"value": {"time": "+1988-04-16T00:00:00Z", "precision": 11}}
+                    },
+                },
+                {
+                    "rank": "normal",
+                    "mainsnak": {
+                        "datavalue": {"value": {"time": "+1988-00-00T00:00:00Z", "precision": 9}}
+                    },
+                },
             ]
         }
 

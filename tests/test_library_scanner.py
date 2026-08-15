@@ -5,7 +5,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from movie_inbox.infrastructure.library_scanner import FilesystemScanError, parse_release_name, scan_media_files
+from movie_inbox.infrastructure.library_scanner import (
+    FilesystemScanError,
+    parse_release_name,
+    scan_media_files,
+)
 
 
 class LibraryScannerTests(unittest.TestCase):

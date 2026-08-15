@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
-
+from typing import Any
 
 VISIBILITY_MODES = {"inherit", "shared", "private"}
 OVERRIDABLE_FIELDS = {"rating", "review"}
@@ -115,11 +115,7 @@ def shared_catalog_item(
     preferences: PrivacyPreferences,
     override: ItemPrivacyOverride | None = None,
 ) -> dict[str, Any]:
-    public = {
-        key: value
-        for key, value in item.items()
-        if key in SHARED_CATALOG_FIELDS
-    }
+    public = {key: value for key, value in item.items() if key in SHARED_CATALOG_FIELDS}
     availability = item.get("_availability")
     if isinstance(availability, Mapping):
         public["_availability"] = {

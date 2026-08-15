@@ -230,5 +230,6 @@ class ImageCacheWarmerTests(unittest.TestCase):
             time.sleep(0.01)
         return bool(predicate())
 
+
 if __name__ == "__main__":
     unittest.main()

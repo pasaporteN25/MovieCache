@@ -16,7 +16,6 @@ from movie_inbox.domain.privacy import (
     shared_watch_history,
 )
 
-
 CatalogLoader = Callable[[list[str]], list[dict[str, Any]]]
 
 

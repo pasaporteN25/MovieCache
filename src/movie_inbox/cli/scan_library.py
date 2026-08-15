@@ -9,15 +9,13 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from movie_inbox.domain.catalog import normalize_item
-from movie_inbox.application.repository import CatalogRepositoryError
-from movie_inbox.infrastructure.repositories import open_catalog_repository
-from movie_inbox.infrastructure.schema import SCHEMA_VERSION, atomic_write_json
 from movie_inbox.application.catalog_service import CatalogService
+from movie_inbox.application.repository import CatalogRepositoryError
+from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.library_scanner import (
     DEFAULT_EXCLUDED_DIRS,
     DEFAULT_EXTENSIONS,
@@ -26,9 +24,12 @@ from movie_inbox.infrastructure.library_scanner import (
     normalize_extensions,
     scan_media_files,
 )
-
+from movie_inbox.infrastructure.repositories import open_catalog_repository
+from movie_inbox.infrastructure.schema import SCHEMA_VERSION, atomic_write_json
 
 STATE_SCHEMA_VERSION = 1
+
+
 class ScannerError(RuntimeError):
     pass
 
@@ -50,13 +51,21 @@ class ScannerConfig:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Incrementally scan a video library into a Movie Inbox catalog.")
+    parser = argparse.ArgumentParser(
+        description="Incrementally scan a video library into a Movie Inbox catalog."
+    )
     parser.add_argument("--config", type=Path, required=True, help="Scanner JSON configuration.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--apply", action="store_true", help="Update the catalog and scanner state.")
-    mode.add_argument("--dry-run", action="store_true", help="Show changes without writing them (default).")
-    parser.add_argument("--watch", action="store_true", help="Repeat the scan until interrupted. Requires --apply.")
-    parser.add_argument("--interval", type=float, default=300.0, help="Seconds between watch scans (minimum 5).")
+    mode.add_argument(
+        "--dry-run", action="store_true", help="Show changes without writing them (default)."
+    )
+    parser.add_argument(
+        "--watch", action="store_true", help="Repeat the scan until interrupted. Requires --apply."
+    )
+    parser.add_argument(
+        "--interval", type=float, default=300.0, help="Seconds between watch scans (minimum 5)."
+    )
     parser.add_argument("--report", type=Path, help="Optional JSON report path.")
     args = parser.parse_args(argv)
 
@@ -114,7 +123,9 @@ def load_config(path: Path) -> ScannerConfig:
         raise ScannerError("Config requires catalog, libraries[0].id and libraries[0].path")
 
     base = config_path.parent
-    extensions = normalize_extensions(library.get("extensions") or raw.get("extensions") or DEFAULT_EXTENSIONS)
+    extensions = normalize_extensions(
+        library.get("extensions") or raw.get("extensions") or DEFAULT_EXTENSIONS
+    )
     excluded = normalize_excluded_dirs(
         library.get("exclude_dirs") or raw.get("exclude_dirs") or DEFAULT_EXCLUDED_DIRS
     )
@@ -125,7 +136,9 @@ def load_config(path: Path) -> ScannerConfig:
         root=resolve_config_path(root_value, base),
         extensions=extensions,
         excluded_dirs=excluded,
-        max_missing_ratio=normalize_ratio(library.get("max_missing_ratio", raw.get("max_missing_ratio", 0.5))),
+        max_missing_ratio=normalize_ratio(
+            library.get("max_missing_ratio", raw.get("max_missing_ratio", 0.5))
+        ),
     )
 
 
@@ -147,7 +160,7 @@ def run_once(config: ScannerConfig, commit: bool) -> dict[str, Any]:
             f"Library is offline or missing: {config.root}. Catalog removals were not evaluated."
         )
 
-    scanned_at = datetime.now(timezone.utc).isoformat()
+    scanned_at = datetime.now(UTC).isoformat()
     previous_state = read_state(config.state_path, config)
     scanned_files, state_files, errors = scan_files(config, previous_state, scanned_at)
     guard_message = removal_guard(previous_state, state_files, config.max_missing_ratio)
@@ -217,7 +230,9 @@ def read_state(path: Path, config: ScannerConfig) -> dict[str, dict[str, Any]]:
         return {}
     if not isinstance(raw, dict):
         return {}
-    if str(raw.get("library_id") or "") != config.library_id or str(raw.get("root") or "") != str(config.root):
+    if str(raw.get("library_id") or "") != config.library_id or str(raw.get("root") or "") != str(
+        config.root
+    ):
         return {}
     files = raw.get("files")
     return files if isinstance(files, dict) else {}

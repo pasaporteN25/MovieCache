@@ -9,7 +9,6 @@ from movie_inbox.domain.catalog import merge_lists
 from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.external.common import fetch_json_safe
 
-
 WIKIDATA_LIST_FIELDS = {
     "genres": ("P136", 8),
     "directors": ("P57", 8),
@@ -21,7 +20,9 @@ WIKIDATA_LIST_FIELDS = {
 def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
     if not entity_id:
         return {}
-    raw = fetch_json_safe(f"https://www.wikidata.org/wiki/Special:EntityData/{quote(entity_id)}.json", timeout=5)
+    raw = fetch_json_safe(
+        f"https://www.wikidata.org/wiki/Special:EntityData/{quote(entity_id)}.json", timeout=5
+    )
     entities = raw.get("entities") if isinstance(raw.get("entities"), dict) else {}
     entity = entities.get(entity_id) if isinstance(entities, dict) else {}
     if not isinstance(entity, dict):
@@ -72,9 +73,15 @@ def wikidata_title_metadata(entity: dict[str, object]) -> dict[str, object]:
     original_title = wikidata_claim_monolingual_text(claims, "P1476")
     spanish_title = wikidata_label_value(labels, "es")
     english_title = wikidata_label_value(labels, "en")
-    alternative_titles = merge_lists(wikidata_all_label_values(labels), wikidata_all_alias_values(aliases))
-    primary_keys = {value.casefold() for value in [original_title, spanish_title, english_title] if value}
-    alternative_titles = [value for value in alternative_titles if value.casefold() not in primary_keys][:40]
+    alternative_titles = merge_lists(
+        wikidata_all_label_values(labels), wikidata_all_alias_values(aliases)
+    )
+    primary_keys = {
+        value.casefold() for value in [original_title, spanish_title, english_title] if value
+    }
+    alternative_titles = [
+        value for value in alternative_titles if value.casefold() not in primary_keys
+    ][:40]
     metadata: dict[str, object] = {}
     if original_title:
         metadata["original_title"] = original_title
@@ -170,7 +177,9 @@ def wikidata_claim_year(claims: dict[str, object], prop: str) -> str:
     return ""
 
 
-def wikidata_claim_release_dates(claims: dict[str, object], entity_id: str = "") -> list[dict[str, object]]:
+def wikidata_claim_release_dates(
+    claims: dict[str, object], entity_id: str = ""
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for position, statement in enumerate(_ordered_statements(claims, "P577")):
         value = _claim_value(statement)
@@ -221,7 +230,9 @@ def fetch_wikidata_labels(entity_ids: list[str]) -> dict[str, str]:
         for item_id, entity in entities.items():
             if not isinstance(entity, dict):
                 continue
-            label = wikidata_label(entity.get("labels") if isinstance(entity.get("labels"), dict) else {})
+            label = wikidata_label(
+                entity.get("labels") if isinstance(entity.get("labels"), dict) else {}
+            )
             if label:
                 labels[str(item_id)] = label
     return labels
@@ -238,14 +249,18 @@ def wikidata_label(labels: dict[str, object]) -> str:
 def fetch_wikidata_article_url(entity_id: str) -> str:
     if not entity_id:
         return ""
-    raw = fetch_json_safe(f"https://www.wikidata.org/wiki/Special:EntityData/{quote(entity_id)}.json", timeout=5)
+    raw = fetch_json_safe(
+        f"https://www.wikidata.org/wiki/Special:EntityData/{quote(entity_id)}.json", timeout=5
+    )
     entities = raw.get("entities") if isinstance(raw.get("entities"), dict) else {}
     entity = entities.get(entity_id) if isinstance(entities, dict) else {}
     if not isinstance(entity, dict):
         return ""
     claims = entity.get("claims") if isinstance(entity.get("claims"), dict) else {}
     if not wikidata_claims_include(claims, "P31", {"Q11424", "Q5398426", "Q24862", "Q506240"}):
-        description_rows = entity.get("descriptions") if isinstance(entity.get("descriptions"), dict) else {}
+        description_rows = (
+            entity.get("descriptions") if isinstance(entity.get("descriptions"), dict) else {}
+        )
         descriptions = " ".join(
             str(value.get("value") or "")
             for value in description_rows.values()
@@ -273,7 +288,13 @@ def wikidata_result_score(title: str, year: str, label: str, description: str) -
     title_key = _match_text(title)
     label_key = _match_text(label)
     description_key = _match_text(description)
-    score = 4 if title_key and title_key == label_key else 2 if title_key and (title_key in label_key or label_key in title_key) else 0
+    score = (
+        4
+        if title_key and title_key == label_key
+        else 2
+        if title_key and (title_key in label_key or label_key in title_key)
+        else 0
+    )
     if year and year in description:
         score += 1
     if any(marker in description_key for marker in ["film", "movie", "pelicula"]):

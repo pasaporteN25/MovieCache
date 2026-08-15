@@ -12,7 +12,6 @@ from pathlib import Path
 from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.security import open_public_url, validate_http_url
 
-
 IMAGE_EXTENSIONS = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -95,7 +94,9 @@ def image_is_cached(config: ViewerConfig, image_url: str) -> bool:
     validated = validate_http_url(image_url, config.image_allowed_hosts)
     cache_dir = Path(config.image_cache_dir)
     with _CACHE_LOCK:
-        return any(_cached_path(cache_dir, key) is not None for key in image_cache_url_keys(validated))
+        return any(
+            _cached_path(cache_dir, key) is not None for key in image_cache_url_keys(validated)
+        )
 
 
 def cached_image_keys(cache_dir: Path) -> set[str]:
@@ -201,18 +202,16 @@ def clear_image_cache(cache_dir: Path) -> ImageCacheInfo:
                 continue
             removed_files += 1
             removed_bytes += size
-        return ImageCacheInfo(cache_dir, 0, 0, removed_files=removed_files, removed_bytes=removed_bytes)
+        return ImageCacheInfo(
+            cache_dir, 0, 0, removed_files=removed_files, removed_bytes=removed_bytes
+        )
 
 
 def _cached_path(cache_dir: Path, key: str) -> Path | None:
     if not cache_dir.is_dir():
         return None
     return next(
-        (
-            path
-            for suffix in IMAGE_EXTENSIONS
-            if (path := cache_dir / f"{key}{suffix}").is_file()
-        ),
+        (path for suffix in IMAGE_EXTENSIONS if (path := cache_dir / f"{key}{suffix}").is_file()),
         None,
     )
 
@@ -257,8 +256,10 @@ def _matches_image_signature(body: bytes, content_type: str) -> bool:
     if content_type == "image/webp":
         return len(body) >= 12 and body.startswith(b"RIFF") and body[8:12] == b"WEBP"
     if content_type == "image/avif":
-        return len(body) >= 12 and body[4:8] == b"ftyp" and any(
-            brand in body[8:32] for brand in (b"avif", b"avis")
+        return (
+            len(body) >= 12
+            and body[4:8] == b"ftyp"
+            and any(brand in body[8:32] for brand in (b"avif", b"avis"))
         )
     return False
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 VALID_KINDS = ("pelicula", "serie", "anime", "documental")
 VALID_STATUSES = ("to_watch", "watched")
 
@@ -49,4 +48,3 @@ def normalize_rating(value: Any) -> int:
     except (TypeError, ValueError):
         return 0
     return max(0, min(10, rating))
-
