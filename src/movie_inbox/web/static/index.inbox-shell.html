@@ -1,0 +1,29 @@
+      <section id="inboxView" class="app-view curation-view" hidden>
+        <header class="curation-heading">
+          <div>
+            <span class="eyebrow">Mesa de ingresos</span>
+            <h2 id="inboxTitle" class="view-focus-target" tabindex="-1">Bandeja</h2>
+            <p>Revisá coincidencias y prepará ingresos antes de modificar tu catálogo.</p>
+          </div>
+          <div class="curation-heading-actions">
+            <label class="history-mode-control">
+              <input id="persistCurationHistory" type="checkbox" checked>
+              <span>Historial persistente</span>
+            </label>
+            <button id="clearCurationHistory" class="quiet-action" type="button">Limpiar historial</button>
+            <button id="refreshCuration" class="quiet-action" type="button">Actualizar bandeja</button>
+          </div>
+        </header>
+
+        <nav id="inboxModeTabs" class="inbox-mode-tabs" aria-label="Modos de la Bandeja">
+          <button id="inboxCurationMode" class="active" type="button" data-inbox-mode="curation" aria-pressed="true">
+            Curadur&iacute;a
+          </button>
+          <button id="inboxImportsMode" type="button" data-inbox-mode="imports" aria-pressed="false">
+            Importaciones <span id="importDraftCount">0</span>
+          </button>
+          <button id="inboxScannerMode" type="button" data-inbox-mode="scanner" aria-pressed="false" hidden>
+            Scanner <span id="scannerQueueCount">0</span>
+          </button>
+        </nav>
+

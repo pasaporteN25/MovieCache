@@ -1,0 +1,167 @@
+      <section id="collectionView" class="app-view collection-view" hidden>
+        <section class="search-console" aria-label="Buscar y filtrar la colección">
+          <div class="search-main">
+            <label class="search-field">
+              <span class="sr-only">Buscar películas</span>
+              <input id="query" type="search" placeholder="Buscar una película..." autocomplete="off">
+            </label>
+            <button id="searchButton" class="search-action" type="button">Buscar</button>
+            <button id="clearManualSearch" class="quiet-action compact-clear-action" type="button" aria-label="Limpiar búsqueda" hidden>
+              <span class="desktop-control-label">Limpiar</span>
+              <span class="mobile-control-label" aria-hidden="true">×</span>
+            </button>
+          </div>
+          <div class="collection-filter-toolbar" aria-label="Filtros rápidos de la colección">
+            <div class="quick-filter-strip">
+              <fieldset class="quick-filter-group">
+                <legend>Estado</legend>
+                <div id="statusQuickFilters" class="filter-segments"></div>
+              </fieldset>
+              <fieldset class="quick-filter-group">
+                <legend>Disponibilidad</legend>
+                <div id="availabilityQuickFilters" class="filter-segments"></div>
+              </fieldset>
+              <fieldset class="quick-filter-group kind-filter-group">
+                <legend>Tipo</legend>
+                <div id="kindQuickFilters" class="filter-segments"></div>
+              </fieldset>
+            </div>
+            <details id="advancedFiltersMenu" class="utility-menu advanced-filter-menu">
+              <summary>
+                Más filtros
+                <span id="advancedFilterCount" class="filter-count" hidden></span>
+              </summary>
+              <div class="utility-panel collection-filter-panel">
+                <section class="utility-section">
+                  <div class="utility-section-heading">
+                    <div>
+                      <span class="section-kicker">Afinar estantería</span>
+                      <h2>Filtros avanzados</h2>
+                    </div>
+                    <button id="clearFilters" class="text-action" type="button">Limpiar todo</button>
+                  </div>
+                  <div class="advanced-filter-grid">
+                    <label>
+                      <span>Década</span>
+                      <select id="decadeFilter" aria-label="Agregar una década">
+                        <option value="">Agregar década</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Género</span>
+                      <select id="genreFilter" aria-label="Agregar un género">
+                        <option value="">Agregar género</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Dirección</span>
+                      <select id="directorFilter" aria-label="Agregar una persona en dirección">
+                        <option value="">Agregar dirección</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Fuente</span>
+                      <select id="sourceFilter" aria-label="Agregar una fuente">
+                        <option value="">Agregar fuente</option>
+                      </select>
+                    </label>
+                  </div>
+                  <fieldset class="advanced-choice-group">
+                    <legend>Memoria personal</legend>
+                    <div class="filter-segments">
+                      <button type="button" data-click="toggle-collection-filter" data-filter="record" data-value="unrated" aria-pressed="false">Sin puntaje</button>
+                      <button type="button" data-click="toggle-collection-filter" data-filter="record" data-value="unreviewed" aria-pressed="false">Sin review</button>
+                    </div>
+                  </fieldset>
+                  <div class="year-filter-block">
+                    <span>Rango de estreno</span>
+                    <div class="year-filter-controls">
+                      <label>
+                        <span class="sr-only">Año desde</span>
+                        <input id="yearFromFilter" type="number" min="1800" max="2199" inputmode="numeric" placeholder="Desde">
+                      </label>
+                      <span aria-hidden="true">a</span>
+                      <label>
+                        <span class="sr-only">Año hasta</span>
+                        <input id="yearToFilter" type="number" min="1800" max="2199" inputmode="numeric" placeholder="Hasta">
+                      </label>
+                      <button id="applyYearRange" class="quiet-action" type="button">Aplicar</button>
+                    </div>
+                  </div>
+                  <div class="collection-sort-row">
+                    <label>
+                      <span>Orden</span>
+                      <select id="sort" aria-label="Ordenar colección">
+                        <option value="original">Orden original</option>
+                        <option value="title-asc">Título A-Z</option>
+                        <option value="year-desc">Año, más nuevas</option>
+                        <option value="year-asc">Año, más antiguas</option>
+                        <option value="rating-desc">Mejor puntuadas</option>
+                        <option value="added-desc">Agregadas recientemente</option>
+                      </select>
+                    </label>
+                    <div class="collection-order-actions">
+                      <button id="randomizeView" type="button">Mezclar vista</button>
+                      <button id="resetOrder" class="quiet-action" type="button">Restablecer orden</button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </details>
+          </div>
+          <div class="search-secondary">
+            <div class="search-options">
+              <label class="source-toggle search-source-toggle">
+                <input id="externalSource" type="checkbox">
+                <span class="desktop-control-label">Buscar también en fuentes externas</span>
+                <span class="mobile-control-label">Fuentes externas</span>
+              </label>
+            </div>
+            <div id="activeFilters" class="active-filters" aria-live="polite" hidden></div>
+          </div>
+          <div id="searchContext" class="search-context" aria-live="polite" hidden>
+            <span id="searchContextText"></span>
+            <div class="search-context-actions">
+              <button id="cancelSearch" class="quiet-action" type="button" hidden>Cancelar búsqueda</button>
+              <button id="reviewPrevious" class="quiet-action review-step" type="button" hidden>Anterior</button>
+              <button id="reviewNext" class="quiet-action review-step" type="button" hidden>Siguiente</button>
+              <button id="backToCollection" class="quiet-action" type="button" hidden>Terminar comparación</button>
+            </div>
+          </div>
+          <div class="search-sections">
+            <section class="search-section comparison-section" id="catalogMergeSection" aria-labelledby="catalogMergeTitle">
+              <div class="section-heading">
+                <div>
+                  <span id="catalogMergeKicker" class="section-kicker">Comparación</span>
+                  <strong id="catalogMergeTitle">Entrada de la colección</strong>
+                </div>
+                <div class="status-line" id="catalogMergeStatus"></div>
+              </div>
+              <div class="search-results search-shelf-results" id="catalogMergeResults"></div>
+            </section>
+            <section class="search-section external-results-section" id="externalSearchSection" aria-labelledby="externalSearchTitle">
+              <div class="section-heading">
+                <div>
+                  <span class="section-kicker">Búsqueda ampliada</span>
+                  <strong id="externalSearchTitle">Resultados externos</strong>
+                </div>
+                <div class="status-line" id="manualSearchStatus"></div>
+              </div>
+              <div class="search-source-groups" id="manualSearchResults"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="catalogSection" class="catalog-heading" aria-labelledby="catalogTitle">
+          <div>
+            <span class="eyebrow">Archivo nocturno</span>
+            <h2 id="catalogTitle" class="view-focus-target" tabindex="-1">La colección</h2>
+          </div>
+          <p id="catalogSummary">Disponibilidad, estado y puntuación visibles en cada caja.</p>
+        </section>
+
+        <section class="grid" id="grid"></section>
+        <button id="catalogLoadMore" class="catalog-more" type="button" hidden>Cargar más</button>
+        <p class="empty" id="empty">No hay obras que coincidan con la búsqueda y los filtros actuales.</p>
+      </section>
+

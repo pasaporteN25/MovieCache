@@ -1,0 +1,140 @@
+      <section id="adminView" class="app-view admin-view" hidden>
+        <header class="admin-heading">
+          <div>
+            <span class="eyebrow">Control room</span>
+            <h2 id="adminTitle" class="view-focus-target" tabindex="-1">Administrar Movie Inbox</h2>
+            <p>Estado del archivo, fuentes externas y herramientas de curación.</p>
+          </div>
+          <button id="refresh" class="search-action admin-refresh" type="button">Actualizar datos</button>
+        </header>
+
+        <nav class="admin-section-nav" aria-label="Secciones de administración">
+          <a href="#adminSummary">Resumen</a>
+          <a href="#adminLibraries">Bibliotecas</a>
+          <a href="#adminMembers">Miembros</a>
+          <a href="#adminDatabase">Base de datos</a>
+          <a href="#adminExternal">Fuentes externas</a>
+          <a href="#adminMatching">Matching y duplicados</a>
+        </nav>
+
+        <section id="adminSummary" class="admin-section" aria-labelledby="adminSummaryTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminSummaryTitle">Resumen</h3>
+              <p>Una lectura rápida del estado actual de la biblioteca.</p>
+            </div>
+          </div>
+          <div class="metric-grid admin-metric-grid">
+            <div class="metric"><span>Total</span><strong id="total">0</strong></div>
+            <div class="metric"><span>Disponibles</span><strong id="catalogCount">0</strong></div>
+            <div class="metric"><span>Vistas</span><strong id="watchedCount">0</strong></div>
+            <div class="metric"><span>Por ver</span><strong id="toWatchCount">0</strong></div>
+            <div class="metric"><span>Puntuadas</span><strong id="ratedCount">0</strong></div>
+            <div class="metric"><span>Con portada</span><strong id="withImage">0</strong></div>
+            <div class="metric"><span>Con link</span><strong id="wikiLinks">0</strong></div>
+            <div class="metric"><span>Sin link</span><strong id="withoutWiki">0</strong></div>
+            <div class="metric"><span>IMDb</span><strong id="imdbLinks">0</strong></div>
+            <div class="metric"><span>FilmAffinity</span><strong id="faLinks">0</strong></div>
+            <div class="metric"><span>Duplicadas</span><strong id="duplicateCount">0</strong></div>
+            <div class="metric"><span>Catálogos</span><strong id="sourceFiles">0</strong></div>
+          </div>
+        </section>
+
+        <section id="adminLibraries" class="admin-section" aria-labelledby="adminLibrariesTitle">
+          <div class="admin-section-heading library-section-heading">
+            <div>
+              <h3 id="adminLibrariesTitle">Bibliotecas</h3>
+              <p>Probá cada ruta, aplicá su inventario y recién entonces decidí si querés automatizarla.</p>
+            </div>
+            <button id="createLibraryButton" type="button">Agregar biblioteca</button>
+          </div>
+          <div id="libraryConfiguration" class="library-configuration" role="status"></div>
+          <p id="libraryFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+          <div id="libraryList" class="library-list">
+            <p class="member-list-empty">Abrí Administrar para comprobar las rutas configuradas.</p>
+          </div>
+        </section>
+
+        <section id="adminMembers" class="admin-section" aria-labelledby="adminMembersTitle">
+          <div class="admin-section-heading member-section-heading">
+            <div>
+              <h3 id="adminMembersTitle">Miembros</h3>
+              <p>Cuentas locales y cat&aacute;logos personales aislados.</p>
+            </div>
+            <button id="createMemberButton" type="button">Agregar miembro</button>
+          </div>
+          <div class="member-roster-summary">
+            <span id="memberCount">0 miembros</span>
+            <span>Sin registro p&uacute;blico</span>
+          </div>
+          <p id="memberFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+          <div id="memberList" class="member-list">
+            <p class="member-list-empty">Abr&iacute; Administrar para cargar las cuentas.</p>
+          </div>
+          <div id="archivedMemberSection" class="archived-member-section" hidden>
+            <div class="archived-member-heading">
+              <div>
+                <h4>Cat&aacute;logos preservados</h4>
+                <p>Cuentas archivadas que pueden volver a habilitarse sin perder sus obras.</p>
+              </div>
+              <span id="archivedMemberCount">0 archivos</span>
+            </div>
+            <div id="archivedMemberList" class="member-list archived-member-list"></div>
+          </div>
+        </section>
+
+        <section id="adminDatabase" class="admin-section" aria-labelledby="adminDatabaseTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminDatabaseTitle">Base de datos</h3>
+              <p>Origen editable y archivos que participan del catálogo actual.</p>
+            </div>
+          </div>
+          <div id="databaseCatalogPanel" class="db-panel admin-db-panel"></div>
+          <div id="imageCacheStatus" class="image-cache-status" role="status" aria-live="polite" aria-busy="true">
+            <div class="image-cache-status-copy">
+              <strong>Portadas en este cat&aacute;logo</strong>
+              <span>Consultando el cach&eacute; persistente&hellip;</span>
+            </div>
+          </div>
+          <div class="catalog-export-tool">
+            <div class="catalog-export-copy">
+              <strong>Copia portable del cat&aacute;logo</strong>
+              <span>JSON conserva la estructura para restaurar. CSV sirve para revisar los datos en una planilla.</span>
+            </div>
+            <div id="catalogExportActions" class="catalog-export-actions">
+              <button id="exportCatalogJson" type="button" data-catalog-export="json">Descargar JSON</button>
+              <button id="exportCatalogCsv" class="quiet-action" type="button" data-catalog-export="csv">Descargar CSV</button>
+            </div>
+          </div>
+          <p id="catalogExportFeedback" class="admin-inline-feedback catalog-export-feedback" role="status" aria-live="polite" hidden></p>
+        </section>
+
+        <section id="adminExternal" class="admin-section" aria-labelledby="adminExternalTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminExternalTitle">Fuentes externas</h3>
+              <p>Salud y actividad reciente de Wikipedia, IMDb y FilmAffinity.</p>
+            </div>
+          </div>
+          <div id="databaseExternalPanel" class="db-panel admin-db-panel"></div>
+        </section>
+
+        <section id="adminMatching" class="admin-section" aria-labelledby="adminMatchingTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminMatchingTitle">Matching y duplicados</h3>
+              <p>Revisión manual de entradas sin links y posibles obras repetidas.</p>
+            </div>
+          </div>
+          <div class="tool-grid admin-tool-grid">
+            <button id="showDuplicates" type="button">Abrir duplicados en Bandeja</button>
+            <button id="startWikiReview" type="button">Abrir entradas sin link</button>
+            <button id="previousWikiReview" class="quiet-action" type="button" hidden>Anterior</button>
+            <button id="nextWikiReview" class="quiet-action" type="button" hidden>Siguiente</button>
+          </div>
+          <div class="status-line" id="wikiReviewStatus"></div>
+        </section>
+      </section>
+    </main>
+
