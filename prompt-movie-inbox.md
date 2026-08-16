@@ -1,0 +1,388 @@
+# Prompt maestro — Movie Inbox
+
+> Pegar tal cual en Claude Code, en la raíz del repo.
+> Está pensado para varias sesiones: el agente hace una fase, para, y vos revisás.
+
+---
+
+Trabajás sobre **Movie Inbox**, un gestor self-hosted de catálogo audiovisual. Python +
+FastAPI + SQLite, frontend vanilla sin build step. Versión estable v0.2.1, con v0.3.0 en
+curso.
+
+Antes de escribir una sola línea, leé estos archivos completos: `PRODUCT.md`, `DESIGN.md`,
+`docs/roadmap.md`, `CHANGELOG.md` (sección `[Sin publicar]`), `tests/test_layering.py`,
+`pyproject.toml` y `.github/workflows/tests.yml`. No son documentación decorativa: son
+contratos vigentes y algunos están verificados por tests.
+
+## Invariantes que no se negocian
+
+Si una tarea parece exigir romper alguna de estas, **pará y preguntame** en vez de decidir
+por tu cuenta.
+
+1. **Layering.** `domain/` y `application/` no importan `infrastructure`, `external`, `web`
+   ni `cli`. `tests/test_layering.py` lo verifica por AST.
+2. **Terminología de PRODUCT.md.** `en_catalogo` (disponibilidad física) es independiente de
+   `to_watch` y `watched`. Archivo físico, identidad compartida y ficha personal son tres
+   cosas distintas y nunca se presentan como intercambiables.
+3. **Matching conservador.** Una coincidencia dudosa requiere revisión humana. Descripción,
+   review, reparto, género o tags nunca convierten una obra en candidata de identidad.
+   Cero falsos positivos conocidos en auto-match es el gate de salida de v0.3.0.
+4. **Privacidad.** Las vistas compartidas nunca exponen rutas, archivos locales, notas ni
+   estado operativo. El owner no tiene excepción.
+5. **Correcciones manuales y campos bloqueados** sobreviven a cualquier enriquecimiento
+   posterior.
+6. **JSON portable.** `catalog.schema.json` es un contrato versionado. SQLite es la fuente
+   de verdad; JSON sigue siendo formato de importación, exportación y backup.
+
+## Cómo quiero que trabajes
+
+- **Una fase por sesión.** Al terminar una fase, pará y hacé un resumen de qué cambió y qué
+  gate quedó verde. No arranques la siguiente sin que yo lo confirme.
+- **Plan primero.** En fases 3, 4 y 5, entrá en plan mode y mostrame el plan antes de tocar
+  archivos.
+- **Verde antes de avanzar.** `python -m unittest discover -s tests` tiene que pasar al final
+  de cada fase. Si una fase requiere romper un test temporalmente, decímelo explícitamente.
+- **Commits chicos y atómicos**, con mensaje que explique el *por qué*. No commitees sin que
+  yo lo pida.
+- **Actualizá `CHANGELOG.md`** (sección `[Sin publicar]`) con cada cambio de comportamiento
+  visible al usuario. Seguí el estilo que ya está: en español, orientado a lo que cambia para
+  la persona, no a la implementación.
+- Los archivos personales (`scripts/*.json`, `catalog*.json`, `.catalog-cache/`, `.movie-inbox/`)
+  son datos reales míos. No los leas para "entender el dominio" ni los uses como fixtures.
+
+---
+
+## Progreso (actualizado 2026-08-16)
+
+Fases 0, 1, 2, 3 y 4 cerradas. Sesión nueva a partir de acá — no hace falta releer
+el historial de conversación, esto + `CLAUDE.md` + `git log` alcanza.
+
+- **Fase 0** — `CLAUDE.md` existe (63 líneas).
+- **Fase 1** — ruff/mypy configurados, `lint` job en CI, reformateo aplicado.
+  Reporte de limpieza del working tree entregado; `scripts/cleanup-workspace.ps1`
+  propuesto y **sin ejecutar** (nada borrado todavía, es tu decisión).
+- **Fase 2** — Gate de calidad de búsqueda de v0.3.0 **cerrado**:
+  `movie-inbox search-lab run --enforce` pasa (Precision@5 0.91, MRR/Recall@5
+  1.0, 0 resultados prohibidos, 0 falsos positivos de auto-match). Job
+  `search-lab` agregado a CI como gate real. Quedan 3 ítems del roadmap de
+  v0.3.0 sin tocar porque no son de ranking: Curaduría todavía muestra
+  `manual: sí/no` crudo (es el P1-c de Fase 5), la cola del Scanner no está
+  organizada por causa/confianza (P1-d de Fase 5), y no existe comparación
+  baseline-vs-candidato en Search Lab (siguiente incremento, sin fecha).
+- **Fase 3** — `tests/test_frontend_quality.py` recortado a
+  `tests/test_design_tokens.py` (solo tokens CSS). Garantías reales migradas a
+  `tests/browser/test_ui_browser.py`, organizado en 3 clases por superficie.
+  `browser-smoke` mide ~13s local, muy por debajo del límite de 8 min.
+- **Fase 4** — `app.js`/`style.css`/`index.html`/`web/app.py` partidos, cero
+  cambios de comportamiento. `web/app.py` (2153 líneas) → `web/dependencies.py`
+  + `web/responses.py` + 8 routers en `web/routers/`, `app.py` bajó a 15.0 KB.
+  `index.html` → 11 fragments servidos por `assets.py::render_html()`.
+  `style.css` → 14 archivos en `static/css/`. `app.js` → 21 módulos ES nativos
+  en `static/js/core/` y `static/js/surfaces/` (sin bundler, `<script
+  type="module">`), el más grande `detail.js` a 37.9 KB. 256 tests + 6
+  Playwright + ruff + mypy + wheel-smoke + `scripts\check.ps1` en verde;
+  `docker-smoke` no se pudo correr local (sin Docker en este entorno) pero usa
+  el mismo empaquetado ya verificado por wheel-smoke. Todo commiteado en 8
+  commits atómicos sobre `master` (CLAUDE.md; groundwork de assets.py/
+  pyproject.toml; CSS; HTML; JS; routers; tests; este archivo +
+  `fase-4-tareas.md`), sin pushear.
+  Decisiones que se apartaron del plan original (detalladas en el resumen de
+  la sesión): `tests/test_package_layout.py` y dos tests de
+  `tests/test_view_http.py` perdieron asserts de copy/nombres de función
+  contra archivos que ya no existen como blob único; se agregaron 3 hooks de
+  test (`window.openDetail/closeDetail/openSearchDescription`) en
+  `bootstrap.js` porque Playwright los llama directo y los módulos ES no
+  filtran al scope global como el `app.js` viejo.
+  Encontrados y corregidos 3 bugs reales introducidos por la extracción
+  automática (no preexistentes): una copia duplicada de `apiFetch` en
+  `router.js`, y dos imports faltantes (`localFiles`,
+  `COLLECTION_MULTI_FILTER_KEYS`, `curationCounts`/`privacyPreferences`) —
+  ninguno se hubiera visto sin correr la app en un browser real.
+
+**Pendiente de decisión, no resuelto todavía**: hablamos de si mobile (v0.5.0)
+merece adelantarse — el roadmap lo pone detrás de v0.4.0 (Fases 4/5) y el
+propio `docs/roadmap.md` dice que v0.5.0 "debe confirmarse antes de congelar
+el alcance de v0.4.0". La Fase 4 (partir `app.js`/`web/app.py`) vale la pena
+en cualquier escenario porque ahí se versiona naturalmente una API real. La
+Fase 5 (pulido visual) no acerca nada a mobile — si mobile pesa más que pulir
+la UI web actual, considerar adelantar "API versionada + sesiones aptas para
+dispositivos" (precondición explícita de v0.5.0) después de la Fase 4 en vez
+de esperar a que termine la Fase 5. Sin decidir — preguntar antes de asumir.
+
+---
+
+# Fase 0 — CLAUDE.md
+
+El repo no tiene `CLAUDE.md` ni `AGENTS.md`. Eso significa que cada sesión de agente
+re-descubre las reglas desde cero y algunas se pierden.
+
+Escribí un `CLAUDE.md` en la raíz que contenga, en forma compacta:
+
+- Cómo correr tests, linters y el servidor local (sacalo del README y del workflow, no lo
+  inventes).
+- Las 6 invariantes de arriba, con puntero al archivo que las define.
+- El mapa de capas: qué va en `domain/`, `application/`, `infrastructure/`, `external/`,
+  `web/`, `cli/`, y qué NO va en cada una.
+- La regla de que `scripts/` son lanzadores finos de compatibilidad (<25 líneas, verificado
+  por `test_layering.py`) y que la lógica nueva va al paquete.
+- Qué archivos son datos personales y no se tocan.
+
+**Que sea corto.** Apuntá a menos de 100 líneas. Un CLAUDE.md largo se ignora. Todo lo que
+ya está bien explicado en PRODUCT.md o DESIGN.md se referencia, no se copia.
+
+**Gate:** existe `CLAUDE.md`, tiene menos de 100 líneas, y todo comando que menciona se puede
+ejecutar tal cual.
+
+---
+
+# Fase 1 — Herramientas y limpieza
+
+Esto va temprano a propósito: es barato y protege todo lo que viene después.
+
+## 1a. Linter y type checker
+
+`pyproject.toml` no tiene ruff, black ni mypy. El proyecto tiene ~100 módulos Python, varios
+de 40-50 KB.
+
+- Agregá `ruff` (lint + format) y `mypy` como dependencias opcionales `[dev]`.
+- Configurá ruff en `pyproject.toml`. Empezá con un ruleset conservador (`E`, `F`, `I`, `UP`,
+  `B`) y `line-length` coherente con el código actual — mirá qué ancho usa hoy, no impongas 88
+  si el código está escrito a 100.
+- Corré `ruff check --fix` y `ruff format`. **En un commit separado del resto**, para que el
+  diff de reformato no se mezcle con cambios de lógica.
+- Para mypy: arrancá en modo laxo con `--ignore-missing-imports`, y hacelo estricto SOLO en
+  `src/movie_inbox/domain/` (que es puro y no tiene dependencias externas). Extenderlo al resto
+  es trabajo para después.
+- Sumá un job `lint` al workflow `.github/workflows/tests.yml`.
+
+## 1b. Limpieza del working tree
+
+Todo esto está gitignoreado, así que no afecta el repo, pero ensucia la carpeta y hace lento
+cualquier listado o búsqueda:
+
+- `scripts/.catalog-cache/images/` — ~536 MB, 843 archivos
+- 15 archivos `scripts/catalogv3_links.*.bak.json` de ~1.7 MB cada uno
+- `scripts/smoke-catalog.*.bak.json` (hasta 3.8 MB cada uno) + `catalogv2/v3/v4.json`
+- `check-output.txt` en la raíz, 771 KB
+- `.git.failed-init-backup/`, `scripts/.git.empty-backup/`, `scripts/.git.nested-backup/`
+- `movie-inbox-main.bundle`, `movie-inbox-v0.1.0.bundle`
+
+**No borres nada.** Son datos míos y algunos son backups de git. Hacé dos cosas:
+
+1. Un reporte en pantalla: qué es cada grupo, cuánto pesa, y si es reproducible o no.
+2. Proponé (sin ejecutar) un `scripts/cleanup-workspace.ps1` que mueva lo descartable a una
+   carpeta `_to_delete/` con fecha. Yo decido después qué borrar.
+
+Además, verificá si hay algo que **debería** estar en `.gitignore` y no está — corré
+`git status --porcelain` y contame si aparece algún archivo generado o personal.
+
+**Gate:** `ruff check` sale limpio, `mypy src/movie_inbox/domain` sale limpio, el job de lint
+está en CI y pasa, la suite de tests sigue verde, y tengo el reporte de limpieza.
+
+---
+
+# Fase 2 — Cerrar v0.3.0
+
+Según `docs/roadmap.md`, v0.3.0 es "confianza en búsqueda, matching e inventario" y el gate de
+salida exige cero falsos positivos conocidos en auto-match y merge, más métricas mínimas del
+corpus dorado.
+
+`movie-inbox search-lab run` ya existe y mide el ranking productivo, pero hoy una baseline que
+no alcanza los umbrales reporta `FAIL (baseline recorded)` y **retorna código 0**. O sea: no es
+un gate, es un informe.
+
+1. Corré `movie-inbox search-lab run --json reports/search-baseline.json --html reports/search-baseline.html`
+   y mostrame los números actuales: Precision@5, MRR, Recall@5, resultados prohibidos y
+   precisión de auto-match, en los cuatro contextos.
+2. Decime, con esos números en la mano, **qué falta para poder activar `--enforce` sin que CI
+   se ponga rojo**. Si falta trabajo de ranking, listámelo priorizado; no lo hagas todavía.
+3. Si los números ya alcanzan: agregá un job `search-lab` al workflow con `--enforce` y
+   dejalo como gate real.
+4. Repasá `docs/roadmap.md` contra el `CHANGELOG` y decime qué ítems de v0.3.0 están hechos y
+   cuáles no. El roadmap dice que Search Lab "todavía mide únicamente el ranking productivo
+   actual" y que la comparación baseline vs candidato "comienza en el siguiente incremento" —
+   confirmá si eso sigue siendo cierto.
+
+**Gate:** sé exactamente qué falta para cerrar v0.3.0, con números, no con impresiones.
+
+---
+
+# Fase 3 — Destrabar los tests de frontend
+
+`tests/test_frontend_quality.py` afirma que ciertos strings literales existen dentro de
+`app.js` y `style.css`. Por ejemplo:
+
+```python
+self.assertIn("Conservar ambas y vincular", self.javascript)
+self.assertIn("body.distinct_review_token", self.javascript)
+self.assertIn("function prepareCatalogViewModel()", self.javascript)
+self.assertIn("scanner-create-guard.is-confirming", self.css)
+```
+
+Eso no prueba comportamiento: prueba que un texto aparece en un archivo. Cualquier refactor
+los rompe sin que nada esté realmente mal. **Hoy son un candado contra el trabajo de la fase 4
+y de v0.4.0.**
+
+Objetivo: cada garantía real que hoy protegen esos tests tiene que seguir protegida, pero
+desde el lugar correcto.
+
+1. Recorré `test_frontend_quality.py` test por test y clasificá cada assertion:
+   - **Garantía real de comportamiento** → migrar a `tests/browser/test_ui_browser.py`
+     (Playwright ya está en CI). Ejemplos: gestión de foco del diálogo, que las regiones
+     estructurales no sean `aria-live`, que `Al azar` esté fuera del `<nav>`, que la
+     disponibilidad efectiva no se presente como el flag manual.
+   - **Garantía de diseño verificable estáticamente** → puede quedarse como test de archivo,
+     pero sobre *tokens CSS*, no sobre strings de UI. El test de contraste AA y el de
+     `--text-label: 10px` son legítimos: leen variables, no copy.
+   - **Assertion sobre copy o sobre nombres internos de función** → borrar. `"Conservar ambas
+     y vincular"` es copy que va a cambiar en v0.4.0; `"function prepareCatalogViewModel()"`
+     es un detalle de implementación.
+2. Escribí los tests de Playwright equivalentes ANTES de borrar los viejos. Quiero ver el
+   solapamiento en un commit, y el borrado en el siguiente.
+3. `tests/browser/test_ui_browser.py` hoy tiene 6 KB. Va a crecer bastante: organizalo por
+   superficie (Colección, Bandeja, Ficha) y no en un solo test gigante.
+4. Ojo: el job `browser-smoke` de CI tiene `timeout-minutes: 10`. Si la suite crece mucho,
+   avisame antes de que se acerque al límite.
+
+**Gate:** `test_frontend_quality.py` ya no contiene assertions sobre copy ni sobre nombres de
+función; las garantías equivalentes corren en Playwright; `browser-smoke` pasa en CI y tarda
+menos de 8 minutos.
+
+---
+
+# Fase 4 — Partir el frontend y `web/app.py`
+
+Estado actual:
+
+```
+src/movie_inbox/web/static/app.js      393 KB   ← un solo archivo
+src/movie_inbox/web/static/style.css   205 KB   ← un solo archivo
+src/movie_inbox/web/static/index.html   57 KB
+src/movie_inbox/web/app.py              87 KB
+```
+
+v0.4.0 es un rediseño transversal de interfaz. Hacerlo sobre un `app.js` de 393 KB es caro y
+cada iteración mete el archivo entero en contexto.
+
+**Esta fase no cambia comportamiento. Ni uno solo.** Si en el camino encontrás un bug, anotalo
+y seguí; no lo arregles acá.
+
+## 4a. Mapa antes de cortar
+
+Primero, sin tocar nada: dame un mapa de `app.js`. Qué bloques hay, cuántas líneas ocupa cada
+uno, qué estado global comparten, y dónde están los acoplamientos que van a doler. Mismo
+ejercicio, más breve, para `style.css` y `web/app.py`.
+
+Con ese mapa proponeme el corte. Mi hipótesis de partida, pero discutila si el código dice otra
+cosa:
+
+- Por superficie: `home`, `collection`, `inbox/scanner`, `inbox/curation`, `inbox/imports`,
+  `club`, `admin`.
+- Más un núcleo compartido: cliente HTTP + CSRF, presentador único de disponibilidad, estado
+  y router, helpers de DOM, formateo.
+
+## 4b. Ejecución
+
+- **ES modules nativos** (`<script type="module">`). Sin bundler, sin build step, sin
+  dependencias nuevas. Es una decisión deliberada del proyecto y la quiero mantener.
+- Un módulo por vez, con la suite verde entre cada uno. No un big bang.
+- CSS: partí en archivos por superficie más un `tokens.css` con las variables. Si `index.html`
+  termina con muchos `<link>`, usá `@import` desde un `style.css` raíz y medí si el costo de
+  red importa en localhost (probablemente no).
+
+## 4c. Trampas concretas de este repo
+
+Estas te van a morder si no las mirás antes:
+
+1. **`pyproject.toml` empaqueta assets con globs planos:**
+   ```toml
+   [tool.setuptools.package-data]
+   "movie_inbox.web" = ["static/*.html", "static/*.css", "static/*.js"]
+   ```
+   `static/*.js` **no matchea subdirectorios**. Si movés archivos a `static/js/`, la wheel sale
+   sin ellos y el job `wheel-smoke` te lo va a decir tarde. Actualizá los globs.
+2. **`scripts/wheel_smoke.py`** verifica assets empaquetados. Actualizalo en el mismo commit
+   que cambie la estructura.
+3. **`web/assets.py`** y el montaje de estáticos en FastAPI tienen que servir subdirectorios y
+   devolver `Content-Type: text/javascript` para los módulos, o el browser los rechaza.
+4. **`web/security.py`**: si hay CSP con `script-src`, los ES modules pueden requerir ajuste.
+   Verificalo antes de cortar, no después.
+5. **`tests/test_package_layout.py`** y **`tests/test_docker_packaging.py`** probablemente
+   asumen la estructura actual. Leelos primero.
+
+## 4d. `web/app.py`
+
+87 KB en un módulo. Partilo en routers de FastAPI por superficie, alineados con el corte del
+frontend. `app.py` queda solo con la creación de la app, middleware y el registro de routers.
+Ojo con los imports circulares y con no violar el layering al hacerlo.
+
+**Gate:** ningún archivo de `web/static/` supera 40 KB; `web/app.py` baja de 15 KB; los cuatro
+jobs de CI pasan (tests, wheel-smoke, browser-smoke, docker-smoke); y el comportamiento observable
+es idéntico — mismo resultado en la suite de Playwright, sin tests nuevos ni modificados salvo
+imports.
+
+---
+
+# Fase 5 — v0.4.0: los 4 P1 de Impeccable
+
+**Recién arrancá esta fase cuando las anteriores estén cerradas.** Sobre el frontend ya partido
+esto es viable; sobre el monolito, no.
+
+Leé `.impeccable/critique/2026-08-14T05-13-09Z__src-movie-inbox-web-static-index-html.md`
+completo. Marca 4 P1 y un score de 22/40.
+
+**Mi lectura, y quiero que la valides o la refutes antes de proponer nada:** los cuatro P1 son
+el mismo problema con cuatro caras. La cadena
+`archivo físico → identidad compartida → ficha personal` no es visible en pantalla, y por eso:
+
+- **P1-a** — la Bandeja mezcla alcance compartido (Scanner, inventario de la instancia) y
+  personal (Curaduría, tu catálogo) bajo una sola metáfora y un solo badge.
+- **P1-b** — "Sin coincidencia" se presenta como ausencia comprobada ("Obra ausente del
+  catálogo") cuando solo significa que el algoritmo no encontró candidata. Ese salto epistémico
+  es lo que produjo duplicados como `1917`.
+- **P1-c** — Curaduría muestra `manual: sí/no` mientras el resto de la app calcula
+  disponibilidad efectiva (declaración manual **o** evidencia del servidor). Una misma ficha se
+  ve `Disponible` en Colección y `manual: no` en Curaduría.
+- **P1-d** — la cola está diseñada para casos, no para 600-700 casos: hasta 8 candidatas por
+  caso, todas con el mismo peso visual, sin triage por causa ni confianza.
+
+Si estás de acuerdo, el trabajo se ordena así:
+
+1. **Un presentador único de disponibilidad**, compartido por Colección, ficha, Curaduría y
+   comparador: `Disponible` + procedencia (`Inventario verificado`, `Declaración manual`, o
+   ambas). Esto solo ya cierra P1-c. Es el cambio más chico y el de mayor retorno: empezá acá.
+2. **Una franja de alcance persistente** durante toda la decisión, con los tres estados
+   (`Archivo físico`, `Identidad compartida`, `Ficha en tu catálogo`), y cada CTA marcando qué
+   filas cambia — antes y después. Separá los contadores del badge por alcance. Cierra P1-a.
+3. **Procedencia en cada candidata** (`En tu catálogo`, `Identidad del inventario`, `Catálogo
+   compartido`) más la razón de confianza. Y renombrar: `No encontramos una coincidencia segura`
+   en vez de `Obra ausente del catálogo`, con búsqueda local prellenada antes de permitir el
+   alta. Cierra P1-b.
+4. **Triage de la cola por causa y confianza**: `Falta identidad`, `Probable ficha existente`,
+   `Conflicto de año/tipo`, `Sin señales`. Top 3 candidatas visibles, el resto a demanda. Cierra
+   P1-d. Es el más grande — dejalo último y proponemelo por separado.
+
+También hay un P2 que vale la pena y es barato: **Scanner no deja recibo durable ni reversible**.
+Al resolver, el caso desaparece y el feedback va a la franja general. Un recibo junto al detalle
+(`Inventario compartido: 1 archivo vinculado a 1917` / `Tu catálogo: sin cambios`) más historial
+con Deshacer, como ya tiene Curaduría.
+
+Y las observaciones menores de terminología: `Scanner` → `Escáner` o `Archivos`, `Sin link` →
+`Sin referencia`, y sacar `manual: sí/no` que es lenguaje de implementación.
+
+**Restricción de diseño:** `DESIGN.md` es un contrato vigente y la auditoría dice explícitamente
+que la estética funciona ("no hace falta rediseñar la estética para resolver este problema").
+Esto es arquitectura de información, no un cambio de look. No toques la paleta, la tipografía ni
+el vocabulario de sombras.
+
+**Gate:** una nueva corrida de `$impeccable audit` sobre la misma superficie, con score y P1
+count comparables contra la corrida del 2026-08-14. Y una prueba concreta: que yo pueda mirar
+una sola pantalla y decir sin dudar qué entidad sobrevive después de `Combinar` y dónde quedan
+los archivos.
+
+---
+
+## Arrancá
+
+Confirmame que leíste los contratos, decime si algo de este plan te parece mal ordenado o mal
+entendido, y empezá por la **Fase 0**.
