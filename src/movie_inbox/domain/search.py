@@ -14,6 +14,11 @@ from movie_inbox.domain.catalog import canonical_url, external_source_name
 
 _MIN_SUBSTRING_LENGTH = 3
 _MIN_FUZZY_QUERY_LENGTH = 5
+YEAR_MATCH_BONUS = 12.0
+# An exact title match (100) minus this must still clear well below the 28-point
+# admission threshold used by search_catalog_items -- a confirmed year mismatch
+# is a hard signal, not a minor deduction.
+YEAR_MISMATCH_PENALTY = 75.0
 _YEAR_PATTERN = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b")
 _MEDIA_QUALIFIER_PATTERN = re.compile(
     r"\s*\((?:\d{4}\s+)?(?:film|movie|pelicula|tv series|series|miniseries|anime|documentary)"
@@ -120,9 +125,9 @@ def external_result_score(query: str | SearchIntent, result: Mapping[str, Any]) 
     result_year = str(result.get("year") or "").strip()
     if intent.year:
         if result_year == intent.year:
-            score += 12
+            score += YEAR_MATCH_BONUS
         elif result_year:
-            score -= 18
+            score -= YEAR_MISMATCH_PENALTY
     return max(0.0, score)
 
 

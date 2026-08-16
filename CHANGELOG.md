@@ -49,6 +49,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   ya no muestra una película distinta solo porque su reparto o su sinopsis
   mencionan esa palabra. Esos campos siguen visibles en la ficha, pero dejan de
   competir con el título en el buscador.
+- Buscar un título con año (`It 2017`) ya no muestra una ficha con el mismo
+  título y otro año (`It 1990`) como si fuera coincidencia. El comparador
+  tampoco ofrece un remake de otro año como candidata para fusionar con la
+  obra correcta.
 
 ## [0.2.1] - 2026-08-13
 
