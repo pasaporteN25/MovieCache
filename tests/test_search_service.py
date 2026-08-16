@@ -122,6 +122,24 @@ class SearchRankingPrecisionTests(unittest.TestCase):
         items = [{"id": "one", "title": "Some Movie", "genres": ["Horror"], "tags": ["Horror"]}]
         self.assertEqual(search_catalog_items(items, "Horror"), [])
 
+    def test_a_year_disambiguated_query_drops_the_wrong_year_title_match(self) -> None:
+        items = [
+            {"id": "it-2017", "title": "It", "year": "2017"},
+            {"id": "it-1990", "title": "It", "year": "1990"},
+        ]
+        results = search_catalog_items(items, "It 2017")
+        self.assertEqual([row["id"] for row in results], ["it-2017"])
+
+    def test_comparing_a_remake_does_not_surface_the_wrong_year_original(self) -> None:
+        items = [
+            {"id": "the-fly-1986", "title": "The Fly", "year": "1986", "kind": "pelicula"},
+            {"id": "the-fly-1958", "title": "The Fly", "year": "1958", "kind": "pelicula"},
+        ]
+        results = rank_catalog_candidates(
+            items, {"title": "The Fly", "year": "1986", "kind": "pelicula"}
+        )
+        self.assertEqual([row["id"] for row in results], ["the-fly-1986"])
+
 
 if __name__ == "__main__":
     unittest.main()

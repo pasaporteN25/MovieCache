@@ -7,9 +7,24 @@ from typing import Any
 
 from movie_inbox.domain.catalog import canonical_url, normalize_local_files, normalize_tags
 from movie_inbox.domain.matching import decide_match
-from movie_inbox.domain.search import SearchIntent, parse_search_query, search_key, text_match_score
+from movie_inbox.domain.search import (
+    YEAR_MATCH_BONUS,
+    YEAR_MISMATCH_PENALTY,
+    SearchIntent,
+    parse_search_query,
+    search_key,
+    text_match_score,
+)
 
 SEARCH_RESULT_LIMIT = 60
+
+# decide_match still reports these with a nonzero, auditable score -- Scanner's
+# manual "confirm" review relies on that score to keep a year/kind mismatch
+# selectable for human review (see tests/test_libraries.py's "1917" legacy-year
+# case). "Comparar" is a different context: a title match the algorithm already
+# knows is contradicted by year or kind shouldn't rank alongside genuine
+# candidates, so it doesn't count as match evidence here.
+_HARD_MISMATCH_REASONS = frozenset({"exact_title_year_mismatch", "exact_title_kind_mismatch"})
 
 
 def search_catalog_items(
@@ -63,6 +78,8 @@ def rank_catalog_candidates(
             payload["_match"] = decision
         search_score = float((payload.get("_search") or {}).get("score") or 0)
         match_score = float(decision.get("score") or 0)
+        if str(decision.get("reason") or "") in _HARD_MISMATCH_REASONS:
+            match_score = 0.0
         if search_score < 28 and match_score <= 0:
             continue
         payload["_search"] = {
@@ -121,9 +138,9 @@ def _catalog_search_score(
     item_year = str(item.get("year") or "").strip()
     if intent.year:
         if item_year == intent.year:
-            best_score += 12
+            best_score += YEAR_MATCH_BONUS
         elif item_year:
-            best_score -= 18
+            best_score -= YEAR_MISMATCH_PENALTY
     return max(0.0, min(best_score, 100.0)), best_field, best_value
 
 

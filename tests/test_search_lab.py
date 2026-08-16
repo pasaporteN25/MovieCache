@@ -28,14 +28,18 @@ class SearchLabTests(unittest.TestCase):
         self.assertEqual(
             set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"}
         )
-        # Short-token and secondary-metadata false positives (docs/search-quality.md
-        # problems #1-#2) are fixed. The 11 remaining forbidden hits are all instances
-        # of a separate, known issue: the year-mismatch penalty (-18 / -0.35) is too
-        # weak against an exact title match (100-18=82 still clears the admission
-        # threshold), e.g. "It 1990" for a query "It 2017", or "The Fly 1958" as an
-        # identity candidate for "The Fly 1986". That fix is a different item.
-        self.assertEqual(report["metrics"]["passed_cases"], 12)
-        self.assertEqual(report["metrics"]["forbidden_hits"], 11)
+        # Short-token, secondary-metadata, and weak-year-penalty false positives
+        # (docs/search-quality.md problems #1-#2, plus the Catálogo/Comparar
+        # year-mismatch fix) are gone. The 6 remaining forbidden hits are two
+        # separate, known issues left for follow-up sessions:
+        # - 5 are in the "external" context, which has no rejection threshold at
+        #   all yet (docs/search-quality.md problem #4) -- external/registry.py
+        #   and application/search_evaluation.py both need one.
+        # - 1 ("1917-legacy-bad-year") is a numeric-title parsing bug in
+        #   parse_search_query: a query with two year-shaped tokens ("1917 2019")
+        #   picks the wrong one as the year and empties the title.
+        self.assertEqual(report["metrics"]["passed_cases"], 15)
+        self.assertEqual(report["metrics"]["forbidden_hits"], 6)
         self.assertEqual(report["metrics"]["auto_match_precision"], 1.0)
         self.assertFalse(report["gate"]["passed"])
 
