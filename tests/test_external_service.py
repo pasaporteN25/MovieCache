@@ -112,6 +112,16 @@ class ExternalCatalogServiceTests(unittest.TestCase):
 
         self.assertEqual(results[0]["title"], "Evil Dead Burn")
 
+    def test_low_relevance_results_are_dropped_instead_of_just_ranked_last(self) -> None:
+        service = ExternalSourceService([RelevanceAdapter()])
+
+        results, _ = service.search("Evil Dead Burn 2026")
+
+        # "Evil Dead Rise" (2023) shares two of three title words but is a
+        # different, wrong-year work -- it should be filtered out entirely,
+        # not merely ranked below the correct "Evil Dead Burn" (2026).
+        self.assertEqual([row["title"] for row in results], ["Evil Dead Burn"])
+
     def test_search_and_snapshot_are_delegated(self) -> None:
         gateway = FakeGateway()
         service = ExternalCatalogService(gateway, lambda _: {})

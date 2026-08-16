@@ -18,7 +18,12 @@ from movie_inbox.search_lab import load_builtin_corpus
 
 
 class SearchLabTests(unittest.TestCase):
-    def test_builtin_corpus_records_the_current_production_baseline(self) -> None:
+    def test_builtin_corpus_meets_the_v030_quality_gate(self) -> None:
+        # The four docs/search-quality.md problems (short tokens, secondary
+        # metadata, weak year-mismatch penalty, no external relevance floor)
+        # plus a numeric-title parsing bug in parse_search_query are all fixed.
+        # This corpus run is the "prueba manual con un snapshot de catalogo que
+        # no permita escrituras" the v0.3.0 exit gate (docs/roadmap.md) calls for.
         corpus = load_builtin_corpus()
 
         report = evaluate_search_corpus(corpus)
@@ -28,28 +33,21 @@ class SearchLabTests(unittest.TestCase):
         self.assertEqual(
             set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"}
         )
-        # Short-token, secondary-metadata, and weak-year-penalty false positives
-        # (docs/search-quality.md problems #1-#2, plus the Catálogo/Comparar
-        # year-mismatch fix) are gone. The 6 remaining forbidden hits are two
-        # separate, known issues left for follow-up sessions:
-        # - 5 are in the "external" context, which has no rejection threshold at
-        #   all yet (docs/search-quality.md problem #4) -- external/registry.py
-        #   and application/search_evaluation.py both need one.
-        # - 1 ("1917-legacy-bad-year") is a numeric-title parsing bug in
-        #   parse_search_query: a query with two year-shaped tokens ("1917 2019")
-        #   picks the wrong one as the year and empties the title.
-        self.assertEqual(report["metrics"]["passed_cases"], 15)
-        self.assertEqual(report["metrics"]["forbidden_hits"], 6)
+        self.assertEqual(report["metrics"]["forbidden_hits"], 0)
         self.assertEqual(report["metrics"]["auto_match_precision"], 1.0)
-        self.assertFalse(report["gate"]["passed"])
+        self.assertEqual(report["metrics"]["auto_match_false_positives"], 0)
+        self.assertGreaterEqual(report["metrics"]["precision_at_5"], 0.9)
+        self.assertGreaterEqual(report["metrics"]["mrr"], 0.9)
+        self.assertGreaterEqual(report["metrics"]["recall_at_5"], 0.9)
+        self.assertTrue(report["gate"]["passed"])
 
-    def test_baseline_command_only_fails_when_enforcement_is_requested(self) -> None:
+    def test_enforced_baseline_now_passes(self) -> None:
         with redirect_stdout(io.StringIO()):
             baseline_status = main(["run"])
             enforced_status = main(["run", "--enforce"])
 
         self.assertEqual(baseline_status, 0)
-        self.assertEqual(enforced_status, 1)
+        self.assertEqual(enforced_status, 0)
 
     def test_reports_do_not_modify_the_input_corpus(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

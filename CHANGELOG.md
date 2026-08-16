@@ -53,6 +53,18 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   título y otro año (`It 1990`) como si fuera coincidencia. El comparador
   tampoco ofrece un remake de otro año como candidata para fusionar con la
   obra correcta.
+- Wikipedia, IMDb y FilmAffinity ya no muestran resultados sin relación real
+  con la búsqueda (una obra distinta, un año equivocado): antes se mostraban
+  igual mientras hubiera lugar en la estantería.
+- Buscar un título formado por un año, como `1917` o `1984`, ya encuentra la
+  ficha correcta en vez de devolver la lista vacía. Lo mismo para un título
+  que empieza con un año, como `2001: A Space Odyssey`.
+
+### Search Lab
+
+- `movie-inbox search-lab run --enforce` ya pasa contra el corpus dorado:
+  Precision@5 0.91, MRR y Recall@5 en 1.0, cero resultados prohibidos, cero
+  falsos positivos de auto-match. CI corre este gate en cada cambio.
 
 ## [0.2.1] - 2026-08-13
 

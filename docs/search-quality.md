@@ -4,9 +4,19 @@ Este documento define el gate de calidad de `v0.3.0`. Su objetivo es evitar otra
 iteracion basada solamente en ejemplos positivos: una busqueda no mejora si encuentra
 el resultado esperado pero tambien presenta decenas de obras irrelevantes.
 
+**Estado:** el gate del corpus dorado (seccion "Metricas y gate de v0.3.0") pasa:
+`movie-inbox search-lab run --enforce` sale con codigo 0 y CI lo hace cumplir en cada
+cambio. Las 4 fallas de abajo estan resueltas en los caminos que ejercita el corpus
+(`search_catalog_items`, `rank_catalog_candidates`, `external/registry.py`,
+`application/search_evaluation.py`). El problema #3 quedo resuelto para el caso
+concreto de un mismatch *confirmado* (mismo titulo, año o tipo distinto) en Catalogo
+y Comparar; `domain/matching.py::rank_candidates` (usado solo por
+`cli/match_external_links.py`) sigue sin ese filtro, sin evidencia de que haga falta
+hoy. Ver `CHANGELOG.md` (`[Sin publicar]`) para el detalle de cada fix.
+
 ## Problemas verificados
 
-El comportamiento actual tiene cuatro fallas diferentes:
+El comportamiento tenia cuatro fallas diferentes (ver "Estado" arriba):
 
 1. La coincidencia de terminos acepta subcadenas en ambas direcciones sin proteger
    tokens cortos. Un articulo como `a` puede hacer que un titulo no relacionado puntue
@@ -112,11 +122,14 @@ o Scanner. En esos flujos, dejar un caso para revision es mejor que unir obras d
 1. [Completado] Crear fixtures y runner con el comportamiento actual como baseline observable.
 2. Agregar pruebas negativas que reproduzcan los falsos positivos conocidos.
 3. Separar `catalog_search`, `external_lookup`, `identity_candidates` y
-   `scanner_candidates`.
-4. Corregir tokens cortos, stopwords, umbrales y evidencia por campo.
-5. Filtrar por relevancia dentro de cada adaptador externo sin perder resultados
-   exactos recientes o multilenguaje.
-6. Integrar el reporte al Search Lab y calibrar con decisiones humanas.
+   `scanner_candidates`. Parcial: tienen umbrales propios ahora, pero
+   `rank_catalog_candidates` sigue llamando a `search_catalog_items` por dentro,
+   no son caminos completamente independientes.
+4. [Completado] Corregir tokens cortos, stopwords, umbrales y evidencia por campo.
+5. [Completado] Filtrar por relevancia dentro de cada adaptador externo sin perder
+   resultados exactos recientes o multilenguaje.
+6. Integrar el reporte al Search Lab y calibrar con decisiones humanas. El reporte ya
+   existe; falta el proceso de calibración con revisión humana.
 7. Recién entonces ajustar la presentacion final de resultados y el triage del Scanner.
 
 No se incorporaran embeddings, modelos de IA ni nuevas APIs durante este gate. Primero

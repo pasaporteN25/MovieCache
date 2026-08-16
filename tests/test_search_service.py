@@ -140,6 +140,19 @@ class SearchRankingPrecisionTests(unittest.TestCase):
         )
         self.assertEqual([row["id"] for row in results], ["the-fly-1986"])
 
+    def test_a_numeric_title_with_a_disambiguating_year_is_found(self) -> None:
+        items = [
+            {"id": "1917-2019", "title": "1917", "year": "2019"},
+            {"id": "1917-legacy-bad-year", "title": "1917", "year": "1917"},
+        ]
+        results = search_catalog_items(items, "1917 2019")
+        self.assertEqual([row["id"] for row in results], ["1917-2019"])
+
+    def test_a_leading_year_shaped_title_is_still_searchable(self) -> None:
+        items = [{"id": "odyssey", "title": "2001: A Space Odyssey", "year": "1968"}]
+        results = search_catalog_items(items, "2001: A Space Odyssey")
+        self.assertEqual([row["id"] for row in results], ["odyssey"])
+
 
 if __name__ == "__main__":
     unittest.main()

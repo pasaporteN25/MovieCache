@@ -8,7 +8,11 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from movie_inbox.domain.search import external_result_score, parse_search_query
+from movie_inbox.domain.search import (
+    EXTERNAL_RELEVANCE_THRESHOLD,
+    external_result_score,
+    parse_search_query,
+)
 from movie_inbox.external.base import SourceAdapter
 from movie_inbox.external.common import clean_text, dedupe_results, utc_now
 from movie_inbox.external.filmaffinity import FilmAffinityAdapter
@@ -172,11 +176,11 @@ class ExternalSourceService:
     @staticmethod
     def _rank_batch(query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rows = dedupe_results(results)
-        ranked = sorted(
-            enumerate(rows),
-            key=lambda row: (-external_result_score(query, row[1]), row[0]),
+        scored = sorted(
+            ((external_result_score(query, row), index, row) for index, row in enumerate(rows)),
+            key=lambda entry: (-entry[0], entry[1]),
         )
-        return [row for _, row in ranked]
+        return [row for score, _, row in scored if score >= EXTERNAL_RELEVANCE_THRESHOLD]
 
     @staticmethod
     def _prune_cache(cache: dict[Any, tuple[float, Any]]) -> None:

@@ -19,6 +19,10 @@ YEAR_MATCH_BONUS = 12.0
 # admission threshold used by search_catalog_items -- a confirmed year mismatch
 # is a hard signal, not a minor deduction.
 YEAR_MISMATCH_PENALTY = 75.0
+# Minimum external_result_score for a source result to be shown at all. Kept
+# independent from search_catalog_items's own admission threshold (even though
+# both start at 28) so the two contexts can be tuned separately later.
+EXTERNAL_RELEVANCE_THRESHOLD = 28.0
 _YEAR_PATTERN = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b")
 _MEDIA_QUALIFIER_PATTERN = re.compile(
     r"\s*\((?:\d{4}\s+)?(?:film|movie|pelicula|tv series|series|miniseries|anime|documentary)"
@@ -46,11 +50,14 @@ def parse_search_query(value: Any) -> SearchIntent:
     source = external_source_name(raw)
     canonical = canonical_url(raw) if source else ""
     title = _title_from_url(raw, source) if source else raw
-    year_match = _YEAR_PATTERN.search(title or raw)
-    year = year_match.group(1) if year_match else ""
+    title = title.replace("_", " ")
+    qualifier_match = _MEDIA_QUALIFIER_PATTERN.search(title)
+    qualifier_year = _YEAR_PATTERN.search(qualifier_match.group(0)) if qualifier_match else None
     title = _MEDIA_QUALIFIER_PATTERN.sub(" ", title)
-    title = _YEAR_PATTERN.sub(" ", title)
-    title = " ".join(title.replace("_", " ").split()).strip(" -")
+    year, title = _split_disambiguating_year(title)
+    if qualifier_year is not None:
+        year = qualifier_year.group(1)
+    title = " ".join(title.split()).strip(" -")
     key = search_key(canonical or raw)
     title_key = search_key(title)
     external_id_match = _EXTERNAL_ID_PATTERN.search(raw)
@@ -129,6 +136,22 @@ def external_result_score(query: str | SearchIntent, result: Mapping[str, Any]) 
         elif result_year:
             score -= YEAR_MISMATCH_PENALTY
     return max(0.0, score)
+
+
+def _split_disambiguating_year(title: str) -> tuple[str, str]:
+    """Split a trailing release-year token from a title, unless it's the only
+    meaningful content: a numeric title like "1917", "1984", or "2001: A Space
+    Odyssey" keeps its year-shaped token instead of losing it as if it were a
+    disambiguating suffix (mirrors the leading-token exception in
+    movie_inbox.domain.catalog.title_match_key)."""
+    matches = list(_YEAR_PATTERN.finditer(title))
+    if not matches:
+        return "", title
+    candidate = matches[-1]
+    if not re.search(r"[a-zA-Z0-9]", title[: candidate.start()]):
+        return "", title
+    year = candidate.group(1)
+    return year, title[: candidate.start()] + title[candidate.end() :]
 
 
 def _title_from_url(value: str, source: str) -> str:

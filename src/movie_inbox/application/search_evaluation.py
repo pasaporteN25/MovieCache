@@ -13,7 +13,7 @@ from movie_inbox.application.search_service import rank_catalog_candidates, sear
 from movie_inbox.domain.catalog import canonical_url
 from movie_inbox.domain.libraries import work_identity, work_identity_key
 from movie_inbox.domain.matching import decide_match
-from movie_inbox.domain.search import external_result_score
+from movie_inbox.domain.search import EXTERNAL_RELEVANCE_THRESHOLD, external_result_score
 
 CORPUS_SCHEMA_VERSION = 1
 SUPPORTED_CONTEXTS = {"catalog", "identity", "external", "scanner"}
@@ -291,12 +291,14 @@ def _evaluate_case(case: Mapping[str, Any], items: list[dict[str, Any]]) -> dict
 
 def _external_results(query: str, raw_results: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     rows = _dedupe_recorded_external_results(raw_results)
-    ranked = sorted(
-        enumerate(rows), key=lambda row: (-external_result_score(query, row[1]), row[0])
+    scored = sorted(
+        ((external_result_score(query, row), index, row) for index, row in enumerate(rows)),
+        key=lambda entry: (-entry[0], entry[1]),
     )
     results: list[dict[str, Any]] = []
-    for _, row in ranked:
-        score = external_result_score(query, row)
+    for score, _, row in scored:
+        if score < EXTERNAL_RELEVANCE_THRESHOLD:
+            continue
         results.append(
             {
                 **_result_summary(row),
