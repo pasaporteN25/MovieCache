@@ -25,6 +25,7 @@ __pycache__/
 /scripts/*.csv
 /scripts/*.txt
 /catalog-view.html
+/reports/
 /data/
 /.env
 /imports/
