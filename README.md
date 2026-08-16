@@ -433,8 +433,10 @@ Todos los usuarios pueden copiar las obras nuevas seleccionadas a su catalogo pe
 
 El visor tiene una consola de busqueda unica. Al tocar `Buscar`, el servidor consulta el
 catalogo personal completo por titulo principal, original, espanol, ingles, aliases,
-nombres de archivo, IDs, links y metadata, ignorando tildes y tolerando una errata en
-palabras largas. `Buscar tambien en fuentes externas` agrega Wikipedia, IMDb y
+nombres de archivo, IDs y links, ignorando tildes y tolerando una errata en
+palabras largas. Descripcion, reparto, genero, tags, direccion y guion no forman parte
+del buscador para que una coincidencia incidental de esos campos no se confunda con una
+coincidencia de titulo; siguen visibles en la ficha. `Buscar tambien en fuentes externas` agrega Wikipedia, IMDb y
 FilmAffinity solamente despues de la accion explicita. La consulta, el orden y las
 facetas de estado, disponibilidad, tipo, fuente, director, genero, decada, rango de
 anos y memoria personal quedan representados en la URL para que Atras y Adelante
@@ -491,7 +493,7 @@ El panel lateral incluye el registro personal para editar `watched_at`, `rating`
 
 Marcar una entrada como pendiente no borra `watched_at`; si queres corregir o limpiar esa fecha, se hace desde el registro personal del panel lateral.
 
-Cuando existen datos enriquecidos, la tarjeta muestra genero y director de forma compacta; el panel lateral muestra genero, director, guionistas y reparto con mas espacio. Esos campos tambien entran en el buscador.
+Cuando existen datos enriquecidos, la tarjeta muestra genero y director de forma compacta; el panel lateral muestra genero, director, guionistas y reparto con mas espacio. Esos campos no forman parte del buscador principal, para que una coincidencia incidental (por ejemplo, un actor cuyo nombre contiene la consulta) no se confunda con una coincidencia de titulo.
 
 La seccion `Metadata` del detalle permite corregir titulos, año, descripcion, genero, direccion, guion y reparto. Cada campo guarda su procedencia en `metadata_sources`; los datos historicos migrados se marcan como procedencia inferida. Al activar `Bloquear`, el campo entra en `locked_fields` y los merges externos posteriores no pueden modificarlo.
 

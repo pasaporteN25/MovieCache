@@ -42,6 +42,13 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Las cards y la ficha ya no presentan como contradictorias la disponibilidad efectiva
   y la declaración manual. La interfaz muestra `Disponible` cuando existe inventario
   verificado y detalla por separado si también hubo una declaración manual.
+- Buscar un título corto como `Up` o `Us` ya no devuelve obras sin relación cuyo
+  título simplemente contiene esas letras (`Setup`, `Suspiria`).
+- La búsqueda de Colección y el comparador ya no confunden reparto, descripción,
+  género, tags, director o guionistas con coincidencias de título: buscar `Heat`
+  ya no muestra una película distinta solo porque su reparto o su sinopsis
+  mencionan esa palabra. Esos campos siguen visibles en la ficha, pero dejan de
+  competir con el título en el buscador.
 
 ## [0.2.1] - 2026-08-13
 

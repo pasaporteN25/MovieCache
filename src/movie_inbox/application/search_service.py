@@ -157,14 +157,11 @@ def _search_values(item: Mapping[str, Any]) -> list[tuple[str, str, float]]:
         ("external_link", item.get("wikipedia_url"), 0.92),
         ("external_link", item.get("imdb_url"), 0.92),
         ("external_link", item.get("filmaffinity_url"), 0.92),
-        ("director", item.get("directors"), 0.72),
-        ("genre", item.get("genres"), 0.68),
-        ("writer", item.get("writers"), 0.65),
-        ("cast", item.get("cast"), 0.62),
-        ("tag", item.get("tags"), 0.62),
-        ("description", item.get("description"), 0.45),
-        ("notes", item.get("notes"), 0.45),
-        ("review", item.get("review"), 0.4),
+        # Secondary metadata (director/genre/writer/cast/tags/description/notes/review)
+        # is deliberately excluded: docs/search-quality.md's "Catálogo" and
+        # "Comparar/merge" contracts only permit title/alias/ID/file evidence here,
+        # so this metadata can't masquerade as a title match. It stays visible on
+        # the item detail view; it just isn't searchable from the main search box.
     )
     values: list[tuple[str, str, float]] = []
     seen: set[tuple[str, str]] = set()

@@ -28,7 +28,14 @@ class SearchLabTests(unittest.TestCase):
         self.assertEqual(
             set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"}
         )
-        self.assertGreater(report["metrics"]["forbidden_hits"], 0)
+        # Short-token and secondary-metadata false positives (docs/search-quality.md
+        # problems #1-#2) are fixed. The 11 remaining forbidden hits are all instances
+        # of a separate, known issue: the year-mismatch penalty (-18 / -0.35) is too
+        # weak against an exact title match (100-18=82 still clears the admission
+        # threshold), e.g. "It 1990" for a query "It 2017", or "The Fly 1958" as an
+        # identity candidate for "The Fly 1986". That fix is a different item.
+        self.assertEqual(report["metrics"]["passed_cases"], 12)
+        self.assertEqual(report["metrics"]["forbidden_hits"], 11)
         self.assertEqual(report["metrics"]["auto_match_precision"], 1.0)
         self.assertFalse(report["gate"]["passed"])
 
