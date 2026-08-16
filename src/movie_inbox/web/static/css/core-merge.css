@@ -1,0 +1,356 @@
+      .merge-comparator-dialog {
+        background: var(--surface-app);
+        border: 1px solid rgba(34, 216, 229, 0.5);
+        color: var(--ink);
+        height: min(920px, calc(100dvh - 28px));
+        margin: auto;
+        max-height: calc(100dvh - 28px);
+        max-width: 1460px;
+        padding: 0;
+        width: calc(100% - 28px);
+      }
+      .merge-comparator-dialog[open] {
+        animation: movie-dialog-in 220ms var(--ease-out) both;
+        display: grid;
+      }
+      .merge-comparator-dialog::backdrop {
+        background: rgba(3, 4, 14, 0.88);
+        backdrop-filter: blur(5px);
+      }
+      .merge-comparator-surface {
+        display: grid;
+        grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+        height: 100%;
+        min-height: 0;
+      }
+      .merge-comparator-header {
+        align-items: start;
+        background: var(--surface-control);
+        border-bottom: 1px solid rgba(139, 124, 255, 0.38);
+        display: flex;
+        gap: 18px;
+        justify-content: space-between;
+        padding: 16px 18px;
+      }
+      .merge-comparator-header h2 {
+        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-size: 30px;
+        line-height: 1;
+        margin: 4px 0 0;
+        overflow-wrap: anywhere;
+        text-transform: uppercase;
+      }
+      .merge-comparator-header p {
+        color: var(--muted);
+        font-size: var(--text-meta);
+        margin: 6px 0 0;
+      }
+      .merge-comparator-toolbar {
+        align-items: end;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        padding: 11px 18px;
+      }
+      .merge-survivor-control {
+        border: 0;
+        display: flex;
+        gap: 2px;
+        margin: 0;
+        min-width: 0;
+        padding: 0;
+      }
+      .merge-survivor-control legend {
+        color: var(--muted);
+        font-family: "Courier New", monospace;
+        font-size: var(--text-label);
+        font-weight: 800;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+      }
+      .merge-survivor-control label { min-width: 0; position: relative; }
+      .merge-survivor-control input { inset: 0; opacity: 0; position: absolute; }
+      .merge-survivor-control span {
+        background: #222745;
+        border: 1px solid #454c78;
+        display: block;
+        font-size: var(--text-meta);
+        font-weight: 800;
+        max-width: 320px;
+        overflow: hidden;
+        padding: 8px 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .merge-survivor-control input:checked + span {
+        background: rgba(34, 216, 229, 0.12);
+        border-color: var(--teal);
+        color: var(--teal);
+      }
+      .merge-survivor-control input:focus-visible + span { outline: 3px solid var(--teal); outline-offset: 2px; }
+      .merge-show-all {
+        align-items: center;
+        color: var(--muted);
+        display: inline-flex;
+        flex: 0 0 auto;
+        font-size: var(--text-meta);
+        gap: 7px;
+        min-height: 38px;
+      }
+      .merge-comparator-summary {
+        align-items: stretch;
+        background: rgba(17, 21, 42, 0.72);
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 12px;
+        grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+        padding: 12px 18px;
+      }
+      .merge-entry-summary {
+        align-items: center;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 64px minmax(0, 1fr);
+        min-width: 0;
+        padding: 6px;
+      }
+      .merge-entry-summary.survivor {
+        background: rgba(34, 216, 229, 0.08);
+        box-shadow: inset 0 0 0 1px rgba(34, 216, 229, 0.44);
+      }
+      .merge-entry-summary .curation-thumb-frame.large,
+      .merge-entry-summary .curation-thumb.large { height: 88px; width: 60px; }
+      .merge-entry-summary > div { display: grid; gap: 4px; min-width: 0; }
+      .merge-entry-summary > div > span {
+        color: var(--teal);
+        font-family: "Courier New", monospace;
+        font-size: var(--text-label);
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+      .merge-entry-summary strong {
+        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-size: 20px;
+        line-height: 1.06;
+        overflow-wrap: anywhere;
+        text-transform: uppercase;
+      }
+      .merge-entry-summary small { color: var(--muted); }
+      .merge-summary-divider { align-self: center; color: var(--gold); font-size: 20px; text-align: center; }
+      .merge-comparator-feedback {
+        color: var(--muted);
+        font-size: var(--text-meta);
+        min-height: 0;
+        padding: 0 18px;
+      }
+      .merge-comparator-feedback:not(:empty) { min-height: 36px; padding-block: 10px; }
+      .merge-comparator-feedback[data-tone="working"] { color: var(--text-highlight); }
+      .merge-comparator-feedback[data-tone="error"] { color: var(--text-danger-soft); }
+      .merge-comparator-fields {
+        background: #0b0e20;
+        min-height: 0;
+        overflow: auto;
+        padding: 0 18px 22px;
+      }
+      .merge-field-group { border-bottom: 1px solid rgba(139, 124, 255, 0.3); }
+      .merge-field-group > header {
+        align-items: center;
+        background: #0b0e20;
+        display: flex;
+        justify-content: space-between;
+        padding: 18px 0 8px;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+      .merge-field-group h3 {
+        font-size: var(--text-control);
+        margin: 0;
+      }
+      .merge-field-group > header span {
+        color: var(--muted);
+        font-family: "Courier New", monospace;
+        font-size: var(--text-label);
+        text-transform: uppercase;
+      }
+      .merge-field-row {
+        border-top: 1px solid rgba(139, 124, 255, 0.2);
+        display: grid;
+        gap: 8px;
+        padding: 12px 0;
+      }
+      .merge-field-row.needs-decision { background: rgba(255, 190, 85, 0.055); }
+      .merge-field-row > header {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+      }
+      .merge-field-row > header > strong { font-size: var(--text-meta); }
+      .merge-field-signals { display: flex; flex-wrap: wrap; gap: 5px; justify-content: end; }
+      .merge-field-options { display: grid; gap: 7px; }
+      .merge-field-options.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .merge-field-options.three { grid-template-columns: minmax(0, 1fr) minmax(150px, 0.7fr) minmax(0, 1fr); }
+      .merge-choice {
+        background: rgba(25, 29, 56, 0.5);
+        border: 1px solid rgba(139, 124, 255, 0.34);
+        cursor: pointer;
+        display: grid;
+        gap: 7px;
+        min-height: 72px;
+        min-width: 0;
+        padding: 9px 10px;
+        position: relative;
+      }
+      .merge-choice:has(input:checked) {
+        background: rgba(34, 216, 229, 0.1);
+        border-color: rgba(34, 216, 229, 0.72);
+        box-shadow: inset 0 0 0 1px rgba(34, 216, 229, 0.18);
+      }
+      .merge-choice.combine:has(input:checked) {
+        background: rgba(255, 190, 85, 0.1);
+        border-color: rgba(255, 190, 85, 0.7);
+      }
+      .merge-choice input { height: 1px; opacity: 0; position: absolute; width: 1px; }
+      .merge-choice:has(input:focus-visible) { outline: 3px solid var(--teal); outline-offset: 2px; }
+      .merge-choice-label {
+        color: var(--muted);
+        font-family: "Courier New", monospace;
+        font-size: var(--text-label);
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+      .merge-choice:has(input:checked) .merge-choice-label { color: var(--teal); }
+      .merge-choice.combine:has(input:checked) .merge-choice-label { color: var(--gold); }
+      .merge-value {
+        color: #ebe9ff;
+        display: block;
+        font-size: var(--text-meta);
+        line-height: 1.4;
+        max-height: 8.4em;
+        overflow: auto;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+      .merge-value.empty { color: #898dab; font-style: italic; }
+      .merge-list-value { display: flex; flex-wrap: wrap; gap: 4px; }
+      .merge-list-value > span {
+        background: rgba(120, 92, 255, 0.15);
+        border: 1px solid rgba(139, 124, 255, 0.28);
+        padding: 3px 5px;
+      }
+      .merge-file-list { display: grid; gap: 5px; }
+      .merge-file-list > span { display: grid; gap: 1px; }
+      .merge-file-list small { color: var(--muted); overflow-wrap: anywhere; }
+      .merge-image-value { align-items: center; display: grid; gap: 8px; grid-template-columns: 52px minmax(0, 1fr); }
+      .merge-image-value img { height: 68px; object-fit: cover; width: 52px; }
+      .merge-image-value small { color: var(--muted); overflow-wrap: anywhere; }
+      .merge-field-same {
+        align-items: center;
+        color: var(--muted);
+        display: grid;
+        gap: 10px;
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+      .merge-field-same > span:last-child {
+        color: var(--teal);
+        font-family: "Courier New", monospace;
+        font-size: var(--text-label);
+        text-transform: uppercase;
+      }
+      .merge-comparator-footer {
+        align-items: center;
+        background: var(--surface-control);
+        border-top: 1px solid rgba(34, 216, 229, 0.4);
+        display: flex;
+        gap: 18px;
+        justify-content: space-between;
+        padding: 12px 18px;
+      }
+      .merge-comparator-footer > div:first-child { display: grid; gap: 3px; }
+      .merge-comparator-footer strong { font-size: var(--text-small); }
+      .merge-comparator-footer span { color: var(--muted); font-size: var(--text-caption); }
+      .merge-error-action { justify-self: center; margin-top: 5px; width: auto; }
+      .merge-comparator-actions { display: flex; gap: 8px; }
+      .merge-comparator-actions button { width: auto; }
+      .merge-loading {
+        align-items: center;
+        display: flex;
+        gap: 7px;
+        justify-content: center;
+        min-height: 240px;
+      }
+      .merge-loading span {
+        animation: merge-loading-pulse 900ms ease-in-out infinite alternate;
+        background: var(--teal);
+        height: 18px;
+        opacity: 0.3;
+        width: 4px;
+      }
+      .merge-loading span:nth-child(2) { animation-delay: 150ms; height: 28px; }
+      .merge-loading span:nth-child(3) { animation-delay: 300ms; }
+      @keyframes merge-loading-pulse {
+        to { opacity: 1; transform: scaleY(1.25); }
+      }
+
+@media (max-width: 860px) {
+        .merge-field-options.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+        .merge-comparator-dialog {
+          border: 0;
+          height: 100dvh;
+          margin: 0;
+          max-height: 100dvh;
+          width: 100vw;
+        }
+
+        .merge-comparator-header { padding: 12px 13px; }
+
+        .merge-comparator-header h2 { font-size: 24px; }
+
+        .merge-comparator-toolbar { align-items: stretch; display: grid; gap: 10px; padding: 10px 13px; }
+
+        .merge-survivor-control { display: grid; grid-template-columns: 1fr 1fr; }
+
+        .merge-survivor-control legend { grid-column: 1 / -1; }
+
+        .merge-survivor-control span { max-width: none; white-space: normal; }
+
+        .merge-show-all { min-height: 34px; }
+
+        .merge-comparator-summary { grid-template-columns: 1fr; padding: 9px 13px; }
+
+        .merge-summary-divider { display: none; }
+
+        .merge-entry-summary { grid-template-columns: 50px minmax(0, 1fr); }
+
+        .merge-entry-summary .curation-thumb-frame.large,
+        .merge-entry-summary .curation-thumb.large { height: 70px; width: 48px; }
+
+        .merge-entry-summary strong { font-size: 17px; }
+
+        .merge-comparator-feedback { padding-inline: 13px; }
+
+        .merge-comparator-fields { padding: 0 13px 18px; }
+
+        .merge-field-group > header { padding-top: 14px; }
+
+        .merge-field-options.two,
+        .merge-field-options.three { grid-template-columns: 1fr; }
+
+        .merge-choice { min-height: 62px; }
+
+        .merge-comparator-footer {
+          align-items: stretch;
+          display: grid;
+          gap: 9px;
+          padding: 10px 13px;
+        }
+
+        .merge-comparator-actions { display: grid; grid-template-columns: 1fr 1fr; }
+
+        .merge-comparator-actions button { width: 100%; }
+}

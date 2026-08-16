@@ -1,0 +1,54 @@
+@media (hover: none) and (pointer: coarse) {
+        .dvd-case { transition: box-shadow 180ms ease, transform 120ms ease-out; }
+        .dvd-card:active .dvd-case { transform: scale(0.985); }
+        .nav-action:active,
+        .search-action:active,
+        .quiet-action:active { filter: brightness(1.14); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+        button, .dvd-flipper, .dvd-case, .detail-drawer { transition: none; }
+        .dvd-cover-image,
+        .dvd-placeholder,
+        .drawer-poster,
+        .curation-thumb,
+        .result-media,
+        .result-placeholder,
+        .spotlight-image,
+        .spotlight-poster { transition: none; }
+        .detail-drawer[open], .merge-comparator-dialog[open], .spotlight-slide { animation: none; }
+        .merge-loading span { animation: none; opacity: 0.8; }
+        .home-loading-hero,
+        .home-loading-section > span,
+        .home-loading-section > div { animation: none; }
+        .library-running-signal { animation: none; }
+        .source-search-spinner { animation: none; }
+        .dvd-card:hover .dvd-flipper,
+        .dvd-card:has(.dvd-open-surface:focus-visible) .dvd-flipper { transform: none; }
+}
+
+@media (forced-colors: active) {
+        h1 {
+          background: none;
+          color: CanvasText;
+          text-shadow: none;
+        }
+        .nav-action.active,
+        .system-menu.active > summary {
+          border: 2px solid Highlight;
+          color: Highlight;
+        }
+        .search-action,
+        .action-primary,
+        .spotlight-cta,
+        .login-submit,
+        .nav-count {
+          background: ButtonFace;
+          border-color: ButtonText;
+          color: ButtonText;
+          forced-color-adjust: auto;
+        }
+        .dvd-case,
+        .spotlight,
+        .system-menu-panel { forced-color-adjust: auto; }
+}
