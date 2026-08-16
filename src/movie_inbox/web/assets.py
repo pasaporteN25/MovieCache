@@ -4,17 +4,31 @@ from __future__ import annotations
 
 import html
 from importlib.resources import files
+from pathlib import PurePosixPath
 
-_STATIC_TYPES = {
-    "style.css": "text/css; charset=utf-8",
-    "app.js": "text/javascript; charset=utf-8",
-    "login.js": "text/javascript; charset=utf-8",
-    "password-change.js": "text/javascript; charset=utf-8",
+_CONTENT_TYPES_BY_SUFFIX = {
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
 }
+
+# index.html is assembled from fragments, one per surface, in document order.
+_INDEX_FRAGMENTS = (
+    "index.shell-open.html",
+    "index.home.html",
+    "index.club.html",
+    "index.inbox-shell.html",
+    "index.inbox-curation.html",
+    "index.inbox-imports.html",
+    "index.inbox-scanner.html",
+    "index.collection.html",
+    "index.admin.html",
+    "index.dialogs.html",
+    "index.shell-close.html",
+)
 
 
 def render_html(title: str, api_token: str) -> str:
-    template = _asset("index.html").decode("utf-8")
+    template = b"".join(_asset(name) for name in _INDEX_FRAGMENTS).decode("utf-8")
     return template.replace("__MOVIE_INBOX_TITLE__", html.escape(title, quote=True)).replace(
         "__MOVIE_INBOX_TOKEN__", html.escape(api_token, quote=True)
     )
@@ -35,11 +49,27 @@ def render_password_change_html(title: str, api_token: str) -> str:
 
 
 def static_asset(name: str) -> tuple[bytes, str] | None:
-    content_type = _STATIC_TYPES.get(name)
-    if not content_type:
+    content_type = _static_content_type(name)
+    if content_type is None:
         return None
-    return _asset(name), content_type
+    try:
+        return _asset(name), content_type
+    except OSError:
+        return None
+
+
+def _static_content_type(name: str) -> str | None:
+    value = str(name or "")
+    if not value or "\\" in value or value.startswith("/"):
+        return None
+    parts = value.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        return None
+    return _CONTENT_TYPES_BY_SUFFIX.get(PurePosixPath(parts[-1]).suffix)
 
 
 def _asset(name: str) -> bytes:
-    return files("movie_inbox.web.static").joinpath(name).read_bytes()
+    resource = files("movie_inbox.web.static")
+    for part in name.split("/"):
+        resource = resource.joinpath(part)
+    return resource.read_bytes()
