@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 import tempfile
 import threading
@@ -25,7 +26,47 @@ def available_port() -> int:
         return int(listener.getsockname()[1])
 
 
+def wait_until_healthy(base_url: str) -> None:
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            with urlopen(f"{base_url}/healthz", timeout=0.5) as response:
+                if response.status == 200:
+                    return
+        except OSError:
+            time.sleep(0.05)
+    raise RuntimeError("Server did not become healthy in time")
+
+
+def run_library_scan(page, base_url: str, headers: dict[str, str], library_id: str) -> None:
+    """Run a dry_run then an apply pass, polling between and after each --
+    under a real uvicorn server (unlike TestClient) the scan itself runs in a
+    FastAPI BackgroundTask after the response is already sent."""
+    for mode in ("dry_run", "apply"):
+        run_id = page.request.post(
+            f"{base_url}/api/libraries/{library_id}/runs",
+            data=json.dumps({"mode": mode}),
+            headers=headers,
+        ).json()["run"]["id"]
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            run = page.request.get(f"{base_url}/api/library-runs/{run_id}", headers=headers).json()[
+                "run"
+            ]
+            if run["status"] == "completed":
+                break
+            if run["status"] in ("failed", "blocked"):
+                raise RuntimeError(f"Library {mode} run ended as {run['status']}: {run}")
+            time.sleep(0.1)
+        else:
+            raise RuntimeError(f"Library {mode} run did not finish in time")
+
+
 class BrowserInterfaceTests(unittest.TestCase):
+    """Colección, Ficha and structural-markup coverage on a shared, read-only
+    catalog. No test here writes to the catalog, so they can safely share one
+    server/session regardless of execution order."""
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.temporary = tempfile.TemporaryDirectory()
@@ -50,7 +91,6 @@ class BrowserInterfaceTests(unittest.TestCase):
                         "id": "akira",
                         "title": "Akira",
                         "year": "1988",
-                        "kind": "anime",
                         "status": "watched",
                     }
                 ),
@@ -69,7 +109,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         cls.port = available_port()
         cls.base_url = f"http://127.0.0.1:{cls.port}"
-        config = ViewerConfig(
+        cls.config = ViewerConfig(
             patterns=[str(cls.catalog_path)],
             title="Movie Inbox Browser Test",
             write_json=str(cls.catalog_path),
@@ -84,78 +124,391 @@ class BrowserInterfaceTests(unittest.TestCase):
             library_scheduler_poll_seconds=3600,
         )
         cls.server = uvicorn.Server(
-            uvicorn.Config(create_app(config), host="127.0.0.1", port=cls.port, log_level="error")
+            uvicorn.Config(
+                create_app(cls.config), host="127.0.0.1", port=cls.port, log_level="error"
+            )
         )
         cls.server_thread = threading.Thread(target=cls.server.run, daemon=True)
         cls.server_thread.start()
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            try:
-                with urlopen(f"{cls.base_url}/healthz", timeout=0.5) as response:
-                    if response.status == 200:
-                        break
-            except OSError:
-                time.sleep(0.05)
-        else:
-            raise RuntimeError("Browser test server did not become healthy")
+        wait_until_healthy(cls.base_url)
+
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch()
+        # bypass_csp: without it, Page.evaluate/wait_for_function on any page
+        # after the first one opened in a context hits the app's strict CSP
+        # ("script-src 'self'", no 'unsafe-eval') and raises EvalError -- a
+        # Playwright/Chromium quirk unrelated to the app itself, only visible
+        # to test automation.
+        cls.context = cls.browser.new_context(
+            viewport={"width": 1280, "height": 900}, bypass_csp=True
+        )
+        setup_page = cls.context.new_page()
+        setup_page.goto(cls.base_url)
+        setup_page.get_by_label("Usuario").fill("lucas")
+        setup_page.get_by_label("Contraseña", exact=True).fill(cls.owner_password)
+        setup_page.get_by_role("button", name="Entrar").click()
+        setup_page.wait_for_selector("#homeView:not([hidden])")
+
+        # Give "Akira" server-verified availability via a real library scan, so
+        # test_ficha_availability_panel_separates_manual_from_server_provenance
+        # can show manual vs. server provenance without a second server.
+        headers = {
+            "X-Movie-Inbox-Token": cls.config.api_token,
+            "Origin": cls.base_url,
+            "Content-Type": "application/json",
+        }
+        (cls.media_path / "Akira.1988.mkv").write_bytes(b"akira-video")
+        library = setup_page.request.post(
+            f"{cls.base_url}/api/libraries",
+            data=json.dumps(
+                {"name": "Anime", "root_path": str(cls.media_path), "schedule": "manual"}
+            ),
+            headers=headers,
+        ).json()["library"]
+        run_library_scan(setup_page, cls.base_url, headers, library["id"])
+        items = setup_page.request.get(f"{cls.base_url}/api/items", headers=headers).json()["items"]
+        akira = next(item for item in items if item["id"] == "akira")
+        if not akira["_availability"]["server"]:
+            raise RuntimeError(f"Library scan did not link Akira: {akira['_availability']}")
+        setup_page.close()
 
     @classmethod
     def tearDownClass(cls) -> None:
+        cls.context.close()
+        cls.browser.close()
+        cls.playwright.stop()
         cls.server.should_exit = True
         cls.server_thread.join(timeout=10)
         cls.temporary.cleanup()
 
-    def test_authenticated_shell_is_accessible_and_responsive(self) -> None:
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch()
-            page = browser.new_page(viewport={"width": 1280, "height": 900})
-            page.goto(self.base_url)
-            page.get_by_label("Usuario").fill("lucas")
-            page.get_by_label("Contraseña").fill(self.owner_password)
-            page.get_by_role("button", name="Entrar").click()
-            page.wait_for_selector("#homeView:not([hidden])")
-            page.wait_for_function(
-                "document.querySelector('#stats').textContent.includes('2 obras')"
+    def setUp(self) -> None:
+        self.page = self.context.new_page()
+
+    def tearDown(self) -> None:
+        self.page.close()
+
+    @staticmethod
+    def _open_and_wait_for_catalog(page) -> None:
+        """openDetail/openSearchDescription read the app's in-memory catalog,
+        which is still empty right when #homeView first becomes visible."""
+        page.goto(BrowserInterfaceTests.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+        page.wait_for_function("document.querySelector('#stats').textContent.includes('2 obras')")
+
+    def test_collection_navigation_and_responsive_layout(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        self.assertEqual(page.locator(".primary-nav > .nav-action").count(), 4)
+        self.assertEqual(page.locator(".primary-nav #randomButton").count(), 0)
+        self.assertEqual(page.locator(".header-utilities #randomButton").count(), 1)
+        self.assertFalse(
+            page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+
+        page.locator("#homeButton").focus()
+        page.keyboard.press("Tab")
+        self.assertEqual(page.evaluate("document.activeElement.id"), "catalogButton")
+
+        page.set_viewport_size({"width": 390, "height": 844})
+        self.assertFalse(
+            page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+        self.assertEqual(page.locator(".primary-nav > .nav-action").count(), 4)
+        for selector in (
+            "#homeButton",
+            "#catalogButton",
+            "#inboxButton",
+            "#clubButton",
+            "#randomButton",
+        ):
+            box = page.locator(selector).bounding_box()
+            self.assertIsNotNone(box, selector)
+            self.assertGreaterEqual(box["height"], 44, selector)
+
+    def test_ficha_description_dialog_focus_and_naming(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        page.locator("#randomButton").focus()
+        # openSearchDescription(collection, itemId): "" looks the id up in the
+        # loaded catalog items rather than in an external-search results list.
+        page.evaluate("openSearchDescription('', 'heat')")
+
+        self.assertTrue(page.get_by_role("dialog", name="Heat").is_visible())
+        # Accessible name comes from aria-labelledby -> #descriptionDialogTitle;
+        # the accessible description (aria-describedby) has to resolve to real,
+        # non-empty content too, not just point at an empty element.
+        self.assertEqual(page.evaluate("document.activeElement.id"), "closeDescriptionDialog")
+        self.assertEqual(
+            page.locator("#descriptionDialogText").inner_text(),
+            "Un detective y un ladrón profesional se enfrentan en Los Ángeles.",
+        )
+
+        page.get_by_role("button", name="Cerrar").click()
+        self.assertEqual(page.evaluate("document.activeElement.id"), "randomButton")
+
+    def test_structural_regions_are_not_live_announcements(self) -> None:
+        page = self.page
+        page.goto(self.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+
+        structural_ids = (
+            "clubCatalogPanel",
+            "collectionList",
+            "collectionDetailPanel",
+            "curationDetail",
+            "importDraftList",
+            "importReviewPanel",
+            "scannerQueue",
+            "scannerQueueDetail",
+            "libraryList",
+            "memberList",
+        )
+        selector = ", ".join(f"#{element_id}[aria-live]" for element_id in structural_ids)
+        self.assertEqual(page.locator(selector).count(), 0)
+
+    def test_ficha_availability_panel_separates_manual_from_server_provenance(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        page.evaluate("openDetail('heat')")
+        page.wait_for_selector("#detailDrawer[open]")
+        # The panel lives inside a collapsed <details> accordion; expand it
+        # before reading, the same way a person would need to.
+        page.locator("summary", has_text="Disponibilidad y fuentes").click()
+        heat_panel = page.locator(".availability-panel").inner_text()
+        page.evaluate("closeDetail()")
+
+        page.evaluate("openDetail('akira')")
+        page.wait_for_selector("#detailDrawer[open]")
+        page.locator("summary", has_text="Disponibilidad y fuentes").click()
+        akira_panel = page.locator(".availability-panel").inner_text()
+        page.evaluate("closeDetail()")
+
+        # "Heat" only has a manual declaration; "Akira" only has a real library
+        # scan behind it. Their panels must not read the same way.
+        self.assertIn("Disponible · Declaración manual", heat_panel)
+        self.assertIn("Activa", heat_panel)
+        self.assertIn("Sin archivos vinculados", heat_panel)
+
+        self.assertIn("Disponible · Inventario del servidor", akira_panel)
+        self.assertIn("Inactiva", akira_panel)
+        self.assertNotIn("Sin archivos vinculados", akira_panel)
+
+
+class ScannerBrowserTests(unittest.TestCase):
+    """Bandeja > Scanner coverage. Isolated from BrowserInterfaceTests because
+    confirming "Conservar ambas" writes a new catalog item -- sharing that
+    mutation with read-only assertions elsewhere would make test order
+    matter."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.temporary = tempfile.TemporaryDirectory()
+        root = Path(cls.temporary.name)
+        cls.catalog_path = root / "catalog.json"
+        JsonCatalogRepository(cls.catalog_path, normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "legacy-1917",
+                        "title": "1917",
+                        "year": "1917",
+                        "kind": "pelicula",
+                        "source": "imdb",
+                        "url": "https://www.imdb.com/title/tt8579674/",
+                        "imdb_url": "https://www.imdb.com/title/tt8579674/",
+                    }
+                ),
+            ]
+        )
+        cls.owner_password = "a-long-scanner-browser-test-password"
+        cls.instance_path = root / "instance.db"
+        cls.media_path = root / "media"
+        cls.media_path.mkdir()
+        (cls.media_path / "1917.2019.1080p.BluRay.mkv").write_bytes(b"numeric-title")
+        AuthService(SqliteIdentityRepository(cls.instance_path)).bootstrap_owner(
+            "lucas",
+            cls.owner_password,
+            catalog_name="Catálogo de Lucas",
+            source_paths=[str(cls.catalog_path)],
+            write_path=str(cls.catalog_path),
+        )
+        cls.port = available_port()
+        cls.base_url = f"http://127.0.0.1:{cls.port}"
+        cls.config = ViewerConfig(
+            patterns=[str(cls.catalog_path)],
+            title="Movie Inbox Scanner Test",
+            write_json=str(cls.catalog_path),
+            image_cache=False,
+            image_cache_dir=str(root / "images"),
+            image_cache_max_bytes=1024,
+            port=cls.port,
+            api_token="scanner-browser-test-token",
+            instance_db=str(cls.instance_path),
+            member_catalog_dir=str(root / "member-catalogs"),
+            library_allowed_roots=(str(cls.media_path),),
+            library_scheduler_poll_seconds=3600,
+        )
+        cls.server = uvicorn.Server(
+            uvicorn.Config(
+                create_app(cls.config), host="127.0.0.1", port=cls.port, log_level="error"
             )
+        )
+        cls.server_thread = threading.Thread(target=cls.server.run, daemon=True)
+        cls.server_thread.start()
+        wait_until_healthy(cls.base_url)
 
-            self.assertEqual(page.locator(".primary-nav > .nav-action").count(), 4)
-            self.assertEqual(page.locator(".primary-nav #randomButton").count(), 0)
-            self.assertEqual(page.locator(".header-utilities #randomButton").count(), 1)
-            self.assertFalse(
-                page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
-            )
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch()
+        # bypass_csp: without it, Page.evaluate/wait_for_function on any page
+        # after the first one opened in a context hits the app's strict CSP
+        # ("script-src 'self'", no 'unsafe-eval') and raises EvalError -- a
+        # Playwright/Chromium quirk unrelated to the app itself, only visible
+        # to test automation.
+        cls.context = cls.browser.new_context(
+            viewport={"width": 1280, "height": 900}, bypass_csp=True
+        )
+        setup_page = cls.context.new_page()
+        setup_page.goto(cls.base_url)
+        setup_page.get_by_label("Usuario").fill("lucas")
+        setup_page.get_by_label("Contraseña", exact=True).fill(cls.owner_password)
+        setup_page.get_by_role("button", name="Entrar").click()
+        setup_page.wait_for_selector("#homeView:not([hidden])")
 
-            page.locator("#homeButton").focus()
-            page.keyboard.press("Tab")
-            self.assertEqual(page.evaluate("document.activeElement.id"), "catalogButton")
+        cls.headers = {
+            "X-Movie-Inbox-Token": cls.config.api_token,
+            "Origin": cls.base_url,
+            "Content-Type": "application/json",
+        }
+        library = setup_page.request.post(
+            f"{cls.base_url}/api/libraries",
+            data=json.dumps(
+                {"name": "Peliculas", "root_path": str(cls.media_path), "schedule": "manual"}
+            ),
+            headers=cls.headers,
+        ).json()["library"]
+        run_library_scan(setup_page, cls.base_url, cls.headers, library["id"])
+        deadline = time.monotonic() + 10
+        queue: dict[str, object] = {}
+        while time.monotonic() < deadline:
+            queue = setup_page.request.get(
+                f"{cls.base_url}/api/scanner/queue", headers=cls.headers
+            ).json()
+            if queue.get("count"):
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("Scanner queue was not populated in time")
+        cls.queue_item_id = queue["items"][0]["id"]
+        setup_page.close()
 
-            page.locator("#randomButton").focus()
-            page.evaluate("openSearchDescription('', 'heat')")
-            self.assertTrue(page.get_by_role("dialog", name="Heat").is_visible())
-            page.get_by_role("button", name="Cerrar").click()
-            self.assertEqual(page.evaluate("document.activeElement.id"), "randomButton")
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.context.close()
+        cls.browser.close()
+        cls.playwright.stop()
+        cls.server.should_exit = True
+        cls.server_thread.join(timeout=10)
+        cls.temporary.cleanup()
 
-            page.set_viewport_size({"width": 390, "height": 844})
-            self.assertFalse(
-                page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
-            )
-            self.assertEqual(page.locator(".primary-nav > .nav-action").count(), 4)
-            for selector in (
-                "#homeButton",
-                "#catalogButton",
-                "#inboxButton",
-                "#clubButton",
-                "#randomButton",
-            ):
-                box = page.locator(selector).bounding_box()
-                self.assertIsNotNone(box, selector)
-                self.assertGreaterEqual(box["height"], 44, selector)
+    def test_bandeja_scanner_confirms_a_distinct_work_behind_a_review_step(self) -> None:
+        page = self.context.new_page()
+        page.goto(self.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
 
-            structural_live_regions = page.locator(
-                "#collectionList[aria-live], #scannerQueue[aria-live], #memberList[aria-live]"
-            )
-            self.assertEqual(structural_live_regions.count(), 0)
-            browser.close()
+        page.locator("#inboxButton").click()
+        page.locator("#inboxScannerMode").click()
+        page.locator(f'[data-scanner-item="{self.queue_item_id}"]').click()
+
+        # Step 1: the guard renders as "review-distinct" and is not yet
+        # confirming. Title/year/kind fields are pre-filled from the scanned
+        # filename, so no form input is needed for either step to submit.
+        page.wait_for_selector('[data-scanner-review="review-distinct"]')
+        self.assertEqual(page.locator("section.scanner-create-guard.is-confirming").count(), 0)
+        page.locator('[data-scanner-review="review-distinct"]').click()
+
+        # Step 2: the same section now carries "is-confirming" and the button
+        # flips to "create-distinct" -- the server-issued review token that
+        # gates this, not copy, is what makes the second click succeed.
+        page.wait_for_selector('[data-scanner-review="create-distinct"]')
+        self.assertGreater(page.locator("section.scanner-create-guard.is-confirming").count(), 0)
+        page.locator('[data-scanner-review="create-distinct"]').click()
+
+        page.wait_for_function(
+            f"""
+            () => fetch('/api/scanner/queue', {{
+                headers: {{'X-Movie-Inbox-Token': '{self.config.api_token}'}}
+            }}).then((response) => response.json()).then((data) => data.count === 0)
+            """,
+            timeout=10000,
+        )
+        page.close()
+
+
+class LoginAccessibilityTests(unittest.TestCase):
+    """Login page coverage. Only needs the server up, not an authenticated
+    session, so it gets its own minimal fixture."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.temporary = tempfile.TemporaryDirectory()
+        root = Path(cls.temporary.name)
+        catalog_path = root / "catalog.json"
+        JsonCatalogRepository(catalog_path, normalize_item).write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995"})]
+        )
+        instance_path = root / "instance.db"
+        AuthService(SqliteIdentityRepository(instance_path)).bootstrap_owner(
+            "lucas",
+            "a-long-login-browser-test-password",
+            catalog_name="Catálogo de Lucas",
+            source_paths=[str(catalog_path)],
+            write_path=str(catalog_path),
+        )
+        cls.port = available_port()
+        cls.base_url = f"http://127.0.0.1:{cls.port}"
+        config = ViewerConfig(
+            patterns=[str(catalog_path)],
+            title="Movie Inbox Login Test",
+            write_json=str(catalog_path),
+            image_cache=False,
+            image_cache_dir=str(root / "images"),
+            image_cache_max_bytes=1024,
+            port=cls.port,
+            api_token="login-browser-test-token",
+            instance_db=str(instance_path),
+            member_catalog_dir=str(root / "member-catalogs"),
+        )
+        cls.server = uvicorn.Server(
+            uvicorn.Config(create_app(config), host="127.0.0.1", port=cls.port, log_level="error")
+        )
+        cls.server_thread = threading.Thread(target=cls.server.run, daemon=True)
+        cls.server_thread.start()
+        wait_until_healthy(cls.base_url)
+        cls.playwright = sync_playwright().start()
+        cls.browser = cls.playwright.chromium.launch()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.browser.close()
+        cls.playwright.stop()
+        cls.server.should_exit = True
+        cls.server_thread.join(timeout=10)
+        cls.temporary.cleanup()
+
+    def test_decorative_member_photo_is_not_an_empty_landmark(self) -> None:
+        page = self.browser.new_page()
+        page.goto(f"{self.base_url}/login")
+        page.wait_for_selector("#loginForm")
+
+        # A decorative image wrapped only in `aria-hidden="true"` produces no
+        # landmark at all; the old markup used a bare <aside>, which browsers
+        # expose as an (empty, unlabelled) "complementary" landmark region.
+        snapshot = page.locator("body").aria_snapshot()
+        self.assertNotIn("complementary", snapshot)
+        page.close()
 
 
 if __name__ == "__main__":
