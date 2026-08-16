@@ -12,6 +12,8 @@ from urllib.parse import unquote, urlparse
 
 from movie_inbox.domain.catalog import canonical_url, external_source_name
 
+_MIN_SUBSTRING_LENGTH = 3
+_MIN_FUZZY_QUERY_LENGTH = 5
 _YEAR_PATTERN = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b")
 _MEDIA_QUALIFIER_PATTERN = re.compile(
     r"\s*\((?:\d{4}\s+)?(?:film|movie|pelicula|tv series|series|miniseries|anime|documentary)"
@@ -73,15 +75,18 @@ def text_match_score(value: str, query: str, query_terms: tuple[str, ...] | list
         return 0.0
     if value == query:
         return 100.0
-    if value.startswith(query):
-        return 88.0
-    if query in value:
-        return 82.0
+    if len(query) >= _MIN_SUBSTRING_LENGTH:
+        if value.startswith(query):
+            return 88.0
+        if query in value:
+            return 82.0
     value_terms = value.split()
     covered = sum(1 for term in query_terms if _term_matches(term, value_terms))
     coverage = covered / max(1, len(query_terms))
     if coverage == 1:
         return 70.0 + (12.0 * min(1.0, len(query) / max(1, len(value))))
+    if len(query) < _MIN_FUZZY_QUERY_LENGTH:
+        return coverage * 62.0
     ratio = SequenceMatcher(None, query, value).ratio()
     return max(coverage * 62.0, ratio * 58.0)
 
@@ -136,8 +141,8 @@ def _title_from_url(value: str, source: str) -> str:
 
 def _term_matches(term: str, values: list[str]) -> bool:
     return any(
-        term in value
-        or value in term
+        (len(term) >= _MIN_SUBSTRING_LENGTH and term in value)
+        or (len(value) >= _MIN_SUBSTRING_LENGTH and value in term)
         or (len(term) >= 5 and SequenceMatcher(None, term, value).ratio() >= 0.82)
         for value in values
     )

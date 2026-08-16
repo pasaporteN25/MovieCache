@@ -70,5 +70,58 @@ class CatalogSearchServiceTests(unittest.TestCase):
         self.assertEqual(results[0]["_search"]["reason"], "exact_title_missing_year")
 
 
+class SearchRankingPrecisionTests(unittest.TestCase):
+    """Regression coverage for the golden-corpus false positives fixed alongside
+    docs/search-quality.md problems #1 (short tokens) and #2 (secondary metadata)."""
+
+    def test_short_title_does_not_match_as_a_substring_of_a_longer_title(self) -> None:
+        items = [
+            {"id": "up-2009", "title": "Up", "year": "2009"},
+            {"id": "setup-2011", "title": "Setup", "year": "2011"},
+        ]
+        results = search_catalog_items(items, "Up 2009")
+        self.assertEqual([row["id"] for row in results], ["up-2009"])
+
+    def test_short_title_is_not_found_inside_an_unrelated_word(self) -> None:
+        items = [
+            {"id": "us-2019", "title": "Us", "year": "2019"},
+            {"id": "suspiria-1977", "title": "Suspiria", "year": "1977"},
+        ]
+        results = search_catalog_items(items, "Us 2019")
+        self.assertEqual([row["id"] for row in results], ["us-2019"])
+
+    def test_short_candidate_word_does_not_bleed_into_a_query_by_letter_overlap(self) -> None:
+        items = [
+            {"id": "heat-1995", "title": "Heat", "year": "1995"},
+            {"id": "different-film", "title": "A Different Film", "year": "2018"},
+        ]
+        results = search_catalog_items(items, "Heat")
+        self.assertEqual([row["id"] for row in results], ["heat-1995"])
+
+    def test_cast_and_description_do_not_count_as_title_search_evidence(self) -> None:
+        items = [
+            {"id": "heat-1995", "title": "Heat", "year": "1995"},
+            {
+                "id": "different-film",
+                "title": "A Different Film",
+                "year": "2018",
+                "cast": ["Heather Young"],
+            },
+            {
+                "id": "moonlight-2016",
+                "title": "Moonlight",
+                "year": "2016",
+                "description": "Heat and humidity frame one short scene, "
+                "but this is a different work.",
+            },
+        ]
+        results = search_catalog_items(items, "Heat")
+        self.assertEqual([row["id"] for row in results], ["heat-1995"])
+
+    def test_genre_and_tags_are_not_searchable_by_the_main_search_box(self) -> None:
+        items = [{"id": "one", "title": "Some Movie", "genres": ["Horror"], "tags": ["Horror"]}]
+        self.assertEqual(search_catalog_items(items, "Horror"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
