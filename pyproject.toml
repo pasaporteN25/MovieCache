@@ -27,7 +27,15 @@ movie-inbox = "movie_inbox.cli.main:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"movie_inbox.web" = ["static/*.html", "static/*.css", "static/*.js"]
+"movie_inbox.web" = [
+    "static/*.html",
+    "static/*.css",
+    "static/*.js",
+    "static/css/*.css",
+    "static/js/*.js",
+    "static/js/core/*.js",
+    "static/js/surfaces/*.js",
+]
 "movie_inbox.search_lab" = ["corpus/*.json"]
 
 [tool.ruff]
@@ -40,6 +48,8 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.per-file-ignores]
 # FastAPI's Depends(...) is idiomatic in argument defaults.
 "src/movie_inbox/web/app.py" = ["B008"]
+"src/movie_inbox/web/dependencies.py" = ["B008"]
+"src/movie_inbox/web/routers/*.py" = ["B008"]
 # Compatibility-only viewer with an embedded HTML/CSS/JS template; wrapping the
 # JS template literals would risk introducing a syntax error for no real benefit.
 "scripts/build_viewer.py" = ["E501"]
