@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="movie-inbox-token" content="__MOVIE_INBOX_TOKEN__">
+    <title>__MOVIE_INBOX_TITLE__</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main>
+      <header class="app-header">
+        <div class="brand-lockup">
+          <span class="brand-kicker">Video club // night shift</span>
+          <h1>__MOVIE_INBOX_TITLE__</h1>
+          <div class="stats" id="stats" aria-live="polite">Cargando...</div>
+        </div>
+        <nav class="primary-nav" aria-label="Navegación principal">
+          <button id="homeButton" class="nav-action active" type="button" aria-current="page">Inicio</button>
+          <button id="catalogButton" class="nav-action" type="button">Colección</button>
+          <button id="inboxButton" class="nav-action inbox-nav-action" type="button">
+            Bandeja <span id="inboxBadge" class="nav-count" hidden>0</span>
+          </button>
+          <button id="clubButton" class="nav-action" type="button">Club</button>
+        </nav>
+        <div class="header-utilities" role="group" aria-label="Acciones de la cuenta">
+          <button id="randomButton" class="header-command random-command" type="button">
+            <span>Al azar</span>
+            <small id="randomScopeLabel">Disponibles</small>
+          </button>
+          <details id="systemMenu" class="system-menu">
+            <summary aria-label="Abrir menú de cuenta">
+              <span id="currentUserInitial" class="account-mark" aria-hidden="true">MI</span>
+              <span id="currentUserLabel">Perfil</span>
+            </summary>
+            <div class="system-menu-panel">
+              <div class="account-overview">
+                <span class="system-menu-kicker">Cuenta activa</span>
+                <strong id="currentUserName">Cargando…</strong>
+                <span id="currentCatalogName">Catálogo personal</span>
+                <small id="currentUserRole">Owner</small>
+              </div>
+              <label class="system-menu-toggle random-scope-control">
+                <input id="randomCatalogOnly" type="checkbox" checked>
+                <span>Al azar solo entre disponibles</span>
+              </label>
+              <button id="privacyButton" class="system-menu-action" type="button">Privacidad</button>
+              <button id="adminButton" class="system-menu-action" type="button">Administrar</button>
+              <button id="logoutButton" class="system-menu-action logout-action" type="button">Cerrar sesión</button>
+            </div>
+          </details>
+        </div>
+      </header>
+

@@ -1,0 +1,301 @@
+    <dialog id="memberDialog" class="member-dialog" aria-labelledby="memberDialogTitle">
+      <form id="memberForm" class="member-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Nueva credencial</span>
+            <h2 id="memberDialogTitle">Agregar miembro</h2>
+          </div>
+          <button id="closeMemberDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields">
+          <label>
+            <span>Usuario</span>
+            <input id="memberUsername" name="username" autocomplete="off" minlength="3" maxlength="64" required>
+          </label>
+          <label>
+            <span>Nombre del cat&aacute;logo</span>
+            <input id="memberCatalogName" name="catalog_name" maxlength="120" placeholder="Se completa autom&aacute;ticamente">
+          </label>
+          <label>
+            <span>Contrase&ntilde;a temporal</span>
+            <input id="memberTemporaryPassword" name="temporary_password" type="password" autocomplete="new-password" minlength="12" placeholder="Dejar vac&iacute;o para generar una">
+          </label>
+          <label class="login-password-toggle">
+            <input id="showMemberPassword" type="checkbox">
+            <span>Mostrar contrase&ntilde;a</span>
+          </label>
+          <p id="memberDialogFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelMemberDialog" class="quiet-action" type="button">Cancelar</button>
+          <button id="submitMember" type="submit">Crear cuenta y cat&aacute;logo</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="libraryDialog" class="member-dialog library-dialog" aria-labelledby="libraryDialogTitle">
+      <form id="libraryForm" class="member-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Inventario del servidor</span>
+            <h2 id="libraryDialogTitle">Agregar biblioteca</h2>
+          </div>
+          <button id="closeLibraryDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields library-form-fields">
+          <label>
+            <span>Nombre</span>
+            <input id="libraryName" name="name" maxlength="120" placeholder="Películas principales" required>
+          </label>
+          <label>
+            <span>Ruta absoluta del servidor</span>
+            <input id="libraryRootPath" name="root_path" autocomplete="off" placeholder="/mnt/peliculas" required>
+          </label>
+          <div class="library-path-tools">
+            <div class="library-path-actions">
+              <button id="browseLibraryPath" class="quiet-action" type="button">Explorar servidor</button>
+              <button id="checkLibraryPath" class="quiet-action" type="button">Comprobar ruta</button>
+            </div>
+            <small id="libraryRootHint">La ruta debe estar dentro de una raíz habilitada al iniciar Movie Inbox.</small>
+            <p id="libraryPathFeedback" class="library-path-feedback" role="status" aria-live="polite"></p>
+          </div>
+          <section id="libraryPathBrowser" class="library-path-browser" aria-label="Carpetas permitidas del servidor" hidden>
+            <header>
+              <div><strong id="libraryPathBrowserTitle">Raíces disponibles</strong><span id="libraryPathBrowserCurrent"></span></div>
+              <div>
+                <button id="libraryPathParent" class="quiet-action" type="button" hidden>Subir</button>
+                <button id="useLibraryPath" type="button" hidden>Usar esta carpeta</button>
+              </div>
+            </header>
+            <div id="libraryPathDirectories" class="library-path-directories"></div>
+          </section>
+          <label>
+            <span>Automatización después de aplicar</span>
+            <select id="librarySchedule" name="schedule">
+              <option value="manual">Manual</option>
+              <option value="hourly">Cada hora</option>
+              <option value="daily">Diaria</option>
+            </select>
+            <small>La programación quedará apagada hasta completar la prueba y aplicar el primer inventario.</small>
+          </label>
+          <details class="library-advanced-options">
+            <summary>Opciones avanzadas</summary>
+            <label>
+              <span>Protección ante archivos ausentes</span>
+              <div class="library-ratio-control">
+                <input id="libraryMissingRatio" name="max_missing_ratio" type="number" min="0" max="100" step="5" value="50" inputmode="numeric">
+                <span>% máximo por recorrido</span>
+              </div>
+              <small>Si desaparece una proporción mayor, Movie Inbox conservará el último inventario válido.</small>
+            </label>
+          </details>
+          <p id="libraryDialogFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelLibraryDialog" class="quiet-action" type="button">Cancelar</button>
+          <button id="submitLibrary" type="submit">Guardar biblioteca</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="temporaryPasswordDialog" class="member-dialog" aria-labelledby="temporaryPasswordTitle">
+      <div class="member-dialog-surface temporary-password-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Mostrar una sola vez</span>
+            <h2 id="temporaryPasswordTitle">Credencial temporal</h2>
+          </div>
+          <button id="closeTemporaryPasswordDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="temporary-password-body">
+          <p>Entreg&aacute; esta contrase&ntilde;a a <strong id="temporaryPasswordUsername"></strong>.</p>
+          <label>
+            <span>Contrase&ntilde;a temporal</span>
+            <input id="temporaryPasswordValue" type="text" readonly>
+          </label>
+          <p id="temporaryPasswordFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="copyTemporaryPassword" type="button">Copiar contrase&ntilde;a</button>
+          <button id="finishTemporaryPassword" class="quiet-action" type="button">Listo</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog id="privacyDialog" class="member-dialog privacy-dialog" aria-labelledby="privacyDialogTitle">
+      <form id="privacyForm" class="member-dialog-surface privacy-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Tu se&ntilde;al al club</span>
+            <h2 id="privacyDialogTitle">Privacidad</h2>
+          </div>
+          <button id="closePrivacyDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="privacy-dialog-body">
+          <label class="privacy-master-control">
+            <input id="catalogShared" name="catalog_shared" type="checkbox">
+            <span>
+              <strong>Compartir mi cat&aacute;logo en el Club</strong>
+              <small>Solo pueden verlo otras cuentas activas de esta instancia.</small>
+            </span>
+          </label>
+          <fieldset id="privacyFields" class="privacy-fieldset">
+            <legend>Registro personal visible</legend>
+            <label><input id="shareStatus" name="share_status" type="checkbox"><span><strong>Estado</strong><small>Vista o pendiente</small></span></label>
+            <label><input id="shareWatchedAt" name="share_watched_at" type="checkbox"><span><strong>Fecha de vista</strong><small>Cu&aacute;ndo la marcaste como vista</small></span></label>
+            <label><input id="shareHistory" name="share_history" type="checkbox"><span><strong>Actividad de vistas</strong><small>&Uacute;ltimas obras vistas</small></span></label>
+            <label><input id="shareRating" name="share_rating" type="checkbox"><span><strong>Puntajes</strong><small>Preferencia por defecto, editable por obra</small></span></label>
+            <label><input id="shareReview" name="share_review" type="checkbox"><span><strong>Reviews</strong><small>Preferencia por defecto, editable por obra</small></span></label>
+          </fieldset>
+          <p class="privacy-boundary">Rutas, archivos locales, notas y datos operativos permanecen privados siempre.</p>
+          <p id="privacyFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelPrivacy" class="quiet-action" type="button">Cancelar</button>
+          <button id="savePrivacy" type="submit">Guardar privacidad</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="editMemberDialog" class="member-dialog" aria-labelledby="editMemberDialogTitle">
+      <form id="editMemberForm" class="member-dialog-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Ficha de miembro</span>
+            <h2 id="editMemberDialogTitle">Editar miembro</h2>
+          </div>
+          <button id="closeEditMemberDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields">
+          <label><span>Usuario</span><input id="editMemberUsername" minlength="3" maxlength="64" required></label>
+          <label><span>Nombre del cat&aacute;logo</span><input id="editMemberCatalogName" maxlength="120" required></label>
+          <p id="editMemberFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelEditMember" class="quiet-action" type="button">Cancelar</button>
+          <button id="saveMemberProfile" type="submit">Guardar cambios</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="archiveMemberDialog" class="member-dialog" aria-labelledby="archiveMemberDialogTitle">
+      <form id="archiveMemberForm" class="member-dialog-surface archive-member-surface">
+        <header class="member-dialog-header">
+          <div>
+            <span class="drawer-kicker">Baja reversible</span>
+            <h2 id="archiveMemberDialogTitle">Archivar miembro</h2>
+          </div>
+          <button id="closeArchiveMemberDialog" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="member-form-fields">
+          <p>La cuenta y sus sesiones se retirar&aacute;n. El cat&aacute;logo quedar&aacute; preservado y podr&aacute; restaurarse.</p>
+          <label>
+            <span>Escrib&iacute; <strong id="archiveMemberUsernameLabel"></strong> para confirmar</span>
+            <input id="archiveMemberConfirmation" autocomplete="off" required>
+          </label>
+          <p id="archiveMemberFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+        </div>
+        <footer class="member-dialog-actions">
+          <button id="cancelArchiveMember" class="quiet-action" type="button">Cancelar</button>
+          <button id="confirmArchiveMember" class="danger-action" type="submit">Archivar cuenta</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="sharedDetailDialog" class="detail-drawer shared-detail-dialog" aria-labelledby="sharedDetailTitle">
+      <div class="movie-dialog-surface shared-detail-surface">
+        <div class="drawer-top">
+          <div class="drawer-top-identity">
+            <strong id="sharedDetailTitle">Ficha compartida</strong>
+            <span id="sharedDetailOwner" class="drawer-feedback"></span>
+          </div>
+          <button id="closeSharedDetail" class="drawer-close" type="button">Cerrar</button>
+        </div>
+        <div id="sharedDetailBody" class="drawer-body"></div>
+      </div>
+    </dialog>
+
+    <dialog id="detailDrawer" class="detail-drawer" aria-labelledby="detailDrawerTitle">
+      <div class="movie-dialog-surface">
+        <div class="drawer-top">
+          <div class="drawer-top-identity">
+            <strong id="detailDrawerTitle">Ficha // lado B</strong>
+            <span id="detailFeedback" class="drawer-feedback" aria-live="polite"></span>
+          </div>
+          <div class="drawer-top-actions">
+            <div id="detailNavigation" class="drawer-navigation" aria-label="Navegar fichas"></div>
+            <button id="closeDetail" class="drawer-close" type="button">Cerrar</button>
+          </div>
+        </div>
+        <div id="detailBody" class="drawer-body"></div>
+      </div>
+    </dialog>
+
+    <dialog id="unsavedDetailDialog" class="unsaved-dialog" aria-labelledby="unsavedDetailTitle">
+      <div class="unsaved-dialog-body">
+        <span class="drawer-kicker">Borrador abierto</span>
+        <h2 id="unsavedDetailTitle">Hay cambios sin guardar</h2>
+        <p>Podés guardarlos antes de continuar, descartarlos o volver a la ficha.</p>
+        <div class="unsaved-dialog-actions">
+          <button id="keepEditingDetail" class="quiet-action" type="button">Volver a editar</button>
+          <button id="discardDetailChanges" class="quiet-action" type="button">Descartar</button>
+          <button id="saveDetailChanges" type="button">Guardar cambios</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="mergeComparatorDialog" class="merge-comparator-dialog" aria-labelledby="mergeComparatorTitle">
+      <div class="merge-comparator-surface">
+        <header class="merge-comparator-header">
+          <div>
+            <span class="drawer-kicker">Mesa de comparación</span>
+            <h2 id="mergeComparatorTitle">Revisar combinación</h2>
+            <p id="mergeComparatorSubtitle"></p>
+          </div>
+          <button id="closeMergeComparator" class="drawer-close" type="button" aria-label="Cerrar comparación">Cerrar</button>
+        </header>
+
+        <div class="merge-comparator-toolbar">
+          <fieldset id="mergeSurvivorControl" class="merge-survivor-control">
+            <legend>Identidad que permanece</legend>
+            <label>
+              <input type="radio" name="merge-survivor" value="left" checked>
+              <span id="mergeSurvivorLeft">Entrada A</span>
+            </label>
+            <label>
+              <input type="radio" name="merge-survivor" value="right">
+              <span id="mergeSurvivorRight">Entrada B</span>
+            </label>
+          </fieldset>
+          <label class="merge-show-all">
+            <input id="mergeShowAllFields" type="checkbox">
+            <span>Ver todos los campos</span>
+          </label>
+        </div>
+
+        <div id="mergeComparatorSummary" class="merge-comparator-summary"></div>
+        <div id="mergeComparatorFeedback" class="merge-comparator-feedback" aria-live="polite"></div>
+        <div id="mergeComparatorFields" class="merge-comparator-fields"></div>
+
+        <footer class="merge-comparator-footer">
+          <div>
+            <strong id="mergeDecisionStatus">Preparando comparación</strong>
+            <span id="mergeDecisionMeta"></span>
+          </div>
+          <div class="merge-comparator-actions">
+            <button id="cancelMergeComparator" class="quiet-action" type="button">Cancelar</button>
+            <button id="confirmReviewedMerge" type="button" disabled>Combinar entradas</button>
+          </div>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog id="descriptionDialog" aria-labelledby="descriptionDialogTitle" aria-describedby="descriptionDialogText">
+      <div class="description-dialog-body">
+        <h2 id="descriptionDialogTitle"></h2>
+        <p id="descriptionDialogText"></p>
+        <div class="description-dialog-actions">
+          <button id="closeDescriptionDialog" type="button">Cerrar</button>
+        </div>
+      </div>
+    </dialog>

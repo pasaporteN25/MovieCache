@@ -1,0 +1,72 @@
+      <section id="clubView" class="app-view club-view" hidden>
+        <header class="club-heading">
+          <div>
+            <span class="eyebrow">Estantes de la instancia</span>
+            <h2 id="clubTitle" class="view-focus-target" tabindex="-1">El club</h2>
+            <p>Cat&aacute;logos compartidos por miembros y colecciones locales que pod&eacute;s seguir sin mezclarlas con tu archivo.</p>
+          </div>
+          <button id="refreshClub" class="quiet-action" type="button">Actualizar club</button>
+        </header>
+        <nav id="clubModeTabs" class="club-mode-tabs" aria-label="Secciones del Club">
+          <button id="clubCollectionsMode" class="active" type="button" data-club-mode="collections" aria-pressed="true">
+            Colecciones <span id="clubCollectionsCount">0</span>
+          </button>
+          <button id="clubMembersMode" type="button" data-club-mode="members" aria-pressed="false">
+            Miembros <span id="clubMembersCount">0</span>
+          </button>
+        </nav>
+        <p id="clubFeedback" class="club-feedback" role="status" aria-live="polite"></p>
+        <section id="clubMembersPanel" class="club-mode-panel" hidden>
+          <nav id="clubMemberTabs" class="club-member-tabs" aria-label="Cat&aacute;logos compartidos"></nav>
+          <section id="clubCatalogPanel" class="club-catalog-panel">
+            <div class="club-empty">
+              <strong>El estante compartido est&aacute; vac&iacute;o</strong>
+              <p>Cuando alguien habilite su cat&aacute;logo aparecer&aacute; en este espacio.</p>
+            </div>
+          </section>
+          <button id="clubLoadMore" class="catalog-more" type="button" hidden>Cargar m&aacute;s</button>
+        </section>
+
+        <section id="clubCollectionsPanel" class="club-mode-panel collections-panel">
+          <section id="collectionDirectory" class="collection-directory" aria-labelledby="collectionDirectoryTitle">
+            <header class="collection-directory-heading">
+              <div>
+                <span class="section-kicker">Programaci&oacute;n local</span>
+                <h3 id="collectionDirectoryTitle">Colecciones para seguir</h3>
+                <p>Seguir conserva este estante separado. Eleg&iacute; qu&eacute; obras quer&eacute;s llevar a tu cat&aacute;logo.</p>
+              </div>
+              <span id="followedCollectionsSummary" class="collection-directory-summary">0 siguiendo</span>
+            </header>
+            <div id="collectionList" class="collection-list"></div>
+          </section>
+
+          <section id="collectionDetailPanel" class="collection-detail-panel" hidden>
+            <button id="backToCollections" class="text-action collection-back-action" type="button">Volver a colecciones</button>
+            <header class="collection-detail-heading">
+              <div>
+                <span id="collectionDetailKicker" class="section-kicker">Colecci&oacute;n local</span>
+                <h3 id="collectionDetailTitle" class="view-focus-target" tabindex="-1">Colecci&oacute;n</h3>
+                <p id="collectionDetailDescription"></p>
+                <a id="collectionDetailSource" class="collection-source-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Ver fuente</a>
+              </div>
+              <div class="collection-detail-actions">
+                <button id="collectionFollowButton" class="quiet-action" type="button">Seguir</button>
+              </div>
+            </header>
+            <div id="collectionStats" class="collection-stats" aria-label="Estado de la colecci&oacute;n"></div>
+            <div class="collection-bulk-bar">
+              <label class="collection-select-control">
+                <input id="selectMissingCollectionItems" type="checkbox">
+                <span>Seleccionar faltantes</span>
+              </label>
+              <span id="collectionSelectionSummary">0 seleccionadas</span>
+              <div>
+                <button id="addCollectionSelection" type="button" disabled>Agregar selecci&oacute;n</button>
+                <button id="addMissingCollectionItems" class="quiet-action" type="button">Agregar faltantes</button>
+              </div>
+            </div>
+            <div id="collectionItems" class="club-grid collection-item-grid"></div>
+          </section>
+        </section>
+      </section>
+

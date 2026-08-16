@@ -1,0 +1,41 @@
+      <section id="homeView" class="app-view home-view" aria-busy="true">
+        <section id="spotlight" class="spotlight" aria-labelledby="spotlightTitle">
+          <div class="spotlight-bar">
+            <div>
+              <span class="eyebrow">Programación personal</span>
+              <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Cartelera del día</h2>
+            </div>
+            <div class="spotlight-date-control">
+              <div class="spotlight-date-tabs" role="group" aria-label="Día de las recomendaciones">
+                <button id="homeDateToday" type="button" data-click="home-date-today" aria-pressed="true">Hoy</button>
+                <button id="homeDateYesterday" type="button" data-click="home-date-yesterday" aria-pressed="false">Ayer</button>
+              </div>
+              <time id="homeDate" class="spotlight-date"></time>
+            </div>
+          </div>
+          <div id="spotlightStage" class="spotlight-stage" aria-live="off">
+            <div class="home-loading-hero" aria-hidden="true"></div>
+          </div>
+        </section>
+
+        <p id="homeFeedback" class="home-feedback" role="status" aria-live="polite" hidden></p>
+        <div id="homeSections" class="home-editorial-sections">
+          <section class="home-loading-section" aria-hidden="true">
+            <span></span>
+            <div></div>
+          </section>
+        </div>
+        <section class="home-empty-state" id="homeEmpty" hidden>
+          <div>
+            <span class="section-kicker">Tu archivo empieza acá</span>
+            <h2>Prepará tu primera cartelera</h2>
+            <p>Agregá obras, importá una lista o seguí una colección para construir una programación personal.</p>
+          </div>
+          <div class="home-empty-actions">
+            <button type="button" data-click="home-empty-catalog">Abrir colección</button>
+            <button class="quiet-action" type="button" data-click="home-empty-import">Importar lista</button>
+            <button class="quiet-action" type="button" data-click="home-empty-club">Explorar Club</button>
+          </div>
+        </section>
+      </section>
+

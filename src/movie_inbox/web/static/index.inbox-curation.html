@@ -1,0 +1,37 @@
+        <section id="curationInboxPanel" class="inbox-mode-panel">
+        <nav class="curation-tabs" aria-label="Filtrar casos de curaduría">
+          <button class="curation-tab active" type="button" data-curation-filter="pending" aria-pressed="true">
+            Pendientes <span id="curationPendingCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="duplicate" aria-pressed="false">
+            Duplicados <span id="curationDuplicateCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="missing_link" aria-pressed="false">
+            Sin link <span id="curationMissingCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="deferred" aria-pressed="false">
+            Pospuestas <span id="curationDeferredCount">0</span>
+          </button>
+          <button class="curation-tab" type="button" data-curation-filter="history" aria-pressed="false">
+            Actividad <span id="curationHistoryCount">0</span>
+          </button>
+        </nav>
+
+        <div id="curationFeedback" class="curation-feedback" aria-live="polite"></div>
+        <section class="curation-workbench" aria-label="Casos de curaduría">
+          <div class="curation-queue-panel">
+            <div class="curation-panel-heading">
+              <strong id="curationQueueTitle">Decisiones pendientes</strong>
+              <span id="curationQueueMeta">0 casos</span>
+            </div>
+            <div id="curationQueue" class="curation-queue" aria-label="Casos disponibles"></div>
+          </div>
+          <div id="curationDetail" class="curation-detail">
+            <div class="curation-empty">
+              <strong>Seleccioná un caso</strong>
+              <p>La evidencia y las acciones disponibles aparecerán en esta mesa.</p>
+            </div>
+          </div>
+        </section>
+        </section>
+
