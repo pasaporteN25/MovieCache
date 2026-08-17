@@ -17,6 +17,7 @@ from movie_inbox.application.curation_service import (
     curation_counts as curation_counts,
 )
 from movie_inbox.application.curation_workflow import CurationWorkflowService
+from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain import catalog as domain
 from movie_inbox.domain.metadata import METADATA_FIELDS
@@ -112,7 +113,9 @@ def catalog_service(path: Path) -> CatalogService:
     return _CATALOG_SERVICES[key]
 
 
-def curation_workflow(config: ViewerConfig) -> CurationWorkflowService:
+def curation_workflow(
+    config: ViewerConfig, availability_service: AvailabilityService
+) -> CurationWorkflowService:
     primary_path = Path(config.write_json)
     try:
         key = str(primary_path.resolve())
@@ -123,6 +126,7 @@ def curation_workflow(config: ViewerConfig) -> CurationWorkflowService:
             lambda path: catalog_service(path).repository,
             JsonCurationHistoryRepository(curation_history_path(primary_path)),
             MemoryCurationHistoryRepository(),
+            availability_service,
         )
     return _CURATION_WORKFLOWS[key]
 

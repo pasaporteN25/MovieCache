@@ -105,9 +105,9 @@
           : Boolean(manual || server || isInCatalog(item?.en_catalogo));
         const fileCount = Math.max(0, Number(details.file_count || 0));
         const origin = server && manual
-          ? "Servidor y declaración manual"
+          ? "Inventario verificado y declaración manual"
           : server
-            ? "Inventario del servidor"
+            ? "Inventario verificado"
             : manual ? "Declaración manual" : "Sin procedencia asociada";
         return { effective, manual, server, fileCount, origin, details };
       }

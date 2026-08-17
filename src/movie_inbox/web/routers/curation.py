@@ -11,15 +11,17 @@ from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.curation_workflow import CurationWorkflowError
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain.merge_review import MergeReviewError
-from movie_inbox.web.catalog_api import build_curation_payload, load_items
+from movie_inbox.web.catalog_api import build_curation_payload
 from movie_inbox.web.dependencies import (
     authorized_json,
     catalog_pointer,
     comparison_inputs,
     history_session_id,
     request_workflow,
+    require_ready_identity,
     require_token,
     session_catalog,
+    session_catalog_rows,
 )
 from movie_inbox.web.responses import curation_application_error_response, repository_error_response
 
@@ -29,8 +31,8 @@ router = APIRouter()
 @router.get("/api/curation", dependencies=[Depends(require_token)])
 def curation(request: Request) -> JSONResponse:
     try:
-        catalog = session_catalog(request)
-        rows = catalog.public_rows(load_items(catalog.config.patterns))
+        identity = require_ready_identity(request)
+        _, _, rows = session_catalog_rows(request, identity)
         return JSONResponse(build_curation_payload(rows))
     except CatalogRepositoryError as error:
         return repository_error_response(error)

@@ -12,6 +12,7 @@ from movie_inbox.application.curation_history import (
     CurationHistoryRepository,
     normalize_history_mode,
 )
+from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.application.repository import CatalogRepository
 from movie_inbox.domain.catalog import has_external_link, normalize_item
 from movie_inbox.domain.curation import (
@@ -63,10 +64,12 @@ class CurationWorkflowService:
         repository_factory: RepositoryFactory,
         persistent_history: CurationHistoryRepository,
         session_history: CurationHistoryRepository,
+        availability_service: AvailabilityService | None = None,
     ) -> None:
         self.repository_factory = repository_factory
         self.persistent_history = persistent_history
         self.session_history = session_history
+        self.availability_service = availability_service
 
     def compare(
         self,
@@ -88,8 +91,12 @@ class CurationWorkflowService:
         )
         review["left"]["reference"] = left.payload()
         review["left"]["external"] = False
+        review["left"]["_availability"] = self._decorated_item(left_state["item"]).get(
+            "_availability"
+        )
         review["right"]["reference"] = right.payload() if right is not None else {}
         review["right"]["external"] = external
+        review["right"]["_availability"] = self._decorated_item(right_item).get("_availability")
         review["can_select_survivor"] = not external
         return review
 
@@ -176,7 +183,7 @@ class CurationWorkflowService:
             },
         )
         return {
-            "item": merged_item,
+            "item": self._decorated_item(merged_item),
             "operation": public_operation(operation),
         }
 
@@ -309,6 +316,16 @@ class CurationWorkflowService:
         if incoming is None:
             raise MergeReviewError("Missing comparison item")
         return None, normalize_item(incoming).to_dict(), True
+
+    def _decorated_item(self, item: Mapping[str, Any]) -> dict[str, Any]:
+        """Attach `_availability` for display only -- never fed back into
+        apply_reviewed_merge or persistence, so `en_catalogo` there stays the raw
+        manual flag."""
+        if self.availability_service is None:
+            return dict(item)
+        return self.availability_service.decorate_items(
+            [dict(item)], include_sources=False
+        )[0]
 
     def _capture(self, pointer: CatalogPointer) -> dict[str, Any]:
         repository = self.repository_factory(pointer.path)

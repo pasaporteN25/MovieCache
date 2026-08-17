@@ -1,3 +1,4 @@
+import { availabilityPill } from "./availability.js";
 import { cachedImageSrc, card } from "./card.js";
 import { loadCatalog } from "./catalog-data.js";
 import { releaseDateLabel } from "./detail.js";
@@ -195,7 +196,7 @@ import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeed
             <strong>${escapeHtml(item.title || "Sin título")}</strong>
             <small>${escapeHtml([item.year, item.kind, item.source].filter(Boolean).join(" · "))}</small>
             <div class="card-badges">
-              <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "manual: sí" : "manual: no"}</span>
+              ${availabilityPill(item)}
               <span class="pill ${item.local_files_count ? "good" : "muted"}">${item.local_files_count || 0} archivos</span>
             </div>
           </div>
