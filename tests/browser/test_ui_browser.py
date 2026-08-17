@@ -429,6 +429,7 @@ class ScannerBrowserTests(unittest.TestCase):
             ),
             headers=cls.headers,
         ).json()["library"]
+        cls.library_id = library["id"]
         run_library_scan(setup_page, cls.base_url, cls.headers, library["id"])
         deadline = time.monotonic() + 10
         queue: dict[str, object] = {}
@@ -549,6 +550,139 @@ class ScannerBrowserTests(unittest.TestCase):
         # text-transform: uppercase (same styling as .scanner-candidate-index)
         # means inner_text() reflects the rendered case, not the DOM string.
         self.assertEqual(origin.inner_text(), "EN TU CATÁLOGO")
+
+        page.close()
+
+    def test_bandeja_scanner_cause_bucket_badges_and_filters_the_queue(self) -> None:
+        # Runs before ..._confirms_... (alphabetical "cause" < "confirms"):
+        # read-only, but the queue item needs to still be pending.
+        page = self.context.new_page()
+        page.goto(self.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+
+        page.locator("#inboxButton").click()
+        page.locator("#inboxScannerMode").click()
+        page.wait_for_selector(f'[data-scanner-item="{self.queue_item_id}"]')
+
+        # "1917" detected as title="1917"/year="2019" against a catalog item
+        # year="1917" -- exact title, year conflict -- lands in year_type_conflict.
+        self.assertEqual(page.locator("#scannerAllCount").inner_text(), "1")
+        self.assertEqual(page.locator("#scannerYearTypeConflictCount").inner_text(), "1")
+        self.assertEqual(page.locator("#scannerMissingIdentityCount").inner_text(), "0")
+        self.assertEqual(page.locator("#scannerLikelyExistingCount").inner_text(), "0")
+        self.assertEqual(page.locator("#scannerNoSignalCount").inner_text(), "0")
+
+        row = page.locator(f'[data-scanner-item="{self.queue_item_id}"]')
+        # .member-state is text-transform: uppercase; inner_text() reflects
+        # the rendered case, not the DOM string (same as P1-b's origin chip).
+        self.assertIn("CONFLICTO DE AÑO/TIPO", row.inner_text())
+        self.assertGreater(row.locator(".member-state-attention").count(), 0)
+
+        page.locator('[data-scanner-filter="missing_identity"]').click()
+        page.wait_for_selector(".curation-empty.compact")
+
+        page.locator('[data-scanner-filter="year_type_conflict"]').click()
+        page.wait_for_selector(f'[data-scanner-item="{self.queue_item_id}"]')
+
+        page.close()
+
+    def test_bandeja_scanner_candidates_beyond_three_stay_collapsed(self) -> None:
+        # Independent of the alphabetical-order convention the other tests in
+        # this class rely on: this one cleans up its own queue item via
+        # addCleanup, so it can't leak state into ..._confirms_... regardless
+        # of when it runs.
+        (self.media_path / "Quartz Lantern Meridian.2010.1080p.mkv").write_bytes(
+            b"collapsed-candidates"
+        )
+
+        def add_items(items: list) -> tuple[bool, None]:
+            items.extend(
+                normalize_item(row)
+                for row in [
+                    {
+                        "id": "quartz-a",
+                        "title": "Quartz Lantern Meridian",
+                        "year": "2010",
+                        "kind": "documental",
+                    },
+                    {
+                        "id": "quartz-b",
+                        "title": "Quartz Lantern Meridian",
+                        "kind": "pelicula",
+                    },
+                    {
+                        "id": "quartz-c",
+                        "title": "Quartz Lantern Meridian",
+                        "year": "2010",
+                        "kind": "serie",
+                    },
+                    {
+                        "id": "quartz-d",
+                        "title": "Quartz Lantern Meridian",
+                        "year": "1975",
+                        "kind": "pelicula",
+                    },
+                    {
+                        "id": "quartz-e",
+                        "title": "Quartz Lantern Meridian",
+                        "year": "1980",
+                        "kind": "pelicula",
+                    },
+                ]
+            )
+            return True, None
+
+        JsonCatalogRepository(self.catalog_path, normalize_item).mutate(add_items)
+
+        page = self.context.new_page()
+        page.goto(self.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+        run_library_scan(page, self.base_url, self.headers, self.library_id)
+
+        deadline = time.monotonic() + 10
+        queue_item_id = ""
+        while time.monotonic() < deadline:
+            queue = page.request.get(
+                f"{self.base_url}/api/scanner/queue", headers=self.headers
+            ).json()
+            match = next(
+                (
+                    item
+                    for item in queue["items"]
+                    if item["detected_title"] == "Quartz Lantern Meridian"
+                ),
+                None,
+            )
+            if match:
+                queue_item_id = match["id"]
+                break
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("New scanner item was not found in time")
+
+        self.addCleanup(
+            lambda: self.context.request.post(
+                f"{self.base_url}/api/scanner/queue/{queue_item_id}",
+                data=json.dumps({"action": "ignore"}),
+                headers=self.headers,
+            )
+        )
+
+        page.locator("#inboxButton").click()
+        page.locator("#inboxScannerMode").click()
+        page.locator(f'[data-scanner-item="{queue_item_id}"]').click()
+        page.wait_for_selector(".scanner-candidate-card")
+
+        # All 5 fixture items must surface as candidates -- if the legacy
+        # silent-auto-match path swallowed one, this catches it directly.
+        self.assertEqual(page.locator(".scanner-candidate-card").count(), 5)
+        self.assertEqual(page.locator(".scanner-candidates > .scanner-candidate-card").count(), 3)
+        hidden_cards = page.locator("details.scanner-candidates-more .scanner-candidate-card")
+        self.assertEqual(hidden_cards.count(), 2)
+        self.assertFalse(hidden_cards.first.is_visible())
+
+        page.locator("details.scanner-candidates-more summary").click()
+        self.assertTrue(hidden_cards.first.is_visible())
 
         page.close()
 

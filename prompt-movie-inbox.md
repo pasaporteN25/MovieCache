@@ -54,9 +54,53 @@ por tu cuenta.
 
 ## Progreso (actualizado 2026-08-17)
 
-Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0) en curso, P1-c,
-P1-a y P1-b cerrados. Sesión nueva a partir de acá — no hace falta releer el
-historial de conversación, esto + `CLAUDE.md` + `git log` alcanza.
+Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0): los 4 P1
+(P1-c, P1-a, P1-b, P1-d) están cerrados. Sesión nueva a partir de acá — no
+hace falta releer el historial de conversación, esto + `CLAUDE.md` +
+`git log` alcanza. Falta el gate final de Fase 5: correr `$impeccable audit`
+de nuevo sobre la misma superficie y comparar score/P1 count contra la
+corrida del 2026-08-14 — no ejecutado todavía, es el único pendiente antes de
+poder considerar la Fase 5 completamente cerrada.
+
+**Fase 5, P1-d cerrado (2026-08-17).** La cola de Scanner se organiza por
+causa y confianza en vez de solo `Comparar`/`Sin coincidencia`:
+`scannerQueueCauseBucket()` nuevo en `inbox-scanner.js` clasifica cada caso
+top-down en `Falta identidad` (`!detected_year`, prioridad — problema de
+higiene del archivo, no de matching), `Conflicto de año/tipo` (alguna
+candidata con `exact_title_year_mismatch`/`exact_title_kind_mismatch`),
+`Probable ficha existente` (`exact_title_missing_year`) o `Sin señales`
+(`else` incondicional — catch-all, no un set enumerado). Los 5 chips de
+filtro reemplazan a los 2 viejos (no se agregan, la crítica pedía "no solo
+por Comparar y Sin coincidencia"), y el header del panel de detalle se
+unificó con el mismo vocabulario que la fila de la lista (antes decían cosas
+distintas para el mismo caso). Cuando un caso tiene más de 3 candidatas se
+muestran las 3 de mayor score (arreglado de paso: el array fusionado de
+candidatas de scan-time + create-time-conflict no estaba ordenado por score,
+sino por origen) y el resto queda en un `<details>` nativo "Ver N candidatas
+más" — mismo patrón ya usado en `admin-libraries.js`.
+
+Mi primer diseño de los 4 buckets tenía dos errores reales que un Plan agent
+encontró y yo verifiqué a mano antes de implementar: (1) enumerar los
+`reason` de "Sin señales" por lista cerrada tiene un hueco — si dos catalog
+items distintos matchean ambos por `exact_title_year` (`len(accepted) > 1`
+en `_classification()`), esas candidatas aparecen visibles con un `reason`
+"aceptado" que ninguna lista cerrada cubre; el fix es un `else`
+incondicional. (2) Clasificar por "la candidata de mayor score" invierte la
+señal que la crítica quiere destacar — verifiqué a mano `candidate_score()`:
+un año-mismatch con título exacto cae a `0.73` mientras un título apenas
+parecido con año casualmente igual puede superar `0.9`; el fix es "¿hay
+ALGUNA candidata con este reason?", no "¿cuál es el reason de la candidata
+top?". Confirmado 100% Scanner — Curaduría no tiene ningún array de
+candidatas con `score`/`reason` que agrupar por causa. También se confirmó
+que "mantener merges automáticos solo para IDs externos o título+año
+exactos" (la otra mitad del pedido de la crítica) ya estaba cerrado sin
+código que tocar, y que no existe ninguna superficie de lote en todo el
+proyecto — nada que revisar ahí. Verificado con 262 tests de Python
+(`scripts\check.ps1` en verde) + 11 Playwright (2 nuevos, con fixture propio
+de 5 candidatas para el tope 3 — score verificado a mano campo por campo) +
+recorrido manual en browser real contra un catálogo sintético que ejercita
+los 4 buckets (incluido el caso mixto de "Quartz Lantern Meridian", con
+razones de dos buckets distintos en el mismo caso, priorizado correctamente).
 
 **Fase 5, P1-b cerrado (2026-08-17).** Scanner deja de presentar "sin
 candidata" como ausencia comprobada: la rama sin candidatas cambia de "Obra

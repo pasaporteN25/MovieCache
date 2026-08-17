@@ -12,6 +12,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   compartida, ficha en tu catálogo) afecta la decisión actual, y el aviso de
   pendientes separa cuántos son tuyos de cuántos son del inventario en vez
   de sumarlos en un solo número.
+- La cola de Scanner se organiza por causa y confianza en vez de solo
+  `Comparar`/`Sin coincidencia`: cada caso se etiqueta como `Falta identidad`,
+  `Conflicto de año/tipo`, `Probable ficha existente` o `Sin señales`, tanto
+  en la fila de la lista como en el detalle, con filtros nuevos para cada
+  una. Cuando un caso tiene más de 3 candidatas, se muestran las 3 de mayor
+  similitud y el resto queda un clic atrás en "Ver N candidatas más".
 
 ### Corregido
 

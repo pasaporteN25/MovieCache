@@ -310,8 +310,9 @@
         padding: 10px 12px 12px;
       }
       .scanner-queue-filters {
-        display: grid;
-        grid-template-columns: auto auto minmax(0, 1fr);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
       }
       .scanner-queue-filters button {
         background: var(--surface-control);
@@ -323,7 +324,6 @@
         padding: 5px 7px;
         white-space: nowrap;
       }
-      .scanner-queue-filters button + button { border-left: 0; }
       .scanner-queue-filters button.active {
         background: rgba(34, 216, 229, 0.1);
         color: var(--teal);
@@ -355,6 +355,7 @@
       .scanner-queue-item > span:not(.scanner-queue-state),
       .scanner-queue-item small { color: var(--muted); }
       .scanner-queue-state { color: var(--gold); font-size: var(--text-label); font-weight: 800; text-transform: uppercase; }
+      .scanner-queue-item > .member-state { justify-self: start; width: auto; }
       .scanner-queue-detail { min-width: 0; padding: 20px; }
       .scanner-case-heading { align-items: start; display: flex; gap: 18px; justify-content: space-between; }
       .scanner-case-heading h3 {
@@ -399,6 +400,8 @@
       .scanner-candidates,
       .scanner-confirm-detected { display: grid; gap: 12px; margin-top: 24px; }
       .scanner-candidates { gap: 14px; }
+      .scanner-candidates-more { display: grid; gap: 14px; }
+      .scanner-candidates-more > summary { color: var(--teal); cursor: pointer; font-size: var(--text-meta); }
       .scanner-candidates-heading h4,
       .scanner-confirm-detected h4 { margin: 0; }
       .scanner-candidates-heading p,
