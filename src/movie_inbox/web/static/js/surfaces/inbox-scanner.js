@@ -3,6 +3,7 @@ import { loadCatalog } from "../core/catalog-data.js";
 import { fields } from "../core/fields.js";
 import { escapeAttr, escapeHtml, hasHost, normalizeText } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
+import { findLocalMatchForItem } from "../core/search-bridge.js";
 import { renderScopeStrip, scannerActionReceipt, scannerScopeStates, summarizeScopeStates } from "../core/scope-strip.js";
 import { curationCounts, currentIdentity } from "../core/state.js";
 import { libraryErrorMessage, loadLibraries } from "./admin-libraries.js";
@@ -196,10 +197,10 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
             <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} ${candidates.length === 1 ? "candidata" : "candidatas"}` : "Sin coincidencia"}</span>
           </header>
           <div class="scanner-scope-note" role="note">
-            <strong>${candidates.length ? "Vincular con una obra existente" : "Obra ausente del catálogo"}</strong>
+            <strong>${candidates.length ? "Vincular con una obra existente" : "No encontramos una coincidencia segura"}</strong>
             <span>${candidates.length
               ? `Elegí la ficha que representa ${multipart ? "estas partes" : "este archivo"}. Vincular sólo registra su disponibilidad física; no crea ni combina fichas.`
-              : `No encontramos una ficha compatible. Podés agregarla a tu catálogo personal y vincular ${multipart ? "estas partes" : "este archivo"} sin marcarla como vista.`}</span>
+              : `La comprobación automática no es exhaustiva: puede no reconocer variantes de título o ediciones. Buscá en tu catálogo antes de dar de alta una ficha nueva; si confirmás que no está, podés agregarla y vincular ${multipart ? "estas partes" : "este archivo"} sin marcarla como vista.`}</span>
           </div>
           <dl class="scanner-file-facts">
             <div><dt>Biblioteca</dt><dd>${escapeHtml(item.library_name || "Biblioteca")}</dd></div>
@@ -211,6 +212,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${candidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}</section>` : ""}
           <section class="scanner-confirm-detected${candidates.length ? " scanner-create-guard" : ""}${distinctReviewReady ? " is-confirming" : ""}">
             <div><h4>${createHeading}</h4><p>${createDescription}</p></div>
+            ${candidates.length ? "" : `<button class="quiet-action" type="button" data-scanner-search-local data-file-id="${escapeAttr(item.id)}">Buscar en tu catálogo</button>`}
             <form data-scanner-confirm-form>
               <label><span>Título</span><input name="title" value="${escapeAttr(createDraft.title ?? item.detected_title ?? "")}" maxlength="240" required></label>
               <label><span>Año</span><input name="year" value="${escapeAttr(createDraft.year ?? item.detected_year ?? "")}" inputmode="numeric" pattern="(18|19|20|21)[0-9]{2}" maxlength="4" required></label>
@@ -288,7 +290,10 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
             <div>
               <span class="scanner-candidate-index">Candidata ${index + 1}</span>
               <strong>${escapeHtml(title)}</strong>
-              <span>${escapeHtml(scannerCandidateReason(candidate.reason))} · ${escapeHtml(formatScannerScore(candidate.score))}</span>
+              <span class="scanner-candidate-meta">
+                ${scannerCandidateOrigin(candidate.catalog_origin) ? `<span class="scanner-candidate-origin">${escapeHtml(scannerCandidateOrigin(candidate.catalog_origin))}</span>` : ""}
+                ${escapeHtml(scannerCandidateReason(candidate.reason))} · ${escapeHtml(formatScannerScore(candidate.score))}
+              </span>
             </div>
             <button class="action-primary" type="button" data-scanner-review="${action}" ${reference} data-file-id="${escapeAttr(selectedScannerItemId)}">Vincular ${Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "archivo"}</button>
           </header>
@@ -355,6 +360,10 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         return `similitud ${Math.round((score <= 1 ? score * 100 : score))}%`;
       }
 
+      export function scannerCandidateOrigin(origin) {
+        return { own_catalog: "En tu catálogo", shared_catalog: "Catálogo compartido" }[origin] || "";
+      }
+
       export function scannerCandidateReason(reason) {
         return {
           shared_external_url: "Misma fuente externa",
@@ -368,6 +377,13 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
       }
 
       export async function handleScannerReviewAction(event) {
+        const searchLocalButton = event.target.closest?.("[data-scanner-search-local]");
+        if (searchLocalButton) {
+          event.preventDefault();
+          const item = scannerQueue.find((entry) => entry.id === (searchLocalButton.dataset.fileId || selectedScannerItemId));
+          if (item) await findLocalMatchForItem(item);
+          return;
+        }
         const button = event.submitter?.closest?.("[data-scanner-review]")
           || event.target.closest?.("[data-scanner-review]")
           || event.target.querySelector?.("[data-scanner-confirm-form] [data-scanner-review]");

@@ -54,9 +54,36 @@ por tu cuenta.
 
 ## Progreso (actualizado 2026-08-17)
 
-Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0) en curso, P1-c
-y P1-a cerrados. Sesión nueva a partir de acá — no hace falta releer el
+Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0) en curso, P1-c,
+P1-a y P1-b cerrados. Sesión nueva a partir de acá — no hace falta releer el
 historial de conversación, esto + `CLAUDE.md` + `git log` alcanza.
+
+**Fase 5, P1-b cerrado (2026-08-17).** Scanner deja de presentar "sin
+candidata" como ausencia comprobada: la rama sin candidatas cambia de "Obra
+ausente del catálogo" a "No encontramos una coincidencia segura", aclara que
+la comprobación no es exhaustiva, y ofrece un botón "Buscar en tu catálogo"
+(`findLocalMatchForItem()` nuevo en `core/search-bridge.js`, reusa
+`runSearch()` de Colección) antes de permitir el alta. Cada candidata de
+Scanner muestra además su procedencia — `En tu catálogo` o `Catálogo
+compartido` — junto a la razón de confianza que ya existía; el backend la
+calcula taggeando transitoriamente `catalog_universe()` (`_scope_owner`,
+mismo patrón no persistido que `_availability` de P1-c) y sumando
+`catalog_origin` a cada candidata en `_classification()` y en
+`ensure_scanner_item()`. La crítica original pedía 3 etiquetas de procedencia
+(`En tu catálogo` / `Identidad del inventario` / `Catálogo compartido`); un
+Plan agent y yo confirmamos que el código solo sostiene 2 reales — toda
+candidata de Scanner está respaldada por un catalog item real de alguna
+cuenta, no existe una tercera fuente de "identidad sin ficha" — así que
+colapsamos a 2 en vez de inventar una categoría sin dato detrás. De paso se
+agregó un tie-break (`_better_candidate()`) para cuando la misma obra vive en
+tu catálogo y en uno compartido a la vez: sin él, cuál "gana" en un empate de
+score dependía del orden de iteración de las cuentas, no de nada semántico —
+verificado con un test que deliberadamente lista la candidata compartida
+primero. Verificado con 262 tests de Python (`scripts\check.ps1` en verde) +
+9 Playwright + recorrido manual en browser real contra un catálogo sintético
+con cuenta compartida (consola sin errores, layout mobile sin overflow).
+Queda P1-d — triage de la cola por causa y confianza —, el más grande de los
+cuatro, para una sesión aparte.
 
 **Fase 5, P1-c cerrado (2026-08-17, commit `4771c5c`).** Presentador único de
 disponibilidad: `core/availability.js` nuevo, adoptado en `card.js`, `merge.js`

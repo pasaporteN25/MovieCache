@@ -420,6 +420,17 @@
       .scanner-candidate-header > div > span:last-child { color: var(--muted); font-size: var(--text-caption); }
       .scanner-candidate-header button { flex: 0 0 auto; width: auto; }
       .scanner-candidate-index { color: var(--teal); font-size: var(--text-label); font-weight: 800; text-transform: uppercase; }
+      .scanner-candidate-meta { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+      .scanner-candidate-origin {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        flex: 0 0 auto;
+        font-size: var(--text-label);
+        font-weight: 800;
+        padding: 2px 8px;
+        text-transform: uppercase;
+      }
       .scanner-field-comparison { border-top: 1px solid var(--line); display: grid; }
       .scanner-comparison-head,
       .scanner-comparison-row {

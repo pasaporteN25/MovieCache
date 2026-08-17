@@ -2,7 +2,7 @@ import { fields } from "./fields.js";
 import { showView } from "./router.js";
 import { SEARCH_PAGE_SIZE, setSelectedExistingIdForSearch } from "./state.js";
 import { render, setCollectionSearchMode, syncCollectionRoute } from "../surfaces/catalog-grid.js";
-import { renderCatalogMergeResults, searchManual, setActiveQuery, setCatalogMergeResults, setCatalogMergeVisibleCount, setSelectedManualIndex } from "../surfaces/catalog-search.js";
+import { renderCatalogMergeResults, runSearch, searchManual, setActiveQuery, setCatalogMergeResults, setCatalogMergeVisibleCount, setSelectedManualIndex } from "../surfaces/catalog-search.js";
 
       export async function findLinkForItem(item) {
         showView("catalog", { updateHistory: false, scroll: false });
@@ -22,6 +22,12 @@ import { renderCatalogMergeResults, searchManual, setActiveQuery, setCatalogMerg
         fields.catalogMergeStatus.textContent = "Elegí un resultado externo y tocá Comparar para revisar diferencias.";
         renderCatalogMergeResults();
         await searchManual("all", "Buscando coincidencias en Wikipedia, IMDb y FilmAffinity...");
+        fields.query.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      export async function findLocalMatchForItem(item) {
+        fields.query.value = [item.detected_title, item.detected_year].filter(Boolean).join(" ");
+        await runSearch({ updateHistory: false });
         fields.query.scrollIntoView({ behavior: "smooth", block: "center" });
       }
 

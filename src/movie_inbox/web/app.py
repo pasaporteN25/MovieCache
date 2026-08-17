@@ -110,11 +110,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
             if user.id != owner.id and not identity_repository.privacy_for(user.id).catalog_shared:
                 continue
             try:
-                universe.extend(load_items([source.path for source in personal_catalog.sources]))
+                rows = load_items([source.path for source in personal_catalog.sources])
             except CatalogRepositoryError:
                 if user.id == owner.id:
                     raise
                 continue
+            for row in rows:
+                row["_scope_owner"] = user.id == owner.id
+            universe.extend(rows)
         return universe
 
     library_service = ManagedLibraryService(
