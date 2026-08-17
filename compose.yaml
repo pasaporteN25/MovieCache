@@ -64,7 +64,7 @@ services:
     cap_drop:
       - ALL
     security_opt:
-      - no-new-privileges:true
+      - no-new-privileges=true
     restart: unless-stopped
     stop_grace_period: 30s
 
@@ -98,7 +98,7 @@ services:
     cap_add:
       - DAC_READ_SEARCH
     security_opt:
-      - no-new-privileges:true
+      - no-new-privileges=true
 
 secrets:
   owner_password:

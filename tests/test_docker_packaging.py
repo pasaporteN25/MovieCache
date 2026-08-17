@@ -27,7 +27,7 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("create_host_path: false", compose)
         self.assertIn("/run/secrets/owner_password", compose)
         self.assertIn("cap_drop:\n      - ALL", compose)
-        self.assertIn("no-new-privileges:true", compose)
+        self.assertIn("no-new-privileges=true", compose)
         self.assertIn("127.0.0.1}", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_MODE:-after-access", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS:-3", compose)
