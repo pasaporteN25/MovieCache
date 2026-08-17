@@ -4,6 +4,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+## [0.3.0] - 2026-08-17
+
 ### Agregado
 
 - Inicio conserva por usuario las recomendaciones destacadas de hoy y ayer en
