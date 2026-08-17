@@ -54,9 +54,20 @@ por tu cuenta.
 
 ## Progreso (actualizado 2026-08-17)
 
-Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Sesión nueva a partir de acá — no
-hace falta releer el historial de conversación, esto + `CLAUDE.md` + `git log`
-alcanza.
+Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0) en curso, P1-c
+cerrado. Sesión nueva a partir de acá — no hace falta releer el historial de
+conversación, esto + `CLAUDE.md` + `git log` alcanza.
+
+**Fase 5, P1-c cerrado (2026-08-17, commit `4771c5c`).** Presentador único de
+disponibilidad: `core/availability.js` nuevo, adoptado en `card.js`, `merge.js`
+e `inbox-curation.js`; backend decora la cola de Curaduría y compare/merge vía
+`AvailabilityService` (solo para mostrar, nunca lo que persiste
+`apply_reviewed_merge`). De paso se encontró y corrigió que el comparador
+(`merge.js`) tenía el mismo bug que Curaduría — la crítica original lo daba
+por ya resuelto y no lo estaba. Verificado con tests nuevos (unitario + HTTP +
+Playwright) y recorrido manual en browser contra un catálogo sintético. Quedan
+P1-a, P1-b y P1-d — en ese orden, según la Fase 5 de abajo. `pyproject.toml`
+también seguía en el gate: `scripts\check.ps1` completo en verde.
 
 - **Fase 0** — `CLAUDE.md` existe (63 líneas).
 - **Fase 1** — ruff/mypy configurados, `lint` job en CI, reformateo aplicado.
