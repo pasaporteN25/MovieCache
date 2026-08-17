@@ -3,7 +3,7 @@
           <div>
             <span class="eyebrow">Mesa de ingresos</span>
             <h2 id="inboxTitle" class="view-focus-target" tabindex="-1">Bandeja</h2>
-            <p>Revisá coincidencias y prepará ingresos antes de modificar tu catálogo.</p>
+            <p>Revisá coincidencias y decidí qué cambia: tu catálogo o el inventario compartido de la instancia.</p>
           </div>
           <div class="curation-heading-actions">
             <label class="history-mode-control">
@@ -17,13 +17,22 @@
 
         <nav id="inboxModeTabs" class="inbox-mode-tabs" aria-label="Modos de la Bandeja">
           <button id="inboxCurationMode" class="active" type="button" data-inbox-mode="curation" aria-pressed="true">
-            Curadur&iacute;a
+            Tu cat&aacute;logo
           </button>
           <button id="inboxImportsMode" type="button" data-inbox-mode="imports" aria-pressed="false">
             Importaciones <span id="importDraftCount">0</span>
           </button>
-          <button id="inboxScannerMode" type="button" data-inbox-mode="scanner" aria-pressed="false" hidden>
-            Scanner <span id="scannerQueueCount">0</span>
+          <button id="inboxScannerMode" type="button" data-inbox-mode="scanner" aria-pressed="false" hidden title="Inventario de la instancia · Admin">
+            Inventario <span class="mode-scope-tag">Admin</span> <span id="scannerQueueCount">0</span>
           </button>
         </nav>
+
+        <div id="scopeStrip" class="scope-strip" role="note" aria-label="Alcance de esta decisión">
+          <span class="scope-strip-chip" data-scope-chip="physical">Archivo f&iacute;sico</span>
+          <span class="scope-strip-chip" data-scope-chip="identity">Identidad compartida</span>
+          <span class="scope-strip-chip" data-scope-chip="catalog">Ficha en tu cat&aacute;logo</span>
+          <p id="scopeStripSummary" class="sr-only" aria-live="polite"></p>
+        </div>
+
+        <div id="curationFeedback" class="curation-feedback" aria-live="polite"></div>
 

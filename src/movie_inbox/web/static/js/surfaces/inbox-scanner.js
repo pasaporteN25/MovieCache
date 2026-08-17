@@ -3,6 +3,7 @@ import { loadCatalog } from "../core/catalog-data.js";
 import { fields } from "../core/fields.js";
 import { escapeAttr, escapeHtml, hasHost, normalizeText } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
+import { renderScopeStrip, scannerActionReceipt, scannerScopeStates, summarizeScopeStates } from "../core/scope-strip.js";
 import { curationCounts, currentIdentity } from "../core/state.js";
 import { libraryErrorMessage, loadLibraries } from "./admin-libraries.js";
 import { setCurationFeedback, syncCurationCounts } from "./inbox-curation.js";
@@ -69,12 +70,14 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         if (!scannerQueue.length) {
           fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Scanner al día</strong><p>No quedan identidades físicas por confirmar.</p></div>`;
           fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Sin decisiones pendientes</strong><p>Los próximos casos aparecerán después de un recorrido aplicado.</p></div>`;
+          renderScopeStrip(scannerScopeStates(null));
           return;
         }
         if (!visible.length) {
           selectedScannerItemId = "";
           fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Sin resultados</strong><p>Probá otro filtro o término de búsqueda.</p></div>`;
           fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>No hay casos para mostrar</strong><p>La cola completa conserva ${scannerQueue.length} pendientes.</p></div>`;
+          renderScopeStrip(scannerScopeStates(null));
           return;
         }
         if (!visible.some((item) => item.id === selectedScannerItemId)) {
@@ -150,7 +153,10 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
 
       export function renderScannerQueueDetail() {
         const item = scannerQueue.find((entry) => entry.id === selectedScannerItemId);
-        if (!item) return;
+        if (!item) {
+          renderScopeStrip(scannerScopeStates(null));
+          return;
+        }
         const createConflict = scannerCreateConflicts.get(item.id) || null;
         const candidates = scannerCandidatesForItem(item);
         const distinctReviewReady = Boolean(createConflict?.reviewToken);
@@ -217,6 +223,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
             <button class="quiet-action danger-action" type="button" data-scanner-review="ignore" data-file-id="${escapeAttr(item.id)}">Omitir ${actionObject}</button>
             <span id="scannerReviewFeedback" role="status" aria-live="polite"></span>
           </footer>`;
+        renderScopeStrip(scannerScopeStates(candidates));
       }
 
       export function scannerCandidatesForItem(item) {
@@ -449,16 +456,17 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           renderScannerQueue();
           const affected = Number(payload.item?.file_count || 1);
           const linkedLabel = affected > 1 ? `${affected} partes vinculadas` : "Archivo vinculado";
+          const scannerMessage = action === "ignore"
+            ? `${affected > 1 ? `${affected} partes omitidas` : "Archivo omitido"}. No se eliminó nada del disco.`
+            : ["create-detected", "review-distinct", "create-distinct"].includes(action)
+              ? payload.catalog_action === "existing"
+                ? `La obra ya estaba en tu catálogo. ${linkedLabel} al inventario compartido.`
+                : payload.catalog_action === "created_distinct"
+                  ? `Conservamos ambas obras. Nueva ficha creada y ${linkedLabel.toLowerCase()} con su identidad.`
+                  : `Obra agregada a tu catálogo. ${linkedLabel} al inventario compartido.`
+              : `${linkedLabel} al inventario compartido.`;
           setCurationFeedback(
-            action === "ignore"
-              ? `${affected > 1 ? `${affected} partes omitidas` : "Archivo omitido"}. No se eliminó nada del disco.`
-              : ["create-detected", "review-distinct", "create-distinct"].includes(action)
-                ? payload.catalog_action === "existing"
-                  ? `La obra ya estaba en tu catálogo. ${linkedLabel} al inventario compartido.`
-                  : payload.catalog_action === "created_distinct"
-                    ? `Conservamos ambas obras. Nueva ficha creada y ${linkedLabel.toLowerCase()} con su identidad.`
-                    : `Obra agregada a tu catálogo. ${linkedLabel} al inventario compartido.`
-                : `${linkedLabel} al inventario compartido.`,
+            `${scannerMessage} ${summarizeScopeStates(scannerActionReceipt(action, payload))}`,
             "success"
           );
           if (selectedScannerItemId) focusSelectedScannerItem();

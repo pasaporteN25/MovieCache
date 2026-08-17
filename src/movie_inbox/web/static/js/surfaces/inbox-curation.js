@@ -6,6 +6,7 @@ import { fields } from "../core/fields.js";
 import { asList, escapeAttr, escapeHtml, meta } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
 import { mergeFieldLabel, openInternalMergeComparator } from "../core/merge.js";
+import { curationScopeStates, renderScopeStrip, summarizeScopeStates } from "../core/scope-strip.js";
 import { findLinkForItem } from "../core/search-bridge.js";
 import { curationCounts, items, setCurationCounts } from "../core/state.js";
 
@@ -164,17 +165,28 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         fields.curationDeferredCount.textContent = curationCounts.deferred || 0;
         fields.curationHistoryCount.textContent = curationHistory.length || 0;
         fields.scannerQueueCount.textContent = curationCounts.scanner || 0;
-        const pendingTotal = Number(curationCounts.pending || 0) + Number(curationCounts.scanner || 0);
-        fields.inboxBadge.textContent = pendingTotal;
-        fields.inboxBadge.hidden = !(pendingTotal > 0);
-        fields.inboxButton.setAttribute(
-          "aria-label",
-          pendingTotal
-            ? `Bandeja, ${pendingTotal} ${
-                pendingTotal === 1 ? "decisión pendiente" : "decisiones pendientes"
-              }`
-            : "Bandeja, sin decisiones pendientes"
-        );
+        const personal = Number(curationCounts.pending || 0);
+        const scanner = Number(curationCounts.scanner || 0);
+        fields.inboxBadge.textContent = personal;
+        fields.inboxBadge.hidden = !(personal > 0);
+        fields.inboxScannerBadge.textContent = scanner;
+        fields.inboxScannerBadge.hidden = !(scanner > 0);
+        fields.inboxButton.setAttribute("aria-label", inboxBadgeAriaLabel(personal, scanner));
+      }
+
+      export function inboxBadgeAriaLabel(personal, scanner) {
+        const parts = [];
+        if (personal) {
+          parts.push(
+            `${personal} ${personal === 1 ? "decisión pendiente" : "decisiones pendientes"} en tu catálogo`
+          );
+        }
+        if (scanner) {
+          parts.push(
+            `${scanner} ${scanner === 1 ? "pendiente" : "pendientes"} en el inventario de la instancia`
+          );
+        }
+        return parts.length ? `Bandeja, ${parts.join(" y ")}` : "Bandeja, sin decisiones pendientes";
       }
 
       export function handleCurationClick(event) {
@@ -267,6 +279,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         fields.curationDetail.innerHTML = selected
           ? curationCaseDetail(selected)
           : curationEmptyState("Sin caso seleccionado", "La evidencia aparecerá cuando haya una decisión disponible.");
+        renderScopeStrip(curationScopeStates());
       }
 
       export function renderCurationHistory() {
@@ -291,6 +304,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         fields.curationDetail.innerHTML = selected
           ? curationHistoryDetail(selected)
           : curationEmptyState("Sin operación seleccionada", "Elegí una actividad para revisar su estado.");
+        renderScopeStrip(curationScopeStates());
       }
 
       export function curationHistoryItem(operation) {
@@ -525,7 +539,11 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           selectedCurationCaseId = "";
           await loadCatalog();
-          setCurationFeedback("Decisión guardada", "success", payload.operation);
+          setCurationFeedback(
+            `Decisión guardada. ${summarizeScopeStates(curationScopeStates())}`,
+            "success",
+            payload.operation
+          );
         } catch (error) {
           console.error("[catalog-viewer] curation update failed", error);
           setCurationFeedback("No se pudo guardar la decisión. Reintentá sin salir de la Bandeja.", "error");

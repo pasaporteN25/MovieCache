@@ -4,12 +4,24 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Agregado
+
+- La Bandeja distingue alcance compartido de personal: los modos pasan a
+  llamarse `Tu catálogo` e `Inventario de la instancia · Admin`, una franja
+  persistente muestra qué de los tres estados (archivo físico, identidad
+  compartida, ficha en tu catálogo) afecta la decisión actual, y el aviso de
+  pendientes separa cuántos son tuyos de cuántos son del inventario en vez
+  de sumarlos en un solo número.
+
 ### Corregido
 
 - Curaduría y el comparador de fusión ya no muestran `manual: sí/no`. Ahora
   presentan la misma disponibilidad efectiva que Colección y la ficha:
   `Disponible` (o no) con su procedencia — inventario verificado, declaración
   manual, o ambas — en vez de lenguaje de implementación.
+- Las confirmaciones de Scanner (vincular, crear obra, omitir) vuelven a
+  mostrarse: el aviso quedaba oculto por error cada vez que Scanner estaba
+  activo, así que ninguna confirmación exitosa era visible hasta ahora.
 
 ## [0.3.0] - 2026-08-17
 

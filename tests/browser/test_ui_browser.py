@@ -300,7 +300,19 @@ class BrowserInterfaceTests(unittest.TestCase):
         page = self.page
         self._open_and_wait_for_catalog(page)
 
+        # Both fixture items are pending Curaduria cases; the shared library
+        # scan in setUpClass gives Akira server availability but leaves no
+        # Scanner queue item, so the scanner badge must stay hidden.
+        page.locator("#inboxBadge").wait_for(state="visible")
+        self.assertEqual(page.locator("#inboxBadge").inner_text(), "2")
+        self.assertFalse(page.locator("#inboxScannerBadge").is_visible())
+
         page.locator("#inboxButton").click()
+        self.assertEqual(page.locator("#inboxCurationMode").inner_text(), "Tu catálogo")
+        self.assertIn(
+            "Inventario de la instancia",
+            page.locator("#inboxScannerMode").get_attribute("title") or "",
+        )
         page.locator("#inboxCurationMode").click()
 
         # "Heat" (manual declaration only) and "Akira" (real library scan only)
@@ -310,6 +322,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         heat_record = page.locator(".curation-record").inner_text()
         self.assertIn("Disponible · Declaración manual", heat_record)
         self.assertNotIn("manual:", heat_record)
+        # Curaduria only ever touches the personal catalog -- the "catalog"
+        # scope chip must be active regardless of which case is selected.
+        self.assertEqual(
+            page.locator('[data-scope-chip="catalog"]').get_attribute("data-active"), "true"
+        )
+        self.assertEqual(
+            page.locator('[data-scope-chip="physical"]').get_attribute("data-active"), "false"
+        )
 
         page.locator(".curation-queue-item", has_text="Akira").click()
         akira_record = page.locator(".curation-record").inner_text()
@@ -464,6 +484,52 @@ class ScannerBrowserTests(unittest.TestCase):
             """,
             timeout=10000,
         )
+
+        # Regression: #curationFeedback used to be nested inside
+        # #curationInboxPanel, which goes `hidden` in Scanner mode -- every
+        # Scanner success message rendered into a display:none element. It
+        # now lives as a sibling of the mode tabs, so it must be visible here.
+        # The queue-count wait above only proves the server finished; give the
+        # frontend's own re-render (loadScannerQueue + setCurationFeedback)
+        # a moment to catch up before reading the feedback text.
+        page.wait_for_function(
+            "() => (document.querySelector('#curationFeedback')?.textContent"
+            " || '').includes('cambió')"
+        )
+        self.assertTrue(page.locator("#curationFeedback").is_visible())
+        self.assertIn("Tu catálogo cambió", page.locator("#curationFeedback").inner_text())
+
+        page.close()
+
+    def test_badge_and_scope_strip_separate_scanner_from_personal_scope(self) -> None:
+        page = self.context.new_page()
+        page.goto(self.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+
+        # This fixture's only catalog item ("legacy-1917") already has an
+        # imdb_url, so it never shows up as a pending Curaduria case -- the
+        # personal badge must stay hidden while the scanner one is not.
+        # loadCatalog() populates both counts asynchronously after the home
+        # view is already visible, so wait for the scanner badge specifically
+        # rather than reading a snapshot right after page load.
+        page.locator("#inboxScannerBadge").wait_for(state="visible")
+        self.assertFalse(page.locator("#inboxBadge").is_visible())
+        self.assertEqual(page.locator("#inboxScannerBadge").inner_text(), "1")
+
+        page.locator("#inboxButton").click()
+        self.assertEqual(page.locator("#inboxCurationMode").inner_text(), "Tu catálogo")
+        self.assertIn(
+            "Inventario de la instancia",
+            page.locator("#inboxScannerMode").get_attribute("title") or "",
+        )
+
+        page.locator("#inboxScannerMode").click()
+        page.locator(f'[data-scanner-item="{self.queue_item_id}"]').click()
+        page.wait_for_selector('[data-scope-chip="identity"][data-active="true"]')
+        summary = page.locator("#scopeStripSummary").inner_text()
+        self.assertIn("archivo físico", summary)
+        self.assertIn("identidad compartida", summary)
+
         page.close()
 
 
