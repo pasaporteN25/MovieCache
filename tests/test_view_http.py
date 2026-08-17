@@ -1391,6 +1391,99 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200, raw_payload)
         self.assertEqual([item.id for item in repository.read()], ["heat-a", "heat-b"])
 
+    def test_curation_endpoints_expose_availability_alongside_the_manual_flag(self) -> None:
+        (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
+        repository = JsonCatalogRepository(self.catalog_path, normalize_item)
+        repository.write(
+            [
+                normalize_item(
+                    {"id": "heat-scanned", "title": "Heat", "year": "1995", "kind": "pelicula"}
+                ),
+                normalize_item(
+                    {
+                        "id": "sicario-manual",
+                        "title": "Sicario",
+                        "year": "2015",
+                        "kind": "pelicula",
+                        "en_catalogo": True,
+                    }
+                ),
+            ]
+        )
+
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                    "max_missing_ratio": 0.5,
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        library_id = created.json()["library"]["id"]
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        applied = self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(applied.status_code, 202, applied.content)
+
+        status, raw_payload = self.request(
+            "GET", "/api/curation", headers={"X-Movie-Inbox-Token": self.config.api_token}
+        )
+        self.assertEqual(status, 200, raw_payload)
+        queue = json.loads(raw_payload)
+        scanned_case = next(
+            case for case in queue["cases"] if case["primary"]["id"] == "heat-scanned"
+        )
+        self.assertTrue(scanned_case["primary"]["_availability"]["server"])
+        self.assertFalse(scanned_case["primary"]["_availability"]["manual"])
+
+        def reference(item_id):
+            return {"id": item_id, "source_file": str(self.catalog_path)}
+
+        compare_body = json.dumps(
+            {
+                "left": reference("heat-scanned"),
+                "right": reference("sicario-manual"),
+                "survivor_side": "left",
+            }
+        )
+        status, raw_payload = self.request(
+            "POST", "/api/curation/compare", compare_body, self.post_headers()
+        )
+        self.assertEqual(status, 200, raw_payload)
+        comparison = json.loads(raw_payload)
+        self.assertTrue(comparison["left"]["_availability"]["server"])
+        self.assertFalse(comparison["left"]["_availability"]["manual"])
+        self.assertFalse(comparison["right"]["_availability"]["server"])
+        self.assertTrue(comparison["right"]["_availability"]["manual"])
+
+        merge_body = json.dumps(
+            {
+                "left": reference("heat-scanned"),
+                "right": reference("sicario-manual"),
+                "survivor_side": "left",
+                "review_id": comparison["review_id"],
+            }
+        )
+        status, raw_payload = self.request(
+            "POST", "/api/curation/merge", merge_body, self.post_headers()
+        )
+        self.assertEqual(status, 200, raw_payload)
+        merged_payload = json.loads(raw_payload)
+        self.assertTrue(merged_payload["item"]["_availability"]["effective"])
+        self.assertTrue(repository.get("heat-scanned").en_catalogo)
+
     @patch("movie_inbox.web.catalog_api.external_metadata_by_title")
     def test_background_enrichment_updates_the_existing_item(self, title_lookup) -> None:
         title_lookup.return_value = {

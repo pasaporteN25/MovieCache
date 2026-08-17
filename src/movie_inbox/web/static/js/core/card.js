@@ -1,4 +1,5 @@
-import { displayTitle, escapeAttr, escapeHtml, firstListValue, isInCatalog, meta, normalizeRating, titleSizeClass } from "./format.js";
+import { availabilityCopy } from "./availability.js";
+import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRating, titleSizeClass } from "./format.js";
 
       export function shuffle(values) {
         const shuffled = [...values];
@@ -15,7 +16,8 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, isInCatalog, meta
         const titleClass = titleSizeClass(title);
         const rating = normalizeRating(item.rating);
         const watched = item.status === "watched";
-        const catalogued = isInCatalog(item.en_catalogo);
+        const availability = availabilityCopy(item);
+        const catalogued = availability.effective;
         const fromCollection = options.action === "open-home-collection-detail";
         const collectionTitle = String(options.collectionTitle || "Colección");
         const action = options.action || "open-detail";
@@ -46,7 +48,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, isInCatalog, meta
                     <div class="dvd-front-statuses">
                       ${fromCollection
                         ? `<span class="dvd-front-status collection">Colección</span><span class="dvd-front-status pending">Por agregar</span>`
-                        : `<span class="dvd-front-status ${catalogued ? "catalogued" : "muted"}">${catalogued ? "Disponible" : "No disponible"}</span><span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>`}
+                        : `<span class="dvd-front-status ${catalogued ? "catalogued" : "muted"}" title="${escapeAttr(availability.text)}">${catalogued ? "Disponible" : "No disponible"}</span><span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>`}
                     </div>
                   </div>
                 </div>

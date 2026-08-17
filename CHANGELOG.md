@@ -4,6 +4,13 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Corregido
+
+- Curaduría y el comparador de fusión ya no muestran `manual: sí/no`. Ahora
+  presentan la misma disponibilidad efectiva que Colección y la ficha:
+  `Disponible` (o no) con su procedencia — inventario verificado, declaración
+  manual, o ambas — en vez de lenguaje de implementación.
+
 ## [0.3.0] - 2026-08-17
 
 ### Agregado

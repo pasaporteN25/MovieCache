@@ -276,7 +276,9 @@ def requested_home_date(request: Request, value: str) -> str:
 
 
 def request_workflow(request: Request):  # type: ignore[no-untyped-def]
-    return curation_workflow(session_catalog(request).config)
+    return curation_workflow(
+        session_catalog(request).config, request.app.state.availability_service
+    )
 
 
 def catalog_pointer(catalog: SessionCatalog, payload: Any) -> CatalogPointer:

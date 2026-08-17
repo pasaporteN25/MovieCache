@@ -9,6 +9,7 @@ from movie_inbox.application.curation_workflow import (
     CurationConflict,
     CurationWorkflowService,
 )
+from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.curation_history import (
     JsonCurationHistoryRepository,
@@ -17,8 +18,24 @@ from movie_inbox.infrastructure.curation_history import (
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 
 
+class _FakeLibraryRepository:
+    """Minimal LibraryRepository stand-in: AvailabilityService only ever calls
+    .availability_records() on it."""
+
+    def __init__(self, records: list[dict]) -> None:
+        self._records = records
+
+    def availability_records(self) -> list[dict]:
+        return self._records
+
+
 class CurationWorkflowTests(unittest.TestCase):
-    def workflow(self, catalog_path: Path):
+    def workflow(
+        self,
+        catalog_path: Path,
+        *,
+        availability_service: AvailabilityService | None = None,
+    ):
         repositories = {}
 
         def repository(path: Path):
@@ -32,6 +49,7 @@ class CurationWorkflowTests(unittest.TestCase):
             repository,
             JsonCurationHistoryRepository(history_path),
             MemoryCurationHistoryRepository(),
+            availability_service,
         )
         return service, history_path
 
@@ -111,6 +129,80 @@ class CurationWorkflowTests(unittest.TestCase):
             history = workflow.history("persistent", "session-a")
             self.assertEqual(history["operations"][0]["status"], "undone")
             self.assertFalse(history["operations"][0]["can_undo"])
+
+    def test_compare_and_merge_expose_availability_without_leaking_into_persisted_flag(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "server-only",
+                            "title": "Heat",
+                            "year": "1995",
+                            "kind": "pelicula",
+                            "en_catalogo": False,
+                        }
+                    ),
+                    normalize_item(
+                        {
+                            "id": "not-scanned",
+                            "title": "Sicario",
+                            "year": "2015",
+                            "kind": "pelicula",
+                            "en_catalogo": False,
+                        }
+                    ),
+                ]
+            )
+            availability_service = AvailabilityService(
+                _FakeLibraryRepository(
+                    [
+                        {
+                            "identity": {"title": "Heat", "year": "1995", "kind": "pelicula"},
+                            "library_id": "lib-1",
+                            "library_name": "Biblioteca de prueba",
+                            "file_count": 1,
+                        }
+                    ]
+                )
+            )
+            workflow, _ = self.workflow(catalog_path, availability_service=availability_service)
+            left = CatalogPointer(catalog_path, "server-only")
+            right = CatalogPointer(catalog_path, "not-scanned")
+
+            review = workflow.compare(left, right=right)
+            self.assertTrue(review["left"]["_availability"]["server"])
+            self.assertFalse(review["left"]["_availability"]["manual"])
+            self.assertFalse(review["right"]["_availability"]["server"])
+            # The raw manual flag on both sides is False, so the field-diff table
+            # (used to decide what apply_reviewed_merge persists) must see them as
+            # equivalent -- decorating before build_merge_review would make the
+            # left side "True" and wrongly mark this field as different.
+            en_catalogo_field = next(
+                field for field in review["fields"] if field["key"] == "en_catalogo"
+            )
+            self.assertFalse(en_catalogo_field["different"])
+
+            result = workflow.merge(
+                left,
+                right=right,
+                survivor_side="left",
+                choices={},
+                expected_review_id=review["review_id"],
+            )
+
+            # The response is decorated for display...
+            self.assertTrue(result["item"]["_availability"]["effective"])
+            self.assertTrue(result["item"]["_availability"]["server"])
+            # ...but what actually got written to disk uses the raw manual flags:
+            # False, never the decorated "effective" True.
+            persisted = repository.read()
+            self.assertEqual(len(persisted), 1)
+            self.assertFalse(persisted[0].en_catalogo)
 
     def test_undo_refuses_to_overwrite_a_later_edit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

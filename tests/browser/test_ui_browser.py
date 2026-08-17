@@ -292,9 +292,29 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIn("Activa", heat_panel)
         self.assertIn("Sin archivos vinculados", heat_panel)
 
-        self.assertIn("Disponible · Inventario del servidor", akira_panel)
+        self.assertIn("Disponible · Inventario verificado", akira_panel)
         self.assertIn("Inactiva", akira_panel)
         self.assertNotIn("Sin archivos vinculados", akira_panel)
+
+    def test_curation_queue_shows_the_unified_availability_pill(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        page.locator("#inboxButton").click()
+        page.locator("#inboxCurationMode").click()
+
+        # "Heat" (manual declaration only) and "Akira" (real library scan only)
+        # are the same two items test_ficha_availability_panel_... uses --
+        # Curaduria's queue must show the same unified pill, not "manual: si/no".
+        page.locator(".curation-queue-item", has_text="Heat").click()
+        heat_record = page.locator(".curation-record").inner_text()
+        self.assertIn("Disponible · Declaración manual", heat_record)
+        self.assertNotIn("manual:", heat_record)
+
+        page.locator(".curation-queue-item", has_text="Akira").click()
+        akira_record = page.locator(".curation-record").inner_text()
+        self.assertIn("Disponible · Inventario verificado", akira_record)
+        self.assertNotIn("manual:", akira_record)
 
 
 class ScannerBrowserTests(unittest.TestCase):

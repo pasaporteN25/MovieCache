@@ -132,6 +132,7 @@ def _item_summary(item: Mapping[str, Any]) -> dict[str, Any]:
         "description": str(item.get("wikipedia_extract") or item.get("description") or ""),
         "en_catalogo": bool(item.get("en_catalogo")),
         "status": str(item.get("status") or "to_watch"),
+        "_availability": item.get("_availability"),
     }
 
 

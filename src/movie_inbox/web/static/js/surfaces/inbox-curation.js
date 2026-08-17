@@ -1,3 +1,4 @@
+import { availabilityPill } from "../core/availability.js";
 import { cachedImageSrc, card } from "../core/card.js";
 import { load, loadCatalog } from "../core/catalog-data.js";
 import { openDetail } from "../core/detail.js";
@@ -436,7 +437,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
               <h4>${escapeHtml(item.title || "Sin título")}</h4>
               <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(item.source)}</div>
               <div class="card-badges">
-                <span class="pill ${item.en_catalogo ? "good" : "muted"}">${item.en_catalogo ? "manual: sí" : "manual: no"}</span>
+                ${availabilityPill(item)}
                 <span class="pill ${item.status === "watched" ? "good" : "muted"}">${item.status === "watched" ? "vista" : "pendiente"}</span>
               </div>
             </div>
