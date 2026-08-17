@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.privacy import PrivacyPreferences
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -1851,6 +1852,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(blocked.status_code, 409, blocked.content)
         self.assertEqual(blocked.json()["reason"], "possible_duplicate")
         self.assertEqual(blocked.json()["candidates"][0]["id"], "legacy-1917")
+        self.assertEqual(blocked.json()["candidates"][0]["catalog_origin"], "own_catalog")
         self.assertTrue(blocked.json()["distinct_review_token"])
         self.assertEqual(len(repository.read()), 2)
 
@@ -1964,6 +1966,71 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(queue.json()["count"], 1)
         self.assertEqual(queue.json()["items"][0]["state"], "new")
         self.assertEqual(queue.json()["items"][0]["candidates"], [])
+
+    def test_scanner_candidates_tag_a_shared_member_catalog_origin(self) -> None:
+        created_member = self.client.post(
+            "/api/members",
+            content=json.dumps(
+                {
+                    "username": "maria",
+                    "temporary_password": "a-temporary-password",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(created_member.status_code, 201, created_member.content)
+        member_id = created_member.json()["member"]["id"]
+        identity_repository = SqliteIdentityRepository(self.instance_path)
+        identity_repository.update_privacy(member_id, PrivacyPreferences(catalog_shared=True))
+        member_catalog = identity_repository.default_catalog_for(member_id)
+        self.assertIsNotNone(member_catalog)
+        open_catalog_repository(Path(member_catalog.write_path), normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "shared-1917",
+                        "title": "1917",
+                        "year": "1917",
+                        "kind": "pelicula",
+                    }
+                )
+            ]
+        )
+        (self.media_path / "1917.2019.1080p.BluRay.mkv").write_bytes(b"numeric-title")
+
+        created_library = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        library_id = created_library.json()["library"]["id"]
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+
+        queue = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(queue.status_code, 200, queue.content)
+        self.assertEqual(queue.json()["count"], 1)
+        queue_item = queue.json()["items"][0]
+        self.assertEqual(queue_item["state"], "review")
+        self.assertEqual(len(queue_item["candidates"]), 1)
+        self.assertEqual(queue_item["candidates"][0]["catalog_origin"], "shared_catalog")
 
     def test_public_origin_is_accepted_for_proxy_deployment(self) -> None:
         proxy_config = replace(self.config, public_origin="https://movies.example.com")

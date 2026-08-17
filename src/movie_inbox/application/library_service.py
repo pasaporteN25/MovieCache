@@ -315,6 +315,7 @@ class ManagedLibraryService:
                     raise ValueError("Scanner candidate was not found")
                 candidate.pop("key", None)
                 candidate.pop("score", None)
+                candidate.pop("catalog_origin", None)
                 selected_identity = candidate
             elif isinstance(payload.get("identity"), Mapping):
                 selected_identity = work_identity(payload["identity"])
@@ -649,9 +650,17 @@ class ManagedLibraryService:
             key = work_identity_key(identity)
             if not key:
                 continue
-            candidate = {**identity, "key": key, "score": decision.score, "reason": decision.reason}
+            candidate = {
+                **identity,
+                "key": key,
+                "score": decision.score,
+                "reason": decision.reason,
+                "catalog_origin": "own_catalog"
+                if catalog_item.get("_scope_owner", True)
+                else "shared_catalog",
+            }
             prior = groups.get(key)
-            if prior is None or float(candidate["score"]) > float(prior.get("score") or 0):
+            if prior is None or _better_candidate(candidate, prior):
                 groups[key] = candidate
             if decision.reason == "exact_title_missing_year" and _has_legacy_inventory_evidence(
                 catalog_item
@@ -665,14 +674,14 @@ class ManagedLibraryService:
         ]
         if len(accepted) == 1:
             identity = dict(accepted[0])
-            for key in ("key", "score", "reason"):
+            for key in ("key", "score", "reason", "catalog_origin"):
                 identity.pop(key, None)
             return "matched", identity, []
         if not accepted and len(groups) == 1:
             key, candidate = next(iter(groups.items()))
             if key in legacy_inventory_keys:
                 identity = dict(candidate)
-                for field in ("key", "score", "reason"):
+                for field in ("key", "score", "reason", "catalog_origin"):
                     identity.pop(field, None)
                 return "matched", identity, []
         candidates = sorted(
@@ -954,6 +963,18 @@ def _resolved_root(value: str) -> Path:
 
 def _relative_path_key(value: str) -> str:
     return os.path.normcase(str(value or "").replace("\\", "/"))
+
+
+def _better_candidate(candidate: Mapping[str, Any], prior: Mapping[str, Any]) -> bool:
+    """Prefer the higher-scoring match; break ties in favor of the owner's own catalog."""
+    candidate_score = float(candidate.get("score") or 0)
+    prior_score = float(prior.get("score") or 0)
+    if candidate_score != prior_score:
+        return candidate_score > prior_score
+    return (
+        candidate.get("catalog_origin") == "own_catalog"
+        and prior.get("catalog_origin") != "own_catalog"
+    )
 
 
 def _has_legacy_inventory_evidence(item: Mapping[str, Any]) -> bool:

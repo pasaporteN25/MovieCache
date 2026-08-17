@@ -199,6 +199,71 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(run.summary["matched"], 0)
         self.assertEqual(run.summary["review"], 1)
 
+    def test_scan_candidates_default_to_the_owners_own_catalog_origin(self) -> None:
+        # self.catalog_items (set up without a "_scope_owner" key) is exactly
+        # what tests/HTTP callers that inject their own catalog_universe look
+        # like -- the default must read as "own_catalog", not as missing data.
+        (self.media / "Heat.1080p.mkv").write_bytes(b"heat")
+        library = self.create_library()
+
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        queue = self.service.review_queue()
+
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["candidates"][0]["catalog_origin"], "own_catalog")
+
+    def test_scan_candidates_tag_a_shared_catalog_origin(self) -> None:
+        self.catalog_items = [
+            {
+                **normalize_item(
+                    {"id": "heat-shared", "title": "Heat", "year": "1995", "kind": "pelicula"}
+                ).to_dict(),
+                "_scope_owner": False,
+            }
+        ]
+        (self.media / "Heat.1080p.mkv").write_bytes(b"heat")
+        library = self.create_library()
+
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        queue = self.service.review_queue()
+
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["candidates"][0]["catalog_origin"], "shared_catalog")
+
+    def test_scan_candidate_tie_break_prefers_the_owners_own_catalog(self) -> None:
+        # Both items share title/year/kind, so they collapse into the same
+        # match-index group with an identical score -- only the tie-break in
+        # _better_candidate() decides which "catalog_origin" survives. The
+        # shared item is listed first so a naive "first write wins on a tie"
+        # would get this wrong.
+        self.catalog_items = [
+            {
+                **normalize_item(
+                    {"id": "crash-shared", "title": "Crash", "year": "1996", "kind": "pelicula"}
+                ).to_dict(),
+                "_scope_owner": False,
+            },
+            {
+                **normalize_item(
+                    {"id": "crash-own", "title": "Crash", "year": "1996", "kind": "pelicula"}
+                ).to_dict(),
+                "_scope_owner": True,
+            },
+        ]
+        (self.media / "Crash.1080p.mkv").write_bytes(b"crash")
+        library = self.create_library()
+
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        queue = self.service.review_queue()
+
+        self.assertEqual(len(queue), 1)
+        candidates = queue[0]["candidates"]
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["catalog_origin"], "own_catalog")
+
     def test_repeated_apply_reconciles_an_existing_legacy_review_case(self) -> None:
         (self.media / "Heat.1080p.mkv").write_bytes(b"heat")
         library = self.create_library()

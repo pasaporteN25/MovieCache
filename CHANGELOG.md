@@ -22,6 +22,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Las confirmaciones de Scanner (vincular, crear obra, omitir) vuelven a
   mostrarse: el aviso quedaba oculto por error cada vez que Scanner estaba
   activo, así que ninguna confirmación exitosa era visible hasta ahora.
+- Scanner ya no presenta "sin candidata" como "obra ausente": el mensaje pasa
+  a ser `No encontramos una coincidencia segura`, aclara que la comprobación
+  automática no es exhaustiva, y ofrece buscar en tu catálogo antes de dar de
+  alta una ficha nueva. Cada candidata muestra además su procedencia
+  (`En tu catálogo` / `Catálogo compartido`) junto a la razón de confianza.
 
 ## [0.3.0] - 2026-08-17
 

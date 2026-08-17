@@ -243,18 +243,21 @@ class CatalogService:
                         "writable": existing.id in writable_ids,
                     },
                 )
-            candidates = (
-                [
-                    {
-                        **_scanner_catalog_candidate(item),
-                        "reason": decision.reason,
-                        "score": decision.score,
-                    }
-                    for item, decision in accepted[:5]
-                ]
-                if accepted
-                else possible_duplicate_candidates(match_items, candidate)[:5]
-            )
+            candidates = [
+                {**row, "catalog_origin": "own_catalog"}
+                for row in (
+                    [
+                        {
+                            **_scanner_catalog_candidate(item),
+                            "reason": decision.reason,
+                            "score": decision.score,
+                        }
+                        for item, decision in accepted[:5]
+                    ]
+                    if accepted
+                    else possible_duplicate_candidates(match_items, candidate)[:5]
+                )
+            ]
             if candidates:
                 review_token = _scanner_distinct_review_token(
                     candidate,

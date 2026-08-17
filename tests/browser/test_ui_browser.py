@@ -532,6 +532,26 @@ class ScannerBrowserTests(unittest.TestCase):
 
         page.close()
 
+    def test_bandeja_scanner_candidate_shows_your_catalog_origin(self) -> None:
+        # Runs before test_bandeja_scanner_confirms_a_distinct_work_behind_a_review_step
+        # (alphabetical "candidate" < "confirms"): that test consumes the only
+        # queue item, so this read-only assertion has to observe it first.
+        page = self.context.new_page()
+        page.goto(self.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+
+        page.locator("#inboxButton").click()
+        page.locator("#inboxScannerMode").click()
+        page.locator(f'[data-scanner-item="{self.queue_item_id}"]').click()
+
+        origin = page.locator(".scanner-candidate-origin").first
+        origin.wait_for(state="visible")
+        # text-transform: uppercase (same styling as .scanner-candidate-index)
+        # means inner_text() reflects the rendered case, not the DOM string.
+        self.assertEqual(origin.inner_text(), "EN TU CATÁLOGO")
+
+        page.close()
+
 
 class LoginAccessibilityTests(unittest.TestCase):
     """Login page coverage. Only needs the server up, not an authenticated
