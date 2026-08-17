@@ -6,37 +6,20 @@ series, anime y documentales.
 
 ## Hitos de producto
 
-### v0.3.0: confianza en busqueda, matching e inventario
+### v0.3.0: confianza en busqueda, matching e inventario — publicado 2026-08-17
 
-La prioridad completa de esta version es recuperar confianza en las decisiones de
-identidad. No se agregaran nuevas fuentes ni tipos de contenido hasta contar con una
-evaluacion repetible que mida falsos positivos y regresiones.
+Gate de salida cumplido: cero falsos positivos conocidos en auto-match y merge,
+metricas minimas del corpus dorado (`movie-inbox search-lab run --enforce`, gate real
+en CI) y prueba manual con snapshot de catalogo sin escrituras. Detalle completo de lo
+publicado, en `CHANGELOG.md` bajo `[0.3.0]`.
 
-El primer incremento ya esta disponible como `movie-inbox search-lab`: incluye corpus
-dorado empaquetado, respuestas externas grabadas, reportes JSON/HTML e inspeccion de
-exports en modo de solo lectura. Todavia mide unicamente el ranking productivo actual;
-la comparacion contra un algoritmo candidato comienza en el siguiente incremento.
+Dos items de esta version no se resolvieron a tiempo y pasan a v0.4.0 porque son
+arquitectura de informacion, no ranking (ver abajo): disponibilidad efectiva unica sin
+llegar a Curaduria, y cola de revision sin organizar por causa/confianza.
 
-- Construir el laboratorio no destructivo definido en
-  [search-quality.md](search-quality.md), con casos dorados, respuestas externas
-  grabadas y comparacion entre baseline y algoritmo candidato.
-- Separar busqueda de descubrimiento, busqueda por titulo, comparacion de identidad y
-  matching del Scanner. Compartiran normalizacion, pero no umbrales ni campos de
-  evidencia.
-- Exigir evidencia conservadora para sugerir un merge. Descripcion, review, reparto,
-  genero o tags nunca podran convertir una obra en candidata de identidad.
-- Filtrar resultados externos por relevancia minima y conservar los resultados de
-  baja confianza solamente bajo divulgacion explicita.
-- Hacer que Scanner confirme primero el inventario fisico. Agregar la obra al catalogo
-  personal sera una accion posterior y opcional.
-- Organizar la cola por causa y confianza para que la revision individual quede
-  reservada a excepciones reales.
-- Mostrar una unica disponibilidad efectiva con procedencia `inventario verificado`,
-  `declaracion manual` o ambas en Coleccion, ficha, Curaduria y comparadores.
-
-El gate de salida exigira cero falsos positivos conocidos en auto-match y merge,
-metricas minimas del corpus dorado y una prueba manual con un snapshot de catalogo que
-no permita escrituras.
+Un tercer item queda sin version asignada: la comparacion entre baseline y algoritmo
+candidato en Search Lab. `movie-inbox search-lab` sigue midiendo unicamente el ranking
+productivo actual; ese incremento no tiene fecha todavia.
 
 ### v0.4.0: coherencia de interfaz
 
@@ -47,6 +30,12 @@ v0.3.0. No se usara un rediseño para ocultar reglas de matching todavia cambian
   Administrar.
 - Hacer visible la cadena `archivo fisico -> identidad compartida -> ficha personal`
   y los recibos de cada operacion.
+- Heredado de v0.3.0: extender la disponibilidad efectiva unica (procedencia
+  `inventario verificado`, `declaracion manual` o ambas) a Curaduria, que hoy muestra
+  `manual: si/no` crudo.
+- Heredado de v0.3.0: organizar la cola de revision por causa y confianza (`Falta
+  identidad`, `Probable ficha existente`, `Conflicto de año/tipo`, `Sin señales`) en
+  vez de candidatas con el mismo peso visual.
 - Reducir carga cognitiva, revisar responsive, teclado, lectores de pantalla y estados
   vacios/error con los flujos reales ya estabilizados.
 - Cerrar con una nueva auditoria y una pasada de `$impeccable polish`.

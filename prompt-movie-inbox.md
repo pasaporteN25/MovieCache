@@ -52,10 +52,11 @@ por tu cuenta.
 
 ---
 
-## Progreso (actualizado 2026-08-16)
+## Progreso (actualizado 2026-08-17)
 
-Fases 0, 1, 2, 3 y 4 cerradas. Sesión nueva a partir de acá — no hace falta releer
-el historial de conversación, esto + `CLAUDE.md` + `git log` alcanza.
+Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Sesión nueva a partir de acá — no
+hace falta releer el historial de conversación, esto + `CLAUDE.md` + `git log`
+alcanza.
 
 - **Fase 0** — `CLAUDE.md` existe (63 líneas).
 - **Fase 1** — ruff/mypy configurados, `lint` job en CI, reformateo aplicado.
@@ -99,15 +100,34 @@ el historial de conversación, esto + `CLAUDE.md` + `git log` alcanza.
   `COLLECTION_MULTI_FILTER_KEYS`, `curationCounts`/`privacyPreferences`) —
   ninguno se hubiera visto sin correr la app en un browser real.
 
-**Pendiente de decisión, no resuelto todavía**: hablamos de si mobile (v0.5.0)
-merece adelantarse — el roadmap lo pone detrás de v0.4.0 (Fases 4/5) y el
-propio `docs/roadmap.md` dice que v0.5.0 "debe confirmarse antes de congelar
-el alcance de v0.4.0". La Fase 4 (partir `app.js`/`web/app.py`) vale la pena
-en cualquier escenario porque ahí se versiona naturalmente una API real. La
-Fase 5 (pulido visual) no acerca nada a mobile — si mobile pesa más que pulir
-la UI web actual, considerar adelantar "API versionada + sesiones aptas para
-dispositivos" (precondición explícita de v0.5.0) después de la Fase 4 en vez
-de esperar a que termine la Fase 5. Sin decidir — preguntar antes de asumir.
+**v0.3.0 publicado (2026-08-17).** El gate de salida ya estaba cerrado desde la
+Fase 2; lo que faltaba era el trámite de release. Actualizados: `pyproject.toml`
+(→ `0.3.0`), `CHANGELOG.md` (`[Sin publicar]` → `[0.3.0] - 2026-08-17`, con un
+`[Sin publicar]` nuevo y vacío arriba), `CLAUDE.md` (línea de versión estable) y
+`docs/roadmap.md`. Dos items que no llegaron a tiempo —disponibilidad efectiva
+unificada en Curaduría, cola organizada por causa/confianza— se reasignaron
+formalmente a v0.4.0; en la práctica ya eran P1-c y P1-d de la Fase 5 de abajo, esto
+solo alinea `docs/roadmap.md` con lo que este archivo ya decía. Un tercer item
+(comparación baseline-vs-candidato en Search Lab) queda sin versión asignada a
+propósito — no encaja en el tema de v0.4.0 ("coherencia de interfaz"), es trabajo de
+ranking. Falta commitear estos cambios y taggear `v0.3.0`: no se hizo solo porque no
+se commitea sin pedido explícito, y un tag debe apuntar a un commit que ya tenga el
+bump — preguntar antes de commitear/taggear.
+
+**Pregunta de mobile vs. Fase 5 — resuelta (2026-08-17).** Mobile no se adelanta a la
+Fase 5 dentro de este repo: van a ser proyectos separados. La visión real de Lucas es
+más ambiciosa que un cliente delgado online-only — uso sin conexión con sync
+oportunista en LAN/VPN cuando el server esté alcanzable, no solo lectura remota
+mientras el server esté arriba. Eso justifica un repo aparte (`movie-inbox-android` o
+como se termine llamando), con su propio toolchain Kotlin/Gradle, para no mezclarlo
+con este repo Python. El plan inicial de esa idea quedó capturado en
+`movie-inbox-android-plan.md` (raíz de este repo) para retomar en otra sesión o con
+otro agente — es una foto de dónde quedó la conversación, no un plan ejecutable
+todavía. Lo que sí sigue siendo trabajo de *este* repo: la Fase 5 (v0.4.0) de abajo, y
+eventualmente una capa `/api/v1/` con auth por usuario/dispositivo cuando se retome
+mobile. Ninguna de las dos depende técnicamente de la otra (no comparten archivos con
+`web/security.py`/`web/dependencies.py` ni entre sí) — es una decisión de dónde poner
+la atención primero, no de dependencias de código.
 
 ---
 
