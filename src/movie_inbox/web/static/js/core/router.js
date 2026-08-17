@@ -144,6 +144,8 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         const scannerActive = inboxMode === "scanner";
         fields.inboxView.dataset.inboxMode = inboxMode;
         fields.curationInboxPanel.hidden = importsActive || scannerActive;
+        fields.scopeStrip.hidden = importsActive;
+        fields.curationFeedback.hidden = importsActive;
         fields.importInboxPanel.hidden = !importsActive;
         fields.scannerInboxPanel.hidden = !scannerActive;
         fields.inboxCurationMode.classList.toggle("active", !importsActive && !scannerActive);
