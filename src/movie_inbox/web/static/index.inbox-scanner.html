@@ -11,8 +11,10 @@
               <div class="scanner-queue-tools">
                 <div id="scannerQueueFilters" class="scanner-queue-filters" role="group" aria-label="Filtrar archivos pendientes">
                   <button class="active" type="button" data-scanner-filter="all" aria-pressed="true">Todos <span id="scannerAllCount">0</span></button>
-                  <button type="button" data-scanner-filter="review" aria-pressed="false">Comparar <span id="scannerReviewCount">0</span></button>
-                  <button type="button" data-scanner-filter="new" aria-pressed="false">Sin coincidencia <span id="scannerNewCount">0</span></button>
+                  <button type="button" data-scanner-filter="missing_identity" aria-pressed="false">Falta identidad <span id="scannerMissingIdentityCount">0</span></button>
+                  <button type="button" data-scanner-filter="likely_existing" aria-pressed="false">Probable ficha existente <span id="scannerLikelyExistingCount">0</span></button>
+                  <button type="button" data-scanner-filter="year_type_conflict" aria-pressed="false">Conflicto de año/tipo <span id="scannerYearTypeConflictCount">0</span></button>
+                  <button type="button" data-scanner-filter="no_signal" aria-pressed="false">Sin señales <span id="scannerNoSignalCount">0</span></button>
                 </div>
                 <label class="scanner-queue-search">
                   <span class="sr-only">Buscar en la cola del Scanner</span>

@@ -54,11 +54,16 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
       }
 
       export function renderScannerQueue() {
-        const reviewCount = scannerQueue.filter((item) => item.state === "review").length;
-        const newCount = scannerQueue.filter((item) => item.state === "new").length;
+        const bucketCounts = { missing_identity: 0, year_type_conflict: 0, likely_existing: 0, no_signal: 0 };
+        scannerQueue.forEach((item) => {
+          const bucket = scannerQueueCauseBucket(item, scannerCandidatesForItem(item));
+          bucketCounts[bucket] += 1;
+        });
         fields.scannerAllCount.textContent = String(scannerQueue.length);
-        fields.scannerReviewCount.textContent = String(reviewCount);
-        fields.scannerNewCount.textContent = String(newCount);
+        fields.scannerMissingIdentityCount.textContent = String(bucketCounts.missing_identity);
+        fields.scannerYearTypeConflictCount.textContent = String(bucketCounts.year_type_conflict);
+        fields.scannerLikelyExistingCount.textContent = String(bucketCounts.likely_existing);
+        fields.scannerNoSignalCount.textContent = String(bucketCounts.no_signal);
         fields.scannerQueueFilters.querySelectorAll("[data-scanner-filter]").forEach((button) => {
           const active = button.dataset.scannerFilter === scannerQueueFilter;
           button.classList.toggle("active", active);
@@ -86,10 +91,10 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         }
         fields.scannerQueue.innerHTML = visible.map((item) => {
           const active = item.id === selectedScannerItemId;
-          const label = item.state === "review" ? "Comparar" : "Sin coincidencia";
+          const bucket = scannerQueueCauseBucket(item, scannerCandidatesForItem(item));
           const partLabel = Number(item.file_count || 1) > 1 ? `${item.file_count} partes` : "";
           return `<button class="scanner-queue-item${active ? " active" : ""}" type="button" data-scanner-item="${escapeAttr(item.id)}" aria-pressed="${active}">
-            <span class="scanner-queue-state">${label}</span>
+            <span class="member-state ${scannerQueueCauseBadgeClass(bucket)}">${escapeHtml(scannerQueueCauseLabel(bucket))}</span>
             <strong>${escapeHtml(item.detected_title || item.name || "Sin título")}</strong>
             <span>${escapeHtml([item.detected_year, importKindLabel(item.detected_kind)].filter(Boolean).join(" · ") || "Identidad incompleta")}</span>
             <small>${escapeHtml([item.library_name || "Biblioteca", partLabel].filter(Boolean).join(" · "))}</small>
@@ -101,7 +106,8 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
       export function visibleScannerQueue() {
         const query = normalizeText(scannerQueueQuery);
         return scannerQueue.filter((item) => {
-          if (scannerQueueFilter !== "all" && item.state !== scannerQueueFilter) return false;
+          if (scannerQueueFilter !== "all"
+              && scannerQueueCauseBucket(item, scannerCandidatesForItem(item)) !== scannerQueueFilter) return false;
           if (!query) return true;
           const values = [
             item.detected_title,
@@ -160,6 +166,9 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         }
         const createConflict = scannerCreateConflicts.get(item.id) || null;
         const candidates = scannerCandidatesForItem(item);
+        const bucket = scannerQueueCauseBucket(item, candidates);
+        const visibleCandidates = candidates.slice(0, 3);
+        const hiddenCandidates = candidates.slice(3);
         const distinctReviewReady = Boolean(createConflict?.reviewToken);
         const createDraft = createConflict?.draft || {};
         const createAction = candidates.length
@@ -194,7 +203,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
               <h3>${escapeHtml(item.detected_title || item.name || "Sin título")}</h3>
               <p>${multipart ? `${parts.length} archivos serán tratados como una sola obra.` : escapeHtml(item.relative_path || item.name || "")}</p>
             </div>
-            <span class="member-state member-state-attention">${candidates.length ? `${candidates.length} ${candidates.length === 1 ? "candidata" : "candidatas"}` : "Sin coincidencia"}</span>
+            <span class="member-state ${scannerQueueCauseBadgeClass(bucket)}">${escapeHtml(scannerQueueCauseLabel(bucket))}</span>
           </header>
           <div class="scanner-scope-note" role="note">
             <strong>${candidates.length ? "Vincular con una obra existente" : "No encontramos una coincidencia segura"}</strong>
@@ -209,7 +218,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
             <div><dt>${multipart ? "Archivos y tamaño" : "Tamaño"}</dt><dd>${multipart ? `${parts.length} · ` : ""}${escapeHtml(formatImportBytes(totalSize))}</dd></div>
           </dl>
           ${multipart ? `<section class="scanner-parts" aria-label="Partes detectadas"><strong>Archivos agrupados</strong><div>${parts.map((part, index) => `<div><span>${escapeHtml(part.part ? `Parte ${part.part}` : `Archivo ${index + 1}`)}</span><code>${escapeHtml(part.relative_path || part.name || "")}</code><small>${escapeHtml(formatImportBytes(part.size_bytes))}</small></div>`).join("")}</div></section>` : ""}
-          ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${candidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}</section>` : ""}
+          ${candidates.length ? `<section class="scanner-candidates"><div class="scanner-candidates-heading"><div><h4>Comparar coincidencias (${candidates.length})</h4><p>La similitud orienta la revisión; verificá título, año y fuente antes de vincular.</p></div></div>${visibleCandidates.map((candidate, index) => scannerCandidate(candidate, item, index)).join("")}${hiddenCandidates.length ? `<details class="scanner-candidates-more"><summary>Ver ${hiddenCandidates.length} candidata${hiddenCandidates.length === 1 ? "" : "s"} más</summary>${hiddenCandidates.map((candidate, index) => scannerCandidate(candidate, item, index + 3)).join("")}</details>` : ""}</section>` : ""}
           <section class="scanner-confirm-detected${candidates.length ? " scanner-create-guard" : ""}${distinctReviewReady ? " is-confirming" : ""}">
             <div><h4>${createHeading}</h4><p>${createDescription}</p></div>
             ${candidates.length ? "" : `<button class="quiet-action" type="button" data-scanner-search-local data-file-id="${escapeAttr(item.id)}">Buscar en tu catálogo</button>`}
@@ -235,10 +244,8 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         const detected = (Array.isArray(item.candidates) ? item.candidates : []).filter((candidate) =>
           !scannerCandidateEquivalenceKeys(candidate).some((key) => verifiedKeys.has(key))
         );
-        const rows = [
-          ...verified,
-          ...detected
-        ];
+        const rows = [...verified, ...detected]
+          .sort((left, right) => Number(right.score || 0) - Number(left.score || 0));
         const seen = new Set();
         return rows.filter((candidate) => {
           const identity = candidate.catalog_item_id
@@ -270,6 +277,29 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           .filter(Boolean)
           .forEach((url) => keys.push(`url:${url}`));
         return [...new Set(keys)];
+      }
+
+      export function scannerQueueCauseBucket(item, candidates) {
+        if (!item.detected_year) return "missing_identity";
+        const reasons = new Set(candidates.map((candidate) => candidate.reason));
+        if (reasons.has("exact_title_year_mismatch") || reasons.has("exact_title_kind_mismatch")) {
+          return "year_type_conflict";
+        }
+        if (reasons.has("exact_title_missing_year")) return "likely_existing";
+        return "no_signal";
+      }
+
+      export function scannerQueueCauseLabel(bucket) {
+        return {
+          missing_identity: "Falta identidad",
+          year_type_conflict: "Conflicto de año/tipo",
+          likely_existing: "Probable ficha existente",
+          no_signal: "Sin señales"
+        }[bucket] || "Sin señales";
+      }
+
+      export function scannerQueueCauseBadgeClass(bucket) {
+        return { year_type_conflict: "member-state-attention", likely_existing: "member-state-active" }[bucket] || "";
       }
 
       export function actionObjectLabel(item) {
@@ -372,7 +402,8 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           exact_title_missing_year: "Título exacto; falta año",
           exact_title_year_mismatch: "Título exacto; año diferente",
           exact_title_kind_mismatch: "Título exacto; tipo diferente",
-          similar_title_requires_review: "Título similar"
+          similar_title_requires_review: "Título similar",
+          insufficient_evidence: "Título apenas similar"
         }[reason] || "Coincidencia posible";
       }
 
