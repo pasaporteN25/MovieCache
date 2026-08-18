@@ -73,7 +73,7 @@
       .merge-survivor-control input { inset: 0; opacity: 0; position: absolute; }
       .merge-survivor-control span {
         background: #222745;
-        border: 1px solid #454c78;
+        border: 1px solid var(--control-border);
         display: block;
         font-size: var(--text-meta);
         font-weight: 800;

@@ -613,7 +613,7 @@
       }
       .filter-segments button {
         background: #171b35;
-        border-color: #454c78;
+        border-color: var(--control-border);
         color: #c5c9e5;
         min-height: 32px;
         padding: 5px 9px;

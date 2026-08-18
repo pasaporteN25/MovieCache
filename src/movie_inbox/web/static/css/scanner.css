@@ -97,7 +97,7 @@
       .library-record-actions button { flex: 0 0 auto; min-height: 34px; width: auto; }
       .library-automation-toggle {
         align-items: center;
-        border: 1px solid #454c78;
+        border: 1px solid var(--control-border);
         border-radius: 3px;
         color: var(--muted);
         cursor: pointer;
@@ -115,7 +115,7 @@
       .library-automation-toggle input { height: 1px; opacity: 0; position: absolute; width: 1px; }
       .library-toggle-track {
         align-items: center;
-        border: 1px solid #454c78;
+        border: 1px solid var(--control-border);
         border-radius: 999px;
         display: flex;
         height: 16px;

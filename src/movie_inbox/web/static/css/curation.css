@@ -32,7 +32,7 @@
       .history-mode-control {
         align-items: center;
         background: var(--surface-control);
-        border: 1px solid #454c78;
+        border: 1px solid var(--control-border);
         color: var(--ink);
         display: inline-flex;
         gap: 8px;
