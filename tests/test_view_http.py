@@ -1205,6 +1205,25 @@ class ViewerHttpTests(unittest.TestCase):
         # back in this form. Real behavioral coverage lives in
         # tests/browser/test_ui_browser.py.
 
+    def test_static_assets_are_cached_with_etag_revalidation(self) -> None:
+        first = self.client.get("/static/js/core/bootstrap.js")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.headers["cache-control"], "public, max-age=3600, must-revalidate")
+        etag = first.headers["etag"]
+        self.assertTrue(etag)
+
+        revalidated = self.client.get(
+            "/static/js/core/bootstrap.js", headers={"If-None-Match": etag}
+        )
+        self.assertEqual(revalidated.status_code, 304)
+        self.assertEqual(revalidated.headers["cache-control"], "public, max-age=3600, must-revalidate")
+        self.assertFalse(revalidated.content)
+
+        # API responses stay uncached: they carry per-session catalog data.
+        api_headers = {"X-Movie-Inbox-Token": self.config.api_token}
+        api_response = self.client.get("/api/items", headers=api_headers)
+        self.assertEqual(api_response.headers["cache-control"], "no-store")
+
     def test_post_requires_same_origin_and_json(self) -> None:
         body = json.dumps({"id": "heat", "status": "watched"})
         status, _ = self.request(
