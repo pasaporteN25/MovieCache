@@ -17,7 +17,7 @@ colors:
   soft-signal-line: "rgba(139, 124, 255, 0.34)"
   projection-panel: "rgba(17, 21, 42, 0.9)"
   control-background: "#0c1025"
-  control-border: "#454c78"
+  control-border: "#6f78b5"
   quiet-control: "#222745"
 typography:
   display:
