@@ -19,16 +19,16 @@
       }
       .search-context {
         align-items: center;
-        background: rgba(120, 92, 255, 0.1);
-        border: 1px solid rgba(120, 92, 255, 0.48);
+        background: rgba(var(--violet-rgb), 0.1);
+        border: 1px solid rgba(var(--violet-rgb), 0.48);
         display: flex;
         gap: 12px;
         justify-content: space-between;
         min-height: 42px;
         padding: 7px 9px 7px 12px;
       }
-      .search-context[data-state="searching"] { border-color: rgba(34, 216, 229, 0.58); }
-      .search-context[data-state="error"] { border-color: rgba(255, 204, 77, 0.66); }
+      .search-context[data-state="searching"] { border-color: rgba(var(--teal-rgb), 0.58); }
+      .search-context[data-state="error"] { border-color: rgba(var(--gold-rgb), 0.66); }
       .search-context > span { color: var(--text-highlight); font-size: var(--text-meta); font-weight: 700; }
       .search-context-actions { display: flex; flex: 0 0 auto; gap: 7px; }
       .search-context-actions button { font-size: var(--text-caption); min-height: 32px; padding: 5px 8px; width: auto; }
@@ -54,7 +54,7 @@
       }
       .search-action {
         background: linear-gradient(135deg, var(--red), var(--action-primary-end));
-        border-color: rgba(255, 121, 191, 0.65);
+        border-color: rgba(var(--text-pink-rgb), 0.65);
         color: var(--on-accent);
       }
       .quiet-action { background: var(--surface-quiet); }
@@ -76,7 +76,7 @@
       .utility-menu { grid-column: 4; min-width: 0; position: relative; }
       .utility-menu > summary {
         align-items: center;
-        background: #222745;
+        background: var(--surface-quiet);
         border: 1px solid #525989;
         border-radius: 3px;
         cursor: pointer;
@@ -93,8 +93,8 @@
       .utility-menu[open] > summary::after { content: " −"; }
       .utility-panel {
         background: var(--surface-panel);
-        border: 1px solid rgba(120, 92, 255, 0.58);
-        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.52), 0 0 24px rgba(120, 92, 255, 0.12);
+        border: 1px solid rgba(var(--violet-rgb), 0.58);
+        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.52), 0 0 24px rgba(var(--violet-rgb), 0.12);
         display: grid;
         gap: 0;
         grid-template-columns: minmax(220px, 1.2fr) minmax(230px, 1fr) minmax(260px, 1.25fr) minmax(230px, 1fr);
@@ -271,7 +271,7 @@
       .source-retry { min-height: 34px; width: auto; }
       @keyframes source-search-spin { to { transform: rotate(360deg); } }
       .source-load-more { justify-self: start; width: auto; }
-      .match-reason { border-color: rgba(255, 196, 70, 0.52); color: var(--gold); }
+      .match-reason { border-color: rgba(var(--gold-rgb), 0.52); color: var(--gold); }
       .search-result {
         align-self: stretch;
         background: #151932;
@@ -292,7 +292,7 @@
         height: auto;
       }
       .search-result:hover {
-        border-color: rgba(34, 216, 229, 0.56);
+        border-color: rgba(var(--teal-rgb), 0.56);
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
       }
       .search-result h3 {
@@ -352,7 +352,7 @@
       .result-media.is-loaded { opacity: 1; }
       .result-placeholder {
         align-items: center;
-        background: linear-gradient(135deg, #262b52, #11152a);
+        background: linear-gradient(135deg, #262b52, var(--paper));
         color: var(--muted);
         display: flex;
         font-size: var(--text-caption);
@@ -404,11 +404,11 @@
         color: var(--on-accent);
       }
       .action-secondary {
-        background: #222745;
+        background: var(--surface-quiet);
       }
       .action-danger {
-        border-color: #b9564c;
-        color: #8e2f28;
+        border-color: var(--danger-border);
+        color: var(--danger-ink);
       }
       .load-more {
         grid-column: 1 / -1;
@@ -453,7 +453,7 @@
         grid-template-columns: 1fr 1fr;
       }
       .menu-tab.active {
-        background: rgba(120, 92, 255, 0.24);
+        background: rgba(var(--violet-rgb), 0.24);
         border-color: var(--violet);
         color: var(--ink);
       }
@@ -496,7 +496,7 @@
       }
       .metric {
         align-items: center;
-        background: rgba(120, 92, 255, 0.11);
+        background: rgba(var(--violet-rgb), 0.11);
         border-left: 2px solid var(--violet);
         display: flex;
         font-size: var(--text-caption);
@@ -506,8 +506,8 @@
       }
       .metric strong { font-family: "Courier New", monospace; font-size: var(--text-small); }
       .danger {
-        border-color: #b9564c;
-        color: #8e2f28;
+        border-color: var(--danger-border);
+        color: var(--danger-ink);
       }
       .duplicate-box {
         background: var(--surface-control-muted);
@@ -620,7 +620,7 @@
         width: auto;
       }
       .filter-segments button[aria-pressed="true"] {
-        background: rgba(34, 216, 229, 0.12);
+        background: rgba(var(--teal-rgb), 0.12);
         border-color: var(--teal);
         color: #f3ffff;
         box-shadow: inset 0 -2px 0 var(--teal);
@@ -635,7 +635,7 @@
         align-items: center;
         background: var(--teal);
         border-radius: 999px;
-        color: #080a18;
+        color: var(--case);
         display: inline-flex;
         font-family: "Courier New", monospace;
         font-size: var(--text-label);
@@ -717,10 +717,10 @@
         text-transform: uppercase;
       }
       .active-filters button {
-        background: rgba(120, 92, 255, 0.13);
-        border-color: rgba(120, 92, 255, 0.45);
+        background: rgba(var(--violet-rgb), 0.13);
+        border-color: rgba(var(--violet-rgb), 0.45);
         border-radius: 999px;
-        color: #dedaff;
+        color: var(--chip-tint-violet);
         font-size: var(--text-meta);
         min-height: 32px;
         padding: 5px 9px;
@@ -836,7 +836,7 @@
           max-width: 100%;
           overflow-x: auto;
           padding: 1px 0 6px;
-          scrollbar-color: rgba(34, 216, 229, 0.5) rgba(8, 10, 24, 0.38);
+          scrollbar-color: rgba(var(--teal-rgb), 0.5) rgba(var(--case-rgb), 0.38);
           scrollbar-width: thin;
         }
 

@@ -28,6 +28,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Las confirmaciones de Scanner (vincular, crear obra, omitir) vuelven a
   mostrarse: el aviso quedaba oculto por error cada vez que Scanner estaba
   activo, así que ninguna confirmación exitosa era visible hasta ahora.
+- Dos acentos dorados de advertencia (borde de error de búsqueda y de razón
+  de coincidencia en Colección) y el ícono de "sin portada" de la ficha
+  usaban tonos ligeramente distintos entre pantallas; ahora usan el mismo
+  Rental Sticker Gold documentado en todos lados.
 - Scanner ya no presenta "sin candidata" como "obra ausente": el mensaje pasa
   a ser `No encontramos una coincidencia segura`, aclara que la comprobación
   automática no es exhaustiva, y ofrece buscar en tu catálogo antes de dar de

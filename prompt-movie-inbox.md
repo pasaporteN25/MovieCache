@@ -52,15 +52,83 @@ por tu cuenta.
 
 ---
 
-## Progreso (actualizado 2026-08-17)
+## Progreso (actualizado 2026-08-18)
 
 Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0): los 4 P1
-(P1-c, P1-a, P1-b, P1-d) están cerrados. Sesión nueva a partir de acá — no
-hace falta releer el historial de conversación, esto + `CLAUDE.md` +
-`git log` alcanza. Falta el gate final de Fase 5: correr `$impeccable audit`
-de nuevo sobre la misma superficie y comparar score/P1 count contra la
-corrida del 2026-08-14 — no ejecutado todavía, es el único pendiente antes de
-poder considerar la Fase 5 completamente cerrada.
+(P1-c, P1-a, P1-b, P1-d) están cerrados. El gate final de Fase 5 —correr
+`$impeccable audit` de nuevo sobre la misma superficie— ya se ejecutó: 16/20
+(contra 22/40 de la corrida del 2026-08-14; escalas distintas, no
+comparables directo). Encontró un P1 propio (contraste de `--control-border`,
+cerrado) y un P2 propio (caching HTTP de estáticos, cerrado), más 4
+hallazgos "P3" menores que se están cerrando uno por uno con aprobación
+previa de cada uno: `extract` (colores literales → tokens, **cerrado**),
+`typeset`, `adapt` y `polish`, en ese orden. Sesión nueva a partir de acá —
+no hace falta releer el historial de conversación, esto + `CLAUDE.md` +
+`git log` alcanza.
+
+**Fase 5, P3 (`$impeccable extract`) cerrado (2026-08-18).** Los ~150
+colores literales de `core-card.css`, `home.css`, `catalog.css`,
+`core-detail.css` y `club.css` que no pasaban por `tokens.css` ni por el
+frontmatter de `DESIGN.md` quedaron formalizados como tokens. La mayoría
+(~110) eran el mismo patrón: `rgba(R, G, B, alpha)` con el RGB exacto de un
+color de señal ya existente, escrito a mano porque CSS no permite
+`rgba(var(--hex), alpha)` sin un triplete RGB aparte — se agregaron 11
+tokens `--x-rgb` (`--red-rgb`, `--teal-rgb`, `--gold-rgb`, `--violet-rgb`,
+`--case-rgb`, `--paper-rgb`, `--cream-rgb`, `--muted-rgb`, `--ink-rgb`,
+`--line-rgb`, `--text-pink-rgb`) y se migraron todas las ocurrencias a
+`rgba(var(--x-rgb), alpha)`. El resto eran dos familias reales sin nombrar:
+la rampa de 3 paradas del fallback de carátula (`.poster-1..4`, un color de
+señal cada uno, con tono medio apagado y remate casi negro) y el tinte
+pálido de los chips de estado / ícono de placeholder — confirmé con Lucas
+que esta segunda familia es intencionalmente distinta de los `--text-*-soft`
+que ya existían para kickers y mensajes de feedback (dos roles de contraste
+distintos, no un duplicado), así que se sumó como familia nueva
+(`--chip-tint-*`) en vez de fusionarla. También apareció una familia
+"danger" real (bordes/fondos de zona peligrosa y de botón destructivo) que
+no es ninguno de los 4 colores de señal y no estaba documentada; se
+formalizó con 3 tokens nuevos (`--danger-rgb`, `--danger-border`,
+`--danger-ink`).
+
+Encontrados y corregidos 4 casos concretos de valores casi duplicados dentro
+del mismo rol (no drift real de paleta, sino la misma intención escrita a
+mano dos veces con un dígito de diferencia): el remate del degradé violeta
+de carátula, el ícono "sin portada" de la ficha (distinto del de Colección),
+y dos bordes de advertencia dorados en Colección — los cuatro casos quedan
+en el CHANGELOG. Se dejaron sin tocar, a propósito, dos hallazgos fuera del
+alcance de esta pasada: los stops de degradé únicos del spotlight de Inicio
+(un solo uso cada uno, tokenizarlos sería sobre-extracción) y un
+`rgba(69, 76, 120, .66)` en `catalog.css` que resultó ser una copia
+hardcodeada del valor VIEJO de `--control-border` (antes del fix de
+contraste del P1) que el P1 nunca actualizó — sigue mostrando el borde de
+bajo contraste original en ese único punto; queda anotado para una sesión
+aparte, no se tocó sin confirmación.
+
+`DESIGN.md` se actualizó en el mismo commit: 13 colores nuevos en el
+frontmatter, más *backfill* de 4 tokens que ya existían en `tokens.css`
+desde antes pero nunca habían llegado al frontmatter (`text-pink`,
+`text-cyan-soft`, `text-gold-soft`, `text-danger-soft`) porque hacía falta
+nombrarlos para explicar por qué la familia de chip-tint es distinta. Los
+otros 7 tokens de `tokens.css` que también faltan en `DESIGN.md`
+(`text-soft`, `text-highlight`, `surface-deep`, etc., sin relación con este
+hallazgo) quedaron sin tocar a propósito, para una futura pasada de
+`$impeccable document`.
+
+Verificado con `scripts\check.ps1` en verde (263 tests + `git diff --check`)
+y un script de verificación numérica que resuelve cada `var()` nuevo contra
+`tokens.css` y lo compara valor por valor contra el literal que reemplazó en
+las ~150 ocurrencias — 100% idéntico salvo los 4 cambios aprobados de
+arriba. Recorrido manual en browser real contra un catálogo sintético (4
+obras sin portada, una por cada color de señal, para forzar los 4 degradés
+de `poster-N`): verificado vía `getComputedStyle` además de inspección
+visual, confirmando que `.poster-3` resuelve al degradé dorado exacto y que
+`.dvd-front-status.catalogued`/`.danger-zone`/`.action-danger` resuelven a
+los tokens nuevos correctos. Cero errores de consola. No se armó una cuenta
+de Club para este recorrido — `club.css` se verificó solo por el script
+numérico, ya que no introduce ningún token nuevo (reusa exactamente los
+mismos `--x-rgb` ya confirmados en las otras cuatro pantallas).
+
+Quedan `typeset`, `adapt` y `polish` — cada uno para una sesión/aprobación
+aparte, según lo pedido.
 
 **Fase 5, P1-d cerrado (2026-08-17).** La cola de Scanner se organiza por
 causa y confianza en vez de solo `Comparar`/`Sin coincidencia`:

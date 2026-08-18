@@ -19,6 +19,22 @@ colors:
   control-background: "#0c1025"
   control-border: "#6f78b5"
   quiet-control: "#222745"
+  text-pink: "#ff79bf"
+  text-cyan-soft: "#9bf8ff"
+  text-gold-soft: "#ffe0a2"
+  text-danger-soft: "#ffacb8"
+  poster-red-mid: "#76256f"
+  poster-teal-mid: "#14627f"
+  poster-gold-mid: "#a13779"
+  poster-violet-mid: "#34306f"
+  poster-deep: "#0a0c1d"
+  chip-tint-red: "#ffb8dc"
+  chip-tint-teal: "#a8faff"
+  chip-tint-gold: "#fff4d7"
+  chip-tint-violet: "#dedaff"
+  danger: "#ff667a"
+  danger-border: "#b9564c"
+  danger-ink: "#8e2f28"
 typography:
   display:
     fontFamily: '"Arial Narrow", "Trebuchet MS", sans-serif'
@@ -156,6 +172,14 @@ La paleta combina una base azul-negra de archivo con señales magenta, cyan, vio
 - **Soft Signal Line:** bordes y divisores de baja intensidad.
 - **Projection Panel:** paneles translúcidos sobre el fondo nocturno.
 - **Control Background, Control Border y Quiet Control:** campos, botones secundarios y estados neutros.
+
+### Derived Tones
+
+Cada color de señal tiene variantes derivadas para usos puntuales, además de su tono base.
+
+- **Rampa de carátula** (Poster Red/Teal/Gold/Violet Mid, Poster Deep): degradé de 3 paradas — señal brillante, tono medio apagado, casi negro (`#0a0c1d`) — para el fallback de portada del DVD Case cuando no hay imagen real.
+- **Tinte de chip** (Chip Tint Red/Teal/Gold/Violet): texto pálido sobre el chip de estado de la tarjeta y sobre el ícono de placeholder de carátula. Es una familia distinta de Text Pink, Text Cyan Soft y Text Gold Soft (el tono más suave que ya usan kickers y mensajes de feedback en toda la app): resuelven contraste en superficies distintas y no se intercambian.
+- **Danger:** fuera de las 4 señales. Text Danger Soft es el texto de mensajes de error; Danger Border y Danger Ink son el borde y el texto de una acción destructiva; Danger es el borde y fondo ambiental de una zona de riesgo (por ejemplo, eliminar una cuenta). Es la única familia roja que no es Playhead Pink.
 
 **The Signal Hierarchy Rule.** Playhead Pink llama a actuar, CRT Cyan confirma y orienta, Rental Sticker Gold destaca valor o excepción y Tape Violet estructura; no intercambiar sus roles por decoración.
 
