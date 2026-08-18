@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -77,6 +78,11 @@ SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
 }
+
+# Static JS/CSS carry no user data and are identical for every request, unlike the
+# no-store default the security middleware applies elsewhere for privacy. Filenames
+# aren't content-hashed, so this revalidates via ETag rather than going immutable.
+STATIC_CACHE_CONTROL = "public, max-age=3600, must-revalidate"
 
 
 def create_app(config: ViewerConfig) -> FastAPI:
@@ -340,12 +346,17 @@ def create_app(config: ViewerConfig) -> FastAPI:
         return response
 
     @app.get("/static/{name:path}")
-    def static(name: str) -> Response:
+    def static(name: str, request: Request) -> Response:
         asset = static_asset(name)
         if not asset:
             return error_response("static_asset_not_found", 404)
         body, content_type = asset
-        return Response(body, headers={"Content-Type": content_type})
+        etag = f'"{hashlib.sha256(body).hexdigest()[:16]}"'
+        headers = {"Cache-Control": STATIC_CACHE_CONTROL, "ETag": etag}
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers=headers)
+        headers["Content-Type"] = content_type
+        return Response(body, headers=headers)
 
     @app.get("/api/session", dependencies=[Depends(require_token)])
     def session(request: Request) -> JSONResponse:
