@@ -55,13 +55,13 @@
       .dvd-open-surface:focus-visible {
         outline: 3px solid var(--teal);
         outline-offset: 4px;
-        box-shadow: 0 0 0 7px rgba(34, 216, 229, 0.14), 0 0 30px rgba(34, 216, 229, 0.38);
+        box-shadow: 0 0 0 7px rgba(var(--teal-rgb), 0.14), 0 0 30px rgba(var(--teal-rgb), 0.38);
       }
       .dvd-case {
         background: linear-gradient(90deg, #030511 0 8px, #25294c 8px 12px, var(--case) 12px 100%);
         border: 1px solid #343a68;
         border-radius: var(--radius-case);
-        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4), -2px 0 13px rgba(120, 92, 255, 0.12);
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4), -2px 0 13px rgba(var(--violet-rgb), 0.12);
         height: 100%;
         padding: 7px 7px 7px 13px;
         position: relative;
@@ -71,7 +71,7 @@
       }
       .dvd-spine {
         background: linear-gradient(90deg, #03040e, #262b52 55%, #090b1c);
-        border-right: 1px solid rgba(34, 216, 229, 0.28);
+        border-right: 1px solid rgba(var(--teal-rgb), 0.28);
         bottom: 8px;
         left: 4px;
         position: absolute;
@@ -79,7 +79,7 @@
         width: 6px;
       }
       .dvd-spine::before, .dvd-spine::after {
-        background: #785cff;
+        background: var(--violet);
         content: "";
         height: 2px;
         left: 1px;
@@ -111,7 +111,7 @@
       .dvd-cover-image.is-loaded { opacity: 1; }
       .dvd-placeholder {
         align-content: space-between;
-        color: #fff4d7;
+        color: var(--chip-tint-gold);
         display: grid;
         isolation: isolate;
         overflow: hidden;
@@ -135,10 +135,10 @@
         position: absolute;
         z-index: -2;
       }
-      .poster-1 { background: linear-gradient(155deg, #ff3ea5, #76256f 50%, #0a0c1d); }
-      .poster-2 { background: linear-gradient(155deg, #22d8e5, #14627f 50%, #0a0c1d); }
-      .poster-3 { background: linear-gradient(155deg, #ffbe55, #a13779 52%, #0a0c1d); }
-      .poster-4 { background: linear-gradient(155deg, #785cff, #34306f 52%, #090b1b); }
+      .poster-1 { background: linear-gradient(155deg, var(--red), var(--poster-red-mid) 50%, var(--poster-deep)); }
+      .poster-2 { background: linear-gradient(155deg, var(--teal), var(--poster-teal-mid) 50%, var(--poster-deep)); }
+      .poster-3 { background: linear-gradient(155deg, var(--gold), var(--poster-gold-mid) 52%, var(--poster-deep)); }
+      .poster-4 { background: linear-gradient(155deg, var(--violet), var(--poster-violet-mid) 52%, var(--poster-deep)); }
       .dvd-placeholder span, .dvd-placeholder small {
         font-family: "Courier New", monospace;
         font-size: var(--text-label);
@@ -157,7 +157,7 @@
         text-transform: uppercase;
       }
       .dvd-gloss {
-        background: linear-gradient(120deg, rgba(183, 243, 255, 0.19), transparent 18%, transparent 72%, rgba(255, 62, 165, 0.09));
+        background: linear-gradient(120deg, rgba(183, 243, 255, 0.19), transparent 18%, transparent 72%, rgba(var(--red-rgb), 0.09));
         inset: 0;
         pointer-events: none;
         position: absolute;
@@ -166,7 +166,7 @@
       .dvd-title-block {
         background: linear-gradient(transparent, rgba(4, 6, 18, 0.86) 34%, rgba(4, 6, 18, 0.98));
         bottom: 0;
-        color: #f5f3ff;
+        color: var(--ink);
         left: 0;
         padding: 36px 11px 12px;
         position: absolute;
@@ -196,7 +196,7 @@
         overflow: visible;
         hyphens: none;
         overflow-wrap: normal;
-        text-shadow: 0 2px 8px #000, 0 0 12px rgba(120, 92, 255, 0.22);
+        text-shadow: 0 2px 8px #000, 0 0 12px rgba(var(--violet-rgb), 0.22);
         text-transform: uppercase;
         word-break: normal;
       }
@@ -208,7 +208,7 @@
       .dvd-sticker {
         background: var(--gold);
         border: 1px solid #39240a;
-        box-shadow: 0 0 16px rgba(255, 190, 85, 0.34);
+        box-shadow: 0 0 16px rgba(var(--gold-rgb), 0.34);
         color: #24170b;
         font-size: var(--text-label);
         font-weight: 900;
@@ -224,9 +224,9 @@
       .dvd-back-case { transform-origin: right center; }
       .dvd-back-cover {
         background:
-          radial-gradient(circle at 90% 8%, rgba(255, 62, 165, 0.18), transparent 34%),
-          linear-gradient(160deg, #191d38, #0b0e22 72%);
-        border: 1px solid rgba(34, 216, 229, 0.34);
+          radial-gradient(circle at 90% 8%, rgba(var(--red-rgb), 0.18), transparent 34%),
+          linear-gradient(160deg, var(--cream), var(--surface-deep) 72%);
+        border: 1px solid rgba(var(--teal-rgb), 0.34);
         color: var(--ink);
         display: grid;
         gap: 9px;
@@ -237,13 +237,13 @@
         position: relative;
       }
       .dvd-back-cover::after {
-        background: linear-gradient(110deg, rgba(34, 216, 229, 0.06), transparent 34%, rgba(255, 62, 165, 0.06));
+        background: linear-gradient(110deg, rgba(var(--teal-rgb), 0.06), transparent 34%, rgba(var(--red-rgb), 0.06));
         content: "";
         inset: 0;
         pointer-events: none;
         position: absolute;
       }
-      .dvd-back-header { border-bottom: 1px solid rgba(255, 62, 165, 0.58); padding-bottom: 7px; }
+      .dvd-back-header { border-bottom: 1px solid rgba(var(--red-rgb), 0.58); padding-bottom: 7px; }
       .dvd-back-header > span {
         color: var(--teal);
         display: block;
@@ -258,7 +258,7 @@
         color: var(--ink);
         font-size: 20px;
         line-height: 1.1;
-        text-shadow: 0 0 14px rgba(255, 62, 165, 0.2);
+        text-shadow: 0 0 14px rgba(var(--red-rgb), 0.2);
       }
       .dvd-back-summary {
         display: -webkit-box;
@@ -282,16 +282,16 @@
       }
       .dvd-back-statuses { display: flex; flex-wrap: wrap; gap: 5px; }
       .dvd-back-statuses span, .dvd-back-statuses strong {
-        background: rgba(120, 92, 255, 0.13);
-        border: 1px solid rgba(120, 92, 255, 0.55);
+        background: rgba(var(--violet-rgb), 0.13);
+        border: 1px solid rgba(var(--violet-rgb), 0.55);
         color: var(--text-highlight);
         font-family: "Courier New", monospace;
         font-size: var(--text-label);
         padding: 4px 5px;
         text-transform: uppercase;
       }
-      .dvd-back-statuses span.active { border-color: rgba(34, 216, 229, 0.72); color: var(--text-cyan-soft); }
-      .dvd-back-statuses strong { background: rgba(255, 190, 85, 0.14); border-color: #b58035; color: var(--gold); }
+      .dvd-back-statuses span.active { border-color: rgba(var(--teal-rgb), 0.72); color: var(--text-cyan-soft); }
+      .dvd-back-statuses strong { background: rgba(var(--gold-rgb), 0.14); border-color: #b58035; color: var(--gold); }
       .dvd-back-hint {
         color: var(--text-pink);
         font-family: "Courier New", monospace;
@@ -302,13 +302,13 @@
       }
       .dvd-barcode { align-items: end; display: grid; gap: 2px; grid-template-columns: 1fr auto; }
       .dvd-barcode > span {
-        background: repeating-linear-gradient(90deg, #a7aac7 0 1px, transparent 1px 3px, #22d8e5 3px 4px, transparent 4px 7px);
+        background: repeating-linear-gradient(90deg, var(--muted) 0 1px, transparent 1px 3px, var(--teal) 3px 4px, transparent 4px 7px);
         display: block;
         height: 17px;
         opacity: 0.66;
       }
       .dvd-barcode small { color: var(--muted); font-family: "Courier New", monospace; font-size: var(--text-label); max-width: 62px; overflow: hidden; }
-      .dvd-card:has(.dvd-open-surface:focus-visible) .dvd-back .dvd-case { box-shadow: 0 18px 38px rgba(0, 0, 0, 0.5), 0 0 25px rgba(34, 216, 229, 0.24); }
+      .dvd-card:has(.dvd-open-surface:focus-visible) .dvd-back .dvd-case { box-shadow: 0 18px 38px rgba(0, 0, 0, 0.5), 0 0 25px rgba(var(--teal-rgb), 0.24); }
       .facts {
         display: grid;
         gap: 4px;
@@ -354,8 +354,8 @@
         min-height: 22px;
       }
       .dvd-front-status {
-        background: rgba(8, 10, 24, 0.82);
-        border: 1px solid rgba(139, 124, 255, 0.42);
+        background: rgba(var(--case-rgb), 0.82);
+        border: 1px solid rgba(var(--line-rgb), 0.42);
         border-radius: 999px;
         color: var(--text-highlight);
         font-size: var(--text-caption);
@@ -364,18 +364,18 @@
         padding: 4px 6px;
       }
       .dvd-front-status.catalogued {
-        background: rgba(34, 216, 229, 0.13);
-        border-color: rgba(34, 216, 229, 0.58);
-        color: #a8faff;
+        background: rgba(var(--teal-rgb), 0.13);
+        border-color: rgba(var(--teal-rgb), 0.58);
+        color: var(--chip-tint-teal);
       }
       .dvd-front-status.watched {
-        background: rgba(255, 62, 165, 0.14);
-        border-color: rgba(255, 62, 165, 0.56);
-        color: #ffb8dc;
+        background: rgba(var(--red-rgb), 0.14);
+        border-color: rgba(var(--red-rgb), 0.56);
+        color: var(--chip-tint-red);
       }
       .dvd-front-status.pending {
-        background: rgba(120, 92, 255, 0.16);
-        color: #dedaff;
+        background: rgba(var(--violet-rgb), 0.16);
+        color: var(--chip-tint-violet);
       }
       .dvd-front-status.muted {
         color: var(--muted);
@@ -388,7 +388,7 @@
           transition-delay: 90ms;
         }
 
-        .dvd-card:hover .dvd-back .dvd-case { box-shadow: 0 18px 38px rgba(0, 0, 0, 0.5), 0 0 25px rgba(255, 62, 165, 0.2); }
+        .dvd-card:hover .dvd-back .dvd-case { box-shadow: 0 18px 38px rgba(0, 0, 0, 0.5), 0 0 25px rgba(var(--red-rgb), 0.2); }
 }
 
 @media (max-width: 860px) {
