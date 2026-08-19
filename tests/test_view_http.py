@@ -1278,6 +1278,16 @@ class ViewerHttpTests(unittest.TestCase):
         item = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
         self.assertEqual(item.link_curation_status, "deferred")
 
+    def test_items_response_exposes_external_link_counts(self) -> None:
+        status, raw_payload = self.request(
+            "GET",
+            "/api/items",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        payload = json.loads(raw_payload)
+        self.assertEqual(status, 200, raw_payload)
+        self.assertEqual(payload["links"], {"with_link": 0, "without_link": 1})
+
     def test_duplicate_pair_can_be_dismissed_from_the_queue(self) -> None:
         repository = JsonCatalogRepository(self.catalog_path, normalize_item)
         repository.write(

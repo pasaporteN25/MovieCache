@@ -99,6 +99,7 @@ class CurationTests(unittest.TestCase):
                     "pending": 0,
                     "duplicates": 0,
                     "missing_link": 0,
+                    "partial_link": 0,
                     "deferred": 1,
                 },
             )
@@ -107,6 +108,37 @@ class CurationTests(unittest.TestCase):
             pending = build_curation_payload(curation_rows(repository.read()))
             self.assertEqual(pending["counts"]["missing_link"], 1)
             self.assertEqual(pending["counts"]["deferred"], 0)
+
+    def test_partial_link_counts_items_with_one_or_two_of_three_sources(self) -> None:
+        items = curation_rows(
+            [
+                normalize_item({"id": "no-links", "title": "A"}),
+                normalize_item(
+                    {"id": "one-source", "title": "B", "imdb_url": "https://www.imdb.com/title/tt0000001/"}
+                ),
+                normalize_item(
+                    {
+                        "id": "two-sources",
+                        "title": "C",
+                        "wikipedia_url": "https://en.wikipedia.org/wiki/C",
+                        "imdb_url": "https://www.imdb.com/title/tt0000002/",
+                    }
+                ),
+                normalize_item(
+                    {
+                        "id": "three-sources",
+                        "title": "D",
+                        "wikipedia_url": "https://en.wikipedia.org/wiki/D",
+                        "imdb_url": "https://www.imdb.com/title/tt0000003/",
+                        "filmaffinity_url": "https://www.filmaffinity.com/es/film456.html",
+                    }
+                ),
+            ]
+        )
+
+        payload = build_curation_payload(items)
+
+        self.assertEqual(payload["counts"]["partial_link"], 2)
 
     def test_sqlite_persists_curation_decisions_relationally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

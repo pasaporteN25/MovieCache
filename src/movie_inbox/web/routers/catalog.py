@@ -102,6 +102,7 @@ def items(
             "write_json": catalog.write_name,
             "schema_version": SCHEMA_VERSION,
             "duplicate_items": duplicate_items,
+            "links": {"with_link": with_link, "without_link": len(rows) - with_link},
             "curation": {"counts": {**curation_counts(rows), "scanner": scanner_pending}},
             "external": external_sources_snapshot(),
             "privacy": preferences.to_dict(),
