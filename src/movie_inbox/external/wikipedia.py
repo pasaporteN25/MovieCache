@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 
 from movie_inbox.domain.catalog import external_source_name
+from movie_inbox.domain.matching import decide_match
 from movie_inbox.domain.search import parse_search_query, search_key
 from movie_inbox.domain.titles import (
     clean_release_title,
@@ -298,13 +299,14 @@ def fetch_wikipedia_by_title(title: str, year: str = "") -> dict[str, Any]:
     query = clean_search_title(clean_release_title(title))
     if not query or looks_like_external_id(query):
         return {}
+    existing = {"title": query, "year": year}
     for language in ["en", "es"]:
         for candidate in wikipedia_direct_candidates(query, year, language):
             metadata = fetch_wikipedia_metadata(
                 f"https://{language}.wikipedia.org/wiki/"
                 f"{quote(candidate.replace(' ', '_'), safe='')}"
             )
-            if wikipedia_match_score(query, year, candidate, "", metadata) >= 3:
+            if metadata and decide_match(existing, metadata).accepted:
                 return metadata
         for search_query in wikipedia_search_queries(query, year, language):
             raw = fetch_wikipedia_search(search_query, language)
@@ -312,25 +314,21 @@ def fetch_wikipedia_by_title(title: str, year: str = "") -> dict[str, Any]:
             results = query_data.get("search") if isinstance(query_data, dict) else []
             if not isinstance(results, list):
                 continue
-            best: tuple[int, dict[str, Any]] = (0, {})
             for result in results[:3]:
                 if not isinstance(result, dict):
                     continue
                 page_title = str(result.get("title") or "")
-                snippet = clean_whitespace(strip_html(str(result.get("snippet") or "")))
                 metadata = fetch_wikipedia_metadata(
                     f"https://{language}.wikipedia.org/wiki/"
                     f"{quote(page_title.replace(' ', '_'), safe='')}"
                 )
-                score = wikipedia_match_score(query, year, page_title, snippet, metadata)
-                if score > best[0]:
-                    best = (score, metadata)
-            if best[0] >= 3:
-                return best[1]
+                if metadata and decide_match(existing, metadata).accepted:
+                    return metadata
     return {}
 
 
 def fetch_wikipedia_by_wikidata_title(title: str, year: str = "") -> dict[str, Any]:
+    existing = {"title": title, "year": year}
     for language in ["en", "es"]:
         search_url = (
             "https://www.wikidata.org/w/api.php"
@@ -349,10 +347,7 @@ def fetch_wikipedia_by_wikidata_title(title: str, year: str = "") -> dict[str, A
             article_url = fetch_wikidata_article_url(entity_id)
             if article_url:
                 metadata = fetch_wikipedia_metadata(article_url)
-                if (
-                    metadata
-                    and wikipedia_match_score(title, year, label, description, metadata) >= 3
-                ):
+                if metadata and decide_match(existing, metadata).accepted:
                     return metadata
     return {}
 
@@ -392,45 +387,6 @@ def wikipedia_direct_candidates(title: str, year: str, language: str) -> list[st
     return list(dict.fromkeys(candidates))
 
 
-def wikipedia_match_score(
-    query_title: str,
-    year: str,
-    page_title: str,
-    snippet: str,
-    metadata: dict[str, Any],
-) -> int:
-    if not metadata:
-        return 0
-    score = 0
-    query_key = normalize_match_text(query_title)
-    page_key = normalize_match_text(page_title)
-    wiki_key = normalize_match_text(str(metadata.get("wikipedia_title") or ""))
-    description = normalize_match_text(str(metadata.get("description") or ""))
-    extract = normalize_match_text(str(metadata.get("wikipedia_extract") or ""))
-    snippet_key = normalize_match_text(snippet)
-    if query_key and query_key in {page_key, wiki_key}:
-        score += 4
-    elif query_key and (query_key in page_key or query_key in wiki_key):
-        score += 2
-    if year and year in f"{page_title} {metadata.get('wikipedia_extract', '')}":
-        score += 2
-    if any(marker in description for marker in ["film", "movie", "pelicula"]):
-        score += 2
-    if any(
-        marker in f"{extract} {snippet_key}"
-        for marker in ["directed by", "starring", "film", "movie", "pelicula"]
-    ):
-        score += 1
-    return score
-
-
-def normalize_match_text(value: str) -> str:
-    value = value.lower()
-    value = re.sub(r"\([^)]*\)", " ", value)
-    value = re.sub(r"[^a-z0-9]+", " ", value)
-    return clean_whitespace(value)
-
-
 def clean_search_title(value: str) -> str:
     value = re.sub(
         r"\s*\((film|movie|pelicula|miniserie|tv series|serie de tv|video game|cortometraje)"
@@ -455,7 +411,3 @@ def wikipedia_page_title(path: str) -> str:
     if marker not in path:
         return ""
     return unquote(path.split(marker, 1)[1].split("#", 1)[0]).replace(" ", "_")
-
-
-def strip_html(value: str) -> str:
-    return re.sub(r"<[^>]+>", " ", value)
