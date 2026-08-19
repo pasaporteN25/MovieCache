@@ -37,6 +37,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   automática no es exhaustiva, y ofrece buscar en tu catálogo antes de dar de
   alta una ficha nueva. Cada candidata muestra además su procedencia
   (`En tu catálogo` / `Catálogo compartido`) junto a la razón de confianza.
+- El borde superior/inferior de la barra de filtros de Colección usaba un tono
+  de `--control-border` desactualizado, de antes del ajuste de contraste del
+  P1-a; ahora usa el mismo color que el resto de la interfaz.
 
 ## [0.3.0] - 2026-08-17
 
