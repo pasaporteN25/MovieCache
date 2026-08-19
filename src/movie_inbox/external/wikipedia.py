@@ -207,51 +207,24 @@ def wikipedia_result_from_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
 
 def fetch_wikipedia_metadata(url: str) -> dict[str, Any]:
     parsed = urlparse(url)
-    host = (parsed.hostname or "").lower()
     if external_source_name(url) != "wikipedia":
         return {}
     page_title = wikipedia_page_title(parsed.path)
     if not page_title:
         return {}
-
+    host = (parsed.hostname or "").lower()
     language = host.split(".")[0] if "." in host else "en"
-    summary_url = (
-        f"https://{language}.wikipedia.org/api/rest_v1/page/summary/{quote(page_title, safe='')}"
-    )
-    raw = fetch_json_safe(summary_url, timeout=5)
-    if not raw:
-        return fetch_wikipedia_metadata_action_api(language, page_title)
-
-    title = clean_title(str(raw.get("title") or raw.get("displaytitle") or page_title))
-    description = clean_whitespace(str(raw.get("description") or ""))
-    extract = clean_whitespace(str(raw.get("extract") or ""))
-    thumbnail = raw.get("thumbnail") if isinstance(raw.get("thumbnail"), dict) else {}
-    image_url = str(thumbnail.get("source") or "") if isinstance(thumbnail, dict) else ""
-    wikidata_id = str(raw.get("wikibase_item") or "")
-    metadata: dict[str, Any] = {
-        "url": f"https://{language}.wikipedia.org/wiki/{quote(page_title, safe='')}",
-        "wikipedia_url": f"https://{language}.wikipedia.org/wiki/{quote(page_title, safe='')}",
-        "title": title,
-        "spanish_title": title if language == "es" else "",
-        "english_title": title if language == "en" else "",
-        "description": description,
-        "wikipedia_title": title,
-        "wikidata_id": wikidata_id,
-        "page_image": image_url,
-        "wikipedia_extract": extract,
-        "og_type": raw.get("type", ""),
-    }
-    metadata["kind"] = infer_kind_from_text(title, description, extract) or "pelicula"
-    metadata.update(fetch_wikidata_metadata(wikidata_id))
-    if not (metadata["wikidata_id"] or metadata["wikipedia_extract"] or metadata["description"]):
-        return fetch_wikipedia_metadata_action_api(language, page_title) or metadata
-    return metadata
+    return fetch_wikipedia_metadata_action_api(language, page_title)
 
 
 def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[str, Any]:
+    # No exintro=1: the REST summary endpoint this used to try first can only
+    # ever return the intro paragraph, structurally, so getting a real
+    # synopsis instead of just that paragraph means reading the full article
+    # -- in this one call, not a second one.
     api_url = (
         f"https://{language}.wikipedia.org/w/api.php?action=query&format=json&redirects=1"
-        "&prop=extracts|pageimages|pageprops|info&exintro=1&explaintext=1"
+        "&prop=extracts|pageimages|pageprops|info&explaintext=1"
         "&piprop=thumbnail&pithumbsize=500&inprop=url"
         f"&titles={quote(page_title.replace('_', ' '))}"
     )
@@ -269,7 +242,9 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
 
     title = clean_title(str(page.get("title") or page_title))
     description = clean_whitespace(str(page.get("description") or ""))
-    extract = clean_whitespace(str(page.get("extract") or ""))
+    intro, sections = _split_wikipedia_sections(str(page.get("extract") or ""))
+    intro = clean_whitespace(intro)
+    synopsis = _find_synopsis_section(sections, language) or intro
     thumbnail = page.get("thumbnail") if isinstance(page.get("thumbnail"), dict) else {}
     pageprops = page.get("pageprops") if isinstance(page.get("pageprops"), dict) else {}
     wikidata_id = str(pageprops.get("wikibase_item") or "")
@@ -287,12 +262,64 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
         "wikipedia_title": title,
         "wikidata_id": wikidata_id,
         "page_image": str(thumbnail.get("source") or ""),
-        "wikipedia_extract": extract,
+        "wikipedia_extract": synopsis,
         "og_type": "",
     }
-    metadata["kind"] = infer_kind_from_text(title, description, extract) or "pelicula"
+    # infer_kind_from_text() only needs to see the intro -- feeding it the
+    # synopsis/full article risks an unrelated later section (e.g. "a
+    # television series adaptation was announced") outscoring the film
+    # markers that are reliably in the opening sentence.
+    metadata["kind"] = infer_kind_from_text(title, description, intro) or "pelicula"
     metadata.update(fetch_wikidata_metadata(wikidata_id))
     return metadata
+
+
+_SECTION_HEADING_PATTERN = re.compile(r"\n+(={2,5}) *([^=\n]+?) *\1\n+")
+_SYNOPSIS_SECTION_NAMES = {
+    "es": ("argumento", "sinopsis", "trama"),
+    "en": ("plot", "synopsis", "plot synopsis", "storyline"),
+}
+
+
+def _split_wikipedia_sections(full_text: str) -> tuple[str, list[tuple[int, str, str]]]:
+    """Split an explaintext=1 extract into its intro and (level, title, body) sections.
+
+    explaintext=1 without exintro=1 keeps "== Heading ==" markers as plain
+    text instead of stripping them, so sections can be located without a
+    second call to fetch wikitext or one specific section by index.
+    """
+    headings = list(_SECTION_HEADING_PATTERN.finditer(full_text))
+    if not headings:
+        return full_text, []
+    intro = full_text[: headings[0].start()]
+    sections: list[tuple[int, str, str]] = []
+    for index, match in enumerate(headings):
+        start = match.end()
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(full_text)
+        sections.append((len(match.group(1)), match.group(2).strip(), full_text[start:end]))
+    return intro, sections
+
+
+def _find_synopsis_section(sections: list[tuple[int, str, str]], language: str) -> str:
+    """Reconstruct the plot/synopsis section, including any nested subsections.
+
+    A film's "Argumento"/"Plot" section is often followed by deeper "===" (or
+    lower) subsections -- e.g. a "Reestreno remasterizado" note -- before the
+    next real "==" section starts. Stopping at the first heading of any level
+    would cut the synopsis off before those subsections; only a heading at
+    the *same or shallower* level actually ends it.
+    """
+    wanted = {*_SYNOPSIS_SECTION_NAMES.get(language, ()), *_SYNOPSIS_SECTION_NAMES["en"]}
+    for index, (level, title, _body) in enumerate(sections):
+        if title.casefold() not in wanted:
+            continue
+        end = len(sections)
+        for later in range(index + 1, len(sections)):
+            if sections[later][0] <= level:
+                end = later
+                break
+        return clean_whitespace(" ".join(body for _, _, body in sections[index:end]))
+    return ""
 
 
 def fetch_wikipedia_by_title(title: str, year: str = "") -> dict[str, Any]:
