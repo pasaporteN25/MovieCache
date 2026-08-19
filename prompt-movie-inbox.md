@@ -61,7 +61,7 @@ alcance de archivo/línea y nivel de modelo sugerido por tarea. Se eligió Markd
 de un kanban autohosteado (se evaluó Kanboard) para no sumar infraestructura nueva que
 mantener. Leerlo junto con este archivo al arrancar una sesión nueva.
 
-## Progreso (actualizado 2026-08-18)
+## Progreso (actualizado 2026-08-19)
 
 Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0): los 4 P1
 (P1-c, P1-a, P1-b, P1-d) están cerrados. El gate final de Fase 5 —correr
@@ -71,9 +71,68 @@ comparables directo). Encontró un P1 propio (contraste de `--control-border`,
 cerrado) y un P2 propio (caching HTTP de estáticos, cerrado), más 4
 hallazgos "P3" menores que se están cerrando uno por uno con aprobación
 previa de cada uno: `extract` (colores literales → tokens, **cerrado**),
-`typeset`, `adapt` y `polish`, en ese orden. Sesión nueva a partir de acá —
-no hace falta releer el historial de conversación, esto + `CLAUDE.md` +
-`git log` alcanza.
+`typeset` (**parcial**: consolidación de `font-family` cerrada, jerarquía
+de `font-size` pendiente — ver abajo), `adapt` y `polish`, en ese orden.
+Sesión nueva a partir de acá — no hace falta releer el historial de
+conversación, esto + `CLAUDE.md` + `git log` alcanza.
+
+También en esta sesión, del tablero `tareas.md` (frente Enriquecimiento y
+cobertura de links): `[E3]` y `[E4]` cerrados (commit `062f69b`), y un bug
+suelto de la pasada de `extract` corregido — el `rgba(69, 76, 120, .66)`
+de `catalog.css` que había quedado con el valor viejo de `--control-border`
+(commit `bea4a43`). `[E6]` sigue en Backlog a pedido de Lucas.
+
+**Fase 5, P3 (`$impeccable typeset`) parcial (2026-08-19).** Primer error a
+corregir: le pedí al skill `audit` en vez de `typeset` — son comandos
+distintos (`audit` es a11y/perf/responsive, no el review de heurísticas UX
+que veníamos llamando "audit" en este archivo). El comando real que
+corresponde a esta entrada de la cola es `typeset`, que hace su propio
+análisis en vivo en vez de leer hallazgos guardados — corregido antes de
+tocar nada.
+
+El scan mecánico (`detect.mjs --scope type`) sobre `src/movie_inbox/web/static/css/`
+completo dio 77 hallazgos: 28 `overused-font` y 49 `design-system-font-size`.
+Los 28 eran el mismo patrón que ya resolvió `extract` para colores pero sin
+tocar: `"Arial Narrow", "Trebuchet MS", sans-serif` (roles display/feature/title)
+y `"Courier New", monospace` (rol label) repetidos como literales — 27 y 65
+veces respectivamente, en los mismos 12 archivos — en vez de vivir en
+`tokens.css` como el resto de los valores documentados en `DESIGN.md`.
+Confirmé que las 27 y las 65 ocurrencias eran texto idéntico byte a byte
+antes de tocar nada. Agregué `--font-display`, `--font-body` y `--font-label`
+a `tokens.css` (mismo lugar que los tokens de color) y reemplacé las 92
+ocurrencias por `var(...)` con un script, no a mano — mecánico y sin
+excepciones que revisar. Verificado con `scripts\check.ps1` en verde (301
+tests) y con `getComputedStyle` contra un catálogo sintético nuevo (Bandeja,
+Colección, Club) confirmando que cada rol resuelve exactamente al mismo
+valor que el literal que reemplazó. Efecto de lado: el scan mecánico bajó de
+28 a 0 hallazgos de `overused-font` — no fue necesario un `ignore-value`,
+porque el valor genérico que el detector reconoce (`"Arial Narrow"`/
+`"Space Grotesk"`) ya no aparece como declaración `font-family:` literal en
+ningún lado salvo dentro de la definición del token mismo, que el detector
+no interpreta como una declaración de fuente.
+
+Los 49 `design-system-font-size` quedan **sin tocar, a propósito**. No es un
+hallazgo mecánico resolvible con un script: son valores realmente arbitrarios
+(7px, 17px, 18px, 19px, 20px, 21px, 22px, 23px, 25px, 26px, 29px, 32px, 34px,
+36px, 38px, 42px, 44px, ninguno de la rampa de `DESIGN.md`), repartidos en 12
+archivos, y cada uno pide criterio real, no snapping mecánico. Dos ejemplos
+concretos que muestran por qué: `curation.css` tiene dos encabezados con el
+mismo rol visual (Arial Narrow, itálica, mayúsculas) en 42px (`.curation-heading h2`)
+y 34px (`.curation-case-heading h3`) — dos pasos de jerarquía reales sin
+nombre, no un error; y `.curation-thumb` usa `font-size: 7px` para un glifo de
+fallback en una caja de 40×56px, que probablemente esté bien así (no es texto
+de lectura) pero tampoco tiene un token que documente esa intención. Además
+encontré (no vía el detector, que solo mira literales) que `.dvd-case`
+`.title-short`/`.title-medium` en `core-card.css` resuelven a `35px` en
+runtime — el rol `title` de `DESIGN.md` documenta `24px` fijo, así que hay un
+tercer caso de tamaño no documentado, probablemente detrás de un `clamp()` o
+cálculo que el scan estático no puede leer.
+
+Pendiente para la próxima sesión de esta misma tarea: decidir, caso por caso
+y con capturas o el browser real, cuáles de los 49 (más el de `core-card.css`)
+son pasos de rampa nuevos que merecen nombre propio en `DESIGN.md`, cuáles
+deberían alinearse a un rol existente, y cuáles son excepciones legítimas
+como el glifo de 7px. `adapt` y `polish` siguen sin arrancar.
 
 **Fase 5, P3 (`$impeccable extract`) cerrado (2026-08-18).** Los ~150
 colores literales de `core-card.css`, `home.css`, `catalog.css`,
