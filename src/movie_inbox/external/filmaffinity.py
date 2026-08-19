@@ -6,6 +6,7 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import quote
 
+from movie_inbox.domain.catalog import external_source_name
 from movie_inbox.domain.search import parse_search_query
 from movie_inbox.domain.titles import infer_year
 from movie_inbox.external.common import clean_text, fetch_text
@@ -69,3 +70,111 @@ class FilmAffinityParser(HTMLParser):
     @staticmethod
     def absolute_url(href: str) -> str:
         return href if href.startswith("http") else "https://www.filmaffinity.com" + href
+
+
+class FilmAffinityMetadataParser(HTMLParser):
+    """Reads the schema.org microdata on a FilmAffinity film detail page.
+
+    Most fields (year, genre, cast, director, synopsis) carry an itemprop
+    attribute. "Titulo original" and "Guion" (writers) do not -- those are
+    read positionally, by pairing each <dt> label with the <dd> that follows.
+    """
+
+    _NAME_TARGETS = {"director": "directors", "actor": "cast"}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.display_title = ""
+        self.original_title = ""
+        self.year = ""
+        self.description = ""
+        self.genres: list[str] = []
+        self.directors: list[str] = []
+        self.writers: list[str] = []
+        self.cast: list[str] = []
+        self._pending = ""
+        self._name_target = ""
+        self._in_dt = False
+        self._current_dt = ""
+        self._in_writers_dd = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = {key.lower(): value or "" for key, value in attrs}
+        itemprop = attributes.get("itemprop", "")
+        # Tag-shaped state (dt/dd pairing, the h1 title, writer links) and
+        # itemprop-shaped state are independent -- a tag can carry both (a
+        # <dd itemprop="datePublished"> must update _pending from the second
+        # block even though the first already matched on tag == "dd").
+        if tag == "h1" and attributes.get("id") == "main-title":
+            self._pending = "display_title"
+        if tag == "dt":
+            self._in_dt = True
+        if tag == "dd":
+            self._in_writers_dd = self._current_dt == "Guion"
+            if self._current_dt == "Título original":
+                self._pending = "original_title"
+        if tag == "a" and self._in_writers_dd:
+            title_attr = attributes.get("title", "").strip()
+            if title_attr:
+                self.writers.append(title_attr)
+
+        if itemprop == "datePublished":
+            self._pending = "year"
+        elif itemprop == "genre":
+            self._pending = "genre"
+        elif itemprop == "description":
+            self._pending = "description"
+        elif itemprop in self._NAME_TARGETS:
+            self._name_target = self._NAME_TARGETS[itemprop]
+        elif itemprop == "name" and self._name_target:
+            self._pending = self._name_target
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "dt":
+            self._in_dt = False
+        elif tag == "dd":
+            self._in_writers_dd = False
+
+    def handle_data(self, data: str) -> None:
+        text = clean_text(data)
+        if not text:
+            return
+        if self._in_dt:
+            self._current_dt = text
+            return
+        if self._pending == "display_title":
+            self.display_title = text
+        elif self._pending == "original_title":
+            self.original_title = text
+        elif self._pending == "year":
+            self.year = text
+        elif self._pending == "genre":
+            self.genres.append(text)
+        elif self._pending == "description":
+            self.description = f"{self.description} {text}".strip()
+        elif self._pending in self._NAME_TARGETS.values():
+            getattr(self, self._pending).append(text)
+        self._pending = ""
+
+
+def fetch_filmaffinity_metadata(url: str) -> dict[str, Any]:
+    if external_source_name(url) != "filmaffinity":
+        return {}
+    parser = FilmAffinityMetadataParser()
+    parser.feed(fetch_text(url))
+    title = parser.display_title or parser.original_title
+    if not title:
+        return {}
+    return {
+        "url": url,
+        "filmaffinity_url": url,
+        "title": title,
+        "original_title": parser.original_title,
+        "spanish_title": parser.display_title,
+        "year": parser.year,
+        "description": parser.description,
+        "genres": parser.genres,
+        "directors": parser.directors,
+        "writers": parser.writers,
+        "cast": parser.cast[:20],
+    }
