@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from movie_inbox.domain.search import parse_search_query
+from movie_inbox.domain.search import external_result_score, parse_search_query
+from movie_inbox.domain.search_strategy import SearchStrategy
 
 
 class ParseSearchQueryYearTests(unittest.TestCase):
@@ -32,6 +33,22 @@ class ParseSearchQueryYearTests(unittest.TestCase):
         intent = parse_search_query("Movie Title (2019 film)")
         self.assertEqual(intent.title, "Movie Title")
         self.assertEqual(intent.year, "2019")
+
+
+class ExternalResultScoreStrategyTests(unittest.TestCase):
+    def test_a_lighter_year_mismatch_penalty_keeps_a_wrong_year_result_above_the_floor(
+        self,
+    ) -> None:
+        result = {"title": "Heat", "year": "1986"}
+
+        baseline = external_result_score("Heat 1995", result)
+        lenient = external_result_score(
+            "Heat 1995", result, SearchStrategy(year_mismatch_penalty=1.0)
+        )
+
+        self.assertLess(baseline, lenient)
+        self.assertLess(baseline, 28.0)
+        self.assertGreaterEqual(lenient, 28.0)
 
 
 if __name__ == "__main__":
