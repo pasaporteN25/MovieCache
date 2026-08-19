@@ -12,7 +12,7 @@
         padding: 0 0 20px;
       }
       .club-heading h2 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 38px;
         font-style: italic;
         line-height: 1;
@@ -53,7 +53,7 @@
         border: 1px solid rgba(var(--violet-rgb), 0.38);
         color: var(--muted);
         display: inline-flex;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         height: 20px;
         justify-content: center;
@@ -76,7 +76,7 @@
       }
       .collection-directory-heading h3,
       .collection-detail-heading h3 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 29px;
         font-style: italic;
         line-height: 1;
@@ -94,7 +94,7 @@
         border: 1px solid rgba(var(--gold-rgb), 0.45);
         color: var(--gold);
         flex: 0 0 auto;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         padding: 6px 8px;
         text-transform: uppercase;
@@ -138,12 +138,12 @@
       }
       .collection-card-heading > span {
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         text-transform: uppercase;
       }
       .collection-card-heading h4 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 28px;
         font-style: italic;
         line-height: 1;
@@ -283,7 +283,7 @@
         border: 1px solid rgba(var(--red-rgb), 0.6);
         color: var(--text-pink);
         display: flex;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 900;
         height: 32px;
@@ -313,13 +313,13 @@
       }
       .club-catalog-heading span {
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         text-transform: uppercase;
       }
       .club-catalog-heading h3 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 28px;
         font-style: italic;
         line-height: 1;
@@ -373,13 +373,13 @@
       .club-card-body > div:first-child > span {
         color: var(--muted);
         display: block;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         text-transform: uppercase;
       }
       .club-card h4 {
         display: -webkit-box;
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 19px;
         font-style: italic;
         line-height: 1.02;

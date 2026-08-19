@@ -25,7 +25,7 @@
       .personal-read-grid dt,
       .personal-review-read > span {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         letter-spacing: 0.1em;
@@ -45,7 +45,7 @@
         border: 1px solid rgba(var(--teal-rgb), 0.5);
         border-radius: 999px;
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         padding: 3px 6px;
@@ -115,7 +115,7 @@
       }
       .personal-privacy-fields legend {
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         padding-inline: 5px;
@@ -203,7 +203,7 @@
         z-index: 2;
       }
       .drawer-top strong {
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-meta);
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -233,7 +233,7 @@
       .drawer-navigation-counter,
       .drawer-navigation-label {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         max-width: 190px;
         overflow: hidden;
@@ -288,13 +288,13 @@
       }
       .drawer-poster-frame img.drawer-poster.is-loaded + .drawer-poster-placeholder { opacity: 0; visibility: hidden; }
       .drawer-poster-placeholder span {
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         letter-spacing: 0.1em;
         text-transform: uppercase;
       }
       .drawer-poster-placeholder strong {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 23px;
         font-style: italic;
         font-weight: 900;
@@ -305,7 +305,7 @@
       .drawer-intro { align-content: center; display: grid; min-width: 0; }
       .drawer-kicker {
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         letter-spacing: 0.12em;
@@ -313,7 +313,7 @@
         text-transform: uppercase;
       }
       .drawer-intro h2 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: clamp(28px, 5vw, 46px);
         font-style: italic;
         font-weight: 900;
@@ -344,7 +344,7 @@
       }
       .drawer-state span {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -362,7 +362,7 @@
       }
       .drawer-synopsis h3, .drawer-personal-section h3 {
         color: var(--text-pink);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-caption);
         letter-spacing: 0.1em;
         margin: 0;
@@ -397,7 +397,7 @@
       }
       .drawer-section h3 {
         color: var(--text-pink);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-meta);
         letter-spacing: 0.08em;
         margin: 0;
@@ -421,7 +421,7 @@
       .drawer-accordion > summary::after {
         color: var(--teal);
         content: "+";
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: 20px;
         font-weight: 800;
       }
@@ -453,7 +453,7 @@
       .unsaved-dialog::backdrop { background: rgba(3, 4, 14, 0.78); }
       .unsaved-dialog-body { display: grid; gap: 12px; padding: 20px; }
       .unsaved-dialog-body h2 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 28px;
         font-style: italic;
         font-weight: 900;

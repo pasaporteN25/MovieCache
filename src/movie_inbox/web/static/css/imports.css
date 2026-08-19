@@ -75,7 +75,7 @@
       .import-draft-item-meta span,
       .import-draft-item-states span {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
       }
       .import-draft-item-states .new { color: var(--teal); }
@@ -105,7 +105,7 @@
         margin-bottom: 20px;
       }
       .import-stage-heading h3 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 32px;
         font-style: italic;
         line-height: 1;
@@ -279,7 +279,7 @@
       .import-state-badge {
         border: 1px solid var(--line);
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         justify-self: start;
         padding: 3px 6px;

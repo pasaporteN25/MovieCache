@@ -69,7 +69,10 @@
         --radius-case: 4px 10px 10px 4px;
         --focus-ring: 3px solid var(--teal);
         --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-        font-family: "Space Grotesk", "Trebuchet MS", Verdana, ui-sans-serif, system-ui, sans-serif;
+        --font-body: "Space Grotesk", "Trebuchet MS", Verdana, ui-sans-serif, system-ui, sans-serif;
+        --font-display: "Arial Narrow", "Trebuchet MS", sans-serif;
+        --font-label: "Courier New", monospace;
+        font-family: var(--font-body);
         color: var(--text-primary);
         background: var(--surface-app);
       }

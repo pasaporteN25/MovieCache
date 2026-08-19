@@ -42,7 +42,7 @@
         align-items: center;
         background: var(--surface-app);
         display: flex;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         justify-content: space-between;
@@ -80,7 +80,7 @@
       }
       .login-member-number span,
       .login-member-number strong {
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         letter-spacing: 0.08em;
         text-transform: uppercase;
@@ -122,7 +122,7 @@
         width: 84%;
       }
       .login-heading h2 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 34px;
         font-style: italic;
         line-height: 1;

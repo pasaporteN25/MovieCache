@@ -33,7 +33,7 @@
         padding: 16px 18px;
       }
       .merge-comparator-header h2 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 30px;
         line-height: 1;
         margin: 4px 0 0;
@@ -63,7 +63,7 @@
       }
       .merge-survivor-control legend {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         margin-bottom: 5px;
@@ -124,13 +124,13 @@
       .merge-entry-summary > div { display: grid; gap: 4px; min-width: 0; }
       .merge-entry-summary > div > span {
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         text-transform: uppercase;
       }
       .merge-entry-summary strong {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 20px;
         line-height: 1.06;
         overflow-wrap: anywhere;
@@ -170,7 +170,7 @@
       }
       .merge-field-group > header span {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         text-transform: uppercase;
       }
@@ -216,7 +216,7 @@
       .merge-choice:has(input:focus-visible) { outline: 3px solid var(--teal); outline-offset: 2px; }
       .merge-choice-label {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         text-transform: uppercase;
@@ -255,7 +255,7 @@
       }
       .merge-field-same > span:last-child {
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         text-transform: uppercase;
       }
