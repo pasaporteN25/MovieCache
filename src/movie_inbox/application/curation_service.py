@@ -8,6 +8,7 @@ from typing import Any
 
 from movie_inbox.domain.catalog import (
     annotate_duplicate_items,
+    external_link_coverage,
     external_urls,
     has_external_link,
     title_match_keys_for_item,
@@ -25,6 +26,7 @@ def build_curation_payload(items: list[dict[str, Any]]) -> dict[str, Any]:
             "pending": len(pending),
             "duplicates": sum(1 for case in pending if case["type"] == "duplicate"),
             "missing_link": sum(1 for case in pending if case["type"] == "missing_link"),
+            "partial_link": sum(1 for item in items if external_link_coverage(item) in (1, 2)),
             "deferred": sum(1 for case in cases if case["status"] == "deferred"),
         },
         "cases": cases,

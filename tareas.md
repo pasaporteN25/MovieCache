@@ -22,28 +22,6 @@ un ítem nunca puede terminar con más de 1 de los 3 links (IMDb/Wikipedia/FilmA
 por dos bugs estructurales independientes en `match_external_links.py`, no por falta de
 cobertura de las fuentes en sí.
 
-#### [E3] Reportar cobertura en `movie-inbox db info`
-- **Archivos**: `src/movie_inbox/cli/database.py`, función `show_info()` (líneas
-  153-166).
-- **Qué hacer**: agregar líneas de conteo — con Wikipedia / con IMDb / con FilmAffinity /
-  con los 3 / sin ninguno — usando [E1]. Mismo lugar donde ya se imprimen `Items`,
-  `Series`, `Local files`.
-- **Depende de**: [E1]
-- **Modelo sugerido**: Chico. Puramente aditivo, un archivo, sigue un patrón visible en
-  el mismo archivo.
-
-#### [E4] Exponer cobertura en Curaduría y en `/api/items`
-- **Archivos**: `src/movie_inbox/application/curation_service.py`
-  (`build_curation_payload`/`curation_counts`, líneas 18-31 y 71-90),
-  `src/movie_inbox/web/routers/catalog.py` (línea 84, hoy solo loguea `with_link`, no
-  va en la respuesta JSON de líneas 98-110).
-- **Qué hacer**: sumar un bucket nuevo (ej. `partial_link`, distinto de `missing_link`
-  que ya existe) para ítems con 1 o 2 de 3 fuentes, y agregar el conteo/cobertura a la
-  respuesta de `/api/items` (hoy no viaja, solo se loguea).
-- **Depende de**: [E1]
-- **Modelo sugerido**: Medio. Dos archivos, pero el patrón de `missing_link` ya existente
-  en `curation_service.py` es la plantilla directa a seguir.
-
 #### [E6] Extraer campos gratis del Wikidata ya descargado
 - **Archivos**: `src/movie_inbox/external/wikidata.py`, `fetch_wikidata_metadata()`
   (líneas 20-53), `WIKIDATA_LIST_FIELDS` (líneas 12-17).
@@ -66,6 +44,23 @@ cobertura de las fuentes en sí.
 *(vacío)*
 
 ## Hecho
+
+#### [E3] Reportar cobertura en `movie-inbox db info`
+`show_info()` en `cli/database.py` suma 5 líneas nuevas usando `linked_sources()`/
+`external_link_coverage()` de [E1]: con Wikipedia, con IMDb, con FilmAffinity, con
+los 3, sin ninguno. Test nuevo en `tests/test_sqlite_repository.py` con un catálogo
+sintético de 4 ítems (0/1/2/3 fuentes) que verifica las 5 líneas.
+2026-08-19, commit `<pendiente>`.
+
+#### [E4] Exponer cobertura en Curaduría y en `/api/items`
+`build_curation_payload()` suma un bucket `partial_link` (ítems con 1 o 2 de 3
+fuentes, vía `external_link_coverage()`), separado de `missing_link` (0 fuentes,
+sin cambios). El router de `/api/items` ya calculaba `with_link`/`without_link`
+para el log de la línea 84 pero no los incluía en la respuesta; ahora viajan bajo
+una clave `links` nueva en el JSON. Test nuevo de `partial_link` en
+`tests/test_curation.py` (4 ítems, 0/1/2/3 fuentes) y test HTTP nuevo en
+`tests/test_view_http.py` para la clave `links` de `/api/items`.
+2026-08-19, commit `<pendiente>`.
 
 #### [E8] Unificar el gate de Wikipedia por título en `decide_match`
 `fetch_wikipedia_by_title()`/`fetch_wikipedia_by_wikidata_title()` en

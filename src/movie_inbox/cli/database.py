@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.catalog import external_link_coverage, linked_sources, normalize_item
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -163,6 +163,14 @@ def show_info(database_path: Path) -> int:
     print(f"- Items: {len(items)}")
     print(f"- Series: {sum(1 for item in items if item.kind == 'serie')}")
     print(f"- Local files: {sum(len(item.local_files) for item in items)}")
+    rows = [item.to_dict() for item in items]
+    print(f"- With Wikipedia: {sum(1 for row in rows if 'wikipedia' in linked_sources(row))}")
+    print(f"- With IMDb: {sum(1 for row in rows if 'imdb' in linked_sources(row))}")
+    print(
+        f"- With FilmAffinity: {sum(1 for row in rows if 'filmaffinity' in linked_sources(row))}"
+    )
+    print(f"- With all 3 sources: {sum(1 for row in rows if external_link_coverage(row) == 3)}")
+    print(f"- With no external link: {sum(1 for row in rows if external_link_coverage(row) == 0)}")
     return 0
 
 

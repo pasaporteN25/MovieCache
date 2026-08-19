@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.repository import CatalogFormatError, CatalogRepositoryError
-from movie_inbox.cli.database import export_json, import_json, verify_catalog_round_trip
+from movie_inbox.cli.database import export_json, import_json, show_info, verify_catalog_round_trip
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -591,6 +591,49 @@ class SqliteRepositoryTests(unittest.TestCase):
             with self.assertRaisesRegex(CatalogRepositoryError, "does not exist"):
                 repository.read()
             self.assertFalse(path.exists())
+
+    def test_show_info_reports_external_link_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "catalog.db"
+            SqliteCatalogRepository(database, normalize_item).write(
+                [
+                    normalize_item(
+                        {
+                            "id": "imdb-only",
+                            "title": "A",
+                            "imdb_url": "https://www.imdb.com/title/tt0000001/",
+                        }
+                    ),
+                    normalize_item(
+                        {
+                            "id": "two-sources",
+                            "title": "B",
+                            "wikipedia_url": "https://en.wikipedia.org/wiki/B",
+                            "imdb_url": "https://www.imdb.com/title/tt0000002/",
+                        }
+                    ),
+                    normalize_item(
+                        {
+                            "id": "three-sources",
+                            "title": "C",
+                            "wikipedia_url": "https://en.wikipedia.org/wiki/C",
+                            "imdb_url": "https://www.imdb.com/title/tt0000003/",
+                            "filmaffinity_url": "https://www.filmaffinity.com/es/film123.html",
+                        }
+                    ),
+                    normalize_item({"id": "no-links", "title": "D"}),
+                ]
+            )
+
+            with redirect_stdout(StringIO()) as output:
+                self.assertEqual(show_info(database), 0)
+
+            report = output.getvalue()
+            self.assertIn("With Wikipedia: 2", report)
+            self.assertIn("With IMDb: 3", report)
+            self.assertIn("With FilmAffinity: 1", report)
+            self.assertIn("With all 3 sources: 1", report)
+            self.assertIn("With no external link: 1", report)
 
     def test_repository_factory_uses_file_extension(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
