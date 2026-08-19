@@ -60,7 +60,7 @@
       .admin-section:first-of-type { border-top: 0; }
       .admin-section-heading h3 {
         color: var(--text-pink);
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 24px;
         font-style: italic;
         margin: 0;
@@ -101,7 +101,7 @@
       .image-cache-state {
         border: 1px solid rgba(34, 216, 229, 0.55);
         color: var(--text-cyan-soft);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         justify-self: end;
@@ -150,7 +150,7 @@
         align-items: center;
         color: var(--muted);
         display: flex;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         gap: 14px;
@@ -230,7 +230,7 @@
         border: 1px solid var(--line);
         border-radius: 999px;
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         padding: 4px 7px;
@@ -275,7 +275,7 @@
         padding: 16px 18px;
       }
       .member-dialog-header h2 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 28px;
         font-style: italic;
         margin: 4px 0 0;
@@ -298,7 +298,7 @@
       .member-dialog-actions button { width: auto; }
       .temporary-password-body p { color: var(--muted); line-height: 1.5; margin: 0; }
       .temporary-password-body strong { color: var(--ink); }
-      #temporaryPasswordValue { font-family: "Courier New", monospace; font-size: 15px; }
+      #temporaryPasswordValue { font-family: var(--font-label); font-size: 15px; }
       .privacy-dialog-body { display: grid; gap: 14px; padding: 18px; }
       .privacy-master-control,
       .privacy-fieldset label {

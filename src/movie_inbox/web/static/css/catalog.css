@@ -134,7 +134,7 @@
         padding: 30px 4px 13px;
       }
       .catalog-heading h2 {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 26px;
         font-style: italic;
         font-weight: 900;
@@ -190,7 +190,7 @@
       }
       .section-kicker {
         color: var(--teal);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         text-transform: uppercase;
@@ -504,7 +504,7 @@
         justify-content: space-between;
         padding: 5px 6px;
       }
-      .metric strong { font-family: "Courier New", monospace; font-size: var(--text-small); }
+      .metric strong { font-family: var(--font-label); font-size: var(--text-small); }
       .danger {
         border-color: var(--danger-border);
         color: var(--danger-ink);
@@ -601,7 +601,7 @@
       .year-filter-block > span,
       .collection-sort-row label > span {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         text-transform: uppercase;
@@ -637,7 +637,7 @@
         border-radius: 999px;
         color: var(--case);
         display: inline-flex;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         height: 19px;
         justify-content: center;
@@ -710,7 +710,7 @@
       }
       .active-filters > span {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-caption);
         font-weight: 800;
         letter-spacing: 0.1em;

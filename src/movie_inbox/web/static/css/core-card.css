@@ -140,14 +140,14 @@
       .poster-3 { background: linear-gradient(155deg, var(--gold), var(--poster-gold-mid) 52%, var(--poster-deep)); }
       .poster-4 { background: linear-gradient(155deg, var(--violet), var(--poster-violet-mid) 52%, var(--poster-deep)); }
       .dvd-placeholder span, .dvd-placeholder small {
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
       .dvd-placeholder strong {
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: clamp(22px, 3vw, 35px);
         font-style: italic;
         font-weight: 900;
@@ -176,7 +176,7 @@
       .dvd-title-block > span {
         color: var(--teal);
         display: block;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         letter-spacing: 0.14em;
@@ -185,7 +185,7 @@
       }
       .dvd-card h2 {
         display: block;
-        font-family: "Arial Narrow", "Trebuchet MS", sans-serif;
+        font-family: var(--font-display);
         font-size: 24px;
         font-style: italic;
         font-weight: 900;
@@ -247,7 +247,7 @@
       .dvd-back-header > span {
         color: var(--teal);
         display: block;
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         letter-spacing: 0.14em;
@@ -272,7 +272,7 @@
       }
       .dvd-back-meta {
         color: var(--muted);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         line-height: 1.3;
         margin: 0;
@@ -285,7 +285,7 @@
         background: rgba(var(--violet-rgb), 0.13);
         border: 1px solid rgba(var(--violet-rgb), 0.55);
         color: var(--text-highlight);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         padding: 4px 5px;
         text-transform: uppercase;
@@ -294,7 +294,7 @@
       .dvd-back-statuses strong { background: rgba(var(--gold-rgb), 0.14); border-color: #b58035; color: var(--gold); }
       .dvd-back-hint {
         color: var(--text-pink);
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
         letter-spacing: 0.04em;
@@ -307,7 +307,7 @@
         height: 17px;
         opacity: 0.66;
       }
-      .dvd-barcode small { color: var(--muted); font-family: "Courier New", monospace; font-size: var(--text-label); max-width: 62px; overflow: hidden; }
+      .dvd-barcode small { color: var(--muted); font-family: var(--font-label); font-size: var(--text-label); max-width: 62px; overflow: hidden; }
       .dvd-card:has(.dvd-open-surface:focus-visible) .dvd-back .dvd-case { box-shadow: 0 18px 38px rgba(0, 0, 0, 0.5), 0 0 25px rgba(var(--teal-rgb), 0.24); }
       .facts {
         display: grid;
@@ -339,7 +339,7 @@
       }
       .dvd-title-meta > span,
       .dvd-title-meta > strong {
-        font-family: "Courier New", monospace;
+        font-family: var(--font-label);
         font-size: var(--text-caption);
         font-weight: 800;
         letter-spacing: 0.08em;
