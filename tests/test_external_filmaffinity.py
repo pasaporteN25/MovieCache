@@ -39,40 +39,91 @@ HEAT_FILM_PAGE_HTML = """
             <dd itemprop="duration">172 min.</dd>
 
             <dt>País</dt>
-            <dd><span id="country-img"><img class="nflag" src="/imgs/countries2/US.png" alt="Estados Unidos"></span>&nbsp;Estados Unidos</dd>
+            <dd><span id="country-img">
+<img class="nflag" src="/imgs/countries2/US.png" alt="Estados Unidos">
+</span>&nbsp;Estados Unidos</dd>
             <dt>Dirección</dt>
             <dd class="directors">
-<div class="credits"><span class="nb" itemprop="director" itemscope="" itemtype="http://schema.org/Person"><a class="link" itemprop="url" href="https://www.filmaffinity.com/es/name.php?name-id=101626315" title="Michael Mann"><span itemprop="name">Michael Mann</span></a></span></div>            </dd>
+<div class="credits">
+<span class="nb" itemprop="director" itemscope="" itemtype="http://schema.org/Person">
+<a class="link" itemprop="url"
+   href="https://www.filmaffinity.com/es/name.php?name-id=101626315"
+   title="Michael Mann"><span itemprop="name">Michael Mann</span></a>
+</span></div>            </dd>
             <dt>Guion</dt>
-            <dd><div class="credits"><span class="nb"><a href="https://www.filmaffinity.com/es/name.php?name-id=101626315" title="Michael Mann">Michael Mann</a></span></div></dd>
+            <dd><div class="credits"><span class="nb">
+<a href="https://www.filmaffinity.com/es/name.php?name-id=101626315"
+   title="Michael Mann">Michael Mann</a>
+</span></div></dd>
             <dt>Reparto</dt>
             <dd class="card-cast-debug">
                 <div class="cast-wrapper">
 <ul class="credits-scroller">
-<li class="nb" itemprop="actor" itemscope="" itemtype="http://schema.org/Person"><a class="link" itemprop="url" href="https://www.filmaffinity.com/es/name.php?name-id=627577077" title="Robert De Niro"><img src="https://pics.filmaffinity.com/robert_de_niro.jpg" alt="Robert De Niro"><div class="name" itemprop="name">Robert De Niro</div></a></li>
-<li class="nb" itemprop="actor" itemscope="" itemtype="http://schema.org/Person"><a class="link" itemprop="url" href="https://www.filmaffinity.com/es/name.php?name-id=951364861" title="Al Pacino"><img src="https://pics.filmaffinity.com/al_pacino.jpg" alt="Al Pacino"><div class="name" itemprop="name">Al Pacino</div></a></li>
-<li class="nb" itemprop="actor" itemscope="" itemtype="http://schema.org/Person"><a class="link" itemprop="url" href="https://www.filmaffinity.com/es/name.php?name-id=322187927" title="Val Kilmer"><img src="https://pics.filmaffinity.com/val_kilmer.jpg" alt="Val Kilmer"><div class="name" itemprop="name">Val Kilmer</div></a></li>
-<li class="see-more-cre"><a href="https://www.filmaffinity.com/es/fullcredits.php?movie_id=267267"> Ver todos los creditos</a></li>
+<li class="nb" itemprop="actor" itemscope="" itemtype="http://schema.org/Person">
+<a class="link" itemprop="url"
+   href="https://www.filmaffinity.com/es/name.php?name-id=627577077"
+   title="Robert De Niro">
+<img src="https://pics.filmaffinity.com/robert_de_niro.jpg" alt="Robert De Niro">
+<div class="name" itemprop="name">Robert De Niro</div></a></li>
+<li class="nb" itemprop="actor" itemscope="" itemtype="http://schema.org/Person">
+<a class="link" itemprop="url"
+   href="https://www.filmaffinity.com/es/name.php?name-id=951364861"
+   title="Al Pacino">
+<img src="https://pics.filmaffinity.com/al_pacino.jpg" alt="Al Pacino">
+<div class="name" itemprop="name">Al Pacino</div></a></li>
+<li class="nb" itemprop="actor" itemscope="" itemtype="http://schema.org/Person">
+<a class="link" itemprop="url"
+   href="https://www.filmaffinity.com/es/name.php?name-id=322187927"
+   title="Val Kilmer">
+<img src="https://pics.filmaffinity.com/val_kilmer.jpg" alt="Val Kilmer">
+<div class="name" itemprop="name">Val Kilmer</div></a></li>
+<li class="see-more-cre">
+<a href="https://www.filmaffinity.com/es/fullcredits.php?movie_id=267267">
+ Ver todos los creditos</a></li>
 </ul>
                 </div>
             </dd>
             <dt>Música</dt>
-            <dd><div class="credits"><span class="nb"><a href="https://www.filmaffinity.com/es/name.php?name-id=538285107" title="Elliot Goldenthal">Elliot Goldenthal</a></span></div></dd>
+            <dd><div class="credits"><span class="nb">
+<a href="https://www.filmaffinity.com/es/name.php?name-id=538285107"
+   title="Elliot Goldenthal">Elliot Goldenthal</a>
+</span></div></dd>
             <dt>Fotografía</dt>
-            <dd><div class="credits"><span class="nb"><a href="https://www.filmaffinity.com/es/name.php?name-id=547183953" title="Dante Spinotti">Dante Spinotti</a></span></div></dd>
+            <dd><div class="credits"><span class="nb">
+<a href="https://www.filmaffinity.com/es/name.php?name-id=547183953"
+   title="Dante Spinotti">Dante Spinotti</a>
+</span></div></dd>
 <style>.card-producer .credits {display: inline;} </style>
 
             <dt>Compañías</dt>
             <dd class="card-producer">
-<div class="credits"><span class="nb"><a href="https://www.filmaffinity.com/es/name.php?name-id=241265159" title="Warner Bros">Warner Bros</a>,</span> <span class="nb"><a href="https://www.filmaffinity.com/es/name.php?name-id=697760714" title="Regency Enterprises">Regency Enterprises</a>.</span></div>            </dd>
+<div class="credits"><span class="nb">
+<a href="https://www.filmaffinity.com/es/name.php?name-id=241265159"
+   title="Warner Bros">Warner Bros</a>,</span>
+<span class="nb">
+<a href="https://www.filmaffinity.com/es/name.php?name-id=697760714"
+   title="Regency Enterprises">Regency Enterprises</a>.</span>
+</div>            </dd>
 
             <dt>Género</dt>
             <dd class="card-genres">
-                <span itemprop="genre"><a href="https://www.filmaffinity.com/es/moviegenre.php?genre=TH&amp;attr=rat_count&amp;nodoc">Thriller</a></span>.                 <span itemprop="genre"><a href="https://www.filmaffinity.com/es/moviegenre.php?genre=AC&amp;attr=rat_count&amp;nodoc">Acción</a></span>.                 <span itemprop="genre"><a href="https://www.filmaffinity.com/es/moviegenre.php?genre=INT&amp;attr=rat_count&amp;nodoc">Intriga</a></span> |                 <a href="https://www.filmaffinity.com/es/movietopic.php?topic=124690&amp;attr=rat_count&amp;nodoc">Policíaco</a>
+                <span itemprop="genre">
+<a href="https://www.filmaffinity.com/es/moviegenre.php?genre=TH&amp;attr=rat_count&amp;nodoc">
+Thriller</a></span>.
+                <span itemprop="genre">
+<a href="https://www.filmaffinity.com/es/moviegenre.php?genre=AC&amp;attr=rat_count&amp;nodoc">
+Acción</a></span>.
+                <span itemprop="genre">
+<a href="https://www.filmaffinity.com/es/moviegenre.php?genre=INT&amp;attr=rat_count&amp;nodoc">
+Intriga</a></span> |
+                <a href="https://www.filmaffinity.com/es/movietopic.php?topic=124690&amp;attr=rat_count&amp;nodoc">
+Policíaco</a>
             </dd>
 
         <dt>Sinopsis</dt>
-        <dd class="" itemprop="description">Neil McCauley (Robert De Niro) es un experto ladrón. Su filosofía consiste en vivir sin ataduras ni vínculos que puedan constituir un obstáculo si las cosas se complican. (FILMAFFINITY)</dd>
+        <dd class="" itemprop="description">Neil McCauley (Robert De Niro) es un
+experto ladrón. Su filosofía consiste en vivir sin ataduras ni vínculos que
+puedan constituir un obstáculo si las cosas se complican. (FILMAFFINITY)</dd>
     </dl>
 </body>
 </html>

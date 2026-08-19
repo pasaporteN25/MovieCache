@@ -323,9 +323,7 @@ class CurationWorkflowService:
         manual flag."""
         if self.availability_service is None:
             return dict(item)
-        return self.availability_service.decorate_items(
-            [dict(item)], include_sources=False
-        )[0]
+        return self.availability_service.decorate_items([dict(item)], include_sources=False)[0]
 
     def _capture(self, pointer: CatalogPointer) -> dict[str, Any]:
         repository = self.repository_factory(pointer.path)

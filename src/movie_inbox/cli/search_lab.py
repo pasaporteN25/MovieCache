@@ -330,7 +330,11 @@ _COMPARISON_METRIC_LABELS = (
     ("auto_match_precision", "Auto-match precisión"),
     ("expectation_failures", "Expectativas fallidas"),
 )
-_COMPARISON_LOWER_IS_BETTER = {"forbidden_hits", "auto_match_false_positives", "expectation_failures"}
+_COMPARISON_LOWER_IS_BETTER = {
+    "forbidden_hits",
+    "auto_match_false_positives",
+    "expectation_failures",
+}
 
 
 def _comparison_summary_html(report: Mapping[str, Any]) -> str:

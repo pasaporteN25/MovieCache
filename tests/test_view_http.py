@@ -1216,7 +1216,9 @@ class ViewerHttpTests(unittest.TestCase):
             "/static/js/core/bootstrap.js", headers={"If-None-Match": etag}
         )
         self.assertEqual(revalidated.status_code, 304)
-        self.assertEqual(revalidated.headers["cache-control"], "public, max-age=3600, must-revalidate")
+        self.assertEqual(
+            revalidated.headers["cache-control"], "public, max-age=3600, must-revalidate"
+        )
         self.assertFalse(revalidated.content)
 
         # API responses stay uncached: they carry per-session catalog data.
