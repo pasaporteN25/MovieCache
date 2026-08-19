@@ -7,7 +7,11 @@ from urllib.error import URLError
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.metadata import fetch_metadata_by_title
 from movie_inbox.external.wikidata import wikidata_kind
-from movie_inbox.external.wikipedia import WikipediaAdapter
+from movie_inbox.external.wikipedia import (
+    WikipediaAdapter,
+    fetch_wikipedia_by_title,
+    fetch_wikipedia_by_wikidata_title,
+)
 
 
 class ExternalMetadataTests(unittest.TestCase):
@@ -146,6 +150,94 @@ class ExternalMetadataTests(unittest.TestCase):
         ImdbAdapter().search("https://www.imdb.com/title/tt0091064/")
 
         self.assertIn("/tt0091064.json", fetch_json.call_args.args[0])
+
+    @patch("movie_inbox.external.wikipedia.fetch_wikipedia_metadata")
+    def test_fetch_wikipedia_by_title_accepts_a_genuine_title_and_year_match(
+        self, fetch_metadata
+    ) -> None:
+        fetch_metadata.return_value = {
+            "title": "Heat",
+            "wikipedia_title": "Heat",
+            "year": "1995",
+            "url": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+            "wikipedia_url": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+            "wikidata_id": "Q184090",
+        }
+
+        metadata = fetch_wikipedia_by_title("Heat", "1995")
+
+        self.assertEqual(metadata["wikidata_id"], "Q184090")
+        fetch_metadata.assert_called_once()
+
+    @patch("movie_inbox.external.wikipedia.fetch_wikipedia_search")
+    @patch("movie_inbox.external.wikipedia.fetch_wikipedia_metadata")
+    def test_fetch_wikipedia_by_title_rejects_the_same_title_with_a_different_year(
+        self, fetch_metadata, fetch_search
+    ) -> None:
+        # The bug this guards: wikipedia_match_score() used to accept this on
+        # fuzzy title overlap alone, wiring up a different film's Wikidata id,
+        # genres and cast onto the wrong catalog item.
+        fetch_metadata.return_value = {
+            "title": "Heat",
+            "wikipedia_title": "Heat",
+            "year": "1986",
+            "url": "https://en.wikipedia.org/wiki/Heat_(1986_film)",
+            "wikipedia_url": "https://en.wikipedia.org/wiki/Heat_(1986_film)",
+        }
+        fetch_search.return_value = {"query": {"search": []}}
+
+        metadata = fetch_wikipedia_by_title("Heat", "1995")
+
+        self.assertEqual(metadata, {})
+
+    @patch("movie_inbox.external.wikipedia.fetch_wikipedia_search")
+    @patch("movie_inbox.external.wikipedia.fetch_wikipedia_metadata")
+    def test_fetch_wikipedia_by_title_accepts_a_match_found_only_via_search(
+        self, fetch_metadata, fetch_search
+    ) -> None:
+        def metadata_for(url: str) -> dict[str, object]:
+            if "Evil_Dead_Burn" in url:
+                return {
+                    "title": "Evil Dead Burn",
+                    "wikipedia_title": "Evil Dead Burn",
+                    "year": "2026",
+                    "url": url,
+                    "wikipedia_url": url,
+                }
+            return {}
+
+        fetch_metadata.side_effect = metadata_for
+        fetch_search.return_value = {
+            "query": {"search": [{"title": "Evil Dead Burn", "snippet": ""}]}
+        }
+
+        metadata = fetch_wikipedia_by_title("Evil Dead Burn", "2026")
+
+        self.assertEqual(metadata["title"], "Evil Dead Burn")
+
+    @patch("movie_inbox.external.wikipedia.fetch_wikipedia_metadata")
+    @patch("movie_inbox.external.wikipedia.fetch_wikidata_article_url")
+    @patch("movie_inbox.external.wikipedia.fetch_json_safe")
+    def test_fetch_wikipedia_by_wikidata_title_rejects_the_same_title_with_a_different_year(
+        self, fetch_json_safe, article_url, fetch_metadata
+    ) -> None:
+        fetch_json_safe.return_value = {
+            "search": [
+                {"id": "Q184090", "label": "Heat", "description": "1986 film by Dick Richards"}
+            ]
+        }
+        article_url.return_value = "https://en.wikipedia.org/wiki/Heat_(1986_film)"
+        fetch_metadata.return_value = {
+            "title": "Heat",
+            "wikipedia_title": "Heat",
+            "year": "1986",
+            "url": "https://en.wikipedia.org/wiki/Heat_(1986_film)",
+            "wikipedia_url": "https://en.wikipedia.org/wiki/Heat_(1986_film)",
+        }
+
+        metadata = fetch_wikipedia_by_wikidata_title("Heat", "1995")
+
+        self.assertEqual(metadata, {})
 
     def test_wikidata_instance_type_detects_series(self) -> None:
         claims = {
