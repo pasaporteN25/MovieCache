@@ -16,12 +16,14 @@ from pathlib import Path
 from typing import Any
 
 from movie_inbox.domain.catalog import (
+    external_link_coverage,
     has_external_link,
+    linked_sources,
     merge_into_existing,
     normalize_item,
 )
 from movie_inbox.domain.deduplication import deduplicate_items
-from movie_inbox.domain.matching import rank_candidates
+from movie_inbox.domain.matching import RankedCandidate, rank_candidates
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.external_catalog import (
     enrich_external_result,
@@ -53,6 +55,16 @@ def main(argv: list[str] | None = None) -> int:
         default=0.0,
         help="Minimum ranking score included in review reports.",
     )
+    parser.add_argument(
+        "--target-coverage",
+        type=int,
+        default=3,
+        choices=(1, 2, 3),
+        help=(
+            "Skip an item once it has links from this many of the 3 sources "
+            "(1-3). Lower this for a faster pass that settles for IMDb+Wikipedia."
+        ),
+    )
     parser.add_argument("--report", type=Path, help="Optional JSON report path.")
     parser.add_argument("--dry-run", action="store_true", help="Do not write output JSON.")
     args = parser.parse_args(argv)
@@ -69,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
 
     searched = 0
     for item in items:
-        if has_external_link(item):
+        if external_link_coverage(item) >= args.target_coverage:
             continue
         if args.limit and searched >= args.limit:
             break
@@ -84,18 +96,13 @@ def main(argv: list[str] | None = None) -> int:
             for candidate in rank_candidates(item, results)
             if candidate["score"] >= args.min_score
         ]
-        if candidates and candidates[0]["decision"]["accepted"]:
-            best = enrich_external_result(candidates[0]["result"])
-            merge_into_existing(items, best, str(item.get("id") or ""))
+        matched_sources = merge_best_candidate_per_missing_source(items, item, candidates)
+        if matched_sources:
             report["matched"].append(
                 {
                     "id": item.get("id", ""),
                     "title": item.get("title") or item.get("local_name") or "",
-                    "score": candidates[0]["score"],
-                    "source": best.get("source", ""),
-                    "url": best.get("url", ""),
-                    "reason": candidates[0]["decision"]["reason"],
-                    "evidence": candidates[0]["decision"]["evidence"],
+                    "sources": matched_sources,
                 }
             )
         elif candidates:
@@ -140,6 +147,46 @@ def main(argv: list[str] | None = None) -> int:
     print(f"- Final with link: {report['final_with_link']}")
     print(f"- Final without link: {report['final_without_link']}")
     return 0
+
+
+def merge_best_candidate_per_missing_source(
+    items: list[CatalogItem],
+    item: CatalogItem,
+    candidates: list[RankedCandidate],
+) -> list[dict[str, Any]]:
+    """Merge the best accepted candidate from each source the item still lacks.
+
+    rank_candidates() ranks all 3 sources together and used to let only the
+    single overall-best candidate through -- if Wikipedia and IMDb both found
+    a good match in the same run, the runner-up source's candidate was
+    silently discarded, and it would never be retried once the item showed
+    *a* link at all.
+    """
+    already_linked = linked_sources(item)
+    best_per_source: dict[str, RankedCandidate] = {}
+    for candidate in candidates:
+        if not candidate["decision"]["accepted"]:
+            continue
+        source = str(candidate["result"].get("source") or "")
+        if not source or source in already_linked or source in best_per_source:
+            continue
+        best_per_source[source] = candidate
+
+    item_id = str(item.get("id") or "")
+    merged: list[dict[str, Any]] = []
+    for source, candidate in best_per_source.items():
+        best = enrich_external_result(candidate["result"])
+        merge_into_existing(items, best, item_id)
+        merged.append(
+            {
+                "source": source,
+                "score": candidate["score"],
+                "url": best.get("url", ""),
+                "reason": candidate["decision"]["reason"],
+                "evidence": candidate["decision"]["evidence"],
+            }
+        )
+    return merged
 
 
 def search_query(item: CatalogItem) -> str:
