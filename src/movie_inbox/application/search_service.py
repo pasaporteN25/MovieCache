@@ -8,13 +8,12 @@ from typing import Any
 from movie_inbox.domain.catalog import canonical_url, normalize_local_files, normalize_tags
 from movie_inbox.domain.matching import decide_match
 from movie_inbox.domain.search import (
-    YEAR_MATCH_BONUS,
-    YEAR_MISMATCH_PENALTY,
     SearchIntent,
     parse_search_query,
     search_key,
     text_match_score,
 )
+from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 SEARCH_RESULT_LIMIT = 60
 
@@ -31,6 +30,7 @@ def search_catalog_items(
     items: Sequence[Mapping[str, Any]],
     query: str,
     limit: int = SEARCH_RESULT_LIMIT,
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> list[dict[str, Any]]:
     """Rank a personal catalog without applying the viewer's active filters."""
     intent = parse_search_query(query)
@@ -38,8 +38,8 @@ def search_catalog_items(
         return []
     ranked: list[tuple[float, str, dict[str, Any]]] = []
     for item in items:
-        score, matched_field, matched_value = _catalog_search_score(item, intent)
-        if score < 28:
+        score, matched_field, matched_value = _catalog_search_score(item, intent, strategy)
+        if score < strategy.catalog_admission_threshold:
             continue
         payload = dict(item)
         payload["_search"] = {
@@ -57,13 +57,16 @@ def rank_catalog_candidates(
     items: Sequence[Mapping[str, Any]],
     candidate: Mapping[str, Any],
     limit: int = SEARCH_RESULT_LIMIT,
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> list[dict[str, Any]]:
     """Rank local candidates using the same conservative merge evidence."""
     query = _candidate_query(candidate)
-    broad_candidates = search_catalog_items(items, query, limit=max(limit * 3, limit))
+    broad_candidates = search_catalog_items(
+        items, query, limit=max(limit * 3, limit), strategy=strategy
+    )
     by_id = {str(row.get("id") or ""): row for row in broad_candidates}
     for item in items:
-        decision = decide_match(item, candidate)
+        decision = decide_match(item, candidate, strategy)
         if decision.score <= 0:
             continue
         item_id = str(item.get("id") or "")
@@ -74,13 +77,13 @@ def rank_catalog_candidates(
     for item_id, payload in by_id.items():
         decision = payload.get("_match")
         if not isinstance(decision, dict):
-            decision = decide_match(payload, candidate).to_dict()
+            decision = decide_match(payload, candidate, strategy).to_dict()
             payload["_match"] = decision
         search_score = float((payload.get("_search") or {}).get("score") or 0)
         match_score = float(decision.get("score") or 0)
         if str(decision.get("reason") or "") in _HARD_MISMATCH_REASONS:
             match_score = 0.0
-        if search_score < 28 and match_score <= 0:
+        if search_score < strategy.catalog_admission_threshold and match_score <= 0:
             continue
         payload["_search"] = {
             **(payload.get("_search") if isinstance(payload.get("_search"), dict) else {}),
@@ -116,6 +119,7 @@ def group_external_results(results: Sequence[Mapping[str, Any]]) -> dict[str, li
 def _catalog_search_score(
     item: Mapping[str, Any],
     intent: SearchIntent,
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> tuple[float, str, str]:
     best_score = 0.0
     best_field = ""
@@ -138,9 +142,9 @@ def _catalog_search_score(
     item_year = str(item.get("year") or "").strip()
     if intent.year:
         if item_year == intent.year:
-            best_score += YEAR_MATCH_BONUS
+            best_score += strategy.year_match_bonus
         elif item_year:
-            best_score -= YEAR_MISMATCH_PENALTY
+            best_score -= strategy.year_mismatch_penalty
     return max(0.0, min(best_score, 100.0)), best_field, best_value
 
 

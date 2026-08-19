@@ -10,6 +10,7 @@ from movie_inbox.domain.catalog import (
 )
 from movie_inbox.domain.libraries import work_identity_key
 from movie_inbox.domain.matching import decide_match
+from movie_inbox.domain.search_strategy import SearchStrategy
 
 
 class MatchingTests(unittest.TestCase):
@@ -77,6 +78,16 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(trusted_external_url("https://imdb.com.example.org/title/tt0113277/"), "")
         self.assertEqual(external_source_name("https://user@imdb.com/title/tt0113277/"), "")
         self.assertEqual(external_source_name("https://imdb.com:8443/title/tt0113277/"), "")
+
+    def test_a_stricter_strategy_can_require_review_where_the_baseline_would_not(self) -> None:
+        existing = {"title": "Heat", "year": ""}
+        incoming = {"title": "Heat 2", "year": ""}
+
+        baseline = decide_match(existing, incoming)
+        stricter = decide_match(existing, incoming, SearchStrategy(similar_title_review_threshold=0.01))
+
+        self.assertEqual(baseline.reason, "insufficient_evidence")
+        self.assertEqual(stricter.reason, "similar_title_requires_review")
 
     def test_year_shaped_titles_keep_their_identity(self) -> None:
         self.assertEqual(title_match_key("1917"), "1917")

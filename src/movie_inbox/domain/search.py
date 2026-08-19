@@ -11,18 +11,15 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from movie_inbox.domain.catalog import canonical_url, external_source_name
+from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 _MIN_SUBSTRING_LENGTH = 3
 _MIN_FUZZY_QUERY_LENGTH = 5
-YEAR_MATCH_BONUS = 12.0
-# An exact title match (100) minus this must still clear well below the 28-point
-# admission threshold used by search_catalog_items -- a confirmed year mismatch
-# is a hard signal, not a minor deduction.
-YEAR_MISMATCH_PENALTY = 75.0
-# Minimum external_result_score for a source result to be shown at all. Kept
-# independent from search_catalog_items's own admission threshold (even though
-# both start at 28) so the two contexts can be tuned separately later.
-EXTERNAL_RELEVANCE_THRESHOLD = 28.0
+# external/registry.py's live external search still filters on this directly
+# (it never receives a SearchStrategy) -- kept as a module constant, derived
+# from the same baseline external_result_score() defaults to, so there is one
+# source of truth instead of two numbers that could quietly drift apart.
+EXTERNAL_RELEVANCE_THRESHOLD = PRODUCTION_BASELINE.external_relevance_threshold
 _YEAR_PATTERN = re.compile(r"\b(18\d{2}|19\d{2}|20\d{2}|21\d{2})\b")
 _MEDIA_QUALIFIER_PATTERN = re.compile(
     r"\s*\((?:\d{4}\s+)?(?:film|movie|pelicula|tv series|series|miniseries|anime|documentary)"
@@ -103,7 +100,11 @@ def text_match_score(value: str, query: str, query_terms: tuple[str, ...] | list
     return max(coverage * 62.0, ratio * 58.0)
 
 
-def external_result_score(query: str | SearchIntent, result: Mapping[str, Any]) -> float:
+def external_result_score(
+    query: str | SearchIntent,
+    result: Mapping[str, Any],
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
+) -> float:
     intent = query if isinstance(query, SearchIntent) else parse_search_query(query)
     result_url = canonical_url(str(result.get("url") or ""))
     if intent.canonical_url and result_url == intent.canonical_url:
@@ -132,9 +133,9 @@ def external_result_score(query: str | SearchIntent, result: Mapping[str, Any]) 
     result_year = str(result.get("year") or "").strip()
     if intent.year:
         if result_year == intent.year:
-            score += YEAR_MATCH_BONUS
+            score += strategy.year_match_bonus
         elif result_year:
-            score -= YEAR_MISMATCH_PENALTY
+            score -= strategy.year_mismatch_penalty
     return max(0.0, score)
 
 

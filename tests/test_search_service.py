@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from movie_inbox.application.search_service import rank_catalog_candidates, search_catalog_items
+from movie_inbox.domain.search_strategy import SearchStrategy
 
 
 class CatalogSearchServiceTests(unittest.TestCase):
@@ -36,6 +37,16 @@ class CatalogSearchServiceTests(unittest.TestCase):
     def test_search_is_diacritic_insensitive(self) -> None:
         item = {"id": "one", "title": "Amélie", "year": "2001"}
         self.assertEqual(search_catalog_items([item], "amelie")[0]["id"], "one")
+
+    def test_a_higher_admission_threshold_excludes_a_borderline_match(self) -> None:
+        item = {"id": "one", "title": "Amelie", "year": ""}
+        baseline = search_catalog_items([item], "amelia")
+        stricter = search_catalog_items(
+            [item], "amelia", strategy=SearchStrategy(catalog_admission_threshold=99.0)
+        )
+
+        self.assertEqual([row["id"] for row in baseline], ["one"])
+        self.assertEqual(stricter, [])
 
     def test_title_and_year_are_scored_as_separate_search_evidence(self) -> None:
         item = {"id": "evil-dead-burn", "title": "Evil Dead Burn", "year": "2026"}

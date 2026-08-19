@@ -13,6 +13,7 @@ from movie_inbox.domain.catalog import (
     title_similarity,
 )
 from movie_inbox.domain.normalization import normalize_kind
+from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,11 @@ class RankedCandidate(TypedDict):
     result: dict[str, Any]
 
 
-def decide_match(existing: Mapping[str, Any], incoming: Mapping[str, Any]) -> MatchDecision:
+def decide_match(
+    existing: Mapping[str, Any],
+    incoming: Mapping[str, Any],
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
+) -> MatchDecision:
     shared_urls = sorted(external_urls(dict(existing)) & external_urls(dict(incoming)))
     if shared_urls:
         return MatchDecision(True, "shared_external_url", 1.0, {"urls": shared_urls})
@@ -50,7 +55,9 @@ def decide_match(existing: Mapping[str, Any], incoming: Mapping[str, Any]) -> Ma
     existing_kind = explicit_kind(existing)
     incoming_kind = explicit_kind(incoming)
     kinds_compatible = not (existing_kind and incoming_kind) or existing_kind == incoming_kind
-    score = candidate_score(existing_titles, incoming_titles, existing_year, incoming_year)
+    score = candidate_score(
+        existing_titles, incoming_titles, existing_year, incoming_year, strategy
+    )
     evidence = {
         "shared_titles": shared_titles,
         "existing_year": existing_year,
@@ -73,7 +80,7 @@ def decide_match(existing: Mapping[str, Any], incoming: Mapping[str, Any]) -> Ma
         return MatchDecision(False, "exact_title_year_mismatch", score, evidence)
     if shared_titles and not kinds_compatible:
         return MatchDecision(False, "exact_title_kind_mismatch", score, evidence)
-    if score >= 0.75:
+    if score >= strategy.similar_title_review_threshold:
         return MatchDecision(False, "similar_title_requires_review", score, evidence)
     return MatchDecision(False, "insufficient_evidence", score, evidence)
 
@@ -114,15 +121,20 @@ def candidate_score(
     incoming_titles: list[str],
     existing_year: str,
     incoming_year: str,
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> float:
     score = max(
         (title_similarity(left, right) for left in existing_titles for right in incoming_titles),
         default=0.0,
     )
     if existing_year and incoming_year:
-        score += 0.18 if existing_year == incoming_year else -0.35
+        score += (
+            strategy.match_year_bonus
+            if existing_year == incoming_year
+            else -strategy.match_year_mismatch_penalty
+        )
     if set(existing_titles) & set(incoming_titles):
-        score += 0.08
+        score += strategy.match_shared_title_bonus
     return round(max(0.0, min(score, 1.0)), 3)
 
 
