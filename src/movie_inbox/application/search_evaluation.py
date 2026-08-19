@@ -13,7 +13,8 @@ from movie_inbox.application.search_service import rank_catalog_candidates, sear
 from movie_inbox.domain.catalog import canonical_url
 from movie_inbox.domain.libraries import work_identity, work_identity_key
 from movie_inbox.domain.matching import decide_match
-from movie_inbox.domain.search import EXTERNAL_RELEVANCE_THRESHOLD, external_result_score
+from movie_inbox.domain.search import external_result_score
+from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 CORPUS_SCHEMA_VERSION = 1
 SUPPORTED_CONTEXTS = {"catalog", "identity", "external", "scanner"}
@@ -24,12 +25,14 @@ class SearchCorpusError(ValueError):
     """Raised when a Search Lab corpus cannot be evaluated safely."""
 
 
-def evaluate_search_corpus(corpus: Mapping[str, Any]) -> dict[str, Any]:
+def evaluate_search_corpus(
+    corpus: Mapping[str, Any], strategy: SearchStrategy = PRODUCTION_BASELINE
+) -> dict[str, Any]:
     """Run the current production rankers against a deterministic corpus."""
     validate_search_corpus(corpus)
     started = time.perf_counter()
     items = [dict(row) for row in corpus["catalog_items"]]
-    case_results = [_evaluate_case(case, items) for case in corpus["cases"]]
+    case_results = [_evaluate_case(case, items, strategy) for case in corpus["cases"]]
     metrics = _aggregate_metrics(case_results)
     thresholds = dict(corpus.get("thresholds") or {})
     gate = _evaluate_gate(metrics, thresholds)
@@ -37,7 +40,7 @@ def evaluate_search_corpus(corpus: Mapping[str, Any]) -> dict[str, Any]:
         "report_type": "search_corpus",
         "schema_version": CORPUS_SCHEMA_VERSION,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "algorithm": "production-baseline",
+        "algorithm": strategy.name,
         "corpus": {
             "name": str(corpus.get("name") or "unnamed"),
             "description": str(corpus.get("description") or ""),
@@ -60,6 +63,7 @@ def inspect_catalog_search(
     year: str = "",
     kind: str = "pelicula",
     limit: int = 20,
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> dict[str, Any]:
     """Inspect a JSON export without mutating it or consulting the network."""
     clean_query = " ".join(str(query or "").split())
@@ -71,21 +75,21 @@ def inspect_catalog_search(
     started = time.perf_counter()
     classification = ""
     if mode == "catalog":
-        ranked = search_catalog_items(rows, clean_query, limit=limit)
+        ranked = search_catalog_items(rows, clean_query, limit=limit, strategy=strategy)
         results = [_result_summary(row) for row in ranked]
     elif mode == "identity":
         candidate = {"title": clean_query, "year": str(year or ""), "kind": kind}
-        ranked = rank_catalog_candidates(rows, candidate, limit=limit)
+        ranked = rank_catalog_candidates(rows, candidate, limit=limit, strategy=strategy)
         results = [_result_summary(row) for row in ranked]
     else:
         candidate = {"title": clean_query, "year": str(year or ""), "kind": kind}
-        results, classification = _scanner_results(rows, candidate)
+        results, classification = _scanner_results(rows, candidate, strategy)
         results = results[:limit]
     return {
         "report_type": "search_inspection",
         "schema_version": CORPUS_SCHEMA_VERSION,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "algorithm": "production-baseline",
+        "algorithm": strategy.name,
         "query": clean_query,
         "mode": mode,
         "year": str(year or ""),
@@ -210,13 +214,17 @@ def validate_search_corpus(corpus: Mapping[str, Any]) -> None:
             raise SearchCorpusError(f"thresholds.{name} cannot be negative")
 
 
-def _evaluate_case(case: Mapping[str, Any], items: list[dict[str, Any]]) -> dict[str, Any]:
+def _evaluate_case(
+    case: Mapping[str, Any],
+    items: list[dict[str, Any]],
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
+) -> dict[str, Any]:
     started = time.perf_counter()
     context = str(case["context"])
     classification = ""
     if context == "catalog":
         ranked = search_catalog_items(
-            items, str(case["query"]), limit=max(60, int(case.get("top_k", 5)))
+            items, str(case["query"]), limit=max(60, int(case.get("top_k", 5))), strategy=strategy
         )
         results = [_result_summary(row) for row in ranked]
     elif context == "identity":
@@ -224,12 +232,13 @@ def _evaluate_case(case: Mapping[str, Any], items: list[dict[str, Any]]) -> dict
             items,
             dict(case["candidate"]),
             limit=max(60, int(case.get("top_k", 5))),
+            strategy=strategy,
         )
         results = [_result_summary(row) for row in ranked]
     elif context == "external":
-        results = _external_results(str(case["query"]), case["results"])
+        results = _external_results(str(case["query"]), case["results"], strategy)
     else:
-        results, classification = _scanner_results(items, case["candidate"])
+        results, classification = _scanner_results(items, case["candidate"], strategy)
 
     top_k = int(case.get("top_k", DEFAULT_TOP_K))
     top_results = results[:top_k]
@@ -289,15 +298,22 @@ def _evaluate_case(case: Mapping[str, Any], items: list[dict[str, Any]]) -> dict
     }
 
 
-def _external_results(query: str, raw_results: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+def _external_results(
+    query: str,
+    raw_results: Sequence[Mapping[str, Any]],
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
+) -> list[dict[str, Any]]:
     rows = _dedupe_recorded_external_results(raw_results)
     scored = sorted(
-        ((external_result_score(query, row), index, row) for index, row in enumerate(rows)),
+        (
+            (external_result_score(query, row, strategy), index, row)
+            for index, row in enumerate(rows)
+        ),
         key=lambda entry: (-entry[0], entry[1]),
     )
     results: list[dict[str, Any]] = []
     for score, _, row in scored:
-        if score < EXTERNAL_RELEVANCE_THRESHOLD:
+        if score < strategy.external_relevance_threshold:
             continue
         results.append(
             {
@@ -331,16 +347,17 @@ def _dedupe_recorded_external_results(
 def _scanner_results(
     items: Sequence[Mapping[str, Any]],
     candidate: Mapping[str, Any],
+    strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> tuple[list[dict[str, Any]], str]:
     rows = [dict(item) for item in items]
     index = _CatalogMatchIndex.build(rows)
     state, selected_identity, classified_candidates = ManagedLibraryService._classification(
-        None, candidate, index
+        None, candidate, index, strategy
     )
     grouped: dict[str, tuple[dict[str, Any], Any]] = {}
     for item in index.candidates(candidate):
-        decision = decide_match(item, candidate)
-        if not decision.accepted and decision.score < 0.72:
+        decision = decide_match(item, candidate, strategy)
+        if not decision.accepted and decision.score < strategy.scanner_review_floor:
             continue
         identity_key = work_identity_key(work_identity(item))
         prior = grouped.get(identity_key)
@@ -494,6 +511,72 @@ def _evaluate_gate(metrics: Mapping[str, Any], thresholds: Mapping[str, Any]) ->
     return {"passed": all(check["passed"] for check in checks), "checks": checks}
 
 
+_COMPARISON_METRIC_KEYS = (
+    "passed_cases",
+    "precision_at_5",
+    "mrr",
+    "recall_at_5",
+    "forbidden_hits",
+    "auto_match_true_positives",
+    "auto_match_false_positives",
+    "auto_match_precision",
+    "expectation_failures",
+)
+
+
+def compare_search_strategies(
+    corpus: Mapping[str, Any],
+    baseline: SearchStrategy,
+    candidate: SearchStrategy,
+) -> dict[str, Any]:
+    """Run the same corpus under two strategies and report both side by side."""
+    started = time.perf_counter()
+    baseline_report = evaluate_search_corpus(corpus, baseline)
+    candidate_report = evaluate_search_corpus(corpus, candidate)
+    return {
+        "report_type": "search_comparison",
+        "schema_version": CORPUS_SCHEMA_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "corpus": baseline_report["corpus"],
+        "baseline": {
+            "algorithm": baseline_report["algorithm"],
+            "metrics": baseline_report["metrics"],
+        },
+        "candidate": {
+            "algorithm": candidate_report["algorithm"],
+            "metrics": candidate_report["metrics"],
+        },
+        "deltas": _metric_deltas(baseline_report["metrics"], candidate_report["metrics"]),
+        "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+    }
+
+
+def _metric_deltas(baseline: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, Any]:
+    deltas = {key: _round_delta(candidate.get(key), baseline.get(key)) for key in _COMPARISON_METRIC_KEYS}
+    baseline_contexts = baseline.get("by_context") if isinstance(baseline.get("by_context"), Mapping) else {}
+    candidate_contexts = (
+        candidate.get("by_context") if isinstance(candidate.get("by_context"), Mapping) else {}
+    )
+    deltas["by_context"] = {
+        name: {
+            key: _round_delta(
+                (candidate_contexts.get(name) or {}).get(key),
+                (baseline_contexts.get(name) or {}).get(key),
+            )
+            for key in _COMPARISON_METRIC_KEYS
+        }
+        for name in sorted(set(baseline_contexts) | set(candidate_contexts))
+    }
+    return deltas
+
+
+def _round_delta(candidate_value: Any, baseline_value: Any) -> float:
+    try:
+        return round(float(candidate_value or 0) - float(baseline_value or 0), 4)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _string_list(value: Any, field: str) -> list[str]:
     if value is None:
         return []
@@ -507,6 +590,7 @@ def _string_list(value: Any, field: str) -> list[str]:
 __all__ = [
     "CORPUS_SCHEMA_VERSION",
     "SearchCorpusError",
+    "compare_search_strategies",
     "evaluate_search_corpus",
     "inspect_catalog_search",
     "validate_search_corpus",

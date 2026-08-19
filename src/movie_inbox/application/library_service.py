@@ -34,6 +34,7 @@ from movie_inbox.domain.libraries import (
     work_identity_key,
 )
 from movie_inbox.domain.matching import decide_match, explicit_kind
+from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 from movie_inbox.domain.titles import detect_media_part
 
 CatalogUniverseProvider = Callable[[], list[dict[str, Any]]]
@@ -329,7 +330,7 @@ class ManagedLibraryService:
                     item.detected_kind,
                 )
                 decision = decide_match(selected_identity, detected)
-                if not decision.accepted and decision.score < 0.72:
+                if not decision.accepted and decision.score < PRODUCTION_BASELINE.scanner_review_floor:
                     raise ValueError("Catalog item is not a scanner candidate")
             else:
                 selected_identity = detected_work_identity(
@@ -624,6 +625,7 @@ class ManagedLibraryService:
         existing: LibraryFile | None,
         row: Mapping[str, Any],
         match_index: _CatalogMatchIndex,
+        strategy: SearchStrategy = PRODUCTION_BASELINE,
     ) -> tuple[str, dict[str, Any], list[dict[str, Any]]]:
         if (
             existing
@@ -643,8 +645,8 @@ class ManagedLibraryService:
         groups: dict[str, dict[str, Any]] = {}
         legacy_inventory_keys: set[str] = set()
         for catalog_item in match_index.candidates(detected):
-            decision = decide_match(catalog_item, detected)
-            if not decision.accepted and decision.score < 0.72:
+            decision = decide_match(catalog_item, detected, strategy)
+            if not decision.accepted and decision.score < strategy.scanner_review_floor:
                 continue
             identity = work_identity(catalog_item)
             key = work_identity_key(identity)

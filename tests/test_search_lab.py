@@ -14,6 +14,7 @@ from movie_inbox.application.search_evaluation import (
     validate_search_corpus,
 )
 from movie_inbox.cli.search_lab import main, render_html_report
+from movie_inbox.domain.search_strategy import SearchStrategy
 from movie_inbox.search_lab import load_builtin_corpus
 
 
@@ -133,6 +134,37 @@ class SearchLabTests(unittest.TestCase):
         self.assertTrue(identity["results"][0]["accepted"])
         self.assertEqual(scanner["classification"], "matched")
         self.assertEqual(scanner["results"][0]["id"], "fly-1986")
+
+    def test_a_named_candidate_strategy_is_reported_and_changes_scanner_evidence(self) -> None:
+        corpus = load_builtin_corpus()
+        candidate = SearchStrategy(name="loose-scanner-review", scanner_review_floor=0.0)
+
+        report = evaluate_search_corpus(corpus, strategy=candidate)
+
+        self.assertEqual(report["algorithm"], "loose-scanner-review")
+        # inspect_catalog_search is threaded the same way for consistency, even
+        # though search-lab's CLI only exposes comparison through "run"/"compare".
+        inspection = inspect_catalog_search(
+            [{"id": "x", "title": "Heat", "year": "1995", "kind": "pelicula"}],
+            "Heat",
+            mode="scanner",
+            year="1995",
+            strategy=candidate,
+        )
+        self.assertEqual(inspection["algorithm"], "loose-scanner-review")
+
+    def test_default_strategy_keeps_todays_corpus_metrics_unchanged(self) -> None:
+        # S0-b/S0-c must not move production behavior. Re-running the exact
+        # v0.3.0 gate assertions with an explicit PRODUCTION_BASELINE (instead
+        # of relying on the parameter default) pins that down directly.
+        from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE
+
+        report = evaluate_search_corpus(load_builtin_corpus(), strategy=PRODUCTION_BASELINE)
+
+        self.assertEqual(report["algorithm"], "production-baseline")
+        self.assertEqual(report["metrics"]["forbidden_hits"], 0)
+        self.assertEqual(report["metrics"]["auto_match_precision"], 1.0)
+        self.assertTrue(report["gate"]["passed"])
 
     def test_invalid_corpus_and_html_values_are_handled_safely(self) -> None:
         with self.assertRaises(SearchCorpusError):
