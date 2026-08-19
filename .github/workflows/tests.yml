@@ -117,6 +117,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p backups imports media secrets
+          # movie-inbox-backup runs as uid:gid 0:0 with cap_drop: ALL and only
+          # DAC_READ_SEARCH added back (no DAC_OVERRIDE) -- it can't bypass
+          # file permission checks, so /backups has to be owned by uid 0 for
+          # it to write there, same as a real host (root-driven cron/systemd)
+          # deployment already assumes via docker-backup.sh's own umask.
+          sudo chown 0:0 backups
           printf '%s' 'a-long-docker-smoke-password' > secrets/owner-password.txt
           printf '%s\n' '{"schema_version":5,"items":[{"id":"heat","title":"Heat","year":"1995","kind":"pelicula"}]}' > imports/catalog.json
           printf '%s' 'video' > media/Heat.1995.mkv
