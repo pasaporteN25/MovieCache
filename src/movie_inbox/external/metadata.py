@@ -18,6 +18,7 @@ from movie_inbox.domain.titles import (
     infer_kind_from_text,
     looks_like_external_id,
 )
+from movie_inbox.external.filmaffinity import fetch_filmaffinity_metadata
 from movie_inbox.external.imdb import fetch_wikipedia_by_imdb_id, imdb_id_from_text
 from movie_inbox.external.wikidata import fetch_wikidata_metadata
 from movie_inbox.external.wikipedia import (
@@ -68,6 +69,11 @@ def fetch_metadata(url: str) -> dict[str, Any]:
         if wikidata_metadata:
             wikidata_metadata["imdb_url"] = f"https://www.imdb.com/title/{imdb_id}/"
             return wikidata_metadata
+
+    if external_source_name(url) == "filmaffinity":
+        filmaffinity_metadata = fetch_filmaffinity_metadata(url)
+        if filmaffinity_metadata:
+            return filmaffinity_metadata
 
     request = Request(
         url,
@@ -182,6 +188,7 @@ def guess_title_from_url(url: str) -> str:
 
 
 __all__ = [
+    "fetch_filmaffinity_metadata",
     "fetch_metadata",
     "fetch_metadata_by_title",
     "fetch_wikidata_metadata",
