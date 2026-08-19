@@ -16,7 +16,6 @@ from movie_inbox.external.wikipedia import (
     fetch_wikipedia_metadata_action_api,
 )
 
-
 # Modeled on real explaintext=1 (no exintro=1) responses fetched live from
 # en.wikipedia.org/w/api.php and es.wikipedia.org/w/api.php: "== Heading =="
 # markers survive as plain text, and a top-level section can be immediately

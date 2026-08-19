@@ -330,7 +330,10 @@ class ManagedLibraryService:
                     item.detected_kind,
                 )
                 decision = decide_match(selected_identity, detected)
-                if not decision.accepted and decision.score < PRODUCTION_BASELINE.scanner_review_floor:
+                if (
+                    not decision.accepted
+                    and decision.score < PRODUCTION_BASELINE.scanner_review_floor
+                ):
                     raise ValueError("Catalog item is not a scanner candidate")
             else:
                 selected_identity = detected_work_identity(

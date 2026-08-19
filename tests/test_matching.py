@@ -86,7 +86,9 @@ class MatchingTests(unittest.TestCase):
         incoming = {"title": "Heat 2", "year": ""}
 
         baseline = decide_match(existing, incoming)
-        stricter = decide_match(existing, incoming, SearchStrategy(similar_title_review_threshold=0.01))
+        stricter = decide_match(
+            existing, incoming, SearchStrategy(similar_title_review_threshold=0.01)
+        )
 
         self.assertEqual(baseline.reason, "insufficient_evidence")
         self.assertEqual(stricter.reason, "similar_title_requires_review")

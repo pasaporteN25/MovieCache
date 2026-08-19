@@ -552,8 +552,12 @@ def compare_search_strategies(
 
 
 def _metric_deltas(baseline: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, Any]:
-    deltas = {key: _round_delta(candidate.get(key), baseline.get(key)) for key in _COMPARISON_METRIC_KEYS}
-    baseline_contexts = baseline.get("by_context") if isinstance(baseline.get("by_context"), Mapping) else {}
+    deltas = {
+        key: _round_delta(candidate.get(key), baseline.get(key)) for key in _COMPARISON_METRIC_KEYS
+    }
+    baseline_contexts = (
+        baseline.get("by_context") if isinstance(baseline.get("by_context"), Mapping) else {}
+    )
     candidate_contexts = (
         candidate.get("by_context") if isinstance(candidate.get("by_context"), Mapping) else {}
     )

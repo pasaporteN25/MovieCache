@@ -15,9 +15,7 @@ from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 
 def _run(catalog_path: Path, output_path: Path, *extra_args: str) -> int:
     with redirect_stdout(io.StringIO()):
-        return main(
-            [str(catalog_path), "--json", str(output_path), "--delay", "0", *extra_args]
-        )
+        return main([str(catalog_path), "--json", str(output_path), "--delay", "0", *extra_args])
 
 
 class MatchExternalLinksTests(unittest.TestCase):
@@ -66,9 +64,7 @@ class MatchExternalLinksTests(unittest.TestCase):
         self.assertEqual(status, 0)
         items = JsonCatalogRepository(self.output_path, normalize_item).read()
         self.assertEqual(len(items), 1)
-        self.assertEqual(
-            items[0].wikipedia_url, "https://en.wikipedia.org/wiki/Heat_(1995_film)"
-        )
+        self.assertEqual(items[0].wikipedia_url, "https://en.wikipedia.org/wiki/Heat_(1995_film)")
         self.assertEqual(items[0].imdb_url, "https://www.imdb.com/title/tt0113277/")
 
     @patch("movie_inbox.cli.match_external_links.enrich_external_result", side_effect=lambda r: r)
