@@ -12,9 +12,11 @@ from typing import Any
 
 from movie_inbox.application.search_evaluation import (
     SearchCorpusError,
+    compare_search_strategies,
     evaluate_search_corpus,
     inspect_catalog_search,
 )
+from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 from movie_inbox.infrastructure.schema import CatalogSchemaError, extract_catalog_items
 from movie_inbox.search_lab import load_builtin_corpus
 
@@ -61,6 +63,19 @@ def main(argv: list[str] | None = None) -> int:
     inspect_parser.add_argument("--limit", type=int, default=20, help="Maximum results to include.")
     add_report_arguments(inspect_parser)
 
+    compare_parser = commands.add_parser(
+        "compare",
+        help="Run the golden corpus under a candidate strategy and diff it against the baseline.",
+    )
+    compare_parser.add_argument("--corpus", type=Path, help="Optional Search Lab corpus JSON.")
+    compare_parser.add_argument(
+        "--candidate",
+        type=Path,
+        required=True,
+        help="JSON file with SearchStrategy field overrides (see domain/search_strategy.py).",
+    )
+    add_report_arguments(compare_parser)
+
     args = parser.parse_args(argv)
     try:
         if args.command == "run":
@@ -70,6 +85,15 @@ def main(argv: list[str] | None = None) -> int:
             write_reports(report, args.json_report, args.html_report, protected)
             print_corpus_summary(report)
             return 1 if args.enforce and not report["gate"]["passed"] else 0
+
+        if args.command == "compare":
+            corpus = read_json_object(args.corpus) if args.corpus else load_builtin_corpus()
+            candidate = load_strategy_from_json(args.candidate)
+            report = compare_search_strategies(corpus, PRODUCTION_BASELINE, candidate)
+            protected = [args.candidate, *([args.corpus] if args.corpus else [])]
+            write_reports(report, args.json_report, args.html_report, protected)
+            print_comparison_summary(report)
+            return 0
 
         if args.limit < 1:
             parser.error("--limit must be greater than zero")
@@ -108,6 +132,14 @@ def read_json_object(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise SearchCorpusError("Search Lab corpus root must be an object")
     return payload
+
+
+def load_strategy_from_json(path: Path) -> SearchStrategy:
+    payload = read_json_object(path)
+    try:
+        return SearchStrategy(**payload)
+    except TypeError as error:
+        raise SearchCorpusError(f"Invalid candidate strategy fields in {path}: {error}") from error
 
 
 def read_catalog_export(path: Path) -> list[dict[str, Any]]:
@@ -152,6 +184,25 @@ def print_corpus_summary(report: Mapping[str, Any]) -> None:
     print(f"- Quality gate: {'PASS' if gate['passed'] else 'FAIL (baseline recorded)'}")
 
 
+def print_comparison_summary(report: Mapping[str, Any]) -> None:
+    baseline, candidate, deltas = report["baseline"], report["candidate"], report["deltas"]
+    print(f"Search Lab comparison: {baseline['algorithm']} vs {candidate['algorithm']}")
+    print(f"- Corpus: {report['corpus']['name']}")
+    for label, key in (
+        ("Precision@5", "precision_at_5"),
+        ("MRR", "mrr"),
+        ("Recall@5", "recall_at_5"),
+        ("Auto-match precision", "auto_match_precision"),
+        ("Forbidden hits", "forbidden_hits"),
+    ):
+        delta = deltas.get(key, 0)
+        sign = "+" if isinstance(delta, (int, float)) and delta > 0 else ""
+        print(
+            f"- {label}: {baseline['metrics'].get(key)} -> {candidate['metrics'].get(key)} "
+            f"({sign}{delta})"
+        )
+
+
 def print_inspection_summary(report: Mapping[str, Any]) -> None:
     print("Search Lab read-only inspection")
     print(f"- Query: {report['query']}")
@@ -170,10 +221,16 @@ def print_inspection_summary(report: Mapping[str, Any]) -> None:
 
 
 def render_html_report(report: Mapping[str, Any]) -> str:
-    if report.get("report_type") == "search_inspection":
+    report_type = report.get("report_type")
+    if report_type == "search_inspection":
         title = f"Search Lab: {report.get('query') or 'inspection'}"
         summary = _inspection_summary_html(report)
         cases = _results_table(report.get("results") or [])
+    elif report_type == "search_comparison":
+        corpus = report.get("corpus") if isinstance(report.get("corpus"), Mapping) else {}
+        title = f"Search Lab: {corpus.get('name') or 'corpus'} comparación"
+        summary = _comparison_summary_html(report)
+        cases = _comparison_tables_html(report)
     else:
         corpus = report.get("corpus") if isinstance(report.get("corpus"), Mapping) else {}
         title = f"Search Lab: {corpus.get('name') or 'corpus'}"
@@ -260,6 +317,87 @@ def _corpus_summary_html(report: Mapping[str, Any]) -> str:
         for row in gate.get("checks") or []
     )
     return f'<section class="metrics">{cards}</section><p>{checks}</p>'
+
+
+_COMPARISON_METRIC_LABELS = (
+    ("passed_cases", "Casos estrictos"),
+    ("precision_at_5", "Precision@5"),
+    ("mrr", "MRR"),
+    ("recall_at_5", "Recall@5"),
+    ("forbidden_hits", "Prohibidos"),
+    ("auto_match_true_positives", "Auto-match TP"),
+    ("auto_match_false_positives", "Auto-match FP"),
+    ("auto_match_precision", "Auto-match precisión"),
+    ("expectation_failures", "Expectativas fallidas"),
+)
+_COMPARISON_LOWER_IS_BETTER = {"forbidden_hits", "auto_match_false_positives", "expectation_failures"}
+
+
+def _comparison_summary_html(report: Mapping[str, Any]) -> str:
+    baseline = report.get("baseline") if isinstance(report.get("baseline"), Mapping) else {}
+    candidate = report.get("candidate") if isinstance(report.get("candidate"), Mapping) else {}
+    values = (
+        ("Baseline", baseline.get("algorithm", "")),
+        ("Candidato", candidate.get("algorithm", "")),
+        ("Casos", report.get("corpus", {}).get("case_count", 0)),
+        ("Duración", f"{report.get('duration_ms', 0)} ms"),
+    )
+    cards = "".join(
+        f'<div class="metric"><strong>{_escape(value)}</strong><span>{_escape(label)}</span></div>'
+        for label, value in values
+    )
+    return f'<section class="metrics">{cards}</section>'
+
+
+def _comparison_tables_html(report: Mapping[str, Any]) -> str:
+    baseline_metrics = (report.get("baseline") or {}).get("metrics") or {}
+    candidate_metrics = (report.get("candidate") or {}).get("metrics") or {}
+    deltas = report.get("deltas") if isinstance(report.get("deltas"), Mapping) else {}
+    sections = [("General", baseline_metrics, candidate_metrics, deltas)]
+    baseline_contexts = baseline_metrics.get("by_context") or {}
+    candidate_contexts = candidate_metrics.get("by_context") or {}
+    context_deltas = deltas.get("by_context") or {}
+    for name in sorted(set(baseline_contexts) | set(candidate_contexts)):
+        sections.append(
+            (
+                name,
+                baseline_contexts.get(name) or {},
+                candidate_contexts.get(name) or {},
+                context_deltas.get(name) or {},
+            )
+        )
+    return "".join(_comparison_section_html(*section) for section in sections)
+
+
+def _comparison_section_html(
+    label: str,
+    baseline: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+    delta: Mapping[str, Any],
+) -> str:
+    rows = []
+    for key, readable in _COMPARISON_METRIC_LABELS:
+        if key not in baseline and key not in candidate:
+            continue
+        delta_value = delta.get(key, 0)
+        try:
+            lower_is_better = key in _COMPARISON_LOWER_IS_BETTER
+            improved = float(delta_value) <= 0 if lower_is_better else float(delta_value) >= 0
+        except (TypeError, ValueError):
+            improved = True
+        rows.append(
+            "<tr>"
+            f"<td>{_escape(readable)}</td><td>{_escape(baseline.get(key))}</td>"
+            f"<td>{_escape(candidate.get(key))}</td>"
+            f'<td class="{"pass" if improved else "fail"}">{_escape(delta_value)}</td>'
+            "</tr>"
+        )
+    return (
+        f'<details class="case" open><summary>{_escape(label)}</summary>'
+        '<div class="case-body"><div class="table-wrap"><table><thead><tr>'
+        "<th>Métrica</th><th>Baseline</th><th>Candidato</th><th>&Delta;</th>"
+        f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div></div></details>"
+    )
 
 
 def _inspection_summary_html(report: Mapping[str, Any]) -> str:

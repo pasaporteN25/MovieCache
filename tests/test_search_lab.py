@@ -166,6 +166,67 @@ class SearchLabTests(unittest.TestCase):
         self.assertEqual(report["metrics"]["auto_match_precision"], 1.0)
         self.assertTrue(report["gate"]["passed"])
 
+    def test_compare_diffs_a_candidate_against_the_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidate_path = root / "candidate.json"
+            json_report = root / "compare.json"
+            html_report = root / "compare.html"
+            candidate_path.write_text(
+                json.dumps({"name": "loose-scanner-review", "scanner_review_floor": 0.0}),
+                encoding="utf-8",
+            )
+
+            with redirect_stdout(io.StringIO()) as stdout:
+                status = main(
+                    [
+                        "compare",
+                        "--candidate",
+                        str(candidate_path),
+                        "--json",
+                        str(json_report),
+                        "--html",
+                        str(html_report),
+                    ]
+                )
+
+            self.assertEqual(status, 0)
+            report = json.loads(json_report.read_text(encoding="utf-8"))
+            self.assertEqual(report["report_type"], "search_comparison")
+            self.assertEqual(report["baseline"]["algorithm"], "production-baseline")
+            self.assertEqual(report["candidate"]["algorithm"], "loose-scanner-review")
+            self.assertIn("scanner", report["deltas"]["by_context"])
+            self.assertIn("precision_at_5", report["deltas"])
+            markup = html_report.read_text(encoding="utf-8")
+            self.assertIn("production-baseline", markup)
+            self.assertIn("loose-scanner-review", markup)
+            self.assertIn("Search Lab comparison:", stdout.getvalue())
+
+    def test_compare_refuses_to_overwrite_the_candidate_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate_path = Path(temporary) / "candidate.json"
+            original = json.dumps({"name": "candidate"})
+            candidate_path.write_text(original, encoding="utf-8")
+
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                status = main(
+                    ["compare", "--candidate", str(candidate_path), "--json", str(candidate_path)]
+                )
+
+            self.assertEqual(status, 2)
+            self.assertEqual(candidate_path.read_text(encoding="utf-8"), original)
+
+    def test_compare_rejects_a_candidate_with_unknown_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidate_path = Path(temporary) / "candidate.json"
+            candidate_path.write_text(json.dumps({"not_a_real_field": 1.0}), encoding="utf-8")
+
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()) as stderr:
+                status = main(["compare", "--candidate", str(candidate_path)])
+
+            self.assertEqual(status, 2)
+            self.assertIn("Invalid candidate strategy fields", stderr.getvalue())
+
     def test_invalid_corpus_and_html_values_are_handled_safely(self) -> None:
         with self.assertRaises(SearchCorpusError):
             validate_search_corpus({"schema_version": 99, "catalog_items": [], "cases": []})
