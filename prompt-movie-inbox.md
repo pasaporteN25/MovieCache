@@ -52,6 +52,15 @@ por tu cuenta.
 
 ---
 
+## Gestión de tareas (a partir de 2026-08-18)
+
+El trabajo más allá de esta fase (Enriquecimiento y cobertura de links, Search Lab, y lo
+que se sume después — Integraciones, Landing) se trackea en `tareas.md` (raíz del repo),
+un tablero en Markdown con columnas Backlog/En curso/Hecho, agrupado por frente, con
+alcance de archivo/línea y nivel de modelo sugerido por tarea. Se eligió Markdown en vez
+de un kanban autohosteado (se evaluó Kanboard) para no sumar infraestructura nueva que
+mantener. Leerlo junto con este archivo al arrancar una sesión nueva.
+
 ## Progreso (actualizado 2026-08-18)
 
 Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0): los 4 P1
