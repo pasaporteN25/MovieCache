@@ -573,7 +573,7 @@
       }
       .collection-filter-toolbar {
         align-items: end;
-        border-block: 1px solid rgba(69, 76, 120, 0.66);
+        border-block: 1px solid rgba(var(--control-border-rgb), 0.66);
         display: flex;
         gap: 12px;
         justify-content: space-between;
