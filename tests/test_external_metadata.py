@@ -9,8 +9,37 @@ from movie_inbox.external.metadata import fetch_metadata_by_title
 from movie_inbox.external.wikidata import wikidata_kind
 from movie_inbox.external.wikipedia import (
     WikipediaAdapter,
+    _find_synopsis_section,
+    _split_wikipedia_sections,
     fetch_wikipedia_by_title,
     fetch_wikipedia_by_wikidata_title,
+    fetch_wikipedia_metadata_action_api,
+)
+
+
+# Modeled on real explaintext=1 (no exintro=1) responses fetched live from
+# en.wikipedia.org/w/api.php and es.wikipedia.org/w/api.php: "== Heading =="
+# markers survive as plain text, and a top-level section can be immediately
+# followed by a deeper "===" subsection before the next real "==" section.
+_ENGLISH_ARTICLE_EXTRACT = (
+    "Heat is a 1995 American epic crime film written and directed by Michael Mann. "
+    "It features an ensemble cast starring Al Pacino and Robert De Niro.\n\n\n"
+    "== Plot ==\n"
+    "Neil McCauley, a Los Angeles professional thief, and his crew rob an armored car.\n\n\n"
+    "== Cast ==\n"
+    "Al Pacino as Vincent Hanna\nRobert De Niro as Neil McCauley\n\n\n"
+    "== Reception ==\n"
+    "The film received critical acclaim.\n"
+)
+
+_SPANISH_ARTICLE_EXTRACT_WITH_NESTED_SUBSECTION = (
+    "El padrino es una película estadounidense de 1972 dirigida por Francis Ford Coppola.\n\n\n"
+    "== Argumento ==\n"
+    "La historia comienza en el verano de 1945, durante la boda de Connie Corleone.\n\n\n"
+    "=== Reestreno remasterizado ===\n"
+    "En 2008 se realizó una restauración digital de la película.\n\n\n"
+    "== Reparto ==\n"
+    "Marlon Brando como Vito Corleone\nAl Pacino como Michael Corleone\n"
 )
 
 
@@ -238,6 +267,86 @@ class ExternalMetadataTests(unittest.TestCase):
         metadata = fetch_wikipedia_by_wikidata_title("Heat", "1995")
 
         self.assertEqual(metadata, {})
+
+    @patch("movie_inbox.external.wikipedia.fetch_wikidata_metadata", return_value={})
+    @patch("movie_inbox.external.wikipedia.fetch_json_safe")
+    def test_fetch_wikipedia_metadata_action_api_stores_the_full_synopsis_not_just_the_intro(
+        self, fetch_json_safe, _wikidata
+    ) -> None:
+        fetch_json_safe.return_value = {
+            "query": {
+                "pages": {
+                    "43566": {
+                        "title": "Heat (1995 film)",
+                        "canonicalurl": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+                        "extract": _ENGLISH_ARTICLE_EXTRACT,
+                        "pageprops": {"wikibase_item": "Q184090"},
+                    }
+                }
+            }
+        }
+
+        metadata = fetch_wikipedia_metadata_action_api("en", "Heat (1995 film)")
+
+        self.assertIn("Neil McCauley", metadata["wikipedia_extract"])
+        self.assertNotIn("Vincent Hanna", metadata["wikipedia_extract"])  # that's the Cast section
+        self.assertEqual(metadata["kind"], "pelicula")
+
+    @patch("movie_inbox.external.wikipedia.fetch_wikidata_metadata", return_value={})
+    @patch("movie_inbox.external.wikipedia.fetch_json_safe")
+    def test_fetch_wikipedia_metadata_action_api_falls_back_to_the_intro_without_a_plot_section(
+        self, fetch_json_safe, _wikidata
+    ) -> None:
+        fetch_json_safe.return_value = {
+            "query": {
+                "pages": {
+                    "1": {
+                        "title": "Some Film",
+                        "extract": "Some Film is a 2020 film.\n\n\n== Awards ==\nWon an award.\n",
+                    }
+                }
+            }
+        }
+
+        metadata = fetch_wikipedia_metadata_action_api("en", "Some Film")
+
+        self.assertEqual(metadata["wikipedia_extract"], "Some Film is a 2020 film.")
+
+    def test_split_wikipedia_sections_finds_the_intro_and_each_top_level_heading(self) -> None:
+        intro, sections = _split_wikipedia_sections(_ENGLISH_ARTICLE_EXTRACT)
+
+        self.assertIn("Heat is a 1995 American epic crime film", intro)
+        self.assertEqual([title for _, title, _ in sections], ["Plot", "Cast", "Reception"])
+
+    def test_find_synopsis_section_returns_the_plot_body_only(self) -> None:
+        _intro, sections = _split_wikipedia_sections(_ENGLISH_ARTICLE_EXTRACT)
+
+        synopsis = _find_synopsis_section(sections, "en")
+
+        self.assertIn("Neil McCauley", synopsis)
+        self.assertNotIn("Vincent Hanna", synopsis)
+
+    def test_find_synopsis_section_includes_a_nested_subsection(self) -> None:
+        # "Argumento" is directly followed by a "===" subsection before the
+        # next real "==" heading ("Reparto"); that subsection has to stay
+        # part of the synopsis instead of getting cut off by the first
+        # heading found, regardless of its level.
+        _intro, sections = _split_wikipedia_sections(
+            _SPANISH_ARTICLE_EXTRACT_WITH_NESTED_SUBSECTION
+        )
+
+        synopsis = _find_synopsis_section(sections, "es")
+
+        self.assertIn("boda de Connie Corleone", synopsis)
+        self.assertIn("restauración digital", synopsis)
+        self.assertNotIn("Marlon Brando", synopsis)
+
+    def test_find_synopsis_section_returns_empty_when_no_matching_heading_exists(self) -> None:
+        _intro, sections = _split_wikipedia_sections(
+            "Intro text.\n\n\n== Awards ==\nSome awards.\n"
+        )
+
+        self.assertEqual(_find_synopsis_section(sections, "en"), "")
 
     def test_wikidata_instance_type_detects_series(self) -> None:
         claims = {
