@@ -50,7 +50,7 @@ cobertura de las fuentes en sí.
 `external_link_coverage()` de [E1]: con Wikipedia, con IMDb, con FilmAffinity, con
 los 3, sin ninguno. Test nuevo en `tests/test_sqlite_repository.py` con un catálogo
 sintético de 4 ítems (0/1/2/3 fuentes) que verifica las 5 líneas.
-2026-08-19, commit `<pendiente>`.
+2026-08-19, commit `062f69b`.
 
 #### [E4] Exponer cobertura en Curaduría y en `/api/items`
 `build_curation_payload()` suma un bucket `partial_link` (ítems con 1 o 2 de 3
@@ -60,7 +60,7 @@ para el log de la línea 84 pero no los incluía en la respuesta; ahora viajan b
 una clave `links` nueva en el JSON. Test nuevo de `partial_link` en
 `tests/test_curation.py` (4 ítems, 0/1/2/3 fuentes) y test HTTP nuevo en
 `tests/test_view_http.py` para la clave `links` de `/api/items`.
-2026-08-19, commit `<pendiente>`.
+2026-08-19, commit `062f69b`.
 
 #### [E8] Unificar el gate de Wikipedia por título en `decide_match`
 `fetch_wikipedia_by_title()`/`fetch_wikipedia_by_wikidata_title()` en
