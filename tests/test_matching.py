@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 
 from movie_inbox.domain.catalog import (
+    external_link_coverage,
     external_source_name,
+    linked_sources,
     possible_duplicate_candidates,
     title_match_key,
     trusted_external_url,
@@ -88,6 +90,37 @@ class MatchingTests(unittest.TestCase):
 
         self.assertEqual(baseline.reason, "insufficient_evidence")
         self.assertEqual(stricter.reason, "similar_title_requires_review")
+
+    def test_linked_sources_counts_each_named_source_independently(self) -> None:
+        item = {
+            "url": "https://www.themoviedb.org/movie/280",
+            "wikipedia_url": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+            "imdb_url": "https://www.imdb.com/title/tt0113277/",
+            "filmaffinity_url": "",
+        }
+
+        self.assertEqual(linked_sources(item), {"wikipedia", "imdb"})
+        self.assertEqual(external_link_coverage(item), 2)
+
+    def test_linked_sources_ignores_the_generic_url_field(self) -> None:
+        # A generic `url` pointing at a trusted host (e.g. copied into `url`
+        # instead of `wikipedia_url`) must not count -- has_external_link()/
+        # external_urls() already cover that field; this one is specifically
+        # about the three named per-source fields.
+        item = {"url": "https://en.wikipedia.org/wiki/Heat_(1995_film)"}
+
+        self.assertEqual(linked_sources(item), set())
+        self.assertEqual(external_link_coverage(item), 0)
+
+    def test_linked_sources_reaches_full_coverage_with_all_three(self) -> None:
+        item = {
+            "wikipedia_url": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+            "imdb_url": "https://www.imdb.com/title/tt0113277/",
+            "filmaffinity_url": "https://www.filmaffinity.com/es/film267267.html",
+        }
+
+        self.assertEqual(linked_sources(item), {"wikipedia", "imdb", "filmaffinity"})
+        self.assertEqual(external_link_coverage(item), 3)
 
     def test_year_shaped_titles_keep_their_identity(self) -> None:
         self.assertEqual(title_match_key("1917"), "1917")

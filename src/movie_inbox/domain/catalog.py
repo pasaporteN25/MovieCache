@@ -294,6 +294,19 @@ def has_external_link(item: Mapping[str, Any]) -> bool:
     return bool(external_urls(item))
 
 
+def linked_sources(item: Mapping[str, Any]) -> set[str]:
+    """Which of the named sources (not the generic `url` field) have a trusted link."""
+    return {
+        source
+        for source in KNOWN_LINK_HOSTS
+        if trusted_external_url(str(item.get(source_url_field(source)) or ""))
+    }
+
+
+def external_link_coverage(item: Mapping[str, Any]) -> int:
+    return len(linked_sources(item))
+
+
 def title_match_key(value: str) -> str:
     value = unicodedata.normalize("NFKD", html.unescape(value).lower())
     value = "".join(character for character in value if not unicodedata.combining(character))
