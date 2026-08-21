@@ -19,7 +19,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
             </div>
             <div class="card-badges">
               ${item._search?.reason ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(item._search))}</span>` : ""}
-              <span class="pill ${hasExternalLink(item) ? "good" : "muted"}">${hasExternalLink(item) ? "con link" : "sin link"}</span>
+              <span class="pill ${hasExternalLink(item) ? "good" : "muted"}">${hasExternalLink(item) ? "con referencia" : "sin referencia"}</span>
               <span class="pill ${isInCatalog(item.en_catalogo) ? "good" : "muted"}">${isInCatalog(item.en_catalogo) ? "disponible: sí" : "disponible: no"}</span>
             </div>
             ${searchDescription(summary, "catalog", item.id)}
@@ -48,7 +48,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
             </div>
             <div class="card-badges">
               <span class="pill good">${escapeHtml(result.source || "externo")}</span>
-              <span class="pill ${result.url ? "good" : "muted"}">${result.url ? "con link" : "sin link"}</span>
+              <span class="pill ${result.url ? "good" : "muted"}">${result.url ? "con referencia" : "sin referencia"}</span>
             </div>
             ${searchDescription(description, "manual", index)}
             <div class="result-actions">

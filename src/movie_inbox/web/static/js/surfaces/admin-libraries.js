@@ -73,7 +73,7 @@ import { loadScannerQueue } from "./inbox-scanner.js";
       export function renderLibraryConfiguration() {
         if (!scannerConfigured) {
           fields.libraryConfiguration.dataset.state = "disabled";
-          fields.libraryConfiguration.innerHTML = `<strong>Scanner administrado desactivado</strong><span>Reiniciá el servidor con al menos un <code>--library-root RUTA</code>.</span>`;
+          fields.libraryConfiguration.innerHTML = `<strong>Inventario administrado desactivado</strong><span>Reiniciá el servidor con al menos un <code>--library-root RUTA</code>.</span>`;
           fields.createLibraryButton.disabled = true;
           return;
         }
