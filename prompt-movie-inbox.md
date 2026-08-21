@@ -71,16 +71,100 @@ comparables directo). Encontró un P1 propio (contraste de `--control-border`,
 cerrado) y un P2 propio (caching HTTP de estáticos, cerrado), más 4
 hallazgos "P3" menores que se están cerrando uno por uno con aprobación
 previa de cada uno: `extract` (colores literales → tokens, **cerrado**),
-`typeset` (`font-family` y `font-size`, **cerrado**), `adapt` (**cerrado**,
-ver abajo — investigación grande, hallazgo chico) y `polish`. Queda solo
-`polish`. Sesión nueva a partir de acá — no hace falta releer el historial
-de conversación, esto + `CLAUDE.md` + `git log` alcanza.
+`typeset` (`font-family` y `font-size`, **cerrado**), `adapt` (**cerrado**
+— investigación grande, hallazgo chico) y `polish` (**cerrado**, ver
+abajo). Los 4 hallazgos "P3" quedan cerrados. Sigue el gate final de esta
+segunda pasada: correr `$impeccable audit` de nuevo y compararlo contra el
+16/20. Sesión nueva a partir de acá — no hace falta releer el historial de
+conversación, esto + `CLAUDE.md` + `git log` alcanza.
 
 También en esta sesión, del tablero `tareas.md` (frente Enriquecimiento y
 cobertura de links): `[E3]` y `[E4]` cerrados (commit `062f69b`), y un bug
 suelto de la pasada de `extract` corregido — el `rgba(69, 76, 120, .66)`
 de `catalog.css` que había quedado con el valor viejo de `--control-border`
 (commit `bea4a43`). `[E6]` sigue en Backlog a pedido de Lucas.
+
+**Fase 5, P3 (`$impeccable polish`) cerrado (2026-08-19), commits
+`d4a30d3` (CSS) y `a12eab4` (terminología).** El más grande de los 4 P3.
+Investigado con un scan mecánico sin `--scope` (colores) más un Explore
+agent en paralelo cubriendo el resto del checklist de `polish.md`
+(estados de interacción, código muerto, terminología) — cada afirmación
+del agent verificada a mano contra el archivo real antes de actuar, no
+solo confiada.
+
+*Colores*: `detect.mjs` sin scope dio 50 hallazgos `design-system-color`.
+Agrupé por triplete RGB ignorando el alpha — no por línea — y eso separó
+el ruido de lo real: 16 son negro puro (`#000`/`rgba(0,0,0,*)`) en
+`box-shadow`/`text-shadow`/`mask-image`, falso positivo confirmado
+(`DESIGN.md` ya documenta las sombras como fórmulas `rgba(0,0,0,.XX)`
+literales, sin tokenizar, en su propia sección "Shadow Vocabulary`).
+3 eran reales: un casi-negro `rgba(3, 4, 14, alpha)` usado como
+`::backdrop` en 4 `<dialog>` distintos con 4 alphas distintas y ningún
+nombre (`--scrim-rgb` nuevo), `#262b52` reusado igual en dos degradés sin
+relación (`--surface-shade` nuevo), y dos `color: #fff` de texto donde el
+resto de la app usa `--ink` (4/255 de diferencia por canal, imperceptible,
+mismo criterio que los 4 casi-duplicados que `extract` ya había corregido).
+El resto (~30) son colores de un solo uso — gradientes de carátula, tonos
+puntuales — sin evidencia de duplicado, dejados igual que `extract` dejó
+los suyos.
+
+También encontré dos falsos positivos más del mismo estilo que el
+`overused-font` de `typeset`: el detector marca `body::before` (la textura
+de grilla de 48px que es literalmente la "señal CRT" del brief de diseño)
+y el degradado de texto del `<h1>` de marca (usa los 3 colores de señal
+documentados, no una paleta genérica) como patrones "de IA genérica" — son
+justo lo contrario, coinciden con el brief a propósito. No se tocó
+ninguno de los dos.
+
+*Estados de interacción*: la base genérica (`core.css:131-169`) ya cubre
+`:focus-visible`/`:hover`/`:active`/`:disabled` en cada botón/input nativo.
+El hueco real es específico: `.library-record-identity`, `.scanner-queue-item`
+y `.curation-queue-item` tienen un `:hover` a medida sin su
+`:focus-visible` correspondiente — quien navega con teclado ve solo el
+outline genérico donde el mouse ve además un cambio de color. El caso de
+`.scanner-queue-item` importa más que los otros: `inbox-scanner.js` mueve
+el foco de teclado ahí mismo después de navegar con flechas. Agregado el
+`:focus-visible` que faltaba en los 3. Al revés, `.merge-choice` tenía
+`:focus-visible`/`:checked` pero ningún `:hover` — agregado también.
+
+*Código muerto*: JS limpio (sin `console.log`, `debugger`, código
+comentado ni TODOs). En CSS, `.library-path-browser-current` en
+`scanner.css` no la usa ningún HTML/JS — quedó de un cambio de clase a ID;
+la regla siguiente ya cubre el mismo elemento por ID con la misma
+propiedad y más. Borrada.
+
+*Terminología*: dos renombres. `Scanner` → `Inventario` en los 5 lugares
+donde todavía se colaba (la pestaña principal ya se había renombrado en
+P1-a; quedaban el estado vacío de la cola, un aviso de refresco, un label
+`sr-only`, un `aria-label` y el aviso de Admin › Bibliotecas). Y `Sin
+link`/`Con link` → `Sin referencia`/`Con referencia` en los 10 sitios de
+Curaduría, Admin y tarjetas de búsqueda — le pregunté a Lucas primero
+porque es vocabulario establecido en 8+ archivos, no un bug obvio; eligió
+renombrar. El identificador interno `missing_link` (claves de objeto,
+atributos `data-`, comparaciones en JS) no se tocó, solo el texto visible.
+De paso encontré un tercero: un checkbox "Review" en Importaciones,
+la única palabra en inglés entre hermanos en español → "Reseña".
+
+No tocado a propósito: las clases CTA compartidas (`.action-primary`,
+`.quiet-action`, etc.) no tienen hover/active/disabled propios más allá
+del genérico — darle a cada una su propio lenguaje de interacción es una
+decisión de sistema de componentes completa, no un fix de polish acotado.
+Y el badge de Bandeja sigue sin incluir los borradores de Importaciones
+(confirmado que sigue siendo cierto, aunque el detalle de "un solo número
+sumado" de la crítica original ya no aplica — ahora son 2 badges
+separados) — sumar un tercer conteo es una decisión de arquitectura de
+información, no algo para decidir en este pase.
+
+Verificado con `scripts\check.ps1` en verde (301 tests), `detect.mjs`
+confirmando exactamente los 8 sitios de color arreglados (ni uno de más
+ni de menos) y el resto intacto, y `getComputedStyle` contra el catálogo
+sintético — el token `--scrim-rgb` resuelve igual que el literal viejo vía
+`::backdrop`, el texto del spotlight resuelve a `--ink`, y "Sin
+referencia" se ve correctamente en Curaduría.
+
+Los 4 P3 de Fase 5 quedan cerrados. Sigue el gate final: correr
+`$impeccable audit` de nuevo sobre la misma superficie y comparar contra
+el 16/20 de la corrida anterior.
 
 **Fase 5, P3 (`$impeccable adapt`) cerrado (2026-08-19).** Investigación
 grande, resultado chico — y vale documentar por qué, para que una sesión
