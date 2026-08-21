@@ -80,7 +80,7 @@
         text-align: center;
       }
       .spotlight-empty strong {
-        color: #fff;
+        color: var(--ink);
         font-family: var(--font-display);
         font-size: var(--text-feature-empty);
         font-style: italic;
@@ -169,7 +169,7 @@
         text-transform: none;
       }
       .spotlight-copy strong {
-        color: #fff;
+        color: var(--ink);
         font-family: var(--font-display);
         font-size: clamp(30px, 5vw, 68px);
         font-style: italic;

@@ -150,7 +150,7 @@
         text-align: left;
         width: 100%;
       }
-      .curation-queue-item:hover { background: rgba(120, 92, 255, 0.1); }
+      .curation-queue-item:hover, .curation-queue-item:focus-visible { background: rgba(120, 92, 255, 0.1); }
       .curation-queue-item.selected {
         background: rgba(34, 216, 229, 0.11);
         box-shadow: inset 0 0 0 1px rgba(34, 216, 229, 0.62);

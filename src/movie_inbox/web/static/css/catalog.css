@@ -352,7 +352,7 @@
       .result-media.is-loaded { opacity: 1; }
       .result-placeholder {
         align-items: center;
-        background: linear-gradient(135deg, #262b52, var(--paper));
+        background: linear-gradient(135deg, var(--surface-shade), var(--paper));
         color: var(--muted);
         display: flex;
         font-size: var(--text-caption);

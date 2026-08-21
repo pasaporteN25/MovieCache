@@ -14,7 +14,7 @@
         display: grid;
       }
       .merge-comparator-dialog::backdrop {
-        background: rgba(3, 4, 14, 0.88);
+        background: rgba(var(--scrim-rgb), 0.88);
         backdrop-filter: blur(5px);
       }
       .merge-comparator-surface {
@@ -202,6 +202,10 @@
         min-width: 0;
         padding: 9px 10px;
         position: relative;
+      }
+      .merge-choice:hover {
+        background: rgba(34, 216, 229, 0.05);
+        border-color: rgba(34, 216, 229, 0.4);
       }
       .merge-choice:has(input:checked) {
         background: rgba(34, 216, 229, 0.1);
