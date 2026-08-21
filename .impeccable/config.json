@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-08-21T23:36:37.220Z",
+        "reason": "Agent: deliberate CRT-scanline grid texture on body::before, matches DESIGN.md's explicit 'senal CRT' brief theme, not generic AI slop; user approved adding the exception"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-08-21T23:36:39.132Z",
+        "reason": "Agent: brand h1 gradient uses the 3 documented signal colors (ink/teal/pink), not a generic palette; user approved adding the exception"
+      }
+    ]
+  }
+}
