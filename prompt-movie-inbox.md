@@ -71,16 +71,69 @@ comparables directo). Encontró un P1 propio (contraste de `--control-border`,
 cerrado) y un P2 propio (caching HTTP de estáticos, cerrado), más 4
 hallazgos "P3" menores que se están cerrando uno por uno con aprobación
 previa de cada uno: `extract` (colores literales → tokens, **cerrado**),
-`typeset` (**parcial**: consolidación de `font-family` cerrada, jerarquía
-de `font-size` pendiente — ver abajo), `adapt` y `polish`, en ese orden.
-Sesión nueva a partir de acá — no hace falta releer el historial de
-conversación, esto + `CLAUDE.md` + `git log` alcanza.
+`typeset` (`font-family` y `font-size`, **cerrado**, ver abajo), `adapt`
+y `polish`, en ese orden — quedan estos dos últimos. Sesión nueva a partir
+de acá — no hace falta releer el historial de conversación, esto +
+`CLAUDE.md` + `git log` alcanza.
 
 También en esta sesión, del tablero `tareas.md` (frente Enriquecimiento y
 cobertura de links): `[E3]` y `[E4]` cerrados (commit `062f69b`), y un bug
 suelto de la pasada de `extract` corregido — el `rgba(69, 76, 120, .66)`
 de `catalog.css` que había quedado con el valor viejo de `--control-border`
 (commit `bea4a43`). `[E6]` sigue en Backlog a pedido de Lucas.
+
+**Fase 5, P3 (`$impeccable typeset`) cerrado (2026-08-19).** Segunda mitad:
+los 49 `design-system-font-size` que había quedado sin tocar (ver la entrada
+de abajo para la primera mitad, `font-family`). A diferencia de esa primera
+mitad, acá cada sitio pedía criterio real, así que se leyeron los 49 en
+contexto completo y se agruparon por rol antes de tocar nada — un Plan agent
+rehizo la categorización de forma independiente desde los archivos reales
+(no desde mi resumen) y encontró 3 sitios que se me habían pasado
+(`core-card.css:259`, `curation.css:252` y `:272`); verifiqué esas 3
+correcciones a mano contra el archivo antes de confirmarlas. El agent
+también confirmó que ningún JS del frontend lee `getComputedStyle`,
+`offsetHeight` ni nada equivalente sobre estas clases — la única función
+relacionada, `titleSizeClass()` en `core/format.js`, solo mapea longitud de
+string a un nombre de clase fijo, nunca lee un tamaño renderizado. Encontré
+(y confirmé leyendo el archivo) que `club.css` define
+`.dvd-placeholder strong.title-medium` pero nunca `.club-card h4.title-medium`
+— un hueco real donde `titleSizeClass()` puede asignar esa clase a un `h4`
+que cae silenciosamente al tamaño base; es un bug de una regla faltante, no
+de un valor de tamaño, así que quedó anotado sin tocar.
+
+Entré en plan mode (obligatorio en Fase 5) con la categorización completa y
+verificada. Dos decisiones necesitaban mi input, no el del agente:
+"¿además de unificar, qué otras opciones hay?" para el cluster más grande
+(11 encabezados de sección, 18-42px en 8 pantallas) — resueltas por
+catalogar cada valor distinto como su propio token con su valor actual
+(cero cambio visual), fusionando solo los dos pares que ya eran idénticos
+byte a byte (32px/32px, 34px/34px) en vez de inventar escalones nuevos; y
+si un cluster de "número de estadística" (22px en 3 archivos, más 25px y
+20px en otros dos) se unifica a 22px — confirmé que sí. Esos son los
+**únicos 2 cambios de valor real de las 49** (`club.css:334` 25→22px,
+`imports.css:215` 20→22px); las otras 47 son cero cambio visual.
+
+36 tokens nuevos en `tokens.css` (agrupados por familia: rampa faltante de
+15px reencontrada 5 veces en archivos sin relación → `--text-compact`;
+cluster de estadística → `--text-stat`; una marca "↔" de comparador
+idéntica en `core-merge.css` y `curation.css` → `--text-comparator-mark`;
+dos cascadas de truncado de título por longitud —`core-card.css` y
+`club.css`— mantenidas como familias separadas porque los valores son
+parecidos pero nunca idénticos, sin evidencia de duplicado real; el resto,
+roles de un solo uso con su propio nombre). Reemplazo de los 49 con un
+script (no a mano) que verificó la cantidad esperada de ocurrencias antes
+de cada reemplazo — falló en seco si algo no cuadraba, no corrigió nada
+silenciosamente. `DESIGN.md` suma `compact` (15px) y `stat` (22px) al
+frontmatter; el resto queda component-scoped para una futura pasada de
+`document`, igual que los tokens de `extract`.
+
+Verificado con `scripts\check.ps1` en verde (301 tests) y `getComputedStyle`
+contra el mismo catálogo sintético (Inicio, Colección, Club, Curaduría) —
+14 selectores representativos de los 6 grupos, todos resuelven exactamente
+al valor esperado, incluida la marca de comparador compartida entre dos
+archivos. `detect.mjs --scope type` pasó de 77 hallazgos (al arrancar esta
+tarea de `typeset`) a **0** — `font-family` y `font-size` quedan
+completamente cerrados. Quedan `adapt` y `polish`.
 
 **Fase 5, P3 (`$impeccable typeset`) parcial (2026-08-19).** Primer error a
 corregir: le pedí al skill `audit` en vez de `typeset` — son comandos
