@@ -319,7 +319,7 @@
 
         .merge-survivor-control span { max-width: none; white-space: normal; }
 
-        .merge-show-all { min-height: 34px; }
+        .merge-show-all { min-height: 44px; }
 
         .merge-comparator-summary { grid-template-columns: 1fr; padding: 9px 13px; }
 
