@@ -15,10 +15,10 @@
         width: 100%;
       }
       .login-brand { max-width: 620px; }
-      .login-brand h1 { font-size: clamp(42px, 8vw, 82px); }
+      .login-brand h1 { font-size: var(--text-hero); }
       .login-brand p {
         color: var(--muted);
-        font-size: clamp(16px, 2vw, 20px);
+        font-size: var(--text-hero-subtitle);
         line-height: 1.5;
         margin: 18px 0 0;
         max-width: 34ch;
@@ -123,7 +123,7 @@
       }
       .login-heading h2 {
         font-family: var(--font-display);
-        font-size: 34px;
+        font-size: var(--text-heading-case);
         font-style: italic;
         line-height: 1;
         margin: 0;
@@ -192,8 +192,8 @@
         .login-brand,
         .login-pass,
         .login-pass-body { min-width: 0; width: 100%; }
-        .login-brand h1 { font-size: clamp(38px, 13vw, 58px); overflow-wrap: anywhere; }
-        .login-brand p { font-size: 15px; margin-top: 12px; }
+        .login-brand h1 { font-size: var(--text-hero-compact); overflow-wrap: anywhere; }
+        .login-brand p { font-size: var(--text-compact); margin-top: 12px; }
         .login-pass { min-height: 430px; }
         .member-login-pass { justify-self: center; min-height: 0; }
         .password-pass { min-height: 560px; }

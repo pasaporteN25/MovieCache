@@ -148,7 +148,7 @@
       }
       .dvd-placeholder strong {
         font-family: var(--font-display);
-        font-size: clamp(22px, 3vw, 35px);
+        font-size: var(--text-card-glyph);
         font-style: italic;
         font-weight: 900;
         line-height: 0.92;
@@ -200,8 +200,8 @@
         text-transform: uppercase;
         word-break: normal;
       }
-      .dvd-card h2.title-medium { font-size: 20px; line-height: 1.12; }
-      .dvd-card h2.title-long { font-size: 17px; line-height: 1.12; }
+      .dvd-card h2.title-medium { font-size: var(--text-title-medium); line-height: 1.12; }
+      .dvd-card h2.title-long { font-size: var(--text-title-long); line-height: 1.12; }
       .dvd-card h2.title-xlong { font-size: var(--text-control); line-height: 1.12; }
       .dvd-card h2.title-xxlong { font-size: var(--text-meta); line-height: 1.12; }
       .dvd-card h2.title-ultra { font-size: var(--text-caption); line-height: 1.12; }
@@ -256,7 +256,7 @@
       }
       .dvd-back-header h2 {
         color: var(--ink);
-        font-size: 20px;
+        font-size: var(--text-title-medium);
         line-height: 1.1;
         text-shadow: 0 0 14px rgba(var(--red-rgb), 0.2);
       }
@@ -417,7 +417,7 @@
         .dvd-placeholder { padding: 14px 8px 16px; }
 
         .dvd-placeholder strong {
-          font-size: 22px;
+          font-size: var(--text-card-glyph-compact);
           line-height: 0.94;
         }
 
@@ -426,9 +426,9 @@
           padding: 31px 8px 9px;
         }
 
-        .dvd-card h2 { font-size: 20px; }
+        .dvd-card h2 { font-size: var(--text-title-medium); }
 
-        .dvd-card h2.title-medium { font-size: 18px; }
+        .dvd-card h2.title-medium { font-size: var(--text-title-medium-compact); }
 
         .dvd-card h2.title-long { font-size: var(--text-body); }
 

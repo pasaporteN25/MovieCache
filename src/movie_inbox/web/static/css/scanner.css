@@ -360,7 +360,7 @@
       .scanner-case-heading { align-items: start; display: flex; gap: 18px; justify-content: space-between; }
       .scanner-case-heading h3 {
         font-family: var(--font-display);
-        font-size: 32px;
+        font-size: var(--text-heading-stage);
         margin: 4px 0;
         overflow-wrap: anywhere;
         text-transform: uppercase;
@@ -419,7 +419,7 @@
         padding: 13px 14px;
       }
       .scanner-candidate-header > div { display: grid; gap: 4px; min-width: 0; }
-      .scanner-candidate-header > div > strong { font-size: 17px; overflow-wrap: anywhere; }
+      .scanner-candidate-header > div > strong { font-size: var(--text-scanner-candidate); overflow-wrap: anywhere; }
       .scanner-candidate-header > div > span:last-child { color: var(--muted); font-size: var(--text-caption); }
       .scanner-candidate-header button { flex: 0 0 auto; width: auto; }
       .scanner-candidate-index { color: var(--teal); font-size: var(--text-label); font-weight: 800; text-transform: uppercase; }

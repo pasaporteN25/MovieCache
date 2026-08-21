@@ -13,7 +13,7 @@
       }
       .club-heading h2 {
         font-family: var(--font-display);
-        font-size: 38px;
+        font-size: var(--text-heading-club);
         font-style: italic;
         line-height: 1;
         margin: 0;
@@ -77,7 +77,7 @@
       .collection-directory-heading h3,
       .collection-detail-heading h3 {
         font-family: var(--font-display);
-        font-size: 29px;
+        font-size: var(--text-heading-collection);
         font-style: italic;
         line-height: 1;
         margin: 4px 0 0;
@@ -165,7 +165,7 @@
         display: flex;
         gap: 7px;
       }
-      .collection-card-meta strong { color: var(--gold); font-size: 22px; }
+      .collection-card-meta strong { color: var(--gold); font-size: var(--text-stat); }
       .collection-card-meta > span { color: var(--muted); font-size: var(--text-label); }
       .collection-card-meta .collection-followed-mark {
         border: 1px solid rgba(var(--teal-rgb), 0.4);
@@ -208,7 +208,7 @@
         padding: 12px 14px;
       }
       .collection-stats > div + div { border-left: 1px solid var(--line); }
-      .collection-stats strong { color: var(--gold); font-size: 22px; line-height: 1; }
+      .collection-stats strong { color: var(--gold); font-size: var(--text-stat); line-height: 1; }
       .collection-stats span { color: var(--muted); font-size: var(--text-label); text-transform: uppercase; }
       .collection-bulk-bar {
         align-items: center;
@@ -331,7 +331,7 @@
         display: flex;
         gap: 7px;
       }
-      .club-catalog-count strong { color: var(--gold); font-size: 25px; line-height: 1; }
+      .club-catalog-count strong { color: var(--gold); font-size: var(--text-stat); line-height: 1; }
       .club-catalog-count span { color: var(--muted); font-size: var(--text-label); }
       .club-grid {
         display: grid;
@@ -357,9 +357,9 @@
         overflow-wrap: normal;
         word-break: normal;
       }
-      .club-card .dvd-placeholder strong.title-medium { font-size: 21px; }
-      .club-card .dvd-placeholder strong.title-long { font-size: 19px; }
-      .club-card .dvd-placeholder strong.title-xlong { font-size: 17px; }
+      .club-card .dvd-placeholder strong.title-medium { font-size: var(--text-club-glyph-medium); }
+      .club-card .dvd-placeholder strong.title-long { font-size: var(--text-club-glyph-long); }
+      .club-card .dvd-placeholder strong.title-xlong { font-size: var(--text-club-glyph-xlong); }
       .club-card .dvd-placeholder strong.title-xxlong { font-size: var(--text-control); }
       .club-card .dvd-placeholder strong.title-ultra { font-size: var(--text-caption); }
       .club-card-body {
@@ -380,7 +380,7 @@
       .club-card h4 {
         display: -webkit-box;
         font-family: var(--font-display);
-        font-size: 19px;
+        font-size: var(--text-club-title);
         font-style: italic;
         line-height: 1.02;
         margin: 5px 0 0;
@@ -534,7 +534,7 @@
 
         .club-card-body { padding: 8px; }
 
-        .club-card h4 { font-size: 17px; }
+        .club-card h4 { font-size: var(--text-club-title-compact); }
 
         .club-card h4.title-long { font-size: var(--text-control); }
 

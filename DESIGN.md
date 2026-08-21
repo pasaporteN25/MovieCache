@@ -54,12 +54,16 @@ typography:
     fontWeight: 900
     lineHeight: 1.12
     letterSpacing: "0.035em"
+  stat:
+    fontSize: "22px"
   body:
     fontFamily: '"Space Grotesk", "Trebuchet MS", Verdana, ui-sans-serif, system-ui, sans-serif'
     fontSize: "16px"
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: "0"
+  compact:
+    fontSize: "15px"
   control:
     fontSize: "14px"
   small:

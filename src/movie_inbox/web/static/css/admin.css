@@ -73,7 +73,7 @@
         min-height: 76px;
         padding: 11px;
       }
-      .admin-metric-grid .metric strong { color: var(--ink); font-size: 22px; }
+      .admin-metric-grid .metric strong { color: var(--ink); font-size: var(--text-stat); }
       .admin-db-panel { max-width: 960px; }
       .image-cache-status {
         align-items: center;
@@ -298,7 +298,7 @@
       .member-dialog-actions button { width: auto; }
       .temporary-password-body p { color: var(--muted); line-height: 1.5; margin: 0; }
       .temporary-password-body strong { color: var(--ink); }
-      #temporaryPasswordValue { font-family: var(--font-label); font-size: 15px; }
+      #temporaryPasswordValue { font-family: var(--font-label); font-size: var(--text-compact); }
       .privacy-dialog-body { display: grid; gap: 14px; padding: 18px; }
       .privacy-master-control,
       .privacy-fieldset label {
