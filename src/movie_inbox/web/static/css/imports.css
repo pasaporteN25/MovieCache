@@ -106,7 +106,7 @@
       }
       .import-stage-heading h3 {
         font-family: var(--font-display);
-        font-size: 32px;
+        font-size: var(--text-heading-stage);
         font-style: italic;
         line-height: 1;
         margin: 4px 0 0;
@@ -212,7 +212,7 @@
       }
       .import-metric { display: grid; gap: 4px; padding: 12px 10px; }
       .import-metric + .import-metric { border-left: 1px solid var(--line); }
-      .import-metric strong { color: var(--ink); font-size: 20px; line-height: 1; }
+      .import-metric strong { color: var(--ink); font-size: var(--text-stat); line-height: 1; }
       .import-metric span { color: var(--muted); font-size: var(--text-label); text-transform: uppercase; }
       .import-metric[data-state="new"] strong { color: var(--teal); }
       .import-metric[data-state="review"] strong { color: var(--gold); }

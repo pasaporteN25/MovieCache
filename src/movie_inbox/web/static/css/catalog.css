@@ -135,7 +135,7 @@
       }
       .catalog-heading h2 {
         font-family: var(--font-display);
-        font-size: 26px;
+        font-size: var(--text-heading-catalog);
         font-style: italic;
         font-weight: 900;
         letter-spacing: 0.055em;
@@ -726,7 +726,7 @@
         padding: 5px 9px;
         width: auto;
       }
-      .active-filters button span { color: var(--teal); font-size: 15px; margin-left: 3px; }
+      .active-filters button span { color: var(--teal); font-size: var(--text-compact); margin-left: 3px; }
 
 @media (max-width: 1100px) {
         .utility-panel { grid-template-columns: 1fr 1fr; width: min(680px, calc(100vw - 48px)); }

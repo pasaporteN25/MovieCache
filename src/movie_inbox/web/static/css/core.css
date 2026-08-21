@@ -186,7 +186,7 @@
       }
       dialog::backdrop { background: rgba(3, 4, 14, 0.76); }
       .description-dialog-body { display: grid; gap: 12px; padding: 18px; }
-      .description-dialog-body h2 { font-size: 18px; }
+      .description-dialog-body h2 { font-size: var(--text-dialog-title); }
       .description-dialog-body p { line-height: 1.55; margin: 0; white-space: pre-wrap; }
       .description-dialog-actions { display: flex; justify-content: end; }
       .description-dialog-actions button { width: auto; }

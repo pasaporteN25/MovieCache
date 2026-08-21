@@ -17,7 +17,7 @@
       }
       .spotlight-bar h2 {
         font-family: var(--font-display);
-        font-size: 18px;
+        font-size: var(--text-heading-utility);
         font-style: italic;
         letter-spacing: 0.05em;
         margin: 0;
@@ -82,7 +82,7 @@
       .spotlight-empty strong {
         color: #fff;
         font-family: var(--font-display);
-        font-size: clamp(24px, 4vw, 44px);
+        font-size: var(--text-feature-empty);
         font-style: italic;
         text-transform: uppercase;
       }
@@ -211,7 +211,7 @@
       .spotlight-step {
         background: rgba(var(--case-rgb), 0.82);
         border-color: rgba(255, 255, 255, 0.38);
-        font-size: 23px;
+        font-size: var(--text-pagination-step);
         height: 36px;
         line-height: 1;
         min-height: 36px;
@@ -290,7 +290,7 @@
       .home-empty-state h2,
       .admin-heading h2 {
         font-family: var(--font-display);
-        font-size: clamp(26px, 4vw, 42px);
+        font-size: var(--text-section);
         font-style: italic;
         font-weight: 900;
         line-height: 0.95;
@@ -305,7 +305,7 @@
         margin: 7px 0 0;
       }
       .home-program-heading h2 {
-        font-size: 36px;
+        font-size: var(--text-section-fixed);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -439,7 +439,7 @@
 
         .spotlight-copy { bottom: 9%; left: 16px; max-width: 82%; }
 
-        .spotlight-copy strong { font-size: clamp(28px, 10vw, 44px); }
+        .spotlight-copy strong { font-size: var(--text-feature-compact); }
 
         .spotlight-copy p { font-size: var(--text-meta); line-height: 1.35; }
 

@@ -131,13 +131,13 @@
       }
       .merge-entry-summary strong {
         font-family: var(--font-display);
-        font-size: 20px;
+        font-size: var(--text-comparator-title);
         line-height: 1.06;
         overflow-wrap: anywhere;
         text-transform: uppercase;
       }
       .merge-entry-summary small { color: var(--muted); }
-      .merge-summary-divider { align-self: center; color: var(--gold); font-size: 20px; text-align: center; }
+      .merge-summary-divider { align-self: center; color: var(--gold); font-size: var(--text-comparator-mark); text-align: center; }
       .merge-comparator-feedback {
         color: var(--muted);
         font-size: var(--text-meta);
@@ -330,7 +330,7 @@
         .merge-entry-summary .curation-thumb-frame.large,
         .merge-entry-summary .curation-thumb.large { height: 70px; width: 48px; }
 
-        .merge-entry-summary strong { font-size: 17px; }
+        .merge-entry-summary strong { font-size: var(--text-comparator-title-compact); }
 
         .merge-comparator-feedback { padding-inline: 13px; }
 
