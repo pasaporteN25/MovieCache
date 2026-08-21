@@ -71,16 +71,58 @@ comparables directo). Encontró un P1 propio (contraste de `--control-border`,
 cerrado) y un P2 propio (caching HTTP de estáticos, cerrado), más 4
 hallazgos "P3" menores que se están cerrando uno por uno con aprobación
 previa de cada uno: `extract` (colores literales → tokens, **cerrado**),
-`typeset` (`font-family` y `font-size`, **cerrado**, ver abajo), `adapt`
-y `polish`, en ese orden — quedan estos dos últimos. Sesión nueva a partir
-de acá — no hace falta releer el historial de conversación, esto +
-`CLAUDE.md` + `git log` alcanza.
+`typeset` (`font-family` y `font-size`, **cerrado**), `adapt` (**cerrado**,
+ver abajo — investigación grande, hallazgo chico) y `polish`. Queda solo
+`polish`. Sesión nueva a partir de acá — no hace falta releer el historial
+de conversación, esto + `CLAUDE.md` + `git log` alcanza.
 
 También en esta sesión, del tablero `tareas.md` (frente Enriquecimiento y
 cobertura de links): `[E3]` y `[E4]` cerrados (commit `062f69b`), y un bug
 suelto de la pasada de `extract` corregido — el `rgba(69, 76, 120, .66)`
 de `catalog.css` que había quedado con el valor viejo de `--control-border`
 (commit `bea4a43`). `[E6]` sigue en Backlog a pedido de Lucas.
+
+**Fase 5, P3 (`$impeccable adapt`) cerrado (2026-08-19).** Investigación
+grande, resultado chico — y vale documentar por qué, para que una sesión
+futura no asuma que "adapt" tiene tanto por corregir como tuvo `typeset`.
+Scan mecánico (`detect.mjs --scope layout`) dio 0. Leí — no solo grepeé —
+los 34 bloques `@media (max-width: ...)` de los 12 archivos CSS que
+tienen alguno. El patrón fue consistente en todos lados salvo uno: los
+controles interactivos suben a `min-height: 44px` (o más) dentro de su
+breakpoint móvil, coherente con el token `--touch-target: 44px` y con las
+inserciones de `env(safe-area-inset-*)` donde hace falta. Confirmé además
+dos cosas puntuales que `DESIGN.md` promete explícitamente: la navegación
+principal sí se convierte en barra inferior fija en móvil (con safe-area y
+objetivos de 52px), y el flip por hover del DVD Case en `core-card.css`
+está detrás de `@media (hover: hover) and (pointer: fine)` con el acceso a
+la ficha cableado como `data-click` en toda la tarjeta — nunca depende
+exclusivamente del hover, tal como pide `DESIGN.md`.
+
+Único hallazgo real: `core-merge.css:322`, dentro del breakpoint de 640px,
+`.merge-show-all { min-height: 34px; }` — el toggle "mostrar todos los
+campos" del comparador de fusión, que en desktop mide 38px, se achicaba
+en móvil a 34px — más chico que su propio default de escritorio y por
+debajo del mínimo táctil, exactamente al revés del patrón que aparece
+~15 veces en los otros 11 archivos. Corregido a 44px, mismo patrón exacto
+que ya usan `curation.css`, `scanner.css` e `imports.css`. Un cambio de
+una línea.
+
+Los valores de breakpoint no son uniformes (`scanner.css` usa 1120px/
+700px, `imports.css` 980px/700px, `login.css` 760px, contra los 1100/860/
+640/440 que documenta `DESIGN.md`) — leí el contenido real detrás de cada
+uno antes de asumir que era un bug, y son quiebres genuinos por el ancho
+interno de cada grid, no deriva arbitraria; `adapt.md` del propio skill
+pide breakpoints por contenido en vez de perseguir tamaños de dispositivo
+fijos, así que se dejaron como están.
+
+Nota aparte, no de producto: el testing en vivo con la herramienta de
+browser mostró `window.innerWidth` desactualizado después de una
+navegación SPA con el viewport ya redimensionado (`visualViewport.width`,
+el ancho real de `<html>`/`<body>` y cada medición directa de elemento
+seguían mostrando 390px correctamente) — lo rastreé con varias mediciones
+independientes antes de concluir que es una rareza de la herramienta de
+testing, no un bug de Movie Inbox, y no seguí insistiendo con eso.
+Verificado con `scripts\check.ps1` en verde (301 tests). Queda `polish`.
 
 **Fase 5, P3 (`$impeccable typeset`) cerrado (2026-08-19).** Segunda mitad:
 los 49 `design-system-font-size` que había quedado sin tocar (ver la entrada
