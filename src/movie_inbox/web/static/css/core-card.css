@@ -70,7 +70,7 @@
         width: 100%;
       }
       .dvd-spine {
-        background: linear-gradient(90deg, #03040e, #262b52 55%, #090b1c);
+        background: linear-gradient(90deg, #03040e, var(--surface-shade) 55%, #090b1c);
         border-right: 1px solid rgba(var(--teal-rgb), 0.28);
         bottom: 8px;
         left: 4px;

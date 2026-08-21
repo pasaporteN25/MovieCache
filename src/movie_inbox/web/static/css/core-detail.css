@@ -184,7 +184,7 @@
       .detail-drawer[open] { animation: movie-dialog-in 220ms var(--ease-out) both; display: grid; }
       .detail-drawer::backdrop {
         backdrop-filter: blur(7px);
-        background: rgba(3, 4, 14, 0.82);
+        background: rgba(var(--scrim-rgb), 0.82);
       }
       .movie-dialog-surface { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
       @keyframes movie-dialog-in {
@@ -450,7 +450,7 @@
         padding: 0;
         width: calc(100% - 32px);
       }
-      .unsaved-dialog::backdrop { background: rgba(3, 4, 14, 0.78); }
+      .unsaved-dialog::backdrop { background: rgba(var(--scrim-rgb), 0.78); }
       .unsaved-dialog-body { display: grid; gap: 12px; padding: 20px; }
       .unsaved-dialog-body h2 {
         font-family: var(--font-display);

@@ -44,6 +44,8 @@
         --line-rgb: 139, 124, 255;
         --text-pink-rgb: 255, 121, 191;
         --control-border-rgb: 111, 120, 181;
+        --scrim-rgb: 3, 4, 14;
+        --surface-shade: #262b52;
         --poster-red-mid: #76256f;
         --poster-teal-mid: #14627f;
         --poster-gold-mid: #a13779;

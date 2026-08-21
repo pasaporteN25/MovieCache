@@ -67,7 +67,7 @@
         text-align: left;
         width: 100%;
       }
-      .library-record-identity:hover { color: var(--teal); }
+      .library-record-identity:hover, .library-record-identity:focus-visible { color: var(--teal); }
       .library-record-identity > span:last-child { display: grid; gap: 4px; min-width: 0; }
       .library-record-identity strong { font-size: var(--text-body); overflow-wrap: anywhere; }
       .library-record-identity code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -246,7 +246,6 @@
       .library-path-browser > header > div:first-child { display: grid; gap: 3px; min-width: 0; }
       .library-path-browser > header > div:last-child { display: flex; flex: 0 0 auto; gap: 7px; }
       .library-path-browser > header button { min-height: 34px; width: auto; }
-      .library-path-browser-current { color: var(--muted); }
       #libraryPathBrowserCurrent { color: var(--muted); font-family: var(--font-label); font-size: var(--text-label); overflow-wrap: anywhere; }
       .library-path-directories {
         border-top: 1px solid var(--line);
@@ -350,6 +349,7 @@
         width: 100%;
       }
       .scanner-queue-item:hover,
+      .scanner-queue-item:focus-visible,
       .scanner-queue-item.active { background: rgba(34, 216, 229, 0.07); }
       .scanner-queue-item.active { box-shadow: inset 2px 0 0 var(--teal); }
       .scanner-queue-item > span:not(.scanner-queue-state),
