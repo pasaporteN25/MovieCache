@@ -42,7 +42,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           }
           renderScannerQueue();
           syncCurationCounts();
-          if (announce) setCurationFeedback("Cola del scanner actualizada.", "success");
+          if (announce) setCurationFeedback("Cola del inventario actualizada.", "success");
         } catch (error) {
           fields.scannerQueue.innerHTML = "";
           fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Cola no disponible</strong><p>${escapeHtml(libraryErrorMessage(error.message))}</p></div>`;
@@ -74,7 +74,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           ? `${scannerQueue.length} ${scannerQueue.length === 1 ? "pendiente" : "pendientes"}`
           : `${visible.length} de ${scannerQueue.length} pendientes`;
         if (!scannerQueue.length) {
-          fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Scanner al día</strong><p>No quedan identidades físicas por confirmar.</p></div>`;
+          fields.scannerQueue.innerHTML = `<div class="curation-empty compact"><strong>Inventario al día</strong><p>No quedan identidades físicas por confirmar.</p></div>`;
           fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Sin decisiones pendientes</strong><p>Los próximos casos aparecerán después de un recorrido aplicado.</p></div>`;
           renderScopeStrip(scannerScopeStates(null));
           return;

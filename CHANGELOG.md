@@ -40,6 +40,19 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - El borde superior/inferior de la barra de filtros de Colección usaba un tono
   de `--control-border` desactualizado, de antes del ajuste de contraste del
   P1-a; ahora usa el mismo color que el resto de la interfaz.
+- El fondo del comparador de fusión, la ficha y el diálogo de cambios sin
+  guardar usaban el mismo tono oscuro escrito a mano tres veces; el título
+  cinematográfico del spotlight y su estado vacío usaban blanco puro en vez
+  del blanco documentado; ahora los tres comparten los mismos tokens.
+- La cola del Scanner y el comparador de fusión no mostraban ningún cambio
+  visual al enfocar con teclado una fila o candidata que sí reacciona al
+  pasar el mouse; ahora el foco por teclado se ve igual que el hover.
+- "Scanner" ya no aparece en los últimos lugares donde había quedado (el
+  estado vacío de la cola, el buscador y el panel de administración de
+  bibliotecas); todos dicen `Inventario`, como el resto de la Bandeja.
+- "Sin link"/"con link" pasan a ser "Sin referencia"/"Con referencia" en
+  Curaduría, Administración y las tarjetas de búsqueda, coherente con el
+  resto del vocabulario en español de la interfaz.
 
 ## [0.3.0] - 2026-08-17
 

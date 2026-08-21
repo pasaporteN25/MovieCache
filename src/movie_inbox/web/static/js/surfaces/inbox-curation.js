@@ -264,7 +264,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         const labels = {
           pending: "Decisiones pendientes",
           duplicate: "Posibles duplicados",
-          missing_link: "Entradas sin link",
+          missing_link: "Entradas sin referencia",
           deferred: "Decisiones pospuestas"
         };
         fields.curationQueueTitle.textContent = labels[curationFilter] || labels.pending;
@@ -373,7 +373,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
       export function curationQueueItem(entry) {
         const item = entry.primary;
         const selected = entry.id === selectedCurationCaseId;
-        const type = entry.type === "duplicate" ? "Duplicado" : "Sin link";
+        const type = entry.type === "duplicate" ? "Duplicado" : "Sin referencia";
         return `<button class="curation-queue-item ${selected ? "selected" : ""}" type="button"
           data-curation-case="${escapeAttr(entry.id)}" aria-pressed="${selected}">
           ${curationThumb(item)}
@@ -427,7 +427,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
               <span class="curation-case-kicker">${deferred ? "Decisión pospuesta" : "Referencia pendiente"}</span>
               <h3>${escapeHtml(entry.primary.title || "Sin título")}</h3>
             </div>
-            <span class="pill muted">Sin link</span>
+            <span class="pill muted">Sin referencia</span>
           </header>
           ${curationEvidence(entry.evidence)}
           <div class="curation-single-record">${curationRecord(entry.primary, "Entrada actual", "open-primary")}</div>

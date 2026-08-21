@@ -513,7 +513,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         wikiReviewQueue = items.filter((item) => !hasExternalLink(item));
         wikiReviewIndex = 0;
         if (!wikiReviewQueue.length) {
-          fields.wikiReviewStatus.textContent = "No quedan entradas sin link.";
+          fields.wikiReviewStatus.textContent = "No quedan entradas sin referencia.";
           fields.reviewPrevious.hidden = true;
           fields.reviewNext.hidden = true;
           return;

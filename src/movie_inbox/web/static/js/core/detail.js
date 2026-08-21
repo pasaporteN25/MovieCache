@@ -478,7 +478,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           item.filmaffinity_url ? `<a href="${escapeAttr(item.filmaffinity_url)}" target="_blank" rel="noreferrer">FilmAffinity</a>` : "",
           item.wikidata_id ? `<a href="https://www.wikidata.org/wiki/${escapeAttr(item.wikidata_id)}" target="_blank" rel="noreferrer">Wikidata</a>` : ""
         ].filter(Boolean).join("");
-        return links || `<span class="status-line">Sin links asociados.</span>`;
+        return links || `<span class="status-line">Sin referencias asociadas.</span>`;
       }
 
       export function metadataEditor(item) {
