@@ -72,17 +72,94 @@ cerrado) y un P2 propio (caching HTTP de estáticos, cerrado), más 4
 hallazgos "P3" menores que se están cerrando uno por uno con aprobación
 previa de cada uno: `extract` (colores literales → tokens, **cerrado**),
 `typeset` (`font-family` y `font-size`, **cerrado**), `adapt` (**cerrado**
-— investigación grande, hallazgo chico) y `polish` (**cerrado**, ver
-abajo). Los 4 hallazgos "P3" quedan cerrados. Sigue el gate final de esta
-segunda pasada: correr `$impeccable audit` de nuevo y compararlo contra el
-16/20. Sesión nueva a partir de acá — no hace falta releer el historial de
-conversación, esto + `CLAUDE.md` + `git log` alcanza.
+— investigación grande, hallazgo chico) y `polish` (**cerrado**). Los 4
+hallazgos "P3" quedan cerrados. **El gate final de Fase 5 ya corrió — ver
+abajo: 29/40** (era `$impeccable critique`, no `audit`; otra confusión de
+comandos de este archivo, corregida esta vez antes de correrlo). Quedan 2
+arreglos chicos del hallazgo de esa corrida cerrados y 1 finding sin poder
+confirmar (ver abajo). Sesión nueva a partir de acá — no hace falta
+releer el historial de conversación, esto + `CLAUDE.md` + `git log`
+alcanza.
 
 También en esta sesión, del tablero `tareas.md` (frente Enriquecimiento y
 cobertura de links): `[E3]` y `[E4]` cerrados (commit `062f69b`), y un bug
 suelto de la pasada de `extract` corregido — el `rgba(69, 76, 120, .66)`
 de `catalog.css` que había quedado con el valor viejo de `--control-border`
 (commit `bea4a43`). `[E6]` sigue en Backlog a pedido de Lucas.
+
+**Fase 5, gate final: 29/40 (2026-08-19/22).** Los 4 P3 (extract/typeset/
+adapt/polish) ya estaban cerrados; tocaba correr de nuevo la revisión con
+puntaje sobre la misma superficie (Bandeja > Scanner y Curaduría) para
+comparar contra el 22/40 del 2026-08-14. Primer paso, otra vez, fue
+corregir el nombre del comando: lo que este archivo viene llamando
+"`$impeccable audit`" desde 2026-08-14 es en realidad `critique` (`audit`
+es a11y/perf/responsive, ya lo había confirmado en la sesión de
+`typeset`). Corrí `critique`, que exige un proceso formal — dos
+sub-agentes aislados en paralelo (uno de revisión de diseño, otro de
+evidencia mecánica + navegador), ninguno viendo el output del otro hasta
+que yo los sintetizo — con servidor y catálogo sintético reales para que
+ambos pudieran usar la app de verdad, no solo leer código.
+
+Resultado: **29/40** (contra 22/40), 0 P0, con mejoras reales confirmadas
+en vivo (los 4 P1 originales siguen resueltos) pero una capa nueva del
+mismo problema que esta fase viene persiguiendo: casos duplicados con
+mismo título y año son indistinguibles en la cola, el detalle y hasta el
+título del diálogo de fusión (con 3 copias de "Heat" en el catálogo
+sintético, las tres filas y el diálogo dicen literalmente "Heat / Heat").
+También confirmé que el P2 original de la crítica del 14/08 ("Scanner no
+deja recibo durable ni reversible") nunca se había cerrado — no era uno
+de los 4 P1 con nombre, así que quedó fuera del radar hasta ahora.
+Reporte completo con los 6 hallazgos priorizados (3 P1, 2 P2, 1 P3) en el
+mensaje de esa sesión y en `.impeccable/critique/2026-08-22T00-04-30Z__...md`
+(archivo local, gitignored igual que las 4 corridas anteriores — nunca
+estuvieron en git).
+
+De los 6 hallazgos, dos eran arreglos chicos y los cerré ese mismo día:
+
+1. **Cerrado.** El workbench de Curaduría se salía de la pantalla en
+   mobile (390px) en vez de pasar a una columna — confirmado en vivo,
+   `clientWidth` 390 contra `scrollWidth` 702. Causa real en
+   `curation.css:453` y `:433`: un track de grilla `1fr` a secas en vez de
+   `minmax(0, 1fr)` — el mínimo implícito de un `1fr` sin `minmax` es el
+   tamaño de su contenido, no cero, así que un descendiente ancho fuerza
+   el desborde de toda la columna. `scanner.css:547` tenía el mismo
+   patrón — corregido preventivamente aunque la cola de Scanner está
+   vacía en el catálogo sintético y no se pudo observar el desborde ahí
+   directamente. Esto **la propia pasada de `adapt` de esta sesión no lo
+   encontró** — me distraje con un artefacto de la herramienta de testing
+   (ver la entrada de `adapt` de abajo) y nunca volví a revisar el
+   contenido real del workbench con las métricas correctas. Verificado
+   antes/después: `clientWidth` 390 / `scrollWidth` 702 (roto) →
+   `clientWidth` 390 / `scrollWidth` 390 (arreglado). Commit `ce0c8f2`
+   (el título del commit quedó mal por un copy-paste — dice "touch
+   target" en vez de describir el fix de grid — Lucas prefirió dejarlo
+   así en vez de un amend).
+
+2. **Retirado, no confirmado.** El reporte inicial decía "el diálogo de
+   fusión no cierra con Escape" como P1, verificado con una tecla
+   simulada real (no un evento de JS). Antes de arreglarlo, probé la
+   MISMA tecla contra otro diálogo (`#detailDrawer`) que tiene el patrón
+   de cierre idéntico y textualmente correcto (`cancel` + `preventDefault`
+   + `close()` propio, igual que todos los demás diálogos de
+   `bootstrap.js`) — tampoco cerró. Como el patrón de código es correcto
+   en los dos casos y ningún diálogo cierra con Escape en este entorno de
+   testing, lo más probable es que sea una limitación de la herramienta
+   de automatización del browser (el cierre nativo de `<dialog>` con
+   Escape se implementa a nivel de motor del browser, no como algo
+   interceptable por JS, y no todas las herramientas de automatización lo
+   simulan fielmente) — no un bug real de la app. Le pedí a Lucas que lo
+   pruebe él mismo en un browser de verdad antes de tocar nada; sigue
+   pendiente su respuesta. **Lección para la próxima vez que un hallazgo
+   de teclado/interacción parezca "confirmado": probar el mismo mecanismo
+   contra un control hermano que se sabe que funciona, antes de reportarlo
+   como bug de un componente específico.**
+
+Quedan 4 hallazgos más grandes sin arrancar (los 2 P1 restantes —
+desambiguar duplicados idénticos, deshacer para Scanner — más paridad de
+teclado/búsqueda Curaduría-Scanner y el `aria-live` del comparador) y la
+pregunta de si corresponde correr `critique` una tercera vez después de
+esos, o si 29/40 con hallazgos ya priorizados es un cierre aceptable para
+Fase 5.
 
 **Fase 5, P3 (`$impeccable polish`) cerrado (2026-08-19), commits
 `d4a30d3` (CSS) y `a12eab4` (terminología).** El más grande de los 4 P3.
