@@ -53,6 +53,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - "Sin link"/"con link" pasan a ser "Sin referencia"/"Con referencia" en
   Curaduría, Administración y las tarjetas de búsqueda, coherente con el
   resto del vocabulario en español de la interfaz.
+- La mesa de trabajo de Curaduría se salía de la pantalla en mobile en vez
+  de pasar a una columna (afectaba también, de forma latente, a Scanner);
+  ahora se ajusta correctamente al ancho del dispositivo.
 
 ## [0.3.0] - 2026-08-17
 
