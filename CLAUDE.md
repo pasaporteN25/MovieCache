@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Movie Inbox: gestor self-hosted de catálogo audiovisual. Python + FastAPI + SQLite,
-frontend vanilla sin build step. Estable v0.3.0, v0.4.0 en curso.
+frontend vanilla sin build step. Estable v0.4.0.
 
 Antes de trabajar, leé los contratos vigentes: `PRODUCT.md`, `DESIGN.md`,
 `docs/roadmap.md`, `CHANGELOG.md` (`[Sin publicar]`), `tests/test_layering.py`.

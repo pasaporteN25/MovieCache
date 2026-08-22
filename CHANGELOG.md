@@ -4,6 +4,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+## [0.4.0] - 2026-08-22
+
 ### Agregado
 
 - La Bandeja distingue alcance compartido de personal: los modos pasan a
