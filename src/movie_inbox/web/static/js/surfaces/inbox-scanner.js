@@ -627,7 +627,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           const count = Number(item?.file_count || 1);
           const confirmed = confirm(
             `¿Omitir "${item?.detected_title || item?.name || "este archivo"}"${count > 1 ? ` y sus ${count} partes` : ""}?\n\n`
-            + `${count > 1 ? "Dejarán" : "Dejará"} de aparecer en la cola mientras no ${count > 1 ? "cambien" : "cambie"}. No se eliminará nada del disco ni del catálogo. Esta decisión todavía no puede restaurarse desde la interfaz.`
+            + `${count > 1 ? "Dejarán" : "Dejará"} de aparecer en la cola mientras no ${count > 1 ? "cambien" : "cambie"}. No se eliminará nada del disco ni del catálogo. Podés deshacer esta decisión después desde Actividad.`
           );
           if (!confirmed) return;
         }

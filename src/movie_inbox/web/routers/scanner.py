@@ -405,8 +405,20 @@ def review_scanner_item(
                 },
                 status_code=201 if created else 200,
             )
-        item = library_service.review_file(file_id, body)
-        return JSONResponse({"ok": True, "reason": "scanner_item_reviewed", "item": item})
+        result = _scanner_workflow(request).review(
+            file_id,
+            body,
+            history_mode=str(body.get("history_mode") or "persistent"),
+            session_id=history_session_id(request),
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "reason": "scanner_item_reviewed",
+                "item": result["item"],
+                "operation": result["operation"],
+            }
+        )
     except LibraryNotFound:
         return error_response("scanner_item_not_found", 404)
     except ValueError as error:

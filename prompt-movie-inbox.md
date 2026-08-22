@@ -89,11 +89,11 @@ más difícil (ver la entrada fechada 2026-08-22 más abajo para el detalle
 técnico de cada uno) y la decisión es arrancar por el más difícil:
 
 1. Historial y deshacer para Scanner — **el más difícil, arrancando por
-   acá.** Paso 1 de 3 (vincular a identidad existente) completo, probado
-   y verificado en browser real — ver la entrada "Scanner: historial y
-   deshacer — paso 1/3" más abajo. **Sin commitear**, a la espera de que
-   Lucas confirme. Pasos 2 (omitir) y 3 (crear y vincular) quedan
-   pendientes.
+   acá.** Pasos 1 (vincular a identidad existente, commit `860c28a`) y 2
+   (omitir, commit pendiente de hash — ver la entrada de abajo) completos,
+   probados y verificados en browser real. Lucas confirmó seguir sin parar
+   a preguntar en cada paso. Queda el paso 3 (crear y vincular), el más
+   difícil de los tres porque toca dos sistemas a la vez.
 2. Desambiguar casos duplicados con mismo título y año.
 3. Paridad de teclado/búsqueda en Curaduría respecto a Scanner.
 4. `aria-live` en el estado de decisión del comparador de fusión — el más
@@ -167,10 +167,37 @@ con el botón real de la interfaz y confirmar que el archivo volvió a la
 cola con su candidata original intacta — no una lista vacía. Sin errores
 nuevos en consola.
 
-**Sin commitear** — todo este trabajo (más el cierre de Fase 5 y la
-mudanza de `scripts/` de la entrada anterior) quedó pendiente de
-confirmación de Lucas antes de commitear, por la regla de no commitear
-sin pedido explícito.
+Commiteado (Lucas confirmó, junto con la mudanza de `scripts/` de la
+entrada anterior, dos commits separados): `565875b` (scripts →
+`codigoLegacy/`) y `860c28a` (este paso).
+
+**Scanner: historial y deshacer — paso 2/3, omitir (2026-08-22).**
+Wireo mucho más chico que el paso 1: la rama `else` de
+`review_scanner_item()` en `scanner.py` (el fallback que ya cubría tanto
+`confirm` vía `candidate_key` como `ignore`) pasa a llamar a
+`scanner_workflow.review()` en vez de `library_service.review_file()`
+directo — el motor ya estaba armado genérico desde el paso 1, así que
+`ignore` lo hereda gratis (misma forma de UPDATE destructivo que
+`confirm` a nivel de fila). Confirmé la generalidad releyendo
+`review_files()`: el único cambio de código nuevo fue esta rama del
+router. El frontend no necesitó ningún cambio de lógica — la pestaña
+Actividad y el toast ya son genéricos por acción desde el paso 1.
+
+Como Lucas eligió alcance completo (no dejar "omitir" con el motor listo
+pero oculto), actualicé las dos promesas explícitas de que "todavía no
+puede restaurarse": el párrafo de `README.md` sobre `Omitir este
+archivo` y el texto del diálogo de confirmación en `inbox-scanner.js`.
+
+Verificado: nuevo test HTTP end-to-end (`test_scanner_ignore_can_be_undone_and_restores_the_queue_item`)
+más un segundo pase de browser real repitiendo el mismo protocolo del
+paso 1 pero con "Omitir" — confirmé el diálogo con el texto nuevo, el
+toast con deshacer inline, la fila de Actividad mostrando "Archivo
+omitido: ..." y la restauración completa a la cola. Suite completa:
+**306/306 verde**, sin errores de consola.
+
+Commiteado sin pausar a confirmar de nuevo — Lucas ya había elegido
+explícitamente "seguir con el paso 2 sin parar de nuevo a preguntar" al
+aprobar el paso 1.
 
 **Cierre de Fase 5: release v0.4.0, README, evaluación de `scripts/` y
 ranking del próximo incremento (2026-08-22).** De los 6 hallazgos del gate

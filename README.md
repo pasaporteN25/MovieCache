@@ -300,9 +300,10 @@ crea una ficha separada, confirma el archivo con su identidad y registra las can
 revisadas como obras diferentes. No cambia fecha de vista, rating ni review.
 La cola se puede filtrar entre casos para comparar y archivos sin coincidencia, o buscar
 por titulo, ano, ruta y biblioteca. `Omitir este archivo` no borra datos ni toca el disco:
-retira el caso mientras conserve la misma huella y exige confirmacion porque todavia no
-puede restaurarse desde la interfaz. Si un disco desaparece o la proporcion de bajas
-supera el limite configurado, se conserva el ultimo inventario valido.
+retira el caso mientras conserve la misma huella y exige confirmacion. La decision, igual
+que vincular un archivo, queda en `Actividad` y puede deshacerse mientras nada mas haya
+cambiado el caso desde entonces. Si un disco desaparece o la proporcion de bajas supera el
+limite configurado, se conserva el ultimo inventario valido.
 
 Las sugerencias se construyen con el catalogo del owner y con catalogos que sus
 miembros hayan compartido de forma explicita. Los catalogos privados nunca se usan como

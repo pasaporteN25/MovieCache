@@ -1980,6 +1980,62 @@ class ViewerHttpTests(unittest.TestCase):
         )
         self.assertEqual(second_undo.status_code, 409, second_undo.content)
 
+    def test_scanner_ignore_can_be_undone_and_restores_the_queue_item(self) -> None:
+        (self.media_path / "Unrelated.2020.1080p.mkv").write_bytes(b"unrelated")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        for mode in ("dry_run", "apply"):
+            response = self.client.post(
+                f"/api/libraries/{library_id}/runs",
+                content=json.dumps({"mode": mode}),
+                headers=self.post_headers(),
+            )
+            self.assertEqual(response.status_code, 202, response.content)
+        queue_item = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        ).json()["items"][0]
+
+        ignored = self.client.post(
+            f"/api/scanner/queue/{queue_item['id']}",
+            content=json.dumps({"action": "ignore"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(ignored.status_code, 200, ignored.content)
+        operation = ignored.json()["operation"]
+        self.assertTrue(operation["can_undo"])
+        self.assertEqual(operation["action"], "scanner_ignore")
+        self.assertEqual(
+            self.client.get(
+                "/api/scanner/queue",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            ).json()["count"],
+            0,
+        )
+
+        undone = self.client.post(
+            "/api/scanner/undo",
+            content=json.dumps({"operation_id": operation["id"]}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(undone.status_code, 200, undone.content)
+        restored = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        ).json()
+        self.assertEqual(restored["count"], 1)
+        self.assertEqual(restored["items"][0]["id"], queue_item["id"])
+
     def test_scanner_create_does_not_write_for_a_missing_queue_item(self) -> None:
         response = self.client.post(
             "/api/scanner/queue/missing-file",
