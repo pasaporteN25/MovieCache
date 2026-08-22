@@ -4,7 +4,21 @@ Gestor self-hosted para organizar obras, disponibilidad fisica y memoria persona
 
 ## Estado del proyecto
 
-La version estable actual es **v0.2.1**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+La version estable actual es **v0.4.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+
+v0.3.0 cerro el gate de calidad de busqueda (cero falsos positivos conocidos en
+auto-match y merge, con `movie-inbox search-lab run --enforce` como gate real en CI).
+v0.4.0 unifico el lenguaje visual y la arquitectura de `Inicio`, `Coleccion`, `Bandeja`,
+`Club` y `Administrar`: una franja de alcance persistente distingue `Archivo fisico`,
+`Identidad compartida` y `Ficha en tu catalogo` en cada decision; disponibilidad se
+presenta siempre como `Disponible` (o no) con su procedencia real, nunca como el flag
+manual crudo; y la cola de revision se organiza por causa y confianza en vez de una
+lista plana. Detalle completo de ambas versiones en [CHANGELOG.md](CHANGELOG.md).
+
+El paquete instalable y la interfaz web son el camino recomendado. Los scripts sueltos
+de `scripts/` (fuera de las herramientas de Docker y CI) son lanzadores de
+compatibilidad con v0.1, no la via principal — ver
+[Estado de compatibilidad](#estado-de-compatibilidad) al final de este documento.
 
 En una instalacion nueva, SQLite es la fuente de verdad recomendada. JSON conserva un contrato versionado como formato de importacion, exportacion y auditoria, pero una exportacion individual no reemplaza el backup completo de la instancia. Catalogos, cuentas, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
 
@@ -98,6 +112,14 @@ movie-inbox search-lab inspect backups/catalog.json "1917" --mode scanner --year
 `inspect` no acepta una base `.db`, no crea locks y se niega a usar el archivo de
 entrada como destino de un reporte. El corpus, las metricas y el orden de trabajo de
 v0.3.0 estan documentados en [docs/search-quality.md](docs/search-quality.md).
+
+`compare` corre el mismo corpus dorado bajo una estrategia candidata (umbrales de
+ranking/matching con nombre, en `domain/search_strategy.py`) y genera un reporte de dos
+columnas contra la baseline productiva, sin cambiar el comportamiento real de busqueda:
+
+```powershell
+movie-inbox search-lab compare --candidate estrategia-candidata.json --html reports/compare.html
+```
 
 ### Primer acceso
 
@@ -503,7 +525,9 @@ El panel lateral permite editar el tipo con un selector: `pelicula`, `serie`, `a
 
 Al combinar un resultado externo se guarda el link especifico de la fuente (`wikipedia_url`, `imdb_url` o `filmaffinity_url`) sin perder el link principal que ya tuviera la entrada.
 
-La navegacion principal incluye una `Bandeja` para trabajar sin mezclar ese proceso con la exploracion. El modo `Curaduria` reune pendientes, posibles duplicados y entradas sin referencia externa; tambien conserva una cola separada de casos pospuestos. Las decisiones `Posponer`, `No son duplicados`, `No requiere referencia` y los merges revisados quedan en `Actividad`, desde donde pueden deshacerse. El modo `Importaciones` conserva borradores temporales y muestra la clasificacion antes de cualquier escritura.
+La navegacion principal incluye una `Bandeja` para trabajar sin mezclar ese proceso con la exploracion, con tres modos. `Curaduria` reune pendientes, posibles duplicados y entradas `Sin referencia` externa; tambien conserva una cola separada de casos pospuestos. Las decisiones `Posponer`, `No son duplicados`, `No requiere referencia` y los merges revisados quedan en `Actividad`, desde donde pueden deshacerse. `Inventario` (el scanner administrado por la instancia, marcado `Admin` porque no modifica tu catalogo personal) organiza su cola por causa y confianza en vez de una lista plana: `Falta identidad`, `Conflicto de año/tipo`, `Probable ficha existente` o `Sin señales`. Cuando no encuentra una candidata segura lo dice explicitamente (`No encontramos una coincidencia segura`, no una ausencia comprobada) y ofrece buscar en tu catalogo antes de dar de alta una ficha nueva; cada candidata muestra ademas su procedencia (`En tu catalogo` / `Catalogo compartido`). `Importaciones` conserva borradores temporales y muestra la clasificacion antes de cualquier escritura.
+
+Una franja de alcance persistente acompaña toda la decision en Curaduria e Inventario, marcando cual de tres estados afecta lo que estas por confirmar: `Archivo fisico`, `Identidad compartida` o `Ficha en tu catalogo`. Disponibilidad se presenta siempre igual en Coleccion, la ficha, Curaduria y el comparador de fusion: `Disponible` (o no) con su procedencia real — inventario verificado, declaracion manual, o ambas — nunca como un flag manual crudo.
 
 El historial conserva hasta 50 operaciones y puede funcionar como `Persistente` o `Solo esta sesion`. El modo persistente usa un unico archivo lateral `.<catalogo>.curation-history.json`, separado del esquema portable y de las exportaciones. `Limpiar historial` elimina esos snapshots con confirmacion y no modifica el catalogo. Si una obra fue editada despues de una operacion, Deshacer se bloquea para no sobrescribir el cambio posterior.
 
@@ -653,9 +677,18 @@ Nota: Chrome puede pedir confirmacion o guardar los archivos en la carpeta de de
 
 La aplicacion web, SQLite, Docker, la Bandeja y el scanner administrado son el camino principal. Estas piezas permanecen en el repositorio porque todavia sirven para migraciones o capturas puntuales, pero no gobiernan el flujo self-hosted:
 
-- visor HTML estatico
-- scanner Bash y scanner Python por archivo de configuracion
-- wrappers historicos de `scripts/`
+- visor HTML estatico (`scripts/build_viewer.py`)
+- scanner Bash y scanner Python por archivo de configuracion (`scripts/scan_video_catalog.sh`, `scripts/scan_library.py`)
+- wrappers historicos de `scripts/` (`txt_to_catalog.py`, `enrich_catalog.py`, `match_external_links.py`, `migrate_catalog.py`, `view_catalog.py`)
 - extension de Chrome basada en exportaciones manuales
 
-Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras, no capacidades de v0.2.1.
+Cada wrapper de `scripts/` es un lanzador de menos de 25 lineas que llama al mismo
+comando del paquete (`movie-inbox import|scan|enrich|match|migrate|serve`, respectivamente)
+verificado por `tests/test_layering.py` — no duplican logica, solo dan compatibilidad a
+comandos de v0.1. Asumen acceso directo del host a rutas de catalogo y biblioteca, algo
+que no encaja con una instancia Docker: ahi el camino es la app web + `movie-inbox`
+**dentro** del contenedor (`docker compose exec app movie-inbox ...`), no un script
+suelto apuntando a una ruta que el contenedor puede no montar igual. Para una instancia
+Docker, tratalos como referencia historica, no como parte del flujo operativo.
+
+Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras.
