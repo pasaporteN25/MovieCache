@@ -1820,6 +1820,180 @@ class ViewerHttpTests(unittest.TestCase):
         )
         enrich.assert_called_once()
 
+    @patch("movie_inbox.web.routers.scanner.background_enrich_catalog_item")
+    def test_scanner_create_can_be_undone_and_removes_the_created_item(self, _enrich) -> None:
+        (self.media_path / "Interstellar.2014.mkv").write_bytes(b"interstellar-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        for mode in ("dry_run", "apply"):
+            self.client.post(
+                f"/api/libraries/{library_id}/runs",
+                content=json.dumps({"mode": mode}),
+                headers=self.post_headers(),
+            )
+        queue_item = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        ).json()["items"][0]
+
+        reviewed = self.client.post(
+            f"/api/scanner/queue/{queue_item['id']}",
+            content=json.dumps({"action": "create", "title": "Interstellar", "year": "2014", "kind": "pelicula"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(reviewed.status_code, 201, reviewed.content)
+        self.assertEqual(reviewed.json()["catalog_action"], "created")
+        operation = reviewed.json()["operation"]
+        self.assertTrue(operation["can_undo"])
+        created_item_id = reviewed.json()["catalog_item"]["id"]
+        self.assertTrue(
+            any(
+                item.id == created_item_id
+                for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()
+            )
+        )
+        self.assertEqual(
+            self.client.get(
+                "/api/scanner/queue",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            ).json()["count"],
+            0,
+        )
+
+        undone = self.client.post(
+            "/api/scanner/undo",
+            content=json.dumps({"operation_id": operation["id"]}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(undone.status_code, 200, undone.content)
+
+        catalog_after_undo = JsonCatalogRepository(self.catalog_path, normalize_item).read()
+        self.assertFalse(any(item.id == created_item_id for item in catalog_after_undo))
+        restored_queue = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        ).json()
+        self.assertEqual(restored_queue["count"], 1)
+        self.assertEqual(restored_queue["items"][0]["id"], queue_item["id"])
+
+    @patch("movie_inbox.web.routers.scanner.background_enrich_catalog_item")
+    def test_scanner_create_undo_reports_a_conflict_instead_of_crashing(self, _enrich) -> None:
+        (self.media_path / "Dune.2021.mkv").write_bytes(b"dune-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        for mode in ("dry_run", "apply"):
+            self.client.post(
+                f"/api/libraries/{library_id}/runs",
+                content=json.dumps({"mode": mode}),
+                headers=self.post_headers(),
+            )
+        queue_item = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        ).json()["items"][0]
+
+        reviewed = self.client.post(
+            f"/api/scanner/queue/{queue_item['id']}",
+            content=json.dumps({"action": "create", "title": "Dune", "year": "2021", "kind": "pelicula"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(reviewed.status_code, 201, reviewed.content)
+        operation = reviewed.json()["operation"]
+        created_item_id = reviewed.json()["catalog_item"]["id"]
+
+        # Something else -- e.g. real background enrichment -- touches the
+        # freshly created item before the undo attempt.
+        JsonCatalogRepository(self.catalog_path, normalize_item).update_item(
+            created_item_id, lambda item: item.__setitem__("description", "Enriched in the meantime")
+        )
+
+        undo_attempt = self.client.post(
+            "/api/scanner/undo",
+            content=json.dumps({"operation_id": operation["id"]}),
+            headers=self.post_headers(),
+        )
+        # This must be a reported conflict, not an unhandled 500: the catalog-side
+        # restore reuses Curacion's CurationConflict, a different exception type
+        # than the scanner-queue side's LibraryConflict, and both need mapping.
+        self.assertEqual(undo_attempt.status_code, 409, undo_attempt.content)
+        surviving = next(
+            item
+            for item in JsonCatalogRepository(self.catalog_path, normalize_item).read()
+            if item.id == created_item_id
+        )
+        self.assertEqual(surviving.description, "Enriched in the meantime")
+
+    @patch("movie_inbox.web.routers.scanner.background_enrich_catalog_item")
+    def test_scanner_create_undo_leaves_a_reused_catalog_item_untouched(self, _enrich) -> None:
+        repository = JsonCatalogRepository(self.catalog_path, normalize_item)
+        repository.write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
+        )
+        # No year in the filename, so the scan itself can't auto-match this to the
+        # existing "Heat" (1995) item -- it lands in the queue needing a manual
+        # decision, and the create form below is what supplies the matching year.
+        (self.media_path / "Heat.mkv").write_bytes(b"heat-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {
+                    "name": "Peliculas principales",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        for mode in ("dry_run", "apply"):
+            self.client.post(
+                f"/api/libraries/{library_id}/runs",
+                content=json.dumps({"mode": mode}),
+                headers=self.post_headers(),
+            )
+        queue_item = self.client.get(
+            "/api/scanner/queue",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        ).json()["items"][0]
+
+        reviewed = self.client.post(
+            f"/api/scanner/queue/{queue_item['id']}",
+            content=json.dumps({"action": "create", "title": "Heat", "year": "1995", "kind": "pelicula"}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(reviewed.status_code, 200, reviewed.content)
+        self.assertEqual(reviewed.json()["catalog_action"], "existing")
+        operation = reviewed.json()["operation"]
+
+        undone = self.client.post(
+            "/api/scanner/undo",
+            content=json.dumps({"operation_id": operation["id"]}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(undone.status_code, 200, undone.content)
+        catalog_after_undo = JsonCatalogRepository(self.catalog_path, normalize_item).read()
+        self.assertEqual([item.id for item in catalog_after_undo], ["heat"])
+
     def test_scanner_blocks_duplicate_creation_and_can_link_the_existing_catalog_item(self) -> None:
         repository = JsonCatalogRepository(self.catalog_path, normalize_item)
         repository.write(

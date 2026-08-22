@@ -88,12 +88,11 @@ hallazgos que dejó el gate de Fase 5.** Están rankeados de más simple a
 más difícil (ver la entrada fechada 2026-08-22 más abajo para el detalle
 técnico de cada uno) y la decisión es arrancar por el más difícil:
 
-1. Historial y deshacer para Scanner — **el más difícil, arrancando por
-   acá.** Pasos 1 (vincular a identidad existente, commit `860c28a`) y 2
-   (omitir, commit pendiente de hash — ver la entrada de abajo) completos,
-   probados y verificados en browser real. Lucas confirmó seguir sin parar
-   a preguntar en cada paso. Queda el paso 3 (crear y vincular), el más
-   difícil de los tres porque toca dos sistemas a la vez.
+1. **Historial y deshacer para Scanner — cerrado.** Los 3 pasos (vincular
+   a identidad existente `860c28a`, omitir `3829fd1`, crear y vincular —
+   ver la entrada de abajo) están completos, probados y verificados en
+   browser real. Era el más difícil de los 4 hallazgos y el único ya
+   resuelto.
 2. Desambiguar casos duplicados con mismo título y año.
 3. Paridad de teclado/búsqueda en Curaduría respecto a Scanner.
 4. `aria-live` en el estado de decisión del comparador de fusión — el más
@@ -198,6 +197,67 @@ omitido: ..." y la restauración completa a la cola. Suite completa:
 Commiteado sin pausar a confirmar de nuevo — Lucas ya había elegido
 explícitamente "seguir con el paso 2 sin parar de nuevo a preguntar" al
 aprobar el paso 1.
+
+**Scanner: historial y deshacer — paso 3/3, crear y vincular (cierre del
+hallazgo completo) (2026-08-22).** El paso más difícil de los tres, como
+anticipaba el plan: la única acción que toca dos sistemas en una sola
+decisión (catálogo personal + fila de Scanner) y la única con un ítem
+"antes" que puede no existir (si se crea de cero) o ser idéntico al
+"después" (si se reusa uno existente).
+
+Extraje `_capture`/`_transition`/`_transition_path` de
+`CurationWorkflowService` a funciones de módulo
+(`capture_catalog_state`/`transition_catalog_states` en
+`curation_workflow.py`) tal como decía el plan — refactor puro, los 6
+tests de `test_curation_workflow.py` siguen pasando sin tocarlos.
+`ScannerWorkflowService.create_and_link()` las reusa directo para el lado
+catálogo: si `created=True` el "antes" es "este id no existía"; si
+`created=False` (reuso) el "antes" y el "después" son el mismo estado
+capturado. La rama `create` de `scanner.py` pasó de hacer el trabajo
+inline a delegar en este método completo.
+
+Dos bugs reales encontrados y corregidos antes de cerrar, ninguno visible
+en los tests unitarios hasta que los hice pasar por un browser real:
+
+- **`infrastructure/scanner_history.py` no persistía `catalog_before`,
+  `catalog_after` ni `catalog_path`.** El diseño los agregó al diccionario
+  de la operación pero la tabla SQLite (`scanner_history`, migración v7)
+  nunca ganó esas columnas — se guardaban y se leían como si nada,
+  silenciosamente descartados. El deshacer de "crear" completaba sin
+  error pero nunca borraba la ficha creada. Como la migración v7 nunca
+  llegó a usarse fuera de este mismo trabajo en curso (sin pushear
+  todavía), la corregí en el lugar en vez de sumar una v8 solo para
+  arreglar una v7 que nunca se publicó.
+- **`CurationConflict` no estaba mapeado en las rutas de Scanner.** El
+  lado catálogo del deshacer reusa la misma excepción de conflicto que
+  Curaduría (`CurationConflict`), distinta de `LibraryConflict` del lado
+  Scanner — y me olvidé de agregarla a los `except` de
+  `web/routers/scanner.py` y a `scanner_application_error_response`. Se
+  manifestó en el browser real, no en los tests unitarios (que llaman al
+  workflow directo, sin pasar por las rutas): al deshacer una creación
+  cuyo enriquecimiento en background ya había tocado la ficha, el server
+  tiraba 500 en vez de 409. Reproducible siempre en este entorno porque
+  `ensure_scanner_item` crea fichas sin metadata, así que el
+  enriquecimiento en background dispara en cada "crear" real. Agregado
+  un test HTTP dedicado para que no vuelva a pasar desapercibido.
+
+Verificado: 2 tests nuevos en `test_scanner_workflow.py` (crear una obra
+nueva y deshacer borra la ficha; deshacer rechaza si algo tocó la ficha
+después —enriquecimiento simulado—) más 3 en `test_view_http.py` (crear
+y deshacer end-to-end, deshacer no toca una ficha reusada, el conflicto
+reporta 409 en vez de romper). Suite completa: **311/311 verde**. Browser
+real con servidor e instancia sintéticos: creé una obra nueva desde la
+interfaz, vi el toast con deshacer inline, deshice y confirmé que la
+ficha desapareció del catálogo y el archivo volvió a la cola — ahí
+encontré el primer bug (la ficha no desaparecía) y lo arreglé; después
+encontré el segundo bug al reintentar deshacer sobre la operación que ya
+había quedado en conflicto por el enriquecimiento real.
+
+Con esto, **el hallazgo "historial y deshacer para Scanner" —el más
+difícil de los 4 que dejó el gate de Fase 5— queda cerrado por completo**.
+`docs/roadmap.md` actualizado para reflejarlo. Quedan los otros 3
+(desambiguar duplicados, paridad de teclado/búsqueda en Curaduría,
+`aria-live` del comparador), en ese orden de dificultad.
 
 **Cierre de Fase 5: release v0.4.0, README, evaluación de `scripts/` y
 ranking del próximo incremento (2026-08-22).** De los 6 hallazgos del gate

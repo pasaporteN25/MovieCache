@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse
 
 from movie_inbox.application.curation_history import CurationHistoryError
+from movie_inbox.application.curation_workflow import CurationConflict
 from movie_inbox.application.library_repository import (
     LibraryConflict,
     LibraryNotFound,
@@ -20,7 +21,6 @@ from movie_inbox.application.scanner_workflow import ScannerWorkflowError
 from movie_inbox.domain.libraries import LibraryValidationError, work_identity
 from movie_inbox.web.catalog_api import (
     background_enrich_catalog_item,
-    catalog_service,
     load_items,
     needs_background_title_enrichment,
     write_path_for,
@@ -74,6 +74,7 @@ def undo_scanner_operation(
         ScannerWorkflowError,
         LibraryConflict,
         LibraryRepositoryError,
+        CurationConflict,
         CurationHistoryError,
     ) as error:
         return scanner_application_error_response(error)
@@ -310,7 +311,6 @@ def review_scanner_item(
     body: dict[str, Any] = Depends(authorized_json),
 ) -> JSONResponse:
     require_owner(request)
-    library_service = request.app.state.library_service
     try:
         action = str(body.get("action") or "").strip().casefold()
         if action == "link_catalog":
@@ -343,29 +343,22 @@ def review_scanner_item(
                 }
             )
         if action == "create":
-            scanner_item = next(
-                (
-                    item
-                    for item in library_service.review_queue()
-                    if str(item.get("id") or "") == file_id
-                ),
-                None,
-            )
-            if scanner_item is None:
-                raise LibraryNotFound("Scanner queue item was not found")
             catalog = session_catalog(request)
             write_path = write_path_for(catalog.config, "")
-            created, catalog_reason, catalog_result = catalog_service(
-                write_path
-            ).ensure_scanner_item(
+            result = _scanner_workflow(request).create_and_link(
+                file_id,
                 {**body, "scanner_reference": file_id},
+                catalog_path=write_path,
                 comparison_items=load_items(catalog.config.patterns),
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
             )
-            if catalog_reason == "possible_duplicate":
+            if not result.get("ok"):
+                catalog_result = result.get("catalog_result") or {}
                 return JSONResponse(
                     {
                         "ok": False,
-                        "reason": catalog_reason,
+                        "reason": result.get("reason"),
                         "candidates": catalog.public_payload(catalog_result.get("candidates", [])),
                         "distinct_review_token": str(
                             catalog_result.get("distinct_review_token") or ""
@@ -373,18 +366,10 @@ def review_scanner_item(
                     },
                     status_code=409,
                 )
-            catalog_item = catalog_result.get("item")
-            if not isinstance(catalog_item, dict):
-                return error_response("catalog_item_unavailable", 500)
-            item = library_service.review_file(
-                file_id,
-                {
-                    "action": "confirm",
-                    "identity": work_identity(catalog_item),
-                },
-            )
+            catalog_item = result["catalog_item"]
+            created = result["created"]
             background_enrichment = "not_needed"
-            if catalog_result.get("writable") and needs_background_title_enrichment(catalog_item):
+            if result["writable"] and needs_background_title_enrichment(catalog_item):
                 background_tasks.add_task(
                     background_enrich_catalog_item,
                     write_path,
@@ -398,8 +383,9 @@ def review_scanner_item(
                     "reason": "scanner_item_created_and_linked"
                     if created
                     else "scanner_item_reused_and_linked",
-                    "item": item,
-                    "catalog_action": catalog_reason,
+                    "item": result["item"],
+                    "operation": result["operation"],
+                    "catalog_action": result["catalog_action"],
                     "catalog_item": catalog.public_payload(catalog_item),
                     "background_enrichment": background_enrichment,
                 },
@@ -425,7 +411,12 @@ def review_scanner_item(
         return error_response(str(error), 400)
     except CatalogRepositoryError as error:
         return repository_error_response(error)
-    except (LibraryConflict, ScannerWorkflowError, CurationHistoryError) as error:
+    except (
+        LibraryConflict,
+        ScannerWorkflowError,
+        CurationConflict,
+        CurationHistoryError,
+    ) as error:
         return scanner_application_error_response(error)
     except LibraryRepositoryError:
         return error_response("library_store_unavailable", 503)

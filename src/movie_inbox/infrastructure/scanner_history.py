@@ -47,8 +47,9 @@ class SqliteScannerHistoryRepository:
                     connection.execute(
                         """INSERT INTO scanner_history(
                             id, action, label, status, mode, created_at, undone_at,
-                            summary_json, before_json, after_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            summary_json, before_json, after_json,
+                            catalog_before_json, catalog_after_json, catalog_path
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         _operation_row(operation),
                     )
                     connection.execute(
@@ -72,7 +73,8 @@ class SqliteScannerHistoryRepository:
                     cursor = connection.execute(
                         """UPDATE scanner_history SET action = ?, label = ?, status = ?, mode = ?,
                             created_at = ?, undone_at = ?, summary_json = ?, before_json = ?,
-                            after_json = ? WHERE id = ?""",
+                            after_json = ?, catalog_before_json = ?, catalog_after_json = ?,
+                            catalog_path = ? WHERE id = ?""",
                         (*row[1:], row[0]),
                     )
                     if cursor.rowcount == 0:
@@ -114,6 +116,9 @@ def _operation_row(operation: dict[str, Any]) -> tuple[Any, ...]:
         json.dumps(operation.get("summary") or {}, ensure_ascii=False),
         json.dumps(operation.get("before") or {}, ensure_ascii=False),
         json.dumps(operation.get("after") or {}, ensure_ascii=False),
+        json.dumps(operation.get("catalog_before"), ensure_ascii=False),
+        json.dumps(operation.get("catalog_after"), ensure_ascii=False),
+        str(operation.get("catalog_path") or ""),
     )
 
 
@@ -129,6 +134,9 @@ def _operation(row: sqlite3.Row) -> dict[str, Any]:
         "summary": _json_object(row["summary_json"]),
         "before": _json_object(row["before_json"]),
         "after": _json_object(row["after_json"]),
+        "catalog_before": _json_value(row["catalog_before_json"]),
+        "catalog_after": _json_value(row["catalog_after_json"]),
+        "catalog_path": str(row["catalog_path"] or ""),
     }
 
 
@@ -138,3 +146,10 @@ def _json_object(value: Any) -> dict[str, Any]:
     except (TypeError, ValueError, json.JSONDecodeError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _json_value(value: Any) -> Any:
+    try:
+        return json.loads(str(value or "null"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None

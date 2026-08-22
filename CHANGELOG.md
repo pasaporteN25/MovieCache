@@ -6,14 +6,14 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
-- Vincular un archivo del Scanner a una identidad existente, u omitirlo,
-  ahora queda registrado en una `Actividad` propia del Inventario
-  (persistente o solo por sesión, igual que Curaduría) y puede deshacerse:
-  la operación restaura el estado exacto que tenía la fila antes de la
-  decisión, incluidas las candidatas detectadas originalmente. Deshacer se
-  rechaza si el archivo cambió después de la operación (otro escaneo, otra
-  decisión). Crear una ficha nueva todavía no tiene esta cobertura — queda
-  para un incremento posterior.
+- Las 3 decisiones del Scanner (vincular a identidad existente, crear una
+  ficha nueva y vincularla, u omitir el archivo) quedan registradas en una
+  `Actividad` propia del Inventario (persistente o solo por sesión, igual
+  que Curaduría) y pueden deshacerse: la operación restaura el estado
+  exacto previo a la decisión, incluidas las candidatas detectadas
+  originalmente y, para una ficha creada, su alta en el catálogo. Deshacer
+  se rechaza si algo más tocó el caso después de la operación —por
+  ejemplo, el enriquecimiento en segundo plano de una ficha recién creada.
 
 ### Cambiado
 

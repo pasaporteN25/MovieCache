@@ -299,7 +299,10 @@ CREATE TABLE scanner_history (
     undone_at TEXT NOT NULL DEFAULT '',
     summary_json TEXT NOT NULL DEFAULT '{}',
     before_json TEXT NOT NULL DEFAULT '{}',
-    after_json TEXT NOT NULL DEFAULT '{}'
+    after_json TEXT NOT NULL DEFAULT '{}',
+    catalog_before_json TEXT NOT NULL DEFAULT 'null',
+    catalog_after_json TEXT NOT NULL DEFAULT 'null',
+    catalog_path TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX ix_scanner_history_created
 ON scanner_history(created_at DESC);

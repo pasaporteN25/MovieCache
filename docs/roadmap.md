@@ -35,13 +35,21 @@ contra el 22/40 del 2026-08-14. Detalle completo en `CHANGELOG.md` bajo `[0.4.0]
 
 La critica de cierre encontro una capa nueva del mismo problema que esta version vino
 resolviendo, mas chica que los 4 P1 originales pero real. Dos arreglos puntuales
-cerraron el mismo dia (border-radius mobile de Curaduria/Scanner); cuatro quedan
-pendientes y pasan a un incremento posterior, sin version asignada todavia:
+cerraron el mismo dia (border-radius mobile de Curaduria/Scanner); pasan a un
+incremento posterior, sin version asignada todavia. De los cuatro, uno ya esta
+cerrado:
+
+- **Cerrado.** Scanner segui­a sin historial ni deshacer — el P2 original de la
+  critica del 14/08, nunca cerrado formalmente. Vincular a identidad existente,
+  omitir y crear-y-vincular tienen ahora una `Actividad` propia (persistente o por
+  sesion) con deshacer que restaura el estado exacto previo a la decision,
+  incluidas las candidatas detectadas y, para crear, el alta en el catalogo.
+  Deshacer se rechaza si algo mas toco el caso desde entonces.
+
+Quedan tres:
 
 - Casos duplicados con mismo titulo y año son indistinguibles en la cola, el detalle y
   el titulo del comparador de fusion.
-- Scanner sigue sin historial ni deshacer — el P2 original de la critica del 14/08,
-  nunca cerrado formalmente.
 - Curaduria no tiene la navegacion por flechas ni la busqueda que si tiene Scanner,
   pese a compartir la misma forma de pantalla.
 - El estado de decision del comparador de fusion no esta anunciado para lectores de

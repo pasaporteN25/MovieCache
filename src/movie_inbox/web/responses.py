@@ -107,7 +107,7 @@ def curation_application_error_response(error: Exception) -> JSONResponse:
 
 
 def scanner_application_error_response(error: Exception) -> JSONResponse:
-    if isinstance(error, LibraryConflict):
+    if isinstance(error, (LibraryConflict, CurationConflict)):
         return error_response(str(error), 409)
     if isinstance(error, ScannerOperationNotFound):
         return error_response(str(error), 404)

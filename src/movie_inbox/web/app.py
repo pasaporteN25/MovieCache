@@ -53,7 +53,7 @@ from movie_inbox.web.assets import (
     render_password_change_html,
     static_asset,
 )
-from movie_inbox.web.catalog_api import load_items
+from movie_inbox.web.catalog_api import catalog_service, load_items
 from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.dependencies import (
     AUTH_SESSION_COOKIE,
@@ -141,6 +141,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         library_repository,
         SqliteScannerHistoryRepository(config.instance_db),
         MemoryCurationHistoryRepository(),
+        catalog_service_factory=catalog_service,
     )
     privacy_service = PrivacyService(
         identity_repository,

@@ -7,6 +7,8 @@ from contextlib import closing
 from pathlib import Path
 
 from movie_inbox.application.auth_service import AuthService
+from movie_inbox.application.catalog_service import CatalogService
+from movie_inbox.application.curation_workflow import CurationConflict
 from movie_inbox.application.library_repository import LibraryConflict
 from movie_inbox.application.library_service import ManagedLibraryService
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
@@ -55,13 +57,23 @@ class ScannerWorkflowTests(unittest.TestCase):
         )
         self.persistent_history = SqliteScannerHistoryRepository(self.instance)
         self.session_history = MemoryCurationHistoryRepository()
+        self._catalog_services: dict[str, CatalogService] = {}
         self.workflow = ScannerWorkflowService(
             self.service,
             self.repository,
             self.persistent_history,
             self.session_history,
+            catalog_service_factory=self.catalog_service_factory,
             clock=lambda: self.now,
         )
+
+    def catalog_service_factory(self, path: Path) -> CatalogService:
+        key = str(Path(path).resolve())
+        if key not in self._catalog_services:
+            self._catalog_services[key] = CatalogService(
+                JsonCatalogRepository(Path(key), normalize_item)
+            )
+        return self._catalog_services[key]
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -175,6 +187,81 @@ class ScannerWorkflowTests(unittest.TestCase):
         self.assertEqual(self.workflow.history("session", "browser-a")["count"], 1)
         self.assertEqual(self.workflow.history("session", "browser-b")["count"], 0)
         self.assertEqual(self.workflow.history("persistent", "")["count"], 0)
+
+    def test_create_undo_refuses_when_background_enrichment_already_touched_the_item(
+        self,
+    ) -> None:
+        (self.media / "Interstellar.2014.1080p.mkv").write_bytes(b"interstellar")
+        library = self.service.create_library(
+            self.owner.id,
+            {"name": "Peliculas", "root_path": str(self.media), "schedule": "manual"},
+        )
+        for mode in ("dry_run", "apply"):
+            run = self.service.queue_scan(library.id, mode)
+            self.service.execute_run(run.id)
+        file_id = self.repository.review_queue()[0].id
+
+        result = self.workflow.create_and_link(
+            file_id,
+            {"action": "create", "title": "Interstellar", "year": "2014", "kind": "pelicula"},
+            catalog_path=self.catalog,
+            comparison_items=[],
+            history_mode="persistent",
+            session_id="session-a",
+        )
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["created"])
+        catalog_item_id = result["catalog_item"]["id"]
+
+        # Background enrichment (or any other write) touches the freshly created
+        # item before the undo attempt.
+        catalog_repository = self.catalog_service_factory(self.catalog).repository
+        catalog_repository.update_item(
+            catalog_item_id, lambda item: item.__setitem__("description", "Enriched")
+        )
+
+        with self.assertRaises(CurationConflict):
+            self.workflow.undo(
+                result["operation"]["id"],
+                history_mode="persistent",
+                session_id="session-a",
+            )
+        # The enrichment must survive: undo refused rather than clobbering it.
+        surviving = catalog_repository.get(catalog_item_id)
+        self.assertIsNotNone(surviving)
+        self.assertEqual(surviving.description, "Enriched")
+
+    def test_create_of_a_genuinely_new_work_can_be_undone(self) -> None:
+        (self.media / "Interstellar.2014.1080p.mkv").write_bytes(b"interstellar")
+        library = self.service.create_library(
+            self.owner.id,
+            {"name": "Peliculas", "root_path": str(self.media), "schedule": "manual"},
+        )
+        for mode in ("dry_run", "apply"):
+            run = self.service.queue_scan(library.id, mode)
+            self.service.execute_run(run.id)
+        file_id = self.repository.review_queue()[0].id
+
+        result = self.workflow.create_and_link(
+            file_id,
+            {"action": "create", "title": "Interstellar", "year": "2014", "kind": "pelicula"},
+            catalog_path=self.catalog,
+            comparison_items=[],
+            history_mode="persistent",
+            session_id="session-a",
+        )
+        catalog_item_id = result["catalog_item"]["id"]
+        catalog_repository = self.catalog_service_factory(self.catalog).repository
+        self.assertIsNotNone(catalog_repository.get(catalog_item_id))
+        self.assertEqual(self.repository.review_queue(), [])
+
+        self.workflow.undo(
+            result["operation"]["id"], history_mode="persistent", session_id="session-a"
+        )
+        self.assertIsNone(catalog_repository.get(catalog_item_id))
+        restored = self.repository.review_queue()
+        self.assertEqual(len(restored), 1)
+        self.assertEqual(restored[0].id, file_id)
 
 
 if __name__ == "__main__":

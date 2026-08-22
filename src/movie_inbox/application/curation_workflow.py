@@ -326,12 +326,7 @@ class CurationWorkflowService:
         return self.availability_service.decorate_items([dict(item)], include_sources=False)[0]
 
     def _capture(self, pointer: CatalogPointer) -> dict[str, Any]:
-        repository = self.repository_factory(pointer.path)
-        items = repository.read()
-        for position, item in enumerate(items):
-            if str(item.get("id") or "") == pointer.item_id:
-                return _catalog_state(pointer.path, pointer.item_id, item, position)
-        raise CurationItemNotFound(f"Catalog item not found: {pointer.item_id}")
+        return capture_catalog_state(self.repository_factory, pointer)
 
     def _commit_operation(
         self,
@@ -380,60 +375,83 @@ class CurationWorkflowService:
         expected_states: list[dict[str, Any]],
         target_states: list[dict[str, Any]],
     ) -> None:
-        expected_by_path = _states_by_path(expected_states)
-        target_by_path = _states_by_path(target_states)
-        paths = list(dict.fromkeys([*expected_by_path, *target_by_path]))
-        applied: list[str] = []
-        try:
-            for path in paths:
-                self._transition_path(
+        transition_catalog_states(self.repository_factory, expected_states, target_states)
+
+
+def capture_catalog_state(
+    repository_factory: RepositoryFactory,
+    pointer: CatalogPointer,
+) -> dict[str, Any]:
+    repository = repository_factory(pointer.path)
+    items = repository.read()
+    for position, item in enumerate(items):
+        if str(item.get("id") or "") == pointer.item_id:
+            return _catalog_state(pointer.path, pointer.item_id, item, position)
+    raise CurationItemNotFound(f"Catalog item not found: {pointer.item_id}")
+
+
+def transition_catalog_states(
+    repository_factory: RepositoryFactory,
+    expected_states: list[dict[str, Any]],
+    target_states: list[dict[str, Any]],
+) -> None:
+    expected_by_path = _states_by_path(expected_states)
+    target_by_path = _states_by_path(target_states)
+    paths = list(dict.fromkeys([*expected_by_path, *target_by_path]))
+    applied: list[str] = []
+    try:
+        for path in paths:
+            _transition_catalog_path(
+                repository_factory,
+                Path(path),
+                expected_by_path.get(path, []),
+                target_by_path.get(path, []),
+            )
+            applied.append(path)
+    except Exception:
+        for path in reversed(applied):
+            try:
+                _transition_catalog_path(
+                    repository_factory,
                     Path(path),
-                    expected_by_path.get(path, []),
                     target_by_path.get(path, []),
+                    expected_by_path.get(path, []),
                 )
-                applied.append(path)
-        except Exception:
-            for path in reversed(applied):
-                try:
-                    self._transition_path(
-                        Path(path),
-                        target_by_path.get(path, []),
-                        expected_by_path.get(path, []),
-                    )
-                except Exception:
-                    pass
-            raise
+            except Exception:
+                pass
+        raise
 
-    def _transition_path(
-        self,
-        path: Path,
-        expected_states: list[dict[str, Any]],
-        target_states: list[dict[str, Any]],
-    ) -> None:
-        repository = self.repository_factory(path)
 
-        def mutation(items):  # type: ignore[no-untyped-def]
-            by_id = {str(item.get("id") or ""): item for item in items}
-            for state in expected_states:
-                current = by_id.get(str(state.get("item_id") or ""))
-                expected = state.get("item")
-                if expected is None:
-                    if current is not None:
-                        raise CurationConflict("catalog_changed_since_operation")
-                elif current is None or _snapshot(current) != expected:
+def _transition_catalog_path(
+    repository_factory: RepositoryFactory,
+    path: Path,
+    expected_states: list[dict[str, Any]],
+    target_states: list[dict[str, Any]],
+) -> None:
+    repository = repository_factory(path)
+
+    def mutation(items):  # type: ignore[no-untyped-def]
+        by_id = {str(item.get("id") or ""): item for item in items}
+        for state in expected_states:
+            current = by_id.get(str(state.get("item_id") or ""))
+            expected = state.get("item")
+            if expected is None:
+                if current is not None:
                     raise CurationConflict("catalog_changed_since_operation")
+            elif current is None or _snapshot(current) != expected:
+                raise CurationConflict("catalog_changed_since_operation")
 
-            affected_ids = {
-                str(state.get("item_id") or "") for state in [*expected_states, *target_states]
-            }
-            items[:] = [item for item in items if str(item.get("id") or "") not in affected_ids]
-            inserts = [state for state in target_states if isinstance(state.get("item"), Mapping)]
-            for state in sorted(inserts, key=lambda row: int(row.get("position") or 0)):
-                position = max(0, min(int(state.get("position") or 0), len(items)))
-                items.insert(position, normalize_item(state["item"]))
-            return True, None
+        affected_ids = {
+            str(state.get("item_id") or "") for state in [*expected_states, *target_states]
+        }
+        items[:] = [item for item in items if str(item.get("id") or "") not in affected_ids]
+        inserts = [state for state in target_states if isinstance(state.get("item"), Mapping)]
+        for state in sorted(inserts, key=lambda row: int(row.get("position") or 0)):
+            position = max(0, min(int(state.get("position") or 0), len(items)))
+            items.insert(position, normalize_item(state["item"]))
+        return True, None
 
-        repository.mutate(mutation)
+    repository.mutate(mutation)
 
 
 def public_operation(operation: Mapping[str, Any]) -> dict[str, Any]:
