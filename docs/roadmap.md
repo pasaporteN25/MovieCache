@@ -21,24 +21,31 @@ Un tercer item queda sin version asignada: la comparacion entre baseline y algor
 candidato en Search Lab. `movie-inbox search-lab` sigue midiendo unicamente el ranking
 productivo actual; ese incremento no tiene fecha todavia.
 
-### v0.4.0: coherencia de interfaz
+### v0.4.0: coherencia de interfaz — publicado 2026-08-22
 
-Esta version aplicara el backlog de Impeccable una vez estabilizada la semantica de
-v0.3.0. No se usara un rediseño para ocultar reglas de matching todavia cambiantes.
+Aplico el backlog de Impeccable sobre la Bandeja (Scanner y Curaduria) una vez
+estabilizada la semantica de v0.3.0: los 4 P1 de la critica del 2026-08-14 (alcance
+mezclado, "sin coincidencia" presentado como ausencia comprobada, disponibilidad
+manual contradiciendo la efectiva, cola sin triage) quedaron resueltos, mas una pasada
+completa de consistencia del sistema de diseño (`extract`/`typeset`/`adapt`/`polish`:
+tokens de color y tipografia, paridad de foco por teclado, terminologia).
 
-- Unificar el lenguaje visual y la arquitectura de Inicio, Coleccion, Bandeja, Club y
-  Administrar.
-- Hacer visible la cadena `archivo fisico -> identidad compartida -> ficha personal`
-  y los recibos de cada operacion.
-- Heredado de v0.3.0: extender la disponibilidad efectiva unica (procedencia
-  `inventario verificado`, `declaracion manual` o ambas) a Curaduria, que hoy muestra
-  `manual: si/no` crudo.
-- Heredado de v0.3.0: organizar la cola de revision por causa y confianza (`Falta
-  identidad`, `Probable ficha existente`, `Conflicto de año/tipo`, `Sin señales`) en
-  vez de candidatas con el mismo peso visual.
-- Reducir carga cognitiva, revisar responsive, teclado, lectores de pantalla y estados
-  vacios/error con los flujos reales ya estabilizados.
-- Cerrar con una nueva auditoria y una pasada de `$impeccable polish`.
+Gate de salida: una nueva critica con puntaje sobre la misma superficie, **29/40**
+contra el 22/40 del 2026-08-14. Detalle completo en `CHANGELOG.md` bajo `[0.4.0]`.
+
+La critica de cierre encontro una capa nueva del mismo problema que esta version vino
+resolviendo, mas chica que los 4 P1 originales pero real. Dos arreglos puntuales
+cerraron el mismo dia (border-radius mobile de Curaduria/Scanner); cuatro quedan
+pendientes y pasan a un incremento posterior, sin version asignada todavia:
+
+- Casos duplicados con mismo titulo y año son indistinguibles en la cola, el detalle y
+  el titulo del comparador de fusion.
+- Scanner sigue sin historial ni deshacer — el P2 original de la critica del 14/08,
+  nunca cerrado formalmente.
+- Curaduria no tiene la navegacion por flechas ni la busqueda que si tiene Scanner,
+  pese a compartir la misma forma de pantalla.
+- El estado de decision del comparador de fusion no esta anunciado para lectores de
+  pantalla (`aria-live`).
 
 ### v0.5.0: cliente basico
 
