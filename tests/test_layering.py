@@ -44,11 +44,6 @@ class LayeringTests(unittest.TestCase):
                 f"{name} imports the presentation layer",
             )
 
-    def test_legacy_entrypoints_are_thin_wrappers(self) -> None:
-        for name in ("view_catalog.py", "txt_to_catalog.py", "scan_library.py"):
-            lines = (ROOT / "scripts" / name).read_text(encoding="utf-8").splitlines()
-            self.assertLess(len(lines), 25, f"{name} contains application logic")
-
 
 if __name__ == "__main__":
     unittest.main()

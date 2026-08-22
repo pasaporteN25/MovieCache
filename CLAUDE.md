@@ -51,9 +51,12 @@ Si una tarea parece exigir romper alguna, parar y preguntar en vez de decidir so
 - `cli/` — subcomandos de `movie-inbox`. Los comandos batch (`match_external_links.py`,
   `enrich_catalog.py`, `scan_library.py`) no pueden importar `web`.
 
-`scripts/*.py` legacy (`view_catalog.py`, `txt_to_catalog.py`, `scan_library.py`) son
-lanzadores finos de compatibilidad con v0.1: **menos de 25 líneas**, sin lógica propia,
-verificado por `test_layering.py`. La lógica nueva va siempre al paquete.
+Los lanzadores finos de compatibilidad con v0.1 (`view_catalog.py`, `txt_to_catalog.py`,
+`scan_library.py`, `enrich_catalog.py`, `match_external_links.py`, `migrate_catalog.py`)
+y los shims de import (`catalog_*.py`) ya no viven en `scripts/`: se movieron a
+`codigoLegacy/` (fuera de Git, ver `.gitignore`) porque nadie los ejecuta dentro del
+contenedor Docker — ahí el camino es `movie-inbox <subcomando>`. La lógica nueva va
+siempre al paquete.
 
 ## Archivos personales — no tocar, no leer como fixture
 

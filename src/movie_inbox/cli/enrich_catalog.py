@@ -3,8 +3,8 @@
 Clean release-style movie titles and optionally link catalog items to Wikipedia.
 
 Examples:
-    py scripts/enrich_catalog.py catalogv2.json --json catalog_clean.json --csv catalog_clean.csv
-    py scripts/enrich_catalog.py catalogv2.json --json catalog_wiki.json \
+    movie-inbox enrich catalogv2.json --json catalog_clean.json --csv catalog_clean.csv
+    movie-inbox enrich catalogv2.json --json catalog_wiki.json \
         --fetch-wikipedia --limit 100
 """
 

@@ -15,16 +15,18 @@ presenta siempre como `Disponible` (o no) con su procedencia real, nunca como el
 manual crudo; y la cola de revision se organiza por causa y confianza en vez de una
 lista plana. Detalle completo de ambas versiones en [CHANGELOG.md](CHANGELOG.md).
 
-El paquete instalable y la interfaz web son el camino recomendado. Los scripts sueltos
-de `scripts/` (fuera de las herramientas de Docker y CI) son lanzadores de
-compatibilidad con v0.1, no la via principal — ver
-[Estado de compatibilidad](#estado-de-compatibilidad) al final de este documento.
+El paquete instalable y la interfaz web son el camino recomendado. Los lanzadores de
+compatibilidad con v0.1 (`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`,
+`enrich_catalog.py`, `match_external_links.py`, `migrate_catalog.py`) no viven en este
+repositorio: quedan en `codigoLegacy/`, fuera de Git, para quien todavia los necesite
+localmente — ver [Estado de compatibilidad](#estado-de-compatibilidad) al final de este
+documento.
 
 En una instalacion nueva, SQLite es la fuente de verdad recomendada. JSON conserva un contrato versionado como formato de importacion, exportacion y auditoria, pero una exportacion individual no reemplaza el backup completo de la instancia. Catalogos, cuentas, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
 
 El gate reproducible de pruebas y aceptacion en un servidor real esta documentado en [docs/release-checklist.md](docs/release-checklist.md).
 
-El codigo principal vive en el paquete instalable `src/movie_inbox`. Los archivos de `scripts/` son lanzadores compatibles con los comandos usados en v0.1.
+El codigo principal vive en el paquete instalable `src/movie_inbox`.
 
 Nucleo actual:
 
@@ -37,14 +39,16 @@ Nucleo actual:
 - `catalog.schema.json`: contrato JSON versionado del catalogo.
 - `PRODUCT.md` y `DESIGN.md`: contratos de producto, terminologia y lenguaje visual del visor.
 
-Herramientas conservadas por compatibilidad:
+Herramientas conservadas por compatibilidad, todavia en el repositorio:
 
-- `scripts/txt_to_catalog.py`: importa TXT con URLs o titulos y genera JSON/CSV.
 - `scripts/scan_video_catalog.sh`: genera un JSON puntual desde archivos de video.
-- `scripts/scan_library.py`: scanner incremental anterior al flujo administrado.
-- `scripts/view_catalog.py`: lanzador compatible del servidor actual.
 - `scripts/build_viewer.py`: visor HTML estatico para exportaciones.
 - `chrome-extension/`: capturador experimental con exportacion CSV/JSON, sin sincronizacion directa con la instancia.
+
+Los lanzadores de v0.1 que solo llamaban al mismo comando del paquete
+(`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`, mas los shims de import
+`catalog_*.py`) se movieron a `codigoLegacy/` — ver
+[Estado de compatibilidad](#estado-de-compatibilidad).
 
 ## Puesta en marcha
 
@@ -84,7 +88,7 @@ py -m movie_inbox serve catalog.json
 
 El ejecutable suele quedar en `%LocalAppData%\Programs\Python\Python314\Scripts`. Agregar esa carpeta al `PATH` permite invocar directamente `movie-inbox` desde una terminal nueva.
 
-Los comandos `py scripts/txt_to_catalog.py ...`, `py scripts/scan_library.py ...` y `py scripts/view_catalog.py ...` siguen funcionando y llaman a la misma implementacion del paquete.
+Los ejemplos de este documento marcados "(compatibilidad)" usan directamente `movie-inbox <subcomando>` — los lanzadores sueltos que antes llamaban a esa misma implementacion (`scripts/txt_to_catalog.py`, `scripts/scan_library.py`, `scripts/view_catalog.py`) se movieron a `codigoLegacy/`, fuera de Git (ver [Estado de compatibilidad](#estado-de-compatibilidad)).
 
 ### Search Lab de v0.3.0
 
@@ -215,10 +219,10 @@ Mile End Kicks
 Generar JSON y CSV:
 
 ```powershell
-python scripts/txt_to_catalog.py links.txt --json catalog.json --csv catalog.csv
+movie-inbox import links.txt --json catalog.json --csv catalog.csv
 ```
 
-El script imprime un resumen con:
+El comando imprime un resumen con:
 
 - filas/URLs/items leidos
 - duplicados dentro del archivo de entrada
@@ -229,7 +233,7 @@ El script imprime un resumen con:
 Intentar completar metadata desde las paginas:
 
 ```powershell
-python scripts/txt_to_catalog.py links.txt --json catalog.json --csv catalog.csv --fetch
+movie-inbox import links.txt --json catalog.json --csv catalog.csv --fetch
 ```
 
 El modo `--fetch` usa solo librerias standard de Python. Para lineas que son solo texto intenta buscar por titulo en Wikipedia; para links de Wikipedia usa la API publica de Wikipedia y completa, cuando existe:
@@ -312,19 +316,19 @@ Este comando conserva el flujo anterior para reconciliar un catalogo de forma pu
 El primer recorrido debe ser una simulacion:
 
 ```powershell
-py scripts/scan_library.py --config scanner.json --dry-run --report scanner-report.json
+movie-inbox scan --config scanner.json --dry-run --report scanner-report.json
 ```
 
 El reporte separa archivos sin cambios, modificados, movidos, asociados a entradas existentes, entradas nuevas y casos `needs_review`. Si el resultado es correcto, se aplica sobre el JSON:
 
 ```powershell
-py scripts/scan_library.py --config scanner.json --apply --report scanner-report.json
+movie-inbox scan --config scanner.json --apply --report scanner-report.json
 ```
 
 Para detectar cambios periodicamente en el mismo proceso:
 
 ```powershell
-py scripts/scan_library.py --config scanner.json --apply --watch --interval 300 --report scanner-report.json
+movie-inbox scan --config scanner.json --apply --watch --interval 300 --report scanner-report.json
 ```
 
 La CLI legacy sigue disponible para reconciliar directamente un unico catalogo. Recorre subcarpetas y guarda estado liviano en `.catalog-state`. Usa el mismo parser y motor de huellas que el scanner administrado para evitar reglas divergentes. Un movimiento dentro del disco conserva la entrada; una coincidencia unica por titulo, ano y tipo se asocia al item existente; una coincidencia ambigua no se aplica y queda en `needs_review`.
@@ -364,13 +368,13 @@ El titulo se limpia para quitar datos tipicos de release, por ejemplo `720p`, `B
 Despues podes sumarlo al catalogo general:
 
 ```powershell
-python scripts/txt_to_catalog.py local_catalog.json --merge catalog.json --json catalog.json --csv catalog.csv
+movie-inbox import local_catalog.json --merge catalog.json --json catalog.json --csv catalog.csv
 ```
 
 Y si queres intentar linkear esos archivos locales con Wikipedia:
 
 ```powershell
-python scripts/txt_to_catalog.py local_catalog.json --merge catalog.json --json catalog.json --csv catalog.csv --fetch
+movie-inbox import local_catalog.json --merge catalog.json --json catalog.json --csv catalog.csv --fetch
 ```
 
 Para items locales sin URL, `--fetch` busca en Wikipedia usando el titulo limpio y el año detectado. Si encuentra un resultado probable, completa `url`, `wikipedia_title`, `wikidata_id`, imagen, resumen y titulos multilenguaje cuando Wikidata/Wikipedia los expone.
@@ -392,13 +396,13 @@ La Bandeja web reemplaza este recorrido para una instancia activa. Estos comando
 Cuando tengas un export de la extension, por ejemplo `movie-inbox-2026-04-27.csv`, podes sumarlo a tu catalogo general asi:
 
 ```powershell
-python scripts/txt_to_catalog.py movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv
+movie-inbox import movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv
 ```
 
 Tambien podes guardar el resumen de importacion:
 
 ```powershell
-python scripts/txt_to_catalog.py movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv --log-json import-log.json
+movie-inbox import movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv --log-json import-log.json
 ```
 
 La deduplicacion se hace por URL normalizada, incluyendo `url`, `wikipedia_url`, `imdb_url` y `filmaffinity_url`. Por ejemplo, ignora diferencias como `www.` o una barra final. Tambien puede combinar mismo titulo exacto, mismo ano y tipo compatible. Cada match automatico del script externo registra en el reporte su motivo y evidencia.
@@ -406,7 +410,7 @@ La deduplicacion se hace por URL normalizada, incluyendo `url`, `wikipedia_url`,
 Si queres que los links nuevos de Wikipedia entren enriquecidos:
 
 ```powershell
-python scripts/txt_to_catalog.py movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv --fetch
+movie-inbox import movie-inbox-2026-04-27.csv --merge catalog.json --json catalog.json --csv catalog.csv --fetch
 ```
 
 ## Interfaz web
@@ -428,13 +432,13 @@ Despues abris `catalog-view.html` en el navegador. La vista incluye buscador, fi
 Tambien podes levantar un visor local en Python para mirar uno o varios JSONs exportados por la extension:
 
 ```powershell
-python scripts/view_catalog.py catalog.json
+movie-inbox serve catalog.json
 ```
 
 O una carpeta de exports:
 
 ```powershell
-python scripts/view_catalog.py exports/*.json --port 8765
+movie-inbox serve exports/*.json --port 8765
 ```
 
 El comando usa FastAPI sobre Uvicorn con un solo worker. Para mantener compatibilidad, `--write-json` sigue disponible como alias de `--write-catalog`.
@@ -488,7 +492,7 @@ mismo ranking sobre todo el catalogo, por lo que aliases o nombres locales que n
 coinciden con la consulta inicial siguen pudiendo aparecer antes de crear un duplicado.
 
 ```powershell
-python scripts/view_catalog.py catalog_wiki_v5.json --write-json catalog_wiki_v5.json
+movie-inbox serve catalog_wiki_v5.json --write-json catalog_wiki_v5.json
 ```
 
 Las tarjetas del visor mantienen una proporcion 2:3 estable para poder escanear la coleccion sin saltos de altura. El frente muestra portada, titulo, ano, disponibilidad, estado personal y puntuacion cuando existe. En desktop el reverso tecnico aparece con hover o foco; hacer click o tap en cualquier punto abre la ficha completa. En movil la interaccion no depende del giro ni del hover.
@@ -552,10 +556,10 @@ Se puede desactivar todo el cache con `--no-image-cache`, desactivar solamente l
 Para intentar completar links automaticamente desde la terminal:
 
 ```powershell
-py scripts/match_external_links.py catalogv2.json --json catalogv3_links.json --report external-links-report.json --limit 100
+movie-inbox match catalogv2.json --json catalogv3_links.json --report external-links-report.json --limit 100
 ```
 
-El script busca en Wikipedia, IMDb y FilmAffinity para entradas sin link, combina automaticamente solo matches de alta confianza y deja en el reporte los casos dudosos para revisar en el visualizador.
+El comando busca en Wikipedia, IMDb y FilmAffinity para entradas sin link, combina automaticamente solo matches de alta confianza y deja en el reporte los casos dudosos para revisar en el visualizador.
 
 Un titulo exacto sin ano, con ano distinto o con tipo incompatible nunca se combina automaticamente. Esos candidatos aparecen en `needs_review` con score, motivo y evidencia para decidirlos desde el visor.
 
@@ -574,7 +578,7 @@ tipo de estreno, fuente y la marca de fecha principal.
 Para convertir un catalogo completo sin reemplazar el original:
 
 ```powershell
-py scripts/migrate_catalog.py scripts/catalogv3_links.json --json scripts/catalogv6.json
+movie-inbox migrate catalogv3_links.json --json catalogv6.json
 ```
 
 Las escrituras del visor y del importador son atomicas: primero se completa un archivo temporal y luego se reemplaza el JSON. El visor bloquea cada catalogo durante operaciones de escritura concurrentes y conserva un unico backup automatico reemplazable.
@@ -628,7 +632,7 @@ El despliegue reproducible con una instancia nueva, importacion inicial y medios
 Para dumps locales con nombres tipo `The English Patient 1996 720p BluRay x264 YIFY`, primero conviene limpiar titulos y normalizar estados:
 
 ```powershell
-py scripts/enrich_catalog.py catalogv2.json --json catalog_clean.json --csv catalog_clean.csv --report enrich-report.json
+movie-inbox enrich catalogv2.json --json catalog_clean.json --csv catalog_clean.csv --report enrich-report.json
 ```
 
 Eso separa el año cuando puede, limpia datos de release/calidad/codecs/grupos y cambia `status: cataloged` a `status: to_watch`. El campo `en_catalogo` no se toca: una pelicula puede tener `en_catalogo: true` y a la vez `status: to_watch`.
@@ -636,23 +640,23 @@ Eso separa el año cuando puede, limpia datos de release/calidad/codecs/grupos y
 Para intentar linkear con Wikipedia:
 
 ```powershell
-py scripts/enrich_catalog.py catalog_clean.json --json catalog_wiki.json --csv catalog_wiki.csv --fetch-wikipedia --report wiki-report.json
+movie-inbox enrich catalog_clean.json --json catalog_wiki.json --csv catalog_wiki.csv --fetch-wikipedia --report wiki-report.json
 ```
 
 Si queres probar de a poco:
 
 ```powershell
-py scripts/enrich_catalog.py catalog_clean.json --json catalog_wiki_sample.json --fetch-wikipedia --limit 100 --report wiki-sample-report.json
+movie-inbox enrich catalog_clean.json --json catalog_wiki_sample.json --fetch-wikipedia --limit 100 --report wiki-sample-report.json
 ```
 
 El reporte lista cuantas entradas pudo linkear y cuales quedaron sin match. Para 1800 entradas conviene revisar primero una muestra antes de correr todo.
 
 El enriquecedor usa tres caminos: completa metadata si ya hay URL de Wikipedia, resuelve IDs de IMDb `tt...` via Wikidata cuando puede, y finalmente busca por titulo limpio en Wikipedia en ingles y espanol.
 
-Para corridas largas, el script guarda progreso cada 25 consultas por defecto y si lo interrumpis con Ctrl+C guarda salida parcial. Evita escribir encima del catalogo base durante pruebas:
+Para corridas largas, el comando guarda progreso cada 25 consultas por defecto y si lo interrumpis con Ctrl+C guarda salida parcial. Evita escribir encima del catalogo base durante pruebas:
 
 ```powershell
-py scripts/enrich_catalog.py catalog_clean.json --json catalog_wiki_v5.json --csv catalog_wiki_v5.csv --fetch-wikipedia --report wiki-report-v5.json --progress-every 25
+movie-inbox enrich catalog_clean.json --json catalog_wiki_v5.json --csv catalog_wiki_v5.csv --fetch-wikipedia --report wiki-report-v5.json --progress-every 25
 ```
 
 El enriquecedor acepta tanto JSON como SQLite. Para pruebas largas sigue siendo prudente escribir a una salida distinta y revisar el reporte antes de reemplazar la fuente principal.
@@ -678,17 +682,20 @@ Nota: Chrome puede pedir confirmacion o guardar los archivos en la carpeta de de
 La aplicacion web, SQLite, Docker, la Bandeja y el scanner administrado son el camino principal. Estas piezas permanecen en el repositorio porque todavia sirven para migraciones o capturas puntuales, pero no gobiernan el flujo self-hosted:
 
 - visor HTML estatico (`scripts/build_viewer.py`)
-- scanner Bash y scanner Python por archivo de configuracion (`scripts/scan_video_catalog.sh`, `scripts/scan_library.py`)
-- wrappers historicos de `scripts/` (`txt_to_catalog.py`, `enrich_catalog.py`, `match_external_links.py`, `migrate_catalog.py`, `view_catalog.py`)
+- scanner Bash por archivo de configuracion (`scripts/scan_video_catalog.sh`)
 - extension de Chrome basada en exportaciones manuales
 
-Cada wrapper de `scripts/` es un lanzador de menos de 25 lineas que llama al mismo
-comando del paquete (`movie-inbox import|scan|enrich|match|migrate|serve`, respectivamente)
-verificado por `tests/test_layering.py` — no duplican logica, solo dan compatibilidad a
-comandos de v0.1. Asumen acceso directo del host a rutas de catalogo y biblioteca, algo
-que no encaja con una instancia Docker: ahi el camino es la app web + `movie-inbox`
+Los wrappers de v0.1 que solo llamaban al mismo comando del paquete
+(`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`, `enrich_catalog.py`,
+`match_external_links.py`, `migrate_catalog.py` → `movie-inbox
+import|scan|serve|enrich|match|migrate`, respectivamente) y los 13 shims de import
+`catalog_*.py` (compatibilidad con nombres de modulo planos pre-paquete) ya no viven en
+este repositorio: asumian acceso directo del host a rutas de catalogo y biblioteca, algo
+que no encaja con una instancia Docker, donde el camino es la app web + `movie-inbox`
 **dentro** del contenedor (`docker compose exec app movie-inbox ...`), no un script
-suelto apuntando a una ruta que el contenedor puede no montar igual. Para una instancia
-Docker, tratalos como referencia historica, no como parte del flujo operativo.
+suelto apuntando a una ruta que el contenedor puede no montar igual. Se movieron —no se
+borraron— a `codigoLegacy/` en el checkout local, ignorado por Git
+(`.gitignore`); quien todavia los necesite los sigue teniendo a mano, pero no forman
+parte de lo que se clona, se publica en un release ni se ejecuta en CI o Docker.
 
 Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras.

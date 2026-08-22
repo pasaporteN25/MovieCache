@@ -24,6 +24,10 @@ __pycache__/
 /scripts/*.json
 /scripts/*.csv
 /scripts/*.txt
+
+# v0.1 compatibility launchers and import shims, kept on disk but out of Git —
+# nobody runs them from inside the Docker deployment path.
+/codigoLegacy/
 /catalog-view.html
 /reports/
 /data/
