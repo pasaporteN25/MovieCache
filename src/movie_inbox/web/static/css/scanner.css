@@ -544,7 +544,7 @@
         .library-run-preview-row code { grid-column: 1 / -1; }
         .library-run-outcome { align-items: stretch; display: grid; }
         .library-run-outcome button { min-height: 44px; width: 100%; }
-        .scanner-workbench { grid-template-columns: 1fr; min-height: 0; }
+        .scanner-workbench { grid-template-columns: minmax(0, 1fr); min-height: 0; }
         .scanner-queue-panel { border-bottom: 1px solid var(--line); border-right: 0; }
         .scanner-queue { display: flex; max-height: none; overflow-x: auto; }
         .scanner-queue-item { flex: 0 0 230px; }

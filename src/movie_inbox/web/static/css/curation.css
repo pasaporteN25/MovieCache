@@ -430,7 +430,7 @@
 }
 
 @media (max-width: 860px) {
-        .curation-pair { grid-template-columns: 1fr; }
+        .curation-pair { grid-template-columns: minmax(0, 1fr); }
 
         .curation-pair-mark { transform: rotate(90deg); }
 }
@@ -450,7 +450,7 @@
 
         .curation-tab { min-height: 44px; }
 
-        .curation-workbench { grid-template-columns: 1fr; min-height: 0; }
+        .curation-workbench { grid-template-columns: minmax(0, 1fr); min-height: 0; }
 
         .curation-queue-panel { border-bottom: 1px solid var(--line); border-right: 0; }
 
