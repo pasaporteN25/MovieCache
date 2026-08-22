@@ -7,13 +7,16 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse
 
+from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.library_repository import (
+    LibraryConflict,
     LibraryNotFound,
     LibraryRepositoryError,
     LibraryRunBusy,
 )
 from movie_inbox.application.library_service import LibraryPathError
 from movie_inbox.application.repository import CatalogRepositoryError
+from movie_inbox.application.scanner_workflow import ScannerWorkflowError
 from movie_inbox.domain.libraries import LibraryValidationError, work_identity
 from movie_inbox.web.catalog_api import (
     background_enrich_catalog_item,
@@ -24,13 +27,73 @@ from movie_inbox.web.catalog_api import (
 )
 from movie_inbox.web.dependencies import (
     authorized_json,
+    history_session_id,
     require_owner,
     require_token,
     session_catalog,
 )
-from movie_inbox.web.responses import error_response, repository_error_response
+from movie_inbox.web.responses import (
+    error_response,
+    repository_error_response,
+    scanner_application_error_response,
+)
 
 router = APIRouter()
+
+
+def _scanner_workflow(request: Request):  # type: ignore[no-untyped-def]
+    return request.app.state.scanner_workflow
+
+
+@router.get("/api/scanner/history", dependencies=[Depends(require_token)])
+def scanner_history(request: Request, mode: str = "persistent") -> JSONResponse:
+    require_owner(request)
+    try:
+        return JSONResponse(
+            _scanner_workflow(request).history(mode, history_session_id(request))
+        )
+    except (ValueError, CurationHistoryError) as error:
+        return scanner_application_error_response(error)
+
+
+@router.post("/api/scanner/undo")
+def undo_scanner_operation(
+    request: Request,
+    body: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    require_owner(request)
+    try:
+        operation = _scanner_workflow(request).undo(
+            str(body.get("operation_id") or ""),
+            history_mode=str(body.get("history_mode") or "persistent"),
+            session_id=history_session_id(request),
+        )
+        return JSONResponse({"ok": True, "reason": "undone", "operation": operation})
+    except (
+        ValueError,
+        ScannerWorkflowError,
+        LibraryConflict,
+        LibraryRepositoryError,
+        CurationHistoryError,
+    ) as error:
+        return scanner_application_error_response(error)
+
+
+@router.post("/api/scanner/history/clear")
+def clear_scanner_history(
+    request: Request,
+    body: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    require_owner(request)
+    try:
+        count = _scanner_workflow(request).clear_history(
+            str(body.get("history_mode") or "persistent"),
+            history_session_id(request),
+            confirmed=body.get("confirmed") is True,
+        )
+        return JSONResponse({"ok": True, "reason": "cleared", "cleared": count})
+    except (ValueError, CurationHistoryError) as error:
+        return scanner_application_error_response(error)
 
 
 @router.get("/api/libraries", dependencies=[Depends(require_token)])
@@ -263,15 +326,18 @@ def review_scanner_item(
             )
             if catalog_item is None:
                 return error_response("catalog_item_not_found", 404)
-            item = library_service.review_file(
+            result = _scanner_workflow(request).review(
                 file_id,
                 {"action": "confirm", "identity": work_identity(catalog_item)},
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
             )
             return JSONResponse(
                 {
                     "ok": True,
                     "reason": "scanner_item_linked_to_catalog",
-                    "item": item,
+                    "item": result["item"],
+                    "operation": result["operation"],
                     "catalog_action": "existing",
                     "catalog_item": catalog.public_payload(catalog_item),
                 }
@@ -347,5 +413,7 @@ def review_scanner_item(
         return error_response(str(error), 400)
     except CatalogRepositoryError as error:
         return repository_error_response(error)
+    except (LibraryConflict, ScannerWorkflowError, CurationHistoryError) as error:
+        return scanner_application_error_response(error)
     except LibraryRepositoryError:
         return error_response("library_store_unavailable", 503)

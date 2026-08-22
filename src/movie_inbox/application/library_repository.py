@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from movie_inbox.domain.libraries import LibraryFile, LibraryScanRun, ManagedLibrary
@@ -17,6 +19,29 @@ class LibraryNotFound(LookupError):
 
 class LibraryRunBusy(RuntimeError):
     """Raised when a scan is already queued or running."""
+
+
+class LibraryConflict(RuntimeError):
+    """Raised when a scanner review row changed since the operation being restored."""
+
+
+@dataclass(frozen=True)
+class ReviewedFileState:
+    """The reviewable slice of a `LibraryFile` a review decision reads and writes."""
+
+    state: str
+    work_key: str
+    identity: Mapping[str, Any] = field(default_factory=dict)
+    candidates: tuple[Mapping[str, Any], ...] = ()
+
+    @classmethod
+    def from_file(cls, file: LibraryFile) -> ReviewedFileState:
+        return cls(
+            state=file.state,
+            work_key=file.work_key,
+            identity=dict(file.identity),
+            candidates=tuple(dict(candidate) for candidate in file.candidates),
+        )
 
 
 class LibraryRepository(Protocol):
@@ -69,6 +94,13 @@ class LibraryRepository(Protocol):
         file_ids: list[str],
         action: str,
         identity: dict[str, Any] | None,
+        updated_at: int,
+    ) -> list[LibraryFile]: ...
+
+    def restore_reviewed_files(
+        self,
+        expected: dict[str, ReviewedFileState],
+        target: dict[str, ReviewedFileState],
         updated_at: int,
     ) -> list[LibraryFile]: ...
 

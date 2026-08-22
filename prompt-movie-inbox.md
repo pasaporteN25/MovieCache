@@ -61,31 +61,245 @@ alcance de archivo/línea y nivel de modelo sugerido por tarea. Se eligió Markd
 de un kanban autohosteado (se evaluó Kanboard) para no sumar infraestructura nueva que
 mantener. Leerlo junto con este archivo al arrancar una sesión nueva.
 
-## Progreso (actualizado 2026-08-19)
+## Progreso (actualizado 2026-08-22)
 
-Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. Fase 5 (v0.4.0): los 4 P1
-(P1-c, P1-a, P1-b, P1-d) están cerrados. El gate final de Fase 5 —correr
-`$impeccable audit` de nuevo sobre la misma superficie— ya se ejecutó: 16/20
-(contra 22/40 de la corrida del 2026-08-14; escalas distintas, no
-comparables directo). Encontró un P1 propio (contraste de `--control-border`,
-cerrado) y un P2 propio (caching HTTP de estáticos, cerrado), más 4
-hallazgos "P3" menores que se están cerrando uno por uno con aprobación
-previa de cada uno: `extract` (colores literales → tokens, **cerrado**),
-`typeset` (`font-family` y `font-size`, **cerrado**), `adapt` (**cerrado**
-— investigación grande, hallazgo chico) y `polish` (**cerrado**). Los 4
-hallazgos "P3" quedan cerrados. **El gate final de Fase 5 ya corrió — ver
-abajo: 29/40** (era `$impeccable critique`, no `audit`; otra confusión de
-comandos de este archivo, corregida esta vez antes de correrlo). Quedan 2
-arreglos chicos del hallazgo de esa corrida cerrados y 1 finding sin poder
-confirmar (ver abajo). Sesión nueva a partir de acá — no hace falta
-releer el historial de conversación, esto + `CLAUDE.md` + `git log`
-alcanza.
+Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. **Fase 5 (v0.4.0) cerrada
+por completo y publicada: tag `v0.4.0` creado (local, sin pushear todavía).**
+Los 4 P1 (P1-c, P1-a, P1-b, P1-d), el P1 y P2 propios del intento de gate
+(`--control-border`, caching HTTP), los 4 P3 (`extract`/`typeset`/`adapt`/
+`polish`) y el gate final con puntaje (`$impeccable critique`, 29/40 contra
+22/40 del 2026-08-14) están todos cerrados. `pyproject.toml`,
+`src/movie_inbox/__init__.py`, `CHANGELOG.md`, `CLAUDE.md` y
+`docs/roadmap.md` reflejan v0.4.0. `README.md` reescrito completo (estaba
+desactualizado: no documentaba Scanner/Inventario en absoluto, terminología
+vieja, faltaba `search-lab compare`) — ver detalle en la entrada de abajo.
+Sesión nueva a partir de acá — no hace falta releer el historial de
+conversación, esto + `CLAUDE.md` + `git log` alcanza.
 
-También en esta sesión, del tablero `tareas.md` (frente Enriquecimiento y
-cobertura de links): `[E3]` y `[E4]` cerrados (commit `062f69b`), y un bug
-suelto de la pasada de `extract` corregido — el `rgba(69, 76, 120, .66)`
-de `catalog.css` que había quedado con el valor viejo de `--control-border`
-(commit `bea4a43`). `[E6]` sigue en Backlog a pedido de Lucas.
+También en esta sesión (2026-08-19), del tablero `tareas.md` (frente
+Enriquecimiento y cobertura de links): `[E3]` y `[E4]` cerrados (commit
+`062f69b`), y un bug suelto de la pasada de `extract` corregido — el
+`rgba(69, 76, 120, .66)` de `catalog.css` que había quedado con el valor
+viejo de `--control-border` (commit `bea4a43`). `[E6]` sigue en Backlog a
+pedido de Lucas.
+
+**Próximo incremento (sin fase/versión asignada todavía): cerrar los 4
+hallazgos que dejó el gate de Fase 5.** Están rankeados de más simple a
+más difícil (ver la entrada fechada 2026-08-22 más abajo para el detalle
+técnico de cada uno) y la decisión es arrancar por el más difícil:
+
+1. Historial y deshacer para Scanner — **el más difícil, arrancando por
+   acá.** Paso 1 de 3 (vincular a identidad existente) completo, probado
+   y verificado en browser real — ver la entrada "Scanner: historial y
+   deshacer — paso 1/3" más abajo. **Sin commitear**, a la espera de que
+   Lucas confirme. Pasos 2 (omitir) y 3 (crear y vincular) quedan
+   pendientes.
+2. Desambiguar casos duplicados con mismo título y año.
+3. Paridad de teclado/búsqueda en Curaduría respecto a Scanner.
+4. `aria-live` en el estado de decisión del comparador de fusión — el más
+   simple.
+
+Las dos preguntas que habían quedado abiertas ya se resolvieron el mismo
+2026-08-22: Lucas confirmó en un browser real que el diálogo de fusión sí
+cierra con Escape (la hipótesis de limitación de la herramienta de testing
+era correcta, no había bug) — el hallazgo queda retirado en firme, no
+requiere ninguna acción. Y sobre `scripts/`: no se borró nada, pero los
+lanzadores de compatibilidad con v0.1 y los shims de import se movieron a
+`codigoLegacy/` (fuera de Git). Detalle completo de ambas resoluciones en
+la entrada fechada 2026-08-22 más abajo.
+
+**Scanner: historial y deshacer — paso 1/3, vincular a identidad
+existente (2026-08-22).** Precedido por `EnterPlanMode` (dos agentes
+Explore en paralelo sobre persistencia real de Scanner y UI de Curaduría/
+Scanner, un agente Plan para el diseño, verificación manual de los
+hallazgos más importantes antes de aceptarlos) y una `AskUserQuestion`:
+Lucas eligió que el alcance incluya deshacer los 3 casos completos
+(vincular, crear, omitir) de punta a punta, no dejar "omitir" afuera ni
+construir el motor sin exponerlo.
+
+Hallazgo que cambió el diseño respecto a copiar el patrón de Curaduría
+literal: confirmar u omitir en Scanner pisa `candidates_json` con `'[]'`
+y nunca lo regenera (ni en un rescan) — a diferencia de Curaduría, donde
+el "antes" siempre se reconstruye leyendo el ítem actual. Por eso el
+"antes" se captura activamente en `resolve_review()` antes de mutar, no
+después. También confirmé (leyendo `curation_workflow()` en
+`web/catalog_api.py`) que el historial de Curaduría es por-catálogo, no
+por-instancia, lo que descartó compartir el mismo `curation-history.json`
+con Scanner — quedó una tabla `scanner_history` propia en `instance.db`
+(migración v7).
+
+Motor nuevo: `application/scanner_history.py` +
+`infrastructure/scanner_history.py` (`SqliteScannerHistoryRepository`,
+misma forma que `CurationHistoryRepository`, reusa `normalize_history_mode`
+de Curaduría), `ReviewedFileState` + `LibraryConflict` +
+`restore_reviewed_files()` en `library_repository.py` (chequeo de "¿cambió
+desde la operación?", mismo patrón que `_transition_path` de Curaduría),
+`library_service.py` partido en `resolve_review()`/`apply_review()`
+(refactor que preserva comportamiento), `application/scanner_workflow.py`
+nuevo (`ScannerWorkflowService.review()`/`undo()`/`history()`). Wireado
+solo para `link_catalog` en este paso — `create` y el fallback de
+`ignore` en `scanner.py` siguen llamando a `library_service.review_file()`
+directo, sin pasar por el historial todavía.
+
+Frontend: nuevo módulo compartido `core/operation-feedback.js` (el toast
+con "Deshacer" inline que Curaduría ya tenía, extraído para que Scanner
+lo use sin crear un import circular — `handleCurationClick` gana una
+línea que delega ahí primero). Tab "Actividad" nueva en Scanner
+(`data-scanner-filter="history"`, reusa toda la maquinaria de filtros que
+ya existía para las otras pestañas), con sus propios controles de modo
+persistente/sesión (no el bloque compartido del shell, que ya tenía su
+propio botón de refresh y hubiera quedado duplicado). Al pasar,
+encontré y corregí un bug que hubiera introducido yo mismo: la navegación
+por flechas de Scanner (`moveScannerQueueSelection`) operaba siempre
+sobre la cola regular — sin el fix, las flechas se comportaban mal
+apenas se entra a la pestaña Actividad.
+
+Verificado: `tests/test_scanner_workflow.py` nuevo (commit dejando fila
+restaurable, deshacer restaurando `candidates_json` byte a byte —no
+`[]`—, rechazo por `LibraryConflict` si la fila cambió desde la
+operación, aislamiento de historial por sesión) más un test HTTP end-to-
+end en `test_view_http.py`. Suite completa: **305/305 verde**. Además,
+levanté un servidor real con catálogo e instancia sintéticos en el
+scratchpad (nunca datos reales) y probé el flujo completo en un browser
+real: crear biblioteca, escanear, vincular un archivo con el mismo click
+que usaría Lucas, ver la operación en la pestaña Actividad, deshacerla
+con el botón real de la interfaz y confirmar que el archivo volvió a la
+cola con su candidata original intacta — no una lista vacía. Sin errores
+nuevos en consola.
+
+**Sin commitear** — todo este trabajo (más el cierre de Fase 5 y la
+mudanza de `scripts/` de la entrada anterior) quedó pendiente de
+confirmación de Lucas antes de commitear, por la regla de no commitear
+sin pedido explícito.
+
+**Cierre de Fase 5: release v0.4.0, README, evaluación de `scripts/` y
+ranking del próximo incremento (2026-08-22).** De los 6 hallazgos del gate
+final, los 2 arreglos chicos ya estaban cerrados (ver más abajo). Esta
+sesión cerró el resto del trámite de fase:
+
+- **Release v0.4.0.** Siguiendo el mismo procedimiento que v0.3.0:
+  `pyproject.toml` y `src/movie_inbox/__init__.py` a `0.4.0` (los dos —
+  tocar solo `pyproject.toml` rompe
+  `test_package_layout.py::test_runtime_version_matches_package_metadata`),
+  `CHANGELOG.md` con la sección `[Sin publicar]` movida a `[0.4.0] -
+  2026-08-22` y una nueva `[Sin publicar]` vacía arriba, `CLAUDE.md` con la
+  línea de versión actualizada, `docs/roadmap.md` con el hito v0.4.0
+  cerrado (29/40 contra 22/40, los 4 hallazgos que quedan pendientes
+  listados explícitamente). Tag anotado `v0.4.0` creado sobre el commit de
+  release (`22a7e26`) — **local, no se pusheó** (no se pidió). Suite
+  completa verde antes de taggear.
+- **README reescrito.** Lucas: "siento que quedo muy desactualizado" — y
+  tenía razón: Scanner/Inventario no estaba documentado en absoluto (todo
+  el párrafo de Bandeja hablaba solo de Curaduría), la terminología vieja
+  seguía (`Sin link` en vez de `Sin referencia`), y `search-lab compare`
+  no estaba. "Estado del proyecto" ahora dice v0.4.0 con resumen de
+  v0.3.0/v0.4.0 y puntero a "Estado de compatibilidad". Esa sección de
+  compatibilidad quedó más explícita sobre por qué los lanzadores legacy
+  de `scripts/` no encajan bien con un deploy Docker (ver el punto
+  siguiente).
+- **Evaluación de `scripts/*.py` (pedido de Lucas: "¿ya no se usan, no?
+  con las rutas de Docker pierde sentido, evalualo").** Confirmado con
+  `wc -l` y lectura directa, no supuesto: son wrappers de compatibilidad
+  genuinos, no lógica muerta ni duplicada. Dos familias distintas:
+  `view_catalog.py`/`txt_to_catalog.py`/`scan_library.py` en la raíz de
+  `scripts/` son lanzadores finos (`tests/test_layering.py::test_legacy_entrypoints_are_thin_wrappers`
+  exige menos de 25 líneas) que llaman a la implementación real en
+  `src/movie_inbox/cli/`; los 13 `scripts/catalog_*.py` son shims de
+  compatibilidad de import (`from movie_inbox.domain.X import *`) para
+  nombres de módulo planos pre-paquete. La lógica real ya vive toda en
+  `src/movie_inbox/cli/`, así que borrar `scripts/` no perdería
+  funcionalidad — el argumento de Lucas sobre Docker es válido en el
+  sentido de que nadie ejecuta estos wrappers *dentro* del contenedor
+  (`movie-inbox <subcomando>` es el único entrypoint documentado ahí), son
+  puramente para gente que todavía invoca los scripts v0.1 directo. Las
+  dos `AskUserQuestion` sobre esto habían quedado sin responder, pero
+  Lucas resolvió el punto directo en el mensaje siguiente: no borrar, pero
+  sacarlos de Git.
+
+  **Ejecutado (2026-08-22):** `git mv` de los 22 archivos (los 6
+  lanzadores, los 13 shims `catalog_*.py`, `_package_bootstrap.py` y el
+  `scripts/README.md` desactualizado) de `scripts/` a una carpeta nueva
+  `codigoLegacy/` en la raíz, agregada a `.gitignore`. `build_viewer.py`,
+  `scan_video_catalog.sh`, `check.ps1`/`check.sh`, `docker-backup.sh` y
+  `cleanup-workspace.ps1` **no se movieron** — siguen siendo herramientas
+  activas (CI invoca `wheel_smoke.py` y `docker-backup.sh` directamente).
+  Confirmado con un grep de todo el repo (tests, `src/`, docs, CI) que
+  nada tracked dependía de los 22 archivos movidos, más allá de menciones
+  en prosa. `git mv` preservó el historial como rename, no como
+  borrado+creación.
+
+  Como los wrappers y shims ya no viven en una ruta que un clone limpio o
+  CI puedan ver, hubo que actualizar todo lo que asumía su presencia, no
+  solo moverlos: `tests/test_layering.py` perdió
+  `test_legacy_entrypoints_are_thin_wrappers` (el contrato que verificaba
+  ya no aplica a nada trackeado — dejarlo apuntando a `codigoLegacy/`
+  habría roto CI en cualquier clone fresco); `CLAUDE.md` y la sección
+  "Estado de compatibilidad" de `README.md` se reescribieron para explicar
+  la mudanza; y **13 ejemplos de comando en `README.md`** que todavía
+  usaban `python scripts/txt_to_catalog.py`, `py scripts/scan_library.py`,
+  `python scripts/view_catalog.py`, `py scripts/enrich_catalog.py`,
+  `py scripts/match_external_links.py` y `py scripts/migrate_catalog.py`
+  se pasaron a su equivalente real `movie-inbox <subcomando>` (mismos
+  flags, mismo comportamiento — eran wrappers finos del mismo código). El
+  docstring de ejemplos de `src/movie_inbox/cli/enrich_catalog.py` tenía
+  el mismo problema y se corrigió igual. Suite completa despues del
+  cambio: **300/300 verde** (301 menos el test eliminado), `git diff
+  --check` limpio.
+
+  Encontrados de paso, marcados pero **no tocados** (fuera del pedido
+  puntual de Lucas): `check-output.txt` en la raíz está trackeado en Git y
+  parece salida de una corrida vieja de `check.ps1`/`check.sh` olvidada;
+  `scripts/LICENSE` es una copia idéntica de la `LICENSE` GPLv3 de la
+  raíz, sin motivo aparente para existir duplicada; `scripts/scripts/catalogv4.json`
+  sigue trackeado en Git pese a ser un catálogo personal — el patrón
+  `/scripts/*.json` de `.gitignore` no alcanza una subcarpeta anidada
+  `scripts/scripts/`, así que este archivo entró en algún commit viejo y
+  sigue en el historial. Es dato personal (no se leyó ni se tocó por la
+  regla de `CLAUDE.md`), pero vale una decisión explícita de Lucas sobre
+  si sacarlo de Git (y de la historia, si llegó a pushearse).
+- **Ranking del próximo incremento**, a pedido explícito de Lucas
+  ("puntua los 4 hallazgos del mas simple al mas dificil, vamos a empezar
+  por el mas dificil"), de más simple a más difícil:
+  1. `aria-live` en el comparador de fusión — agregar
+     `aria-live="polite"` a `#mergeDecisionStatus` y `aria-describedby` en
+     el botón de confirmar. Un atributo, un elemento, patrón de anuncio ya
+     usado en el resto del código.
+  2. Paridad de teclado/búsqueda en Curaduría — Scanner ya tiene
+     `moveScannerQueueSelection` (flechas, cableado en
+     `bootstrap.js:178`) y `#scannerQueueSearch`; es adaptar ese mismo
+     código a la cola de Curaduría, no inventar nada, pero toca
+     HTML+CSS+JS y hay que decidir si el handler se generaliza o se
+     duplica.
+  3. Desambiguar casos duplicados con mismo título y año — antes de tocar
+     código hace falta decidir qué mostrar como diferenciador (¿ruta de
+     archivo? ¿fecha agregada? ¿fuente?) y qué pasa cuando ni eso alcanza,
+     y después aplicarlo consistente en 3 lugares (fila de cola, panel de
+     detalle, título del diálogo de fusión). Pide criterio de diseño, no
+     solo reusar un patrón existente.
+  4. **Historial y deshacer para Scanner — el más difícil.** La
+     arquitectura de Curaduría ya existe y es reusable como referencia:
+     `infrastructure/curation_history.py`
+     (`JsonCurationHistoryRepository.append(operation, namespace="")`,
+     sidecar `.{catalog}.curation-history.json` vía
+     `curation_history_path()`), listado por
+     `GET /api/curation/history` y deshecho por
+     `POST /api/curation/undo` (`web/routers/curation.py:41,104`, delega
+     en `request_workflow(request).undo(...)` de
+     `application/curation_workflow.py`). Confirmado que Scanner
+     (`web/routers/scanner.py:273,332`) devuelve códigos de razón
+     descriptivos (`scanner_item_linked_to_catalog`,
+     `scanner_item_created_and_linked`) en la respuesta JSON pero **no
+     llama a ningún repositorio de historial ni tiene ruta de deshacer** —
+     el hueco es real, no aparente. Lo que hace esto más difícil que
+     copiar el patrón de Curaduría: las 3 acciones de Scanner (vincular a
+     identidad existente, crear y vincular, omitir) tocan un inventario
+     compartido entre usuarios, no solo el catálogo personal de quien
+     actúa, así que deshacer una vinculación después de que otro usuario
+     ya la haya referenciado es un caso real a resolver, no un detalle.
+     El parámetro `namespace` de `.append()` nunca se vio usado en este
+     repaso — puede ser una pista de que el repositorio ya está pensado
+     para más de un namespace, o puede ser para otra cosa; confirmarlo es
+     el primer paso, no un hecho.
 
 **Fase 5, gate final: 29/40 (2026-08-19/22).** Los 4 P3 (extract/typeset/
 adapt/polish) ya estaban cerrados; tocaba correr de nuevo la revisión con
@@ -153,6 +367,11 @@ De los 6 hallazgos, dos eran arreglos chicos y los cerré ese mismo día:
    de teclado/interacción parezca "confirmado": probar el mismo mecanismo
    contra un control hermano que se sabe que funciona, antes de reportarlo
    como bug de un componente específico.**
+
+   **Resuelto (2026-08-22):** Lucas lo probó en un browser real — el
+   diálogo cierra con Escape sin problema. Confirma que fue un artefacto
+   de la herramienta de automatización, no un bug de la app. Sin acción
+   pendiente.
 
 Quedan 4 hallazgos más grandes sin arrancar (los 2 P1 restantes —
 desambiguar duplicados idénticos, deshacer para Scanner — más paridad de

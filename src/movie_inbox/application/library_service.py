@@ -48,6 +48,23 @@ class LibraryPathError(ValueError):
 
 
 @dataclass(frozen=True)
+class ReviewPlan:
+    """A resolved scanner review decision, captured before it is applied."""
+
+    action: str
+    siblings: tuple[LibraryFile, ...]
+    selected_identity: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class ReviewResult:
+    """The rows a review decision updated, plus the display payload for the caller."""
+
+    files: tuple[LibraryFile, ...]
+    payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class _CatalogMatchIndex:
     items: tuple[dict[str, Any], ...]
     by_title: Mapping[str, frozenset[int]]
@@ -294,6 +311,9 @@ class ManagedLibraryService:
         return payloads
 
     def review_file(self, file_id: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+        return self.apply_review(self.resolve_review(file_id, payload)).payload
+
+    def resolve_review(self, file_id: str, payload: Mapping[str, Any]) -> ReviewPlan:
         action = str(payload.get("action") or "").strip().casefold()
         selected_identity: dict[str, Any] | None = None
         queue_items = self.repository.review_queue()
@@ -347,15 +367,23 @@ class ManagedLibraryService:
         siblings = [
             value for value in queue_items if group_key and _multipart_group_key(value) == group_key
         ] or [item]
+        return ReviewPlan(
+            action=action,
+            siblings=tuple(siblings),
+            selected_identity=selected_identity,
+        )
+
+    def apply_review(self, plan: ReviewPlan) -> ReviewResult:
         updated = self.repository.review_files(
-            [value.id for value in siblings],
-            action,
-            selected_identity,
+            [value.id for value in plan.siblings],
+            plan.action,
+            plan.selected_identity,
             self._now(),
         )
         representative = sorted(updated, key=_multipart_sort_key)[0]
         library = self.repository.get_library(representative.library_id)
-        return self.file_payload(representative, library, updated)
+        payload = self.file_payload(representative, library, updated)
+        return ReviewResult(files=tuple(updated), payload=payload)
 
     def validate_root(self, value: str) -> Path:
         if not self.allowed_roots:

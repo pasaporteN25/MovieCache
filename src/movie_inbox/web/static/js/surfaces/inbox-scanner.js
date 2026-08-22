@@ -3,11 +3,12 @@ import { loadCatalog } from "../core/catalog-data.js";
 import { fields } from "../core/fields.js";
 import { escapeAttr, escapeHtml, hasHost, normalizeText } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
+import { registerUndoHandler, setOperationFeedback } from "../core/operation-feedback.js";
 import { findLocalMatchForItem } from "../core/search-bridge.js";
 import { renderScopeStrip, scannerActionReceipt, scannerScopeStates, summarizeScopeStates } from "../core/scope-strip.js";
 import { curationCounts, currentIdentity } from "../core/state.js";
 import { libraryErrorMessage, loadLibraries } from "./admin-libraries.js";
-import { setCurationFeedback, syncCurationCounts } from "./inbox-curation.js";
+import { formatHistoryDate, syncCurationCounts } from "./inbox-curation.js";
 import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
 
       export let scannerQueue = [];
@@ -21,6 +22,18 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
       export let scannerQueueQuery = "";
 
       export let scannerCreateConflicts = new Map();
+
+      export let scannerHistory = [];
+
+      export let scannerHistoryLoading = false;
+
+      export let scannerHistoryMode = storedScannerHistoryMode();
+
+      export function setScannerFeedback(message, tone = "", operation = null) {
+        setOperationFeedback(message, tone, operation, "scanner");
+      }
+
+      registerUndoHandler("scanner", undoScannerOperation);
 
       export async function loadScannerQueue({ announce = false } = {}) {
         if (scannerQueueLoading || currentIdentity?.user?.role !== "owner") return;
@@ -40,9 +53,10 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           if (!scannerQueue.some((item) => item.id === selectedScannerItemId)) {
             selectedScannerItemId = scannerQueue[0]?.id || "";
           }
+          await loadScannerHistory();
           renderScannerQueue();
           syncCurationCounts();
-          if (announce) setCurationFeedback("Cola del inventario actualizada.", "success");
+          if (announce) setScannerFeedback("Cola del inventario actualizada.", "success");
         } catch (error) {
           fields.scannerQueue.innerHTML = "";
           fields.scannerQueueDetail.innerHTML = `<div class="curation-empty"><strong>Cola no disponible</strong><p>${escapeHtml(libraryErrorMessage(error.message))}</p></div>`;
@@ -53,7 +67,129 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         }
       }
 
+      export async function loadScannerHistory() {
+        if (scannerHistoryLoading) return;
+        scannerHistoryLoading = true;
+        try {
+          const response = await apiFetch(`/api/scanner/history?mode=${encodeURIComponent(scannerHistoryMode)}`);
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          scannerHistory = payload.operations || [];
+          fields.scannerHistoryCount.textContent = payload.count || 0;
+        } catch (error) {
+          console.error("[catalog-viewer] scanner history load failed", error);
+          scannerHistory = [];
+          fields.scannerHistoryCount.textContent = "!";
+          if (scannerQueueFilter === "history") {
+            setScannerFeedback("No se pudo cargar la actividad del inventario.", "error");
+          }
+        } finally {
+          scannerHistoryLoading = false;
+        }
+      }
+
+      export function storedScannerHistoryMode() {
+        try {
+          return localStorage.getItem("movie-inbox-scanner-history-mode") === "session"
+            ? "session"
+            : "persistent";
+        } catch (_) {
+          return "persistent";
+        }
+      }
+
+      export async function changeScannerHistoryMode() {
+        scannerHistoryMode = fields.persistScannerHistory.checked ? "persistent" : "session";
+        try {
+          localStorage.setItem("movie-inbox-scanner-history-mode", scannerHistoryMode);
+        } catch (_) {
+          // The preference remains active for this page even when storage is unavailable.
+        }
+        fields.persistScannerHistory.nextElementSibling.textContent = scannerHistoryMode === "persistent"
+          ? "Historial persistente"
+          : "Sólo esta sesión";
+        selectedScannerItemId = "";
+        await loadScannerHistory();
+        renderScannerQueue();
+        setScannerFeedback(
+          scannerHistoryMode === "persistent"
+            ? "Las próximas decisiones conservarán Deshacer después de reiniciar."
+            : "Las próximas decisiones podrán deshacerse sólo durante esta sesión.",
+          "success"
+        );
+      }
+
+      export async function clearScannerHistory() {
+        const count = scannerHistory.length;
+        if (!count) {
+          setScannerFeedback("No hay actividad para limpiar.", "");
+          return;
+        }
+        const confirmed = confirm(
+          `Eliminar ${count} ${count === 1 ? "operación" : "operaciones"} del historial? Ya no podrán deshacerse.`
+        );
+        if (!confirmed) return;
+        fields.clearScannerHistory.disabled = true;
+        try {
+          const response = await apiFetch("/api/scanner/history/clear", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              history_mode: scannerHistoryMode,
+              confirmed: true
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          scannerHistory = [];
+          selectedScannerItemId = "";
+          renderScannerQueue();
+          setScannerFeedback("Historial eliminado.", "success");
+        } catch (error) {
+          console.error("[catalog-viewer] scanner history clear failed", error);
+          setScannerFeedback("No se pudo limpiar el historial. El inventario no fue modificado.", "error");
+        } finally {
+          fields.clearScannerHistory.disabled = false;
+        }
+      }
+
+      export async function undoScannerOperation(operationId) {
+        if (!operationId) return;
+        setScannerFeedback("Restaurando estado anterior…", "working");
+        try {
+          const response = await apiFetch("/api/scanner/undo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              operation_id: operationId,
+              history_mode: scannerHistoryMode
+            })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            const reason = payload.reason || `HTTP ${response.status}`;
+            if (response.status === 409) {
+              throw new Error("El archivo cambió después de esta operación. Revisalo antes de restaurar.");
+            }
+            throw new Error(reason);
+          }
+          selectedScannerItemId = operationId;
+          await Promise.all([loadScannerQueue(), loadCatalog(), loadLibraries()]);
+          scannerQueueFilter = "history";
+          renderScannerQueue();
+          setScannerFeedback("Operación deshecha. El archivo volvió a la cola.", "success");
+        } catch (error) {
+          console.error("[catalog-viewer] scanner undo failed", error);
+          setScannerFeedback(error.message || "No se pudo deshacer la operación.", "error");
+          renderScannerQueue();
+        }
+      }
+
       export function renderScannerQueue() {
+        if (scannerQueueFilter === "history") {
+          renderScannerHistory();
+          return;
+        }
         const bucketCounts = { missing_identity: 0, year_type_conflict: 0, likely_existing: 0, no_signal: 0 };
         scannerQueue.forEach((item) => {
           const bucket = scannerQueueCauseBucket(item, scannerCandidatesForItem(item));
@@ -143,8 +279,9 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
       }
 
       export function moveScannerQueueSelection(event) {
-        const visible = visibleScannerQueue();
-        if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(event.key) || !visible.length) return;
+        if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(event.key)) return;
+        const visible = scannerQueueFilter === "history" ? scannerHistory : visibleScannerQueue();
+        if (!visible.length) return;
         event.preventDefault();
         const current = Math.max(0, visible.findIndex((item) => item.id === selectedScannerItemId));
         const forwards = event.key === "ArrowDown" || event.key === "ArrowRight";
@@ -235,6 +372,69 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
             <span id="scannerReviewFeedback" role="status" aria-live="polite"></span>
           </footer>`;
         renderScopeStrip(scannerScopeStates(candidates));
+      }
+
+      export function renderScannerHistory() {
+        if (!scannerHistory.some((entry) => entry.id === selectedScannerItemId)) {
+          selectedScannerItemId = scannerHistory[0]?.id || "";
+        }
+        fields.scannerQueueMeta.textContent = `${scannerHistory.length} ${
+          scannerHistory.length === 1 ? "operación" : "operaciones"
+        }`;
+        fields.scannerQueue.innerHTML = scannerHistory.length
+          ? scannerHistory.map(scannerHistoryItem).join("")
+          : `<div class="curation-empty compact"><strong>Todavía no hay actividad</strong><p>Las decisiones nuevas aparecerán en este registro.</p></div>`;
+        const selected = scannerHistory.find((entry) => entry.id === selectedScannerItemId);
+        fields.scannerQueueDetail.innerHTML = selected
+          ? scannerHistoryDetail(selected)
+          : `<div class="curation-empty"><strong>Sin operación seleccionada</strong><p>Elegí una actividad para revisar su estado.</p></div>`;
+        renderScopeStrip(scannerScopeStates(null));
+      }
+
+      export function scannerHistoryItem(operation) {
+        const selected = operation.id === selectedScannerItemId;
+        return `<button class="scanner-queue-item history-item${selected ? " active" : ""}" type="button"
+          data-scanner-item="${escapeAttr(operation.id)}" aria-pressed="${selected}">
+          <span class="history-operation-mark" aria-hidden="true">${scannerActionLabel(operation.action).charAt(0)}</span>
+          <strong>${escapeHtml(operation.label || "Revisión de inventario")}</strong>
+          <small>${escapeHtml(formatHistoryDate(operation.created_at))}</small>
+          <span class="pill ${operation.status === "undone" ? "muted" : "good"}">${
+            operation.status === "undone" ? "deshecha" : "aplicada"
+          }</span>
+        </button>`;
+      }
+
+      export function scannerHistoryDetail(operation) {
+        const summary = operation.summary || {};
+        return `<section class="history-detail">
+          <header class="scanner-case-heading">
+            <div>
+              <span class="section-kicker">${escapeHtml(scannerActionLabel(operation.action))}</span>
+              <h3>${escapeHtml(operation.label || "Revisión de inventario")}</h3>
+            </div>
+            <span class="pill ${operation.status === "undone" ? "muted" : "good"}">${
+              operation.status === "undone" ? "Deshecha" : "Aplicada"
+            }</span>
+          </header>
+          <dl class="history-facts">
+            <div><dt>Fecha</dt><dd>${escapeHtml(formatHistoryDate(operation.created_at))}</dd></div>
+            <div><dt>Alcance</dt><dd>${operation.mode === "session" ? "Sólo esta sesión" : "Persistente"}</dd></div>
+            ${summary.file_count > 1 ? `<div><dt>Archivos</dt><dd>${summary.file_count}</dd></div>` : ""}
+          </dl>
+          <footer class="curation-actions">
+            ${operation.can_undo
+              ? `<button class="action-primary" type="button" data-operation-action="undo-operation"
+                   data-operation-source="scanner" data-operation-id="${escapeAttr(operation.id)}">Deshacer operación</button>`
+              : `<span class="history-closed-note">Esta operación ya fue deshecha.</span>`}
+          </footer>
+        </section>`;
+      }
+
+      export function scannerActionLabel(action) {
+        return {
+          scanner_confirm: "Vinculación",
+          scanner_ignore: "Omitido"
+        }[action] || "Inventario";
       }
 
       export function scannerCandidatesForItem(item) {
@@ -512,9 +712,10 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
                   ? `Conservamos ambas obras. Nueva ficha creada y ${linkedLabel.toLowerCase()} con su identidad.`
                   : `Obra agregada a tu catálogo. ${linkedLabel} al inventario compartido.`
               : `${linkedLabel} al inventario compartido.`;
-          setCurationFeedback(
+          setScannerFeedback(
             `${scannerMessage} ${summarizeScopeStates(scannerActionReceipt(action, payload))}`,
-            "success"
+            "success",
+            payload.operation
           );
           if (selectedScannerItemId) focusSelectedScannerItem();
           else fields.refreshScannerQueue.focus({ preventScroll: true });

@@ -14,7 +14,7 @@ import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionIte
 import { activateHomeSection, addHomeCollectionItem, goToHomeCollection, loadEditorialFeaturedDate, moveSpotlight, openHomeCollectionDetail, refreshEditorialHome, selectSpotlight } from "../surfaces/home.js";
 import { changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
-import { changeScannerQueueFilter, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
+import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
 
       export function handleDelegatedClick(event) {
         const target = event.target.closest("[data-click]");
@@ -181,6 +181,12 @@ import { changeScannerQueueFilter, handleScannerReviewAction, loadScannerQueue, 
       fields.scannerQueueDetail.addEventListener("click", handleScannerReviewAction);
       fields.scannerQueueDetail.addEventListener("submit", handleScannerReviewAction);
       fields.refreshScannerQueue.addEventListener("click", () => loadScannerQueue({ announce: true }));
+      fields.persistScannerHistory.checked = scannerHistoryMode === "persistent";
+      fields.persistScannerHistory.nextElementSibling.textContent = scannerHistoryMode === "persistent"
+        ? "Historial persistente"
+        : "Sólo esta sesión";
+      fields.persistScannerHistory.addEventListener("change", changeScannerHistoryMode);
+      fields.clearScannerHistory.addEventListener("click", clearScannerHistory);
       fields.importInboxPanel.addEventListener("click", handleImportClick);
       fields.importSourceForm.addEventListener("submit", analyzeImportSource);
       fields.importApplyForm.addEventListener("submit", applySelectedImport);

@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 6
+INSTANCE_SCHEMA_VERSION = 7
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -288,12 +288,30 @@ CREATE INDEX ix_home_featured_snapshots_user_date
 ON home_featured_snapshots(user_id, local_date DESC);
 """
 
+INSTANCE_SCHEMA_V7 = """
+CREATE TABLE scanner_history (
+    id TEXT PRIMARY KEY,
+    action TEXT NOT NULL,
+    label TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'applied' CHECK (status IN ('applied', 'undone')),
+    mode TEXT NOT NULL DEFAULT 'persistent',
+    created_at TEXT NOT NULL,
+    undone_at TEXT NOT NULL DEFAULT '',
+    summary_json TEXT NOT NULL DEFAULT '{}',
+    before_json TEXT NOT NULL DEFAULT '{}',
+    after_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX ix_scanner_history_created
+ON scanner_history(created_at DESC);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
     4: ("bounded user import drafts", INSTANCE_SCHEMA_V4),
     5: ("managed media libraries and shared availability", INSTANCE_SCHEMA_V5),
     6: ("daily featured recommendation snapshots", INSTANCE_SCHEMA_V6),
+    7: ("reversible scanner review history", INSTANCE_SCHEMA_V7),
 }
 
 

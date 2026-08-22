@@ -6,6 +6,7 @@ import { fields } from "../core/fields.js";
 import { asList, escapeAttr, escapeHtml, meta } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
 import { mergeFieldLabel, openInternalMergeComparator } from "../core/merge.js";
+import { handleOperationFeedbackClick } from "../core/operation-feedback.js";
 import { curationScopeStates, renderScopeStrip, summarizeScopeStates } from "../core/scope-strip.js";
 import { findLinkForItem } from "../core/search-bridge.js";
 import { curationCounts, items, setCurationCounts } from "../core/state.js";
@@ -190,6 +191,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
       }
 
       export function handleCurationClick(event) {
+        if (handleOperationFeedbackClick(event)) return;
         const filter = event.target.closest("[data-curation-filter]");
         if (filter) {
           curationFilter = filter.dataset.curationFilter || "pending";

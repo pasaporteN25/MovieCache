@@ -4,6 +4,26 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Agregado
+
+- Vincular un archivo del Scanner a una identidad existente ahora queda
+  registrado en una `Actividad` propia del Inventario (persistente o solo
+  por sesión, igual que Curaduría) y puede deshacerse: la operación
+  restaura el estado exacto que tenía la fila antes de confirmarla,
+  incluidas las candidatas detectadas originalmente. Deshacer se rechaza si
+  el archivo cambió después de la operación (otro escaneo, otra decisión).
+  Crear una ficha nueva y omitir un archivo todavía no tienen esta
+  cobertura — quedan para un incremento posterior.
+
+### Cambiado
+
+- Los lanzadores de compatibilidad con v0.1 (`txt_to_catalog.py`,
+  `scan_library.py`, `view_catalog.py`, `enrich_catalog.py`,
+  `match_external_links.py`, `migrate_catalog.py`) y los shims de import
+  `catalog_*.py` se movieron de `scripts/` a `codigoLegacy/`, fuera de
+  Git: nadie los ejecuta dentro de una instancia Docker, donde el camino
+  es `movie-inbox <subcomando>` dentro del contenedor.
+
 ## [0.4.0] - 2026-08-22
 
 ### Agregado

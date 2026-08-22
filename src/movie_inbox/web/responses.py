@@ -11,11 +11,17 @@ from fastapi.responses import JSONResponse
 
 from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.curation_workflow import CurationConflict, CurationItemNotFound
+from movie_inbox.application.library_repository import LibraryConflict, LibraryRepositoryError
 from movie_inbox.application.member_service import ManagedMember
 from movie_inbox.application.repository import (
     CatalogBusyError,
     CatalogFormatError,
     CatalogRepositoryError,
+)
+from movie_inbox.application.scanner_history import ScannerHistoryError
+from movie_inbox.application.scanner_workflow import (
+    ScannerOperationNotApplied,
+    ScannerOperationNotFound,
 )
 from movie_inbox.domain.identity import ArchivedMember, AuthenticatedIdentity
 from movie_inbox.infrastructure.import_parsers import MAX_IMPORT_CONTENT_BYTES
@@ -96,6 +102,23 @@ def curation_application_error_response(error: Exception) -> JSONResponse:
     if isinstance(error, CurationItemNotFound):
         return error_response(str(error), 404)
     if isinstance(error, CurationHistoryError):
+        return error_response(str(error), 500)
+    return error_response(str(error), 400)
+
+
+def scanner_application_error_response(error: Exception) -> JSONResponse:
+    if isinstance(error, LibraryConflict):
+        return error_response(str(error), 409)
+    if isinstance(error, ScannerOperationNotFound):
+        return error_response(str(error), 404)
+    if isinstance(error, ScannerOperationNotApplied):
+        return error_response(str(error), 409)
+    if isinstance(error, LibraryRepositoryError):
+        return error_response(str(error), 503)
+    if isinstance(error, (ScannerHistoryError, CurationHistoryError)):
+        # Session-mode scanner history reuses `MemoryCurationHistoryRepository`
+        # (a generic, per-session in-memory store with no scanner-specific
+        # logic), so its errors surface under Curacion's history exception type.
         return error_response(str(error), 500)
     return error_response(str(error), 400)
 

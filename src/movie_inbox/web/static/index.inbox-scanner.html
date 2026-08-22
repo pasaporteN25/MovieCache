@@ -8,6 +8,13 @@
                 </div>
                 <button id="refreshScannerQueue" class="quiet-action" type="button">Actualizar</button>
               </div>
+              <div class="scanner-history-controls">
+                <label class="history-mode-control">
+                  <input id="persistScannerHistory" type="checkbox" checked>
+                  <span>Historial persistente</span>
+                </label>
+                <button id="clearScannerHistory" class="quiet-action" type="button">Limpiar historial</button>
+              </div>
               <div class="scanner-queue-tools">
                 <div id="scannerQueueFilters" class="scanner-queue-filters" role="group" aria-label="Filtrar archivos pendientes">
                   <button class="active" type="button" data-scanner-filter="all" aria-pressed="true">Todos <span id="scannerAllCount">0</span></button>
@@ -15,6 +22,7 @@
                   <button type="button" data-scanner-filter="likely_existing" aria-pressed="false">Probable ficha existente <span id="scannerLikelyExistingCount">0</span></button>
                   <button type="button" data-scanner-filter="year_type_conflict" aria-pressed="false">Conflicto de año/tipo <span id="scannerYearTypeConflictCount">0</span></button>
                   <button type="button" data-scanner-filter="no_signal" aria-pressed="false">Sin señales <span id="scannerNoSignalCount">0</span></button>
+                  <button type="button" data-scanner-filter="history" aria-pressed="false">Actividad <span id="scannerHistoryCount">0</span></button>
                 </div>
                 <label class="scanner-queue-search">
                   <span class="sr-only">Buscar en la cola del inventario</span>

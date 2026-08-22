@@ -31,8 +31,10 @@ from movie_inbox.application.library_service import (
 from movie_inbox.application.member_service import MemberService
 from movie_inbox.application.privacy_service import PrivacyService
 from movie_inbox.application.repository import CatalogRepositoryError
+from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
+from movie_inbox.infrastructure.curation_history import MemoryCurationHistoryRepository
 from movie_inbox.infrastructure.home_snapshot_repository import SqliteHomeSnapshotRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import parse_import_content
@@ -40,6 +42,7 @@ from movie_inbox.infrastructure.import_repository import SqliteImportDraftReposi
 from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
 from movie_inbox.infrastructure.library_scanner import scan_media_files
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
+from movie_inbox.infrastructure.scanner_history import SqliteScannerHistoryRepository
 from movie_inbox.infrastructure.starter_collections import (
     AKIRA_KUROSAWA_SEED_KEY,
     akira_kurosawa_collection,
@@ -133,6 +136,12 @@ def create_app(config: ViewerConfig) -> FastAPI:
         scanner=scan_media_files,
     )
     availability_service = AvailabilityService(library_repository)
+    scanner_workflow = ScannerWorkflowService(
+        library_service,
+        library_repository,
+        SqliteScannerHistoryRepository(config.instance_db),
+        MemoryCurationHistoryRepository(),
+    )
     privacy_service = PrivacyService(
         identity_repository,
         lambda patterns: availability_service.decorate_items(
@@ -191,6 +200,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.library_repository = library_repository
     app.state.library_service = library_service
     app.state.availability_service = availability_service
+    app.state.scanner_workflow = scanner_workflow
     app.state.library_scheduler = library_scheduler
     app.state.image_warmer = image_warmer
     app.add_middleware(

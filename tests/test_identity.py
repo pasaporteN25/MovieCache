@@ -234,7 +234,7 @@ class IdentityTests(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
-            self.assertEqual(versions, [1, 2, 3, 4, 5, 6])
+            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
@@ -244,6 +244,7 @@ class IdentityTests(unittest.TestCase):
             self.assertIn("library_files", tables)
             self.assertIn("curated_collection_items", tables)
             self.assertIn("collection_follows", tables)
+            self.assertIn("scanner_history", tables)
             self.assertIn("import_drafts", tables)
             self.assertIn("import_draft_items", tables)
             self.assertIn("home_featured_snapshots", tables)

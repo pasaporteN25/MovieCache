@@ -302,6 +302,16 @@
       .scanner-queue-heading > div { display: grid; gap: 3px; }
       .scanner-queue-heading span { color: var(--muted); font-size: var(--text-label); }
       .scanner-queue-heading button { min-height: 34px; width: auto; }
+      .scanner-history-controls {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: end;
+        padding: 8px 12px;
+      }
+      .scanner-history-controls button { width: auto; }
       .scanner-queue-tools {
         border-bottom: 1px solid var(--line);
         display: grid;

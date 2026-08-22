@@ -11,9 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from movie_inbox.application.library_repository import (
+    LibraryConflict,
     LibraryNotFound,
     LibraryRepositoryError,
     LibraryRunBusy,
+    ReviewedFileState,
 )
 from movie_inbox.domain.libraries import (
     LibraryFile,
@@ -475,6 +477,60 @@ class SqliteLibraryRepository:
             except sqlite3.Error as error:
                 raise LibraryRepositoryError(
                     f"Cannot update scanner review queue in: {self.path}"
+                ) from error
+
+    def restore_reviewed_files(
+        self,
+        expected: dict[str, ReviewedFileState],
+        target: dict[str, ReviewedFileState],
+        updated_at: int,
+    ) -> list[LibraryFile]:
+        unique_ids = list(dict.fromkeys(expected))
+        if not unique_ids or set(target) != set(expected):
+            raise LibraryNotFound("Scanner queue item was not found")
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    placeholders = ",".join("?" for _ in unique_ids)
+                    rows = connection.execute(
+                        f"SELECT * FROM library_files WHERE id IN ({placeholders})",
+                        unique_ids,
+                    ).fetchall()
+                    if len(rows) != len(unique_ids):
+                        connection.rollback()
+                        raise LibraryConflict("scanner_item_changed_since_operation")
+                    for row in rows:
+                        current = ReviewedFileState.from_file(_file(row))
+                        if current != expected[str(row["id"])]:
+                            connection.rollback()
+                            raise LibraryConflict("scanner_item_changed_since_operation")
+                    for file_id in unique_ids:
+                        state = target[file_id]
+                        connection.execute(
+                            """UPDATE library_files SET state = ?, work_key = ?, identity_json = ?,
+                                candidates_json = ?, updated_at = ? WHERE id = ?""",
+                            (
+                                state.state,
+                                state.work_key,
+                                _json_dump(dict(state.identity)),
+                                _json_dump(list(state.candidates)),
+                                updated_at,
+                                file_id,
+                            ),
+                        )
+                    connection.commit()
+                    updated_rows = connection.execute(
+                        f"SELECT * FROM library_files WHERE id IN ({placeholders}) "
+                        "ORDER BY relative_key",
+                        unique_ids,
+                    ).fetchall()
+                    return [_file(row) for row in updated_rows]
+            except (LibraryNotFound, LibraryConflict):
+                raise
+            except sqlite3.Error as error:
+                raise LibraryRepositoryError(
+                    f"Cannot restore scanner review queue in: {self.path}"
                 ) from error
 
     def availability_records(self) -> list[dict[str, Any]]:
