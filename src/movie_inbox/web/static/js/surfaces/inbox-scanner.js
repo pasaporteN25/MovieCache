@@ -1,14 +1,14 @@
 import { card } from "../core/card.js";
 import { loadCatalog } from "../core/catalog-data.js";
 import { fields } from "../core/fields.js";
-import { escapeAttr, escapeHtml, hasHost, normalizeText } from "../core/format.js";
+import { escapeAttr, escapeHtml, formatDateTime, hasHost, normalizeText } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
 import { registerUndoHandler, setOperationFeedback } from "../core/operation-feedback.js";
 import { findLocalMatchForItem } from "../core/search-bridge.js";
 import { renderScopeStrip, scannerActionReceipt, scannerScopeStates, summarizeScopeStates } from "../core/scope-strip.js";
 import { curationCounts, currentIdentity } from "../core/state.js";
 import { libraryErrorMessage, loadLibraries } from "./admin-libraries.js";
-import { formatHistoryDate, syncCurationCounts } from "./inbox-curation.js";
+import { syncCurationCounts } from "./inbox-curation.js";
 import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
 
       export let scannerQueue = [];
@@ -397,7 +397,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           data-scanner-item="${escapeAttr(operation.id)}" aria-pressed="${selected}">
           <span class="history-operation-mark" aria-hidden="true">${scannerActionLabel(operation.action).charAt(0)}</span>
           <strong>${escapeHtml(operation.label || "Revisión de inventario")}</strong>
-          <small>${escapeHtml(formatHistoryDate(operation.created_at))}</small>
+          <small>${escapeHtml(formatDateTime(operation.created_at))}</small>
           <span class="pill ${operation.status === "undone" ? "muted" : "good"}">${
             operation.status === "undone" ? "deshecha" : "aplicada"
           }</span>
@@ -417,7 +417,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
             }</span>
           </header>
           <dl class="history-facts">
-            <div><dt>Fecha</dt><dd>${escapeHtml(formatHistoryDate(operation.created_at))}</dd></div>
+            <div><dt>Fecha</dt><dd>${escapeHtml(formatDateTime(operation.created_at))}</dd></div>
             <div><dt>Alcance</dt><dd>${operation.mode === "session" ? "Sólo esta sesión" : "Persistente"}</dd></div>
             ${summary.file_count > 1 ? `<div><dt>Archivos</dt><dd>${summary.file_count}</dd></div>` : ""}
           </dl>

@@ -384,4 +384,5 @@ def _item_summary(item: Mapping[str, Any]) -> dict[str, Any]:
         "status": str(item.get("status") or "to_watch"),
         "local_files_count": len(normalize_local_files(item.get("local_files"))),
         "has_external_link": has_external_link(item),
+        "added_at": str(item.get("added_at") or ""),
     }

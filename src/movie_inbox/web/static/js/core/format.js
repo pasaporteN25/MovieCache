@@ -72,6 +72,29 @@
           .join(", ");
       }
 
+      const SOURCE_LABELS = {
+        wikipedia: "Wikipedia",
+        imdb: "IMDb",
+        filmaffinity: "FilmAffinity",
+        wikidata: "Wikidata",
+        local_files: "Archivo local",
+        txt: "Importación de texto",
+        web: "Búsqueda web",
+        manual_merge: "Fusión manual"
+      };
+
+      export function sourceLabel(source) {
+        return SOURCE_LABELS[String(source || "").trim()] || "Sin fuente";
+      }
+
+      export function formatDateTime(value) {
+        if (!value) return "Sin fecha";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime())
+          ? String(value)
+          : date.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      }
+
       export function asList(value) {
         if (Array.isArray(value)) return value.filter(Boolean);
         if (typeof value === "string") return value.split(",").map((entry) => entry.trim()).filter(Boolean);

@@ -3,7 +3,7 @@ import { cachedImageSrc, card } from "./card.js";
 import { loadCatalog } from "./catalog-data.js";
 import { releaseDateLabel } from "./detail.js";
 import { fields } from "./fields.js";
-import { asList, escapeAttr, escapeHtml, normalizeText } from "./format.js";
+import { asList, escapeAttr, escapeHtml, formatDateTime, normalizeText, sourceLabel } from "./format.js";
 import { apiFetch } from "./http.js";
 import { items, setSelectedExistingIdForSearch } from "./state.js";
 import { isExternalResult, manualResults, renderCatalogMergeResults, renderManualResults, reportExternalResultProblem } from "../surfaces/catalog-search.js";
@@ -149,10 +149,18 @@ import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeed
         requestMergeComparison(mergeContext.survivor_side || "left");
       }
 
+      export function mergeTitleFragment(item, other) {
+        if (item.year && item.year !== other.year) return `${item.title} (${item.year})`;
+        return `${item.title} (${sourceLabel(item.source)})`;
+      }
+
       export function renderMergeComparator() {
         if (!mergeReview) return;
-        const leftTitle = mergeReview.left?.title || "Entrada A";
-        const rightTitle = mergeReview.right?.title || "Entrada B";
+        const rawLeftTitle = mergeReview.left?.title || "Entrada A";
+        const rawRightTitle = mergeReview.right?.title || "Entrada B";
+        const titlesCollide = Boolean(mergeReview.left && mergeReview.right) && rawLeftTitle === rawRightTitle;
+        const leftTitle = titlesCollide ? mergeTitleFragment(mergeReview.left, mergeReview.right) : rawLeftTitle;
+        const rightTitle = titlesCollide ? mergeTitleFragment(mergeReview.right, mergeReview.left) : rawRightTitle;
         fields.mergeComparatorTitle.textContent = `${leftTitle} / ${rightTitle}`;
         fields.mergeComparatorSubtitle.textContent = mergeReview.can_select_survivor
           ? "Elegí qué identidad permanece y resolvé los campos señalados."
@@ -194,7 +202,8 @@ import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeed
           <div>
             <span>${escapeHtml(label)}${survivor ? " · permanece" : ""}</span>
             <strong>${escapeHtml(item.title || "Sin título")}</strong>
-            <small>${escapeHtml([item.year, item.kind, item.source].filter(Boolean).join(" · "))}</small>
+            <small>${escapeHtml([item.year, item.kind, sourceLabel(item.source)].filter(Boolean).join(" · "))}</small>
+            ${item.added_at ? `<small class="merge-entry-added">Agregada ${escapeHtml(formatDateTime(item.added_at))}</small>` : ""}
             <div class="card-badges">
               ${availabilityPill(item)}
               <span class="pill ${item.local_files_count ? "good" : "muted"}">${item.local_files_count || 0} archivos</span>

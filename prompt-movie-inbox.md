@@ -93,7 +93,16 @@ técnico de cada uno) y la decisión es arrancar por el más difícil:
    ver la entrada de abajo) están completos, probados y verificados en
    browser real. Era el más difícil de los 4 hallazgos y el único ya
    resuelto.
-2. Desambiguar casos duplicados con mismo título y año.
+2. **Desambiguar casos duplicados con mismo título y año — fase 1
+   (mostrar señales) cerrada.** La cola, el detalle y el título del
+   comparador de fusión ya distinguen por fuente/fecha/archivo — ver la
+   entrada fechada 2026-08-22 más abajo. Queda la fase 2 (árbol de
+   auto-resolución que decidimos con Lucas, muta datos del catálogo, su
+   propio plan) y 3 puntos explícitamente pospuestos que no hay que
+   perder: empate de fecha de agregado, grupos de 3+ duplicados, y
+   visibilidad de archivos escaneados para miembros comunes — esto último
+   requeriría relajar una invariante dura de privacidad, es una decisión
+   de producto aparte.
 3. Paridad de teclado/búsqueda en Curaduría respecto a Scanner.
 4. `aria-live` en el estado de decisión del comparador de fusión — el más
    simple.
@@ -106,6 +115,55 @@ requiere ninguna acción. Y sobre `scripts/`: no se borró nada, pero los
 lanzadores de compatibilidad con v0.1 y los shims de import se movieron a
 `codigoLegacy/` (fuera de Git). Detalle completo de ambas resoluciones en
 la entrada fechada 2026-08-22 más abajo.
+
+**Desambiguar duplicados — fase 1 (mostrar señales), implementación y
+cierre (2026-08-22).** Después de la conversación de diseño (ver la
+entrada de abajo), plan mode con un agente Plan cuya síntesis verifiqué a
+mano en los 3 puntos más cargados antes de aceptarla — confirmé
+directamente que `compare()` en `curation_workflow.py` ya pega
+`_availability` sobre la respuesta del comparador (así que ese lado no
+necesitaba cambios de backend, menos trabajo del que yo mismo había
+supuesto), que `_duplicate_cases()` ordena el par alfabéticamente para
+elegir `primary` (por eso 2 de 3 filas de un trío idéntico comparten
+literalmente el mismo `primary`), y que `GET /api/curation` no pasa por
+`public_payload()` como sí hace `/api/curation/compare` — expone la ruta
+absoluta del catálogo en `source_file` hoy, sin relación con este cambio
+y solo al propio dueño de esa sesión, nunca a otro usuario. Anotado, no
+lo tocué.
+
+Cambio de backend puramente aditivo: `added_at` y `local_files` en
+`_item_summary()` de `curation_service.py`; solo `added_at` en la de
+`merge_review.py` (el otro lado, disponibilidad, ya llegaba). Frontend:
+nuevo `sourceLabel()` en `core/format.js` (los valores reales de
+`source` en el dominio — `local_files`, `wikidata`, `manual_merge`,
+vacío — no estaban cubiertos por el helper existente, acotado a 3
+fuentes externas de búsqueda); `formatHistoryDate` se renombró a
+`formatDateTime` y se movió de `inbox-curation.js` a `core/format.js`
+porque ya era genérico y ahora lo usan 3 archivos, no 1 (hubo que
+actualizar también su uso en `inbox-scanner.js`, que lo importaba
+indirectamente desde `inbox-curation.js`). Las 3 superficies: el panel
+de detalle (`curationRecord`) y el resumen del comparador
+(`mergeEntrySummary`) muestran las señales siempre; la fila de la cola
+(`curationQueueItem`) y el título del comparador
+(`renderMergeComparator`) solo cuando título y año realmente coinciden,
+para no meter ruido en duplicados que no colisionan visualmente (mismo
+link externo, título distinto). El título del comparador prioriza año
+sobre fuente cuando el año difiere — es el dato más informativo y ya se
+calculaba pero no se usaba.
+
+Verificado: 3 tests nuevos/extendidos (`test_curation.py`,
+`test_curation_workflow.py`, `test_view_http.py`) más toda la suite
+existente — **312/312 verde**. Browser real con 3 copias sintéticas de
+"Heat" (mismo título/año, fuentes y fechas distintas, una con
+`local_files`): las 3 filas de la cola —antes texto idéntico— ahora
+muestran pistas distintas ("IMDb ↔ Wikipedia", "IMDb ↔ Archivo local",
+"Archivo local ↔ Wikipedia"); el título del comparador de fusión pasó de
+"Heat / Heat" a "Heat (Archivo local) / Heat (Wikipedia)". Sin errores
+de consola.
+
+Queda la fase 2 (árbol de auto-resolución) para una sesión futura, con
+su propio plan — muta datos del catálogo y merece su propia revisión
+ahora que la desambiguación visual está funcionando y probada.
 
 **Scanner: historial y deshacer — paso 1/3, vincular a identidad
 existente (2026-08-22).** Precedido por `EnterPlanMode` (dos agentes
@@ -258,6 +316,99 @@ difícil de los 4 que dejó el gate de Fase 5— queda cerrado por completo**.
 `docs/roadmap.md` actualizado para reflejarlo. Quedan los otros 3
 (desambiguar duplicados, paridad de teclado/búsqueda en Curaduría,
 `aria-live` del comparador), en ese orden de dificultad.
+
+**Diseño: desambiguar casos duplicados con mismo título y año
+(2026-08-22).** Conversación larga con Lucas, sin tocar código todavía —
+esto es la síntesis para no perder ninguna decisión.
+
+*El problema, tal como lo encontró la crítica de cierre:* con 3 copias
+sintéticas de "Heat" en el catálogo, la cola de duplicados, el panel de
+detalle y el título del comparador de fusión mostraban las tres filas
+como texto idéntico — sin abrir cada una no hay forma de saber cuál es
+cuál.
+
+*Señales de desambiguación acordadas, en este orden de utilidad:*
+nombre/ruta del archivo local, fuente de origen, fecha de agregado.
+Casos borde ya identificados para cuando se implemente la parte visual:
+un ítem puede tener varios archivos (multi-parte, mostrar "N archivos" en
+vez de un nombre); el mismo nombre puede repetirse en bibliotecas
+distintas (no es ambigüedad real — Lucas: eso debería reflejarse como una
+sola ficha con múltiples entradas en `local_files`, cada una con su
+propio `library_id`); ambas entradas con la misma fuente `local_files`
+probablemente sea el mismo archivo visto en dos escaneos, no dos archivos
+distintos; la fecha de agregado puede estar vacía (ítems migrados) o
+empatada (importación masiva).
+
+*Confirmado leyendo el código real, no supuesto:* ya existe un mecanismo
+de identidad de archivo por contenido —`sampled_fingerprint()` en
+`infrastructure/library_scanner.py`, un SHA-256 del tamaño más los
+primeros y últimos bytes muestreados— que además de detectar archivos
+movidos a nivel Scanner (`library_service.py`, busca por fingerprint
+entre los archivos "desaparecidos" de la corrida cuando la ruta no
+matchea) **ya llega hasta la ficha del catálogo**:
+`normalize_local_files()` en `domain/metadata.py` guarda `fingerprint` y
+`library_id` en cada entrada de `local_files`. La base de datos para
+"misma obra, dos bibliotecas, reflejado en una ficha" ya existe. Lo que
+falta confirmar (al implementar, no ahora): si el flujo actual de
+"confirmar desde Scanner" ya acumula en esa lista o solo escribe una
+entrada.
+
+*Árbol de auto-resolución acordado* para un par de duplicados con mismo
+título/año, siempre registrado en el historial existente y deshacible
+(nunca una acción silenciosa e irreversible):
+
+- Ninguna tiene archivo y son idénticas en **todo**, incluidos campos
+  personales (rating, review, watched_at, tags, notas) — auto-suprimir
+  una. "Idénticas" tiene que incluir los campos personales: si difieren
+  en uno solo (por ejemplo el rating), no es un caso de auto-supresión.
+- Ninguna tiene archivo pero difieren en algún campo personal —
+  auto-combinar conservando el valor no vacío de cada campo (mismo
+  criterio que ya usa el merge existente con la disponibilidad: un dato
+  cargado nunca se pisa con uno vacío).
+- Ambas tienen archivo, con fingerprint distinto — caso real de decisión
+  humana, pero probablemente no necesita lógica nueva: es exactamente lo
+  que ya resuelve el comparador de fusión existente (combina
+  `local_files` en vez de descartar uno). El trabajo acá es mostrar bien
+  las señales de desambiguación para decidir con confianza, no inventar
+  un flujo de resolución nuevo.
+- Ambas tienen archivo con el mismo fingerprint (mismo archivo visto dos
+  veces, por ejemplo en dos escaneos) — auto-unificar, quedándose con los
+  metadatos más enriquecidos mientras se preservan todas las rutas
+  (nunca se descarta una ruta por "elegir la más rica").
+- Una tiene archivo y la otra no, mismo título/año — "deseo adquirido"
+  (la ficha sin archivo era algo que se seguía/quería, la que tiene
+  archivo confirma que ya se consiguió): auto-combinar, avisar después
+  con el toast normal, deshacible como todo lo demás.
+- Ninguna regla aplica con confianza, o el título/año coincide por
+  casualidad entre obras distintas — cae al flujo manual existente
+  ("No son duplicados" / comparar y fusionar a mano). Este escape hatch
+  ya está resuelto por el sistema de historial: nada de esto debe ser
+  permanente sin poder deshacerse.
+
+*Tres puntos explícitamente pospuestos por Lucas — anotados para no
+perderlos, no para resolver ahora:*
+
+1. Qué hacer cuando la fecha de agregado también empata entre las dos
+   entradas — sin regla todavía.
+2. Grupos de 3+ duplicados idénticos (no solo pares) — no se confirmó
+   todavía si la lógica actual de detección/comparación entiende grupos
+   o solo compara de a pares; si es lo segundo, un grupo de 3 podría
+   mostrarse como 3 comparaciones de a pares en vez de un solo grupo,
+   confundiendo más de lo que aclara.
+3. Que los miembros comunes de una instancia puedan ver los archivos
+   escaneados si el admin lo habilita (hoy los archivos/rutas locales
+   nunca se exponen en vistas compartidas, sin excepción, ni para el
+   owner). Esto requeriría relajar una invariante dura documentada en
+   `CLAUDE.md`, no es un ajuste chico, y es una feature aparte de
+   desambiguar duplicados — queda anotada para su propio hilo de diseño
+   futuro, no se decide acá.
+
+Lucas: "comenza en modo automático con lo que puedas de lo que ya
+decidimos" — sigue investigación del código real (detección de
+duplicados en `domain/`, forma de los 3 sitios de renderizado en
+`inbox-curation.js`, si el payload del caso de duplicado ya expone lo
+necesario) y plan mode antes de tocar archivos, mismo proceso que
+Scanner.
 
 **Cierre de Fase 5: release v0.4.0, README, evaluación de `scripts/` y
 ranking del próximo incremento (2026-08-22).** De los 6 hallazgos del gate

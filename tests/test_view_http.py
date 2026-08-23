@@ -1429,7 +1429,13 @@ class ViewerHttpTests(unittest.TestCase):
         repository.write(
             [
                 normalize_item(
-                    {"id": "heat-scanned", "title": "Heat", "year": "1995", "kind": "pelicula"}
+                    {
+                        "id": "heat-scanned",
+                        "title": "Heat",
+                        "year": "1995",
+                        "kind": "pelicula",
+                        "added_at": "2026-01-01T00:00:00+00:00",
+                    }
                 ),
                 normalize_item(
                     {
@@ -1479,6 +1485,8 @@ class ViewerHttpTests(unittest.TestCase):
         )
         self.assertTrue(scanned_case["primary"]["_availability"]["server"])
         self.assertFalse(scanned_case["primary"]["_availability"]["manual"])
+        self.assertEqual(scanned_case["primary"]["added_at"], "2026-01-01T00:00:00+00:00")
+        self.assertEqual(scanned_case["primary"]["local_files"], [])
 
         def reference(item_id):
             return {"id": item_id, "source_file": str(self.catalog_path)}
@@ -1499,6 +1507,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertFalse(comparison["left"]["_availability"]["manual"])
         self.assertFalse(comparison["right"]["_availability"]["server"])
         self.assertTrue(comparison["right"]["_availability"]["manual"])
+        self.assertEqual(comparison["left"]["added_at"], "2026-01-01T00:00:00+00:00")
 
         merge_body = json.dumps(
             {

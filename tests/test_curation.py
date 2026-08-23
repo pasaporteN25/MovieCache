@@ -63,6 +63,44 @@ class CurationTests(unittest.TestCase):
 
         self.assertEqual(payload["counts"]["duplicates"], 0)
 
+    def test_duplicate_case_summaries_expose_added_at_and_local_files_for_disambiguation(
+        self,
+    ) -> None:
+        items = curation_rows(
+            [
+                normalize_item(
+                    {
+                        "id": "heat-local",
+                        "title": "Heat",
+                        "year": "1995",
+                        "source": "local_files",
+                        "added_at": "2026-01-01T00:00:00+00:00",
+                        "local_files": [{"path": "D:/Heat.mkv", "name": "Heat.mkv"}],
+                    }
+                ),
+                normalize_item(
+                    {
+                        "id": "heat-imdb",
+                        "title": "Heat",
+                        "year": "1995",
+                        "source": "imdb",
+                        "added_at": "2026-02-01T00:00:00+00:00",
+                    }
+                ),
+            ]
+        )
+
+        payload = build_curation_payload(items)
+
+        duplicate_cases = [case for case in payload["cases"] if case["type"] == "duplicate"]
+        self.assertEqual(len(duplicate_cases), 1)
+        sides = {duplicate_cases[0]["primary"]["id"]: duplicate_cases[0]["primary"]}
+        sides[duplicate_cases[0]["secondary"]["id"]] = duplicate_cases[0]["secondary"]
+        self.assertEqual(sides["heat-local"]["added_at"], "2026-01-01T00:00:00+00:00")
+        self.assertEqual(sides["heat-imdb"]["added_at"], "2026-02-01T00:00:00+00:00")
+        self.assertEqual(sides["heat-local"]["local_files"][0]["name"], "Heat.mkv")
+        self.assertEqual(sides["heat-imdb"]["local_files"], [])
+
     def test_not_duplicate_decision_removes_the_pair(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = JsonCatalogRepository(Path(temporary) / "catalog.json", normalize_item)

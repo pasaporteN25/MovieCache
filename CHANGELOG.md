@@ -14,6 +14,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   originalmente y, para una ficha creada, su alta en el catálogo. Deshacer
   se rechaza si algo más tocó el caso después de la operación —por
   ejemplo, el enriquecimiento en segundo plano de una ficha recién creada.
+- Cuando dos fichas duplicadas comparten título y año, la cola de
+  Curaduría, el panel de detalle y el título del comparador de fusión ya
+  no las muestran como texto idéntico: ahora distinguen por fuente
+  (Wikipedia, IMDb, FilmAffinity, archivo local...), fecha de alta y
+  archivo local asociado cuando existe.
 
 ### Cambiado
 

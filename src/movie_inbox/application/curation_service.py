@@ -14,6 +14,7 @@ from movie_inbox.domain.catalog import (
     title_match_keys_for_item,
 )
 from movie_inbox.domain.curation import curation_item_reference
+from movie_inbox.domain.metadata import normalize_local_files
 
 
 def build_curation_payload(items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -135,6 +136,8 @@ def _item_summary(item: Mapping[str, Any]) -> dict[str, Any]:
         "en_catalogo": bool(item.get("en_catalogo")),
         "status": str(item.get("status") or "to_watch"),
         "_availability": item.get("_availability"),
+        "added_at": str(item.get("added_at") or ""),
+        "local_files": normalize_local_files(item.get("local_files")),
     }
 
 

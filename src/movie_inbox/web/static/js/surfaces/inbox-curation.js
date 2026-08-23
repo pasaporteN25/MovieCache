@@ -3,7 +3,7 @@ import { cachedImageSrc, card } from "../core/card.js";
 import { load, loadCatalog } from "../core/catalog-data.js";
 import { openDetail } from "../core/detail.js";
 import { fields } from "../core/fields.js";
-import { asList, escapeAttr, escapeHtml, meta } from "../core/format.js";
+import { asList, escapeAttr, escapeHtml, formatDateTime, localFilesText, meta, sourceLabel } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
 import { mergeFieldLabel, openInternalMergeComparator } from "../core/merge.js";
 import { handleOperationFeedbackClick } from "../core/operation-feedback.js";
@@ -317,7 +317,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           <span class="curation-queue-copy">
             <span class="curation-queue-type">${escapeHtml(curationActionLabel(operation.action))}</span>
             <strong>${escapeHtml(operation.label || "Decisión de curaduría")}</strong>
-            <small>${escapeHtml(formatHistoryDate(operation.created_at))}</small>
+            <small>${escapeHtml(formatDateTime(operation.created_at))}</small>
           </span>
           <span class="pill ${operation.status === "undone" ? "muted" : "good"}">${
             operation.status === "undone" ? "deshecha" : "aplicada"
@@ -339,7 +339,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
             }</span>
           </header>
           <dl class="history-facts">
-            <div><dt>Fecha</dt><dd>${escapeHtml(formatHistoryDate(operation.created_at))}</dd></div>
+            <div><dt>Fecha</dt><dd>${escapeHtml(formatDateTime(operation.created_at))}</dd></div>
             <div><dt>Alcance</dt><dd>${operation.mode === "session" ? "Sólo esta sesión" : "Persistente"}</dd></div>
             ${summary.survivor_title ? `<div><dt>Entrada final</dt><dd>${escapeHtml(summary.survivor_title)}</dd></div>` : ""}
             ${changedFields.length ? `<div><dt>Campos revisados</dt><dd>${changedFields.length}</dd></div>` : ""}
@@ -364,18 +364,14 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         }[action] || "Curaduría";
       }
 
-      export function formatHistoryDate(value) {
-        if (!value) return "Sin fecha";
-        const date = new Date(value);
-        return Number.isNaN(date.getTime())
-          ? String(value)
-          : date.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
-      }
-
       export function curationQueueItem(entry) {
         const item = entry.primary;
         const selected = entry.id === selectedCurationCaseId;
         const type = entry.type === "duplicate" ? "Duplicado" : "Sin referencia";
+        const collides = entry.type === "duplicate"
+          && entry.secondary
+          && String(item.title || "").trim() === String(entry.secondary.title || "").trim()
+          && String(item.year || "") === String(entry.secondary.year || "");
         return `<button class="curation-queue-item ${selected ? "selected" : ""}" type="button"
           data-curation-case="${escapeAttr(entry.id)}" aria-pressed="${selected}">
           ${curationThumb(item)}
@@ -383,6 +379,9 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
             <span class="curation-queue-type">${escapeHtml(type)}${entry.status === "deferred" ? " · Pospuesta" : ""}</span>
             <strong>${escapeHtml(item.title || "Sin título")}</strong>
             <small>${escapeHtml([item.year, item.kind].filter(Boolean).join(" · ") || "Sin año")}</small>
+            ${collides
+              ? `<small class="curation-queue-duplicate-hint">${escapeHtml(sourceLabel(item.source))} ↔ ${escapeHtml(sourceLabel(entry.secondary.source))}</small>`
+              : ""}
           </span>
           <span class="curation-queue-arrow" aria-hidden="true">→</span>
         </button>`;
@@ -451,7 +450,8 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
             ${curationThumb(item, true)}
             <div>
               <h4>${escapeHtml(item.title || "Sin título")}</h4>
-              <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(item.source)}</div>
+              <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(sourceLabel(item.source))}</div>
+              <div class="meta">${meta(item.added_at ? `Agregada ${formatDateTime(item.added_at)}` : "")}${meta(localFilesText(item))}</div>
               <div class="card-badges">
                 ${availabilityPill(item)}
                 <span class="pill ${item.status === "watched" ? "good" : "muted"}">${item.status === "watched" ? "vista" : "pendiente"}</span>

@@ -145,6 +145,7 @@ class CurationWorkflowTests(unittest.TestCase):
                             "year": "1995",
                             "kind": "pelicula",
                             "en_catalogo": False,
+                            "added_at": "2026-01-01T00:00:00+00:00",
                         }
                     ),
                     normalize_item(
@@ -177,6 +178,7 @@ class CurationWorkflowTests(unittest.TestCase):
             review = workflow.compare(left, right=right)
             self.assertTrue(review["left"]["_availability"]["server"])
             self.assertFalse(review["left"]["_availability"]["manual"])
+            self.assertEqual(review["left"]["added_at"], "2026-01-01T00:00:00+00:00")
             self.assertFalse(review["right"]["_availability"]["server"])
             # The raw manual flag on both sides is False, so the field-diff table
             # (used to decide what apply_reviewed_merge persists) must see them as
