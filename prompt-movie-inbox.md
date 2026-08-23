@@ -61,10 +61,10 @@ alcance de archivo/línea y nivel de modelo sugerido por tarea. Se eligió Markd
 de un kanban autohosteado (se evaluó Kanboard) para no sumar infraestructura nueva que
 mantener. Leerlo junto con este archivo al arrancar una sesión nueva.
 
-## Progreso (actualizado 2026-08-22)
+## Progreso (actualizado 2026-08-23)
 
 Fases 0, 1, 2, 3 y 4 cerradas. v0.3.0 publicado. **Fase 5 (v0.4.0) cerrada
-por completo y publicada: tag `v0.4.0` creado (local, sin pushear todavía).**
+por completo y publicada: tag `v0.4.0` pusheado a `origin`.**
 Los 4 P1 (P1-c, P1-a, P1-b, P1-d), el P1 y P2 propios del intento de gate
 (`--control-border`, caching HTTP), los 4 P3 (`extract`/`typeset`/`adapt`/
 `polish`) y el gate final con puntaje (`$impeccable critique`, 29/40 contra
@@ -83,10 +83,10 @@ Enriquecimiento y cobertura de links): `[E3]` y `[E4]` cerrados (commit
 viejo de `--control-border` (commit `bea4a43`). `[E6]` sigue en Backlog a
 pedido de Lucas.
 
-**Próximo incremento (sin fase/versión asignada todavía): cerrar los 4
-hallazgos que dejó el gate de Fase 5.** Están rankeados de más simple a
+**Próximo incremento: v0.5.0, cierre de coherencia de interfaz y limpieza.**
+De los 4 hallazgos que dejó el gate de Fase 5, rankeados de más simple a
 más difícil (ver la entrada fechada 2026-08-22 más abajo para el detalle
-técnico de cada uno) y la decisión es arrancar por el más difícil:
+técnico de cada uno), los 2 más difíciles ya están cerrados:
 
 1. **Historial y deshacer para Scanner — cerrado.** Los 3 pasos (vincular
    a identidad existente `860c28a`, omitir `3829fd1`, crear y vincular —
@@ -98,14 +98,21 @@ técnico de cada uno) y la decisión es arrancar por el más difícil:
    el detalle y el comparador de fusión) y fase 2 (botón "Resolver
    duplicados claros": combina solo los pares sin conflicto real,
    reusando el motor de fusión existente sin lógica de decisión nueva —
-   ver la entrada fechada 2026-08-22 más abajo). Quedan 3 puntos
-   explícitamente pospuestos que no hay que perder: empate de fecha de
-   agregado, grupos de 3+ duplicados, y visibilidad de archivos
-   escaneados para miembros comunes — esto último requeriría relajar una
-   invariante dura de privacidad, es una decisión de producto aparte.
-3. Paridad de teclado/búsqueda en Curaduría respecto a Scanner.
-4. `aria-live` en el estado de decisión del comparador de fusión — el más
-   simple.
+   ver la entrada fechada 2026-08-22 más abajo).
+
+Los 2 hallazgos restantes (paridad de teclado/búsqueda en Curaduría,
+`aria-live` del comparador) ya no quedan sueltos: la sesión del
+2026-08-23 los formalizó como **v0.5.0** en `docs/roadmap.md`, junto con
+un caso borde que dejó pendiente la desambiguación (empate de fecha de
+agregado además de archivo y fuente) y 3 hallazgos de higiene de
+repositorio encontrados al mover `scripts/` el 2026-08-22
+(`check-output.txt` trackeado por accidente, `scripts/LICENSE` duplicado,
+un hueco de `.gitignore` que dejó pasar un catálogo personal anidado).
+Las 7 tareas están desglosadas con archivo/línea y modelo sugerido en
+`tareas.md` (frentes "Cierre de coherencia de interfaz" y "Higiene de
+repositorio") — ver la entrada de esa fecha más abajo para el detalle de
+qué quedó explícitamente afuera y por qué (grupos de 3+ duplicados,
+visibilidad de archivos para miembros, purga de historial de git).
 
 Las dos preguntas que habían quedado abiertas ya se resolvieron el mismo
 2026-08-22: Lucas confirmó en un browser real que el diálogo de fusión sí
@@ -115,6 +122,97 @@ requiere ninguna acción. Y sobre `scripts/`: no se borró nada, pero los
 lanzadores de compatibilidad con v0.1 y los shims de import se movieron a
 `codigoLegacy/` (fuera de Git). Detalle completo de ambas resoluciones en
 la entrada fechada 2026-08-22 más abajo.
+
+**Planificación: v0.5.0 y desglose de tareas para modelos más chicos
+(2026-08-23).** Con los 2 hallazgos más difíciles del gate de Fase 5
+cerrados, Lucas pidió tomarse una pausa para probar bien lo construido:
+"revisá lo que tenemos por delante y armá un plan en tareas menores para
+que las pueda resolver un modelo más chico", con el pedido explícito de
+que el progreso hasta hoy más el backlog que corresponda formen la
+versión v0.5.0, y de marcar como TBD lo que sea demasiado grande para
+tomar ahora. Sesión sin tocar código de producto — solo lectura y
+reorganización de `docs/roadmap.md` y `tareas.md`.
+
+Antes de escribir nada, releído `tareas.md` completo: ya existía el
+tablero (creado 2026-08-18) con exactamente el formato pedido —
+Backlog/En curso/Hecho, agrupado por "Frente", cada tarea con
+archivo/línea, dependencias y modelo sugerido (chico/medio/grande, con la
+regla explícita de no asignar nunca una tarea de criterio a un modelo
+chico). Se descartó crear un archivo nuevo (`fase-4-tareas.md` había sido
+justamente ese patrón antes de `tareas.md`, y su propio encabezado dice
+"este archivo es el tablero completo, no uno por fase") — se sumaron 2
+frentes nuevos a `tareas.md` en su lugar: "Cierre de coherencia de
+interfaz (v0.5.0)" (4 tareas, `[V5-1]` a `[V5-4]`) y "Higiene de
+repositorio" (3 tareas, `[H1]` a `[H3]`).
+
+Cada tarea se verificó contra el código real antes de escribirla, no
+contra lo que decía la crítica original — encontré varios detalles que
+cambian el alcance:
+
+- El patrón de `aria-live` que `[V5-1]` necesita **ya existe** en el mismo
+  archivo: `#mergeComparatorFeedback` (`index.dialogs.html:277`) ya tiene
+  `aria-live="polite"`, 4 líneas antes de `#mergeDecisionStatus`. La tarea
+  quedó como copiar ese criterio exacto, no inventar uno.
+- Curaduría no tiene ningún estado de selección por teclado todavía
+  (`grep` de `moveCurationQueueSelection`/`curationQueueSearch` no
+  encontró nada), pero sí tiene ya el resto del estado que hace falta
+  para portarlo: `curationFilter`, `selectedCurationCaseId`,
+  `visibleCurationCases()`, `renderCuration()`, `curationHistory` — todos
+  paralelos exactos a sus equivalentes de Scanner. La única decisión de
+  diseño abierta que había dejado la crítica ("¿se generaliza el handler
+  o se duplica?") se resolvió acá: duplicar adaptado a Curaduría, no
+  generalizar — el estado es específico de cada módulo y no justifica una
+  abstracción compartida. Encontré además que la fila de Curaduría marca
+  "seleccionada" con la clase `selected`, no `active` como Scanner — un
+  detalle que, sin señalarlo explícitamente en la tarea, un modelo chico
+  probablemente hubiera copiado mal.
+- El caso de "empate también en fecha" que había quedado sin regla
+  (`[V5-4]`) se pudo resolver con una propuesta concreta en vez de dejarlo
+  abierto: si además de archivo/fuente/fecha todos los campos personales
+  también coincidieran, el botón de auto-resolución ya los fusiona solos
+  antes de que el usuario los vea — así que el caso real solo aparece
+  cuando hay un conflicto genuino de datos personales, y ahí alcanza con
+  un desempate posicional ("Duplicado 1 de 2") sin inventar una cuarta
+  señal de datos.
+- Grupos de 3+ duplicados sí quedaron fuera de `tareas.md`, como pidió
+  Lucas para lo "demasiado grande": la detección
+  (`annotate_duplicate_items()` en `domain/catalog.py`) ya agrupa
+  correctamente, pero `_duplicate_cases()` en `curation_service.py`
+  descompone cada grupo en pares a propósito, y el comparador de fusión y
+  el botón de auto-resolución de hoy están pensados para pares, no para
+  N — colapsarlo probablemente merece su propio hilo de diseño, igual que
+  tuvo la desambiguación. Anotado en `docs/roadmap.md`, no en `tareas.md`.
+
+De paso, verificado el estado real de los 3 hallazgos de higiene que
+habían quedado solo anotados el 2026-08-22: los 3 archivos
+(`check-output.txt`, `scripts/LICENSE`, `scripts/scripts/catalogv4.json`)
+siguen tal cual se los dejó, y **los 3 ya están en `origin/master`** — se
+confirmó con `git log origin/master -- <archivo>` en vez de asumir que
+seguían solo locales. Esto le sube la prioridad a `[H3]`: el catálogo
+personal anidado no es solo un descuido local, ya está expuesto en el
+remoto desde el commit `a21314a` (2026-08-01). La tarea en `tareas.md`
+cubre solo la parte segura y mecánica (arreglar el patrón de
+`.gitignore` recursivo y `git rm --cached`, sin abrir el archivo);
+purgarlo del historial de git requeriría reescribir commits y
+probablemente un force-push, así que quedó anotado como decisión
+pendiente de Lucas, no como tarea delegable. De paso se confirmó también
+que los 6 commits de esta sesión (incluido el tag `v0.4.0`) ya estaban
+todos en `origin/master` — `git status` no mostraba nada por pushear.
+
+También se aprovechó para reordenar `docs/roadmap.md`: el hito
+"v0.5.0: cliente básico" que ya estaba escrito ahí se movió a "En
+investigación" sin número de versión — `PRODUCT.md` ya decía
+explícitamente que el cliente Android "no forma parte de la siguiente
+etapa inmediata", y el propio texto del hito reconocía prerequisitos sin
+empezar (API versionada, sesiones aptas para dispositivos). v0.5.0 pasó a
+nombrar lo que realmente se va a hacer a continuación: el cierre de
+coherencia de interfaz más la higiene de repositorio. Ningún contenido se
+perdió, solo se destinó a un momento distinto del roadmap — queda como
+candidato natural para v0.6.0 una vez que se confirme la hipótesis.
+
+Sin tests que correr (no se tocó código de producto). `git diff --check`
+limpio en los 3 archivos de documentación tocados
+(`docs/roadmap.md`, `tareas.md`, este archivo).
 
 **Desambiguar duplicados — fase 2 (árbol de auto-resolución), cierre del
 hallazgo completo (2026-08-22).** Plan mode con un agente Explore para

@@ -36,6 +36,17 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   Git: nadie los ejecuta dentro de una instancia Docker, donde el camino
   es `movie-inbox <subcomando>` dentro del contenedor.
 
+- Los checks locales instalan las dependencias de desarrollo y ejecutan el mismo gate
+  Ruff/mypy que CI antes de compilar y correr la suite.
+
+### Corregido
+
+- La migracion de instancia v8 completa sin perdida las columnas de snapshot personal
+  del historial de Scanner en bases que ya hubieran aplicado la definicion temprana de
+  v7. Las instalaciones nuevas y las v7 ya completas convergen al mismo esquema.
+- El smoke test de Docker Compose reintenta una unica salida transitoria de `up`, pero
+  sigue fallando y mostrando estado/logs si el servicio no llega realmente a saludable.
+
 ## [0.4.0] - 2026-08-22
 
 ### Agregado

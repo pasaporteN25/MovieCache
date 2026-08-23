@@ -134,11 +134,27 @@ jobs:
       - name: Start and verify container
         shell: bash
         run: |
-          docker compose up --detach
+          compose_started=false
+          for compose_attempt in 1 2; do
+            if docker compose up --detach; then
+              compose_started=true
+              break
+            fi
+            echo "docker compose up failed on attempt ${compose_attempt}; collecting state before retry"
+            docker compose ps --all || true
+            docker compose logs --no-color || true
+            sleep 2
+          done
+          test "$compose_started" = "true"
           container_id="$(docker compose ps --quiet movie-inbox)"
+          test -n "$container_id"
           for attempt in $(seq 1 60); do
             status="$(docker inspect --format '{{.State.Health.Status}}' "$container_id")"
             if [ "$status" = "healthy" ]; then break; fi
+            if [ "$status" = "unhealthy" ]; then
+              docker compose logs --no-color
+              exit 1
+            fi
             sleep 1
           done
           test "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" = "healthy"

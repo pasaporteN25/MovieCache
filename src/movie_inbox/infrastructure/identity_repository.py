@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 7
+INSTANCE_SCHEMA_VERSION = 8
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -308,6 +308,8 @@ CREATE INDEX ix_scanner_history_created
 ON scanner_history(created_at DESC);
 """
 
+INSTANCE_SCHEMA_V8 = ""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -315,6 +317,7 @@ INSTANCE_MIGRATIONS = {
     5: ("managed media libraries and shared availability", INSTANCE_SCHEMA_V5),
     6: ("daily featured recommendation snapshots", INSTANCE_SCHEMA_V6),
     7: ("reversible scanner review history", INSTANCE_SCHEMA_V7),
+    8: ("scanner history catalog snapshots", INSTANCE_SCHEMA_V8),
 }
 
 
@@ -1111,7 +1114,11 @@ class SqliteIdentityRepository:
                 raise IdentityRepositoryError(f"Missing instance migration v{target_version}")
             name, script = migration
             try:
-                connection.executescript("BEGIN IMMEDIATE;\n" + script)
+                if target_version == 8:
+                    connection.execute("BEGIN IMMEDIATE")
+                    self._migrate_scanner_history_v8(connection)
+                else:
+                    connection.executescript("BEGIN IMMEDIATE;\n" + script)
                 connection.execute(
                     "INSERT INTO instance_migrations(version, name, applied_at) VALUES (?, ?, ?)",
                     (target_version, name, _utc_now()),
@@ -1120,6 +1127,20 @@ class SqliteIdentityRepository:
             except Exception:
                 connection.rollback()
                 raise
+
+    @staticmethod
+    def _migrate_scanner_history_v8(connection: sqlite3.Connection) -> None:
+        columns = {
+            str(row["name"]) for row in connection.execute("PRAGMA table_info(scanner_history)")
+        }
+        additions = {
+            "catalog_before_json": "TEXT NOT NULL DEFAULT 'null'",
+            "catalog_after_json": "TEXT NOT NULL DEFAULT 'null'",
+            "catalog_path": "TEXT NOT NULL DEFAULT ''",
+        }
+        for column, declaration in additions.items():
+            if column not in columns:
+                connection.execute(f"ALTER TABLE scanner_history ADD COLUMN {column} {declaration}")
 
     @staticmethod
     def _catalog(connection: sqlite3.Connection, user_id: str) -> PersonalCatalog | None:

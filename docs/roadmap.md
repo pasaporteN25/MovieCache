@@ -17,9 +17,11 @@ Dos items de esta version no se resolvieron a tiempo y pasan a v0.4.0 porque son
 arquitectura de informacion, no ranking (ver abajo): disponibilidad efectiva unica sin
 llegar a Curaduria, y cola de revision sin organizar por causa/confianza.
 
-Un tercer item queda sin version asignada: la comparacion entre baseline y algoritmo
-candidato en Search Lab. `movie-inbox search-lab` sigue midiendo unicamente el ranking
-productivo actual; ese incremento no tiene fecha todavia.
+El incremento posterior de comparacion entre baseline y algoritmo candidato ya esta
+implementado: `movie-inbox search-lab compare --candidate ...` ejecuta ambos rankings
+sobre el mismo corpus y genera reportes JSON/HTML sin modificar produccion. El gate
+productivo sigue usando la estrategia publicada hasta que una candidata demuestre una
+mejora sin falsos auto-match.
 
 ### v0.4.0: coherencia de interfaz — publicado 2026-08-22
 
@@ -35,9 +37,8 @@ contra el 22/40 del 2026-08-14. Detalle completo en `CHANGELOG.md` bajo `[0.4.0]
 
 La critica de cierre encontro una capa nueva del mismo problema que esta version vino
 resolviendo, mas chica que los 4 P1 originales pero real. Dos arreglos puntuales
-cerraron el mismo dia (border-radius mobile de Curaduria/Scanner); pasan a un
-incremento posterior, sin version asignada todavia. De los cuatro, dos ya estan
-cerrados:
+cerraron el mismo dia (border-radius mobile de Curaduria/Scanner). De los cuatro
+hallazgos restantes, los dos mas dificiles ya estan cerrados:
 
 - **Cerrado.** Scanner seguia sin historial ni deshacer — el P2 original de la
   critica del 14/08, nunca cerrado formalmente. Vincular a identidad existente,
@@ -53,27 +54,49 @@ cerrados:
   de decision, y deja en la cola —ya bien diferenciados— los que si tienen un
   conflicto real de datos personales.
 
-Quedan dos:
+Los dos restantes, mas un caso borde que dejo pendiente el punto anterior y una
+pasada de higiene de repositorio encontrada en el camino, pasan a formar v0.5.0 (ver
+abajo) en vez de quedar sin version asignada.
+
+### v0.5.0: cierre de coherencia de interfaz y limpieza
+
+Incremento chico a proposito: agrupa lo que quedo pendiente del gate de cierre de
+v0.4.0 mas higiene de repositorio encontrada en el camino, para poder probar bien lo
+construido hasta aca antes de seguir. Desglose de tareas concreto, con alcance de
+archivo/linea y modelo sugerido por tarea, en `tareas.md` (frentes "Cierre de
+coherencia de interfaz" e "Higiene de repositorio").
 
 - Curaduria no tiene la navegacion por flechas ni la busqueda que si tiene Scanner,
-  pese a compartir la misma forma de pantalla.
+  pese a compartir la misma forma de pantalla (`tareas.md` [V5-2], [V5-3]).
 - El estado de decision del comparador de fusion no esta anunciado para lectores de
-  pantalla (`aria-live`).
+  pantalla (`tareas.md` [V5-1]).
+- Cuando dos duplicados empatan hasta en archivo, fuente y fecha de alta —y solo
+  quedan distinguibles por un conflicto real de datos personales—, la desambiguacion
+  visual de v0.4.0 no alcanza (`tareas.md` [V5-4]).
+- Un archivo de salida de instalacion vieja y una licencia duplicada quedaron
+  trackeados por accidente en el repo (`tareas.md` [H1], [H2]).
+- Un hueco en `.gitignore` deja pasar catalogos personales anidados en subcarpetas de
+  `scripts/` — ya afecto a uno real (`tareas.md` [H3]).
 
-### v0.5.0: cliente basico
+Explicitamente fuera de esta version, anotado para no perderlo pero sin tomar
+todavia:
 
-La hipotesis de trabajo es un primer cliente Android en Kotlin para una instancia
-self-hosted. Debe confirmarse antes de congelar el alcance de v0.4.0.
-
-- Inicio de sesion seguro contra una URL HTTPS elegida por el usuario.
-- Lectura, busqueda y detalle del catalogo personal.
-- Cambio de estado, fecha de vista, puntaje y review.
-- Disponibilidad fisica en modo lectura y apertura de links externos.
-- Sin administracion, Scanner, importaciones, curaduria avanzada ni uso offline en la
-  primera entrega.
-
-Este hito requiere antes una API versionada y documentada, sesiones aptas para
-dispositivos y pruebas de compatibilidad entre servidor y cliente.
+- **Grupos de 3+ duplicados identicos.** La deteccion (`annotate_duplicate_items()` en
+  `domain/catalog.py`) ya los agrupa correctamente, pero la cola los presenta como
+  pares (`_duplicate_cases()` en `application/curation_service.py` descompone cada
+  grupo en C(n,2) casos). Colapsarlos en un solo caso tocaria el comparador de fusion
+  (pensado para 2 entradas, no N) y el boton de auto-resolucion que ya itera de a
+  pares — es mas que un ajuste de presentacion, probablemente necesita su propio hilo
+  de diseno como el que definio la desambiguacion de v0.4.0.
+- **Visibilidad de archivos escaneados para miembros comunes, a discrecion del
+  admin.** Hoy los archivos y rutas locales nunca se exponen en vistas compartidas,
+  sin excepcion ni para el owner. Habilitar esto relajaria una invariante dura de
+  privacidad documentada en `CLAUDE.md` — es una decision de producto aparte, no un
+  ajuste de esta version.
+- **Purgar `scripts/scripts/catalogv4.json` del historial de git.** [H3] deja de
+  trackearlo hacia adelante, pero el archivo ya esta en `origin/master` desde
+  2026-08-01. Sacarlo de la historia requiere reescribir commits y probablemente un
+  force-push — decision de Lucas, no delegable a una tarea de `tareas.md`.
 
 ## Implementado en el incremento de descubrimiento y scanner
 
@@ -117,6 +140,16 @@ del mismo incremento.
 - Juegos y musica requieren modelos verticales propios. No se agregaran como valores
   de `kind` hasta definir campos, fuentes, disponibilidad y experiencias de detalle
   especificas para cada medio.
-- Clientes Kotlin, Radarr, Sonarr, Letterboxd y otras integraciones siguen siendo
-  direcciones validas, pero se priorizan despues de estabilizar busqueda, scanner,
-  backup y contratos de datos.
+- **Cliente basico (Android/Kotlin).** Hipotesis de trabajo: un primer cliente Android
+  para una instancia self-hosted, con inicio de sesion seguro contra una URL HTTPS
+  elegida por el usuario, lectura/busqueda/detalle del catalogo personal, cambio de
+  estado/fecha de vista/puntaje/review, y disponibilidad fisica en modo lectura — sin
+  administracion, Scanner, importaciones, curaduria avanzada ni uso offline en la
+  primera entrega. Movido fuera de v0.5.0 a proposito: `PRODUCT.md` ya aclaraba que no
+  es la etapa inmediata, y tiene prerequisitos propios sin empezar (API versionada y
+  documentada, sesiones aptas para dispositivos, pruebas de compatibilidad
+  servidor-cliente). Candidato natural para v0.6.0 una vez confirmada la hipotesis y
+  resueltos esos prerequisitos.
+- Radarr, Sonarr, Letterboxd y otras integraciones siguen siendo direcciones validas,
+  pero se priorizan despues de estabilizar busqueda, scanner, backup y contratos de
+  datos.

@@ -1909,7 +1909,14 @@ class ViewerHttpTests(unittest.TestCase):
 
         reviewed = self.client.post(
             f"/api/scanner/queue/{queue_item['id']}",
-            content=json.dumps({"action": "create", "title": "Interstellar", "year": "2014", "kind": "pelicula"}),
+            content=json.dumps(
+                {
+                    "action": "create",
+                    "title": "Interstellar",
+                    "year": "2014",
+                    "kind": "pelicula",
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(reviewed.status_code, 201, reviewed.content)
@@ -1975,7 +1982,14 @@ class ViewerHttpTests(unittest.TestCase):
 
         reviewed = self.client.post(
             f"/api/scanner/queue/{queue_item['id']}",
-            content=json.dumps({"action": "create", "title": "Dune", "year": "2021", "kind": "pelicula"}),
+            content=json.dumps(
+                {
+                    "action": "create",
+                    "title": "Dune",
+                    "year": "2021",
+                    "kind": "pelicula",
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(reviewed.status_code, 201, reviewed.content)
@@ -1985,7 +1999,8 @@ class ViewerHttpTests(unittest.TestCase):
         # Something else -- e.g. real background enrichment -- touches the
         # freshly created item before the undo attempt.
         JsonCatalogRepository(self.catalog_path, normalize_item).update_item(
-            created_item_id, lambda item: item.__setitem__("description", "Enriched in the meantime")
+            created_item_id,
+            lambda item: item.__setitem__("description", "Enriched in the meantime"),
         )
 
         undo_attempt = self.client.post(
@@ -2039,7 +2054,14 @@ class ViewerHttpTests(unittest.TestCase):
 
         reviewed = self.client.post(
             f"/api/scanner/queue/{queue_item['id']}",
-            content=json.dumps({"action": "create", "title": "Heat", "year": "1995", "kind": "pelicula"}),
+            content=json.dumps(
+                {
+                    "action": "create",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                }
+            ),
             headers=self.post_headers(),
         )
         self.assertEqual(reviewed.status_code, 200, reviewed.content)

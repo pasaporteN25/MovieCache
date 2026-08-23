@@ -152,7 +152,11 @@ class CurationTests(unittest.TestCase):
             [
                 normalize_item({"id": "no-links", "title": "A"}),
                 normalize_item(
-                    {"id": "one-source", "title": "B", "imdb_url": "https://www.imdb.com/title/tt0000001/"}
+                    {
+                        "id": "one-source",
+                        "title": "B",
+                        "imdb_url": "https://www.imdb.com/title/tt0000001/",
+                    }
                 ),
                 normalize_item(
                     {

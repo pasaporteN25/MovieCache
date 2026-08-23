@@ -12,7 +12,7 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 - `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
 
-## Base de instancia v6
+## Base de instancia v8
 
 La base de instancia contiene:
 
@@ -39,6 +39,10 @@ La base de instancia contiene:
   y recorridos programados; conserva los 100 mas recientes por biblioteca.
 - `library_files`: inventario privado de rutas relativas, huellas, identidad confirmada
   y disponibilidad observada; nunca se expone a miembros.
+- `home_featured_snapshots`: referencias y motivos de las dos selecciones editoriales
+  mas recientes de cada usuario.
+- `scanner_history`: decisiones reversibles del Scanner, incluido el estado del
+  inventario y, cuando corresponde, de la ficha personal creada o reutilizada.
 
 El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
 
@@ -48,7 +52,16 @@ El servidor resuelve las fuentes desde la sesion autenticada. Las rutas absoluta
 
 Una exportacion JSON incluye solamente el catalogo. No incluye cuentas, sesiones, preferencias de privacidad, overrides, colecciones, seguimientos, inventario fisico ni el historial de recomendaciones. Para restaurar una instancia completa se respaldan por separado todos los catalogos activos o archivados e `instance.db`; las raices permitidas se conservan en la configuracion del proceso. Para restaurar solamente las obras se importa el JSON y se crea un owner nuevo.
 
-Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y archivo reversible; la v3 agrega colecciones locales y seguimientos; la v4 agrega borradores de importacion acotados; la v5 agrega bibliotecas administradas, recorridos e inventario compartido; la v6 agrega las dos selecciones destacadas mas recientes de cada usuario. La primera seleccion registrada para una fecha queda fija. Ese historial guarda referencias, orden y motivo, no copias de obras ni rutas. Las cuentas existentes conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
+Las migraciones de instancia se aplican al abrir la base. La v2 agrega privacidad y
+archivo reversible; la v3 agrega colecciones locales y seguimientos; la v4 agrega
+borradores de importacion acotados; la v5 agrega bibliotecas administradas, recorridos
+e inventario compartido; la v6 agrega las dos selecciones destacadas mas recientes de
+cada usuario; la v7 agrega el historial reversible del Scanner; y la v8 completa sus
+snapshots de catalogo en instalaciones que hubieran aplicado una definicion temprana
+de v7. La primera seleccion editorial registrada para una fecha queda fija. Ese
+historial guarda referencias, orden y motivo, no copias de obras ni rutas. Las cuentas
+existentes conservan sus catalogos privados y ninguna coleccion se sigue
+automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
 
 ## Disponibilidad con procedencia
 
@@ -65,8 +78,9 @@ nombre de biblioteca y cantidad de archivos para el owner; las vistas de miembro
 Club reciben solamente conteos agregados, nunca rutas, nombres o fingerprints.
 Confirmar vincula el archivo al inventario de la instancia, pero no crea una entrada en
 ningun catalogo personal. Omitir conserva el archivo fisico y recuerda la decision
-mientras no cambie su huella; la interfaz exige confirmacion y todavia no ofrece una
-operacion para restaurarla.
+mientras no cambie su huella. La Actividad del Scanner permite deshacer ambas
+decisiones; crear una ficha y vincularla tambien restaura el estado personal previo si
+no hubo una modificacion posterior en conflicto.
 La clasificacion puede consultar el catalogo del owner y catalogos de miembros con
 `catalog_shared` activo; un catalogo privado nunca aporta candidatos a la Bandeja del
 administrador. La serializacion compartida vuelve a retirar cualquier lista de fuentes

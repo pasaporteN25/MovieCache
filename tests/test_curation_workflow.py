@@ -380,12 +380,8 @@ class CurationWorkflowTests(unittest.TestCase):
             repository = JsonCatalogRepository(catalog_path, normalize_item)
             repository.write(
                 [
-                    normalize_item(
-                        {"id": "heat-a", "title": "Heat", "year": "1995", "rating": 9}
-                    ),
-                    normalize_item(
-                        {"id": "heat-b", "title": "Heat", "year": "1995", "rating": 4}
-                    ),
+                    normalize_item({"id": "heat-a", "title": "Heat", "year": "1995", "rating": 9}),
+                    normalize_item({"id": "heat-b", "title": "Heat", "year": "1995", "rating": 4}),
                 ]
             )
             workflow, _ = self.workflow(catalog_path)
@@ -407,9 +403,7 @@ class CurationWorkflowTests(unittest.TestCase):
             repository = JsonCatalogRepository(catalog_path, normalize_item)
             repository.write(
                 [
-                    normalize_item(
-                        {"id": "heat-a", "title": "Heat", "year": "1995", "rating": 8}
-                    ),
+                    normalize_item({"id": "heat-a", "title": "Heat", "year": "1995", "rating": 8}),
                     normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
                 ]
             )

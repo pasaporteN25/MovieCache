@@ -234,7 +234,7 @@ class IdentityTests(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
-            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7])
+            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
@@ -248,6 +248,60 @@ class IdentityTests(unittest.TestCase):
             self.assertIn("import_drafts", tables)
             self.assertIn("import_draft_items", tables)
             self.assertIn("home_featured_snapshots", tables)
+
+    def test_v7_scanner_history_is_repaired_without_losing_existing_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "instance.db"
+            with closing(sqlite3.connect(database)) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE instance_migrations (
+                        version INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        applied_at TEXT NOT NULL
+                    );
+                    CREATE TABLE scanner_history (
+                        id TEXT PRIMARY KEY,
+                        action TEXT NOT NULL,
+                        label TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'applied',
+                        mode TEXT NOT NULL DEFAULT 'persistent',
+                        created_at TEXT NOT NULL,
+                        undone_at TEXT NOT NULL DEFAULT '',
+                        summary_json TEXT NOT NULL DEFAULT '{}',
+                        before_json TEXT NOT NULL DEFAULT '{}',
+                        after_json TEXT NOT NULL DEFAULT '{}'
+                    );
+                    INSERT INTO scanner_history(id, action, label, created_at)
+                    VALUES ('history-1', 'link', 'Vincular', '2026-08-22T10:00:00Z');
+                    """
+                )
+                connection.executemany(
+                    "INSERT INTO instance_migrations(version, name, applied_at) "
+                    "VALUES (?, ?, 'now')",
+                    [(version, f"v{version}") for version in range(1, 8)],
+                )
+                connection.commit()
+
+            SqliteIdentityRepository(database).initialize()
+
+            with closing(sqlite3.connect(database)) as connection:
+                columns = {
+                    row[1] for row in connection.execute("PRAGMA table_info(scanner_history)")
+                }
+                version = connection.execute(
+                    "SELECT MAX(version) FROM instance_migrations"
+                ).fetchone()[0]
+                history = connection.execute(
+                    "SELECT id, catalog_before_json, catalog_after_json, catalog_path "
+                    "FROM scanner_history"
+                ).fetchone()
+
+            self.assertEqual(version, 8)
+            self.assertTrue(
+                {"catalog_before_json", "catalog_after_json", "catalog_path"} <= columns
+            )
+            self.assertEqual(history, ("history-1", "null", "null", ""))
 
     def test_privacy_and_archival_are_reversible_without_losing_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

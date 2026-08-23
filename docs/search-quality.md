@@ -64,7 +64,7 @@ solo para el owner cuando una feature flag lo habilite.
 El runner automatizado y los fixtures son la fuente de verdad. La vista web sera una
 herramienta para inspeccionar y etiquetar casos, no un segundo algoritmo.
 
-### Incremento 1 implementado
+### Incrementos implementados
 
 El primer incremento entrega el runner determinista, el corpus dorado `v1` empaquetado
 y una inspeccion HTML/JSON de exports. Reutiliza sin cambios los cuatro caminos
@@ -80,7 +80,15 @@ El primer comando siempre permite registrar la baseline aunque el gate falle. El
 segundo se reserva para CI y retorna un estado distinto de cero si no se cumplen los
 umbrales. `inspect` solo admite un export JSON, nunca una base SQLite viva; tampoco
 consulta fuentes externas ni crea archivos de bloqueo. La vista owner con feature flag,
-el etiquetado y la comparacion baseline/candidato pertenecen al incremento siguiente.
+el etiquetado y la calibracion humana siguen pendientes.
+
+`compare` ya ejecuta el mismo corpus con la estrategia productiva y una estrategia
+candidata configurable, y genera un reporte JSON/HTML de dos columnas sin cambiar el
+ranking real:
+
+```powershell
+movie-inbox search-lab compare --candidate estrategia-candidata.json --html reports/compare.html
+```
 
 ## Corpus inicial
 
@@ -120,7 +128,7 @@ o Scanner. En esos flujos, dejar un caso para revision es mejor que unir obras d
 ## Secuencia de implementacion
 
 1. [Completado] Crear fixtures y runner con el comportamiento actual como baseline observable.
-2. Agregar pruebas negativas que reproduzcan los falsos positivos conocidos.
+2. [Completado] Agregar pruebas negativas que reproduzcan los falsos positivos conocidos.
 3. Separar `catalog_search`, `external_lookup`, `identity_candidates` y
    `scanner_candidates`. Parcial: tienen umbrales propios ahora, pero
    `rank_catalog_candidates` sigue llamando a `search_catalog_items` por dentro,

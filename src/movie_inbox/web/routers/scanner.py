@@ -49,9 +49,7 @@ def _scanner_workflow(request: Request):  # type: ignore[no-untyped-def]
 def scanner_history(request: Request, mode: str = "persistent") -> JSONResponse:
     require_owner(request)
     try:
-        return JSONResponse(
-            _scanner_workflow(request).history(mode, history_session_id(request))
-        )
+        return JSONResponse(_scanner_workflow(request).history(mode, history_session_id(request)))
     except (ValueError, CurationHistoryError) as error:
         return scanner_application_error_response(error)
 

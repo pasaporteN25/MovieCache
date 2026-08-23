@@ -7,6 +7,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DockerPackagingTests(unittest.TestCase):
+    def test_local_check_scripts_include_the_ci_lint_gate(self) -> None:
+        powershell = (ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
+        shell = (ROOT / "scripts" / "check.sh").read_text(encoding="utf-8")
+
+        for script in (powershell, shell):
+            self.assertIn(".[test,dev]", script)
+            self.assertIn("ruff check src scripts tests", script)
+            self.assertIn("ruff format --check src scripts tests", script)
+            self.assertIn("mypy src/movie_inbox/domain", script)
+
     def test_image_is_multi_stage_non_root_and_health_checked(self) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
@@ -83,6 +93,8 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("docker-smoke:", workflow)
         self.assertIn("docker compose build", workflow)
         self.assertIn("docker compose run --rm movie-inbox db import", workflow)
+        self.assertIn("for compose_attempt in 1 2", workflow)
+        self.assertIn('test "$compose_started" = "true"', workflow)
         self.assertIn("docker compose restart movie-inbox", workflow)
         self.assertIn(".private-backup-smoke", workflow)
         self.assertIn("ReadonlyRootfs", workflow)

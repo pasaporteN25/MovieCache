@@ -1,8 +1,8 @@
 # Gate de release
 
-Este gate prepara `v0.2.1` sin agregar capacidades. Combina pruebas automaticas
-con una aceptacion manual sobre una biblioteca descartable. Nunca se ejecuta por primera
-vez contra la unica copia de un catalogo o un disco sin backup.
+Este gate valida una release candidate combinando pruebas automaticas con una
+aceptacion manual sobre una biblioteca descartable. Nunca se ejecuta por primera vez
+contra la unica copia de un catalogo o un disco sin backup.
 
 Para el despliegue Docker, ejecutar esta aceptacion dentro del contenedor siguiendo
 `docker.md`; la primera ruta visible por la aplicacion sera `/media/library/disco1`.
@@ -21,9 +21,10 @@ En Linux:
 bash scripts/check.sh
 ```
 
-El gate debe compilar `src`, `scripts` y `tests`, ejecutar toda la suite y terminar con
-`git diff --check` limpio. El workflow de GitHub debe construir e instalar tambien el
-wheel en un entorno limpio.
+El gate debe comprobar formato y lint con Ruff, validar el dominio con mypy, compilar
+`src`, `scripts` y `tests`, ejecutar toda la suite y terminar con `git diff --check`
+limpio. El workflow de GitHub debe construir e instalar tambien el wheel en un entorno
+limpio.
 
 ## 2. Preparacion segura
 

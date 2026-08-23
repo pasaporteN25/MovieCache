@@ -15,6 +15,184 @@ mismo — este archivo es el tablero completo, no uno por fase.
 
 ## Backlog
 
+### Frente: Cierre de coherencia de interfaz (v0.5.0)
+
+Los 4 hallazgos que dejo el gate de cierre de Fase 5 (critica del 2026-08-22, 29/40)
+tenian un ranking de mas simple a mas dificil. Los 2 mas dificiles (historial/deshacer
+de Scanner, desambiguar duplicados) ya estan cerrados — ver `docs/roadmap.md` y las
+entradas fechadas 2026-08-22 en `prompt-movie-inbox.md`. Quedan los 2 mas simples mas
+un caso borde que la fase de desambiguacion dejo explicitamente pendiente. Los 4 se
+agrupan aca como el contenido de v0.5.0 (ver `docs/roadmap.md`) — un incremento chico
+a proposito, para probar bien lo construido en v0.4.0 antes de seguir.
+
+#### [V5-1] `aria-live` en el estado de decision del comparador de fusion
+- **Archivos**: `src/movie_inbox/web/static/index.dialogs.html` (lineas 276-289, el
+  `<footer class="merge-comparator-footer">` del dialogo de fusion).
+- **Que hacer**: envolver el `<div>` de la linea 281 (que contiene `#mergeDecisionStatus`
+  y `#mergeDecisionMeta`, ambos actualizados juntos desde `core/merge.js`) con
+  `aria-live="polite"` en ese mismo `<div>` — no en cada hijo por separado, para que un
+  lector de pantalla anuncie un solo cambio combinado en vez de dos anuncios sueltos.
+  Mismo patron que ya usa `#mergeComparatorFeedback` cuatro lineas arriba (linea 277,
+  tambien `aria-live="polite"`) — copiar ese criterio, no inventar uno nuevo. Agregar
+  ademas `aria-describedby="mergeDecisionStatus"` al boton `#confirmReviewedMerge`
+  (linea 287) para que un lector de pantalla enfocado en el boton conozca el estado
+  actual de la decision. No hace falta tocar `core/merge.js`: el contenido ya se
+  actualiza via `textContent`, alcanza con marcar el contenedor una vez.
+- **Depende de**: —
+- **Modelo sugerido**: Chico. Dos atributos HTML, patron ya usado 4 lineas arriba en el
+  mismo archivo, sin logica nueva.
+- **Verificacion**: `scripts\check.ps1` en verde; confirmar a mano en el navegador que
+  el atributo sobrevive despues de que `merge.js` reemplaza el `textContent` del `<div>`.
+
+#### [V5-2] Buscador de texto libre en la cola de Curaduria
+- **Archivos**: `src/movie_inbox/web/static/index.inbox-curation.html` (nav de tabs,
+  lineas 2-18, agregar el input ahi), `src/movie_inbox/web/static/js/core/fields.js`
+  (registrar el campo, junto a `curationQueue` en la linea 113),
+  `src/movie_inbox/web/static/js/core/bootstrap.js` (wireo, junto a la linea 175),
+  `src/movie_inbox/web/static/js/surfaces/inbox-curation.js` (`visibleCurationCases()`
+  linea 268, nueva funcion `searchCurationQueue`), `src/movie_inbox/web/static/css/curation.css`.
+- **Que hacer**: Scanner ya tiene exactamente este patron resuelto — `#scannerQueueSearch`
+  (`index.inbox-scanner.html:27-30`, un `<label class="scanner-queue-search">` con
+  `<span class="sr-only">` + `<input type="search">`), el estado `scannerQueueQuery`
+  (`inbox-scanner.js:22`), el filtro por texto dentro de `visibleScannerQueue()`
+  (`inbox-scanner.js:242-258`, normaliza con `normalizeText` y compara contra
+  titulo/año/tipo/nombre de archivo/ruta/biblioteca) y `searchScannerQueue(event)`
+  (`inbox-scanner.js:268-271`) wireado en `bootstrap.js:180`. Portar el mismo patron a
+  Curaduria 1 a 1: agregar el mismo bloque de input (adaptando la clase a
+  `.curation-queue-search` y el id a `curationQueueSearch`) dentro de
+  `index.inbox-curation.html`, cerca de la nav de tabs; agregar
+  `export let curationQueueQuery = "";` en `inbox-curation.js`; sumar el mismo filtro
+  por texto dentro de `visibleCurationCases()` (que hoy solo filtra por
+  `curationFilter`, no por texto) usando los campos disponibles de `entry.primary`
+  (titulo, año, tipo) — mirar `curationQueueItem()` en la linea 394 para confirmar que
+  campos trae cada `entry`; agregar `searchCurationQueue(event)` identica a la de
+  Scanner; registrar el campo en `fields.js` y wirear el evento `input` en
+  `bootstrap.js`, junto a `handleCurationClick`. En CSS, copiar la regla
+  `.scanner-queue-search` de `scanner.css` adaptada a `.curation-queue-search` en
+  `curation.css`.
+- **Depende de**: —
+- **Modelo sugerido**: Medio. Mecanico y con un patron de referencia completo ya
+  funcionando, pero toca 5 archivos distintos.
+- **Verificacion**: catalogo sintetico con varios casos en Curaduria, confirmar que
+  escribir en el buscador filtra la cola igual que en Scanner, incluidos los acentos
+  (`normalizeText` ya los maneja). `scripts\check.ps1` en verde.
+
+#### [V5-3] Navegacion por flechas del teclado en la cola de Curaduria
+- **Archivos**: `src/movie_inbox/web/static/js/surfaces/inbox-curation.js` (nueva
+  `moveCurationQueueSelection`, nueva `focusSelectedCurationItem`),
+  `src/movie_inbox/web/static/js/core/bootstrap.js` (wireo, junto a la linea 175),
+  `src/movie_inbox/web/static/css/curation.css` (confirmar que ya alcanza con el
+  `:focus-visible` de `.curation-queue-item` que el pase de `polish` de Fase 5 ya
+  agrego — no deberia hacer falta CSS nuevo).
+- **Que hacer**: portar `moveScannerQueueSelection`/`focusSelectedScannerItem`
+  (`inbox-scanner.js:281-296`) a Curaduria, reusando el estado que ya existe ahi
+  (`curationFilter`, `selectedCurationCaseId`, `visibleCurationCases()`,
+  `renderCuration()`, `curationHistory` — no hace falta crear ninguno nuevo). Ojo con
+  un detalle: la fila de Curaduria marca "seleccionada" con la clase `selected`
+  (`curationQueueItem()`, linea 402: `` `curation-queue-item ${selected ? "selected" :
+  ""}` ``), **no** `active` como en Scanner — `focusSelectedCurationItem` tiene que
+  buscar `.curation-queue-item.selected`; copiar el selector de Scanner tal cual haria
+  foco en el elemento equivocado (ninguno, silenciosamente, sin error visible). Igual
+  que `moveScannerQueueSelection` resuelve para la pestaña "Actividad"
+  (`scannerQueueFilter === "history" ? scannerHistory : visibleScannerQueue()`), la
+  version de Curaduria tiene que ramificar sobre `curationFilter === "history"` con
+  `curationHistory` — Scanner tuvo un bug real por olvidar esta rama (ver la entrada
+  fechada 2026-08-22 en `prompt-movie-inbox.md`), no repetirlo aca. Wirear `keydown`
+  sobre `fields.curationQueue` (no sobre `fields.inboxView`, que ya tiene el `click`
+  generico) en `bootstrap.js`.
+- **Depende de**: — (independiente de [V5-2]; si se resuelven en sesiones distintas,
+  avisar de todas formas que ambas tocan `bootstrap.js` y `fields.js` para evitar un
+  conflicto de merge chico).
+- **Modelo sugerido**: Medio. Sin decisiones de diseño pendientes (ya se decidio aca
+  duplicar el patron de Scanner adaptado, no generalizar un helper compartido — la
+  cantidad de estado especifico de cada modulo no lo justifica), pero hay que prestar
+  atencion a los 2 detalles señalados arriba para no introducir un bug silencioso.
+- **Verificacion**: catalogo sintetico con 3+ casos en Curaduria, confirmar que las
+  flechas mueven la seleccion igual que en Scanner, incluida la pestaña "Actividad".
+  `scripts\check.ps1` en verde.
+
+#### [V5-4] Señal de respaldo cuando archivo, fuente y fecha tambien empatan entre duplicados
+- **Archivos**: `src/movie_inbox/web/static/js/surfaces/inbox-curation.js`
+  (`curationQueueItem()` linea 394, `curationRecord()` linea 472),
+  `src/movie_inbox/web/static/js/core/merge.js` (`renderMergeComparator()` linea 157,
+  `mergeEntrySummary()` linea 199).
+- **Que hacer**: caso borde dejado pendiente al cerrar la fase de desambiguacion de
+  duplicados (ver la entrada fechada 2026-08-22 en `prompt-movie-inbox.md`): cuando dos
+  casos duplicados con mismo titulo/año ademas comparten archivo local, fuente y fecha
+  de alta, las 3 señales que ya se muestran no alcanzan para diferenciarlos. Si ademas
+  todos los campos personales coincidieran, "Resolver duplicados claros" ya los
+  fusiona solos sin que el usuario los vea — asi que este caso solo aparece cuando hay
+  un conflicto real de datos personales (ej. dos puntajes distintos) y el usuario
+  necesita alguna forma de saber cual fila es cual. Resolucion propuesta: cuando las 3
+  señales existentes coinciden por completo entre los dos lados de un caso, agregar un
+  ultimo recurso puramente posicional — "Duplicado 1 de 2" / "Duplicado 2 de 2" (o
+  redaccion similar), calculado en el momento segun el orden en que ya llegan
+  agrupados, sin necesidad de guardar ningun id nuevo. Mostrar esta numeracion
+  unicamente cuando las 3 señales coinciden por completo — si al menos una difiere, no
+  hace falta.
+- **Depende de**: —
+- **Modelo sugerido**: Medio. Toca los mismos 4 puntos de renderizado que la fase 1 de
+  desambiguacion (mismo patron, mismo estilo de cambio aditivo), pero la regla de
+  producto ya esta decidida aca.
+- **Verificacion**: catalogo sintetico con 2 "Heat" identicas en archivo/fuente/fecha
+  pero con rating distinto (9 y 3) — confirmar que la cola y el comparador muestran
+  ahora una numeracion en vez de dos filas indistinguibles. `scripts\check.ps1` en
+  verde.
+
+---
+
+### Frente: Higiene de repositorio
+
+Encontrado al mover `scripts/` a `codigoLegacy/` en la sesion del 2026-08-22 (ver
+`prompt-movie-inbox.md`), marcado pero no tocado en su momento por estar fuera del
+pedido puntual de esa sesion. Las 3 tareas son independientes entre si.
+
+#### [H1] Borrar `check-output.txt` (salida de instalacion vieja, trackeada por error)
+- **Archivos**: `check-output.txt` (raiz del repo, ~770 KB), `.gitignore`.
+- **Que hacer**: confirmado leyendo el contenido — es la salida cruda de una corrida
+  vieja de instalacion/tests (lineas de `pip install`, no datos personales),
+  commiteada por accidente el 2026-08-10 (commit visible en `origin/master`).
+  `git rm check-output.txt`; agregar `/check-output.txt` a `.gitignore` para que una
+  futura corrida de `scripts\check.ps1`/`check.sh` que alguien redirija a ese nombre no
+  lo vuelva a trackear.
+- **Depende de**: —
+- **Modelo sugerido**: Chico.
+- **Nota**: ya esta en `origin/master`; borrarlo solo lo saca de commits futuros, sigue
+  recuperable del historial si hiciera falta. No requiere reescribir historia.
+
+#### [H2] Borrar `scripts/LICENSE` (duplicado exacto de `LICENSE`)
+- **Archivos**: `scripts/LICENSE`.
+- **Que hacer**: confirmado byte a byte identico a la `LICENSE` GPLv3 de la raiz
+  (`diff` sin salida). Buscar primero si algo referencia esta ruta (`grep -r
+  "scripts/LICENSE"` sobre el repo) — no deberia haber nada, pero confirmarlo antes de
+  borrar. `git rm scripts/LICENSE`.
+- **Depende de**: —
+- **Modelo sugerido**: Chico.
+
+#### [H3] Cerrar el hueco de `.gitignore` que dejo trackeado un catalogo personal anidado
+- **Archivos**: `.gitignore` (patrones `/scripts/*.json`, `/scripts/*.csv`,
+  `/scripts/*.txt`).
+- **Que hacer**: estos 3 patrones no alcanzan una subcarpeta anidada como
+  `scripts/scripts/`, asi que `scripts/scripts/catalogv4.json` (catalogo personal
+  real) quedo trackeado desde el commit `a21314a` (2026-08-01) y ya esta en
+  `origin/master`. Cambiar los 3 patrones a su forma recursiva (`scripts/**/*.json`,
+  `scripts/**/*.csv`, `scripts/**/*.txt`, sin la barra inicial, para que apliquen a
+  cualquier profundidad) y correr `git rm --cached scripts/scripts/catalogv4.json`
+  (sin `-f`, **sin abrir ni leer el archivo** — es dato personal real, la regla de
+  `CLAUDE.md` aplica igual aca; el archivo sigue en disco, solo deja de trackearse).
+  Revisar con `git ls-files scripts/` si este mismo hueco dejo pasar algun otro
+  archivo personal anidado antes de dar la tarea por cerrada.
+- **Depende de**: —
+- **Modelo sugerido**: Chico — cambio de patron + `git rm --cached`, sin necesidad de
+  abrir el archivo.
+- **Importante, fuera del alcance de esta tarea**: esto solo detiene el tracking hacia
+  adelante. El archivo sigue en el historial de git y ya llego a `origin/master` desde
+  2026-08-01 — purgarlo de la historia (`git filter-repo` o similar) requiere reescribir
+  historia y probablemente un force-push a un repo con datos personales ya expuestos en
+  el remoto. Es una decision de Lucas, no de esta tarea — ver `docs/roadmap.md`.
+
+---
+
 ### Frente: Enriquecimiento y cobertura de links externos
 
 Investigado a fondo en sesión 2026-08-18. Causa raíz confirmada con líneas exactas: hoy

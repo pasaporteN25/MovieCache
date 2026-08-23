@@ -600,7 +600,8 @@ La suite usa `unittest` de la libreria standard y cubre migraciones, repositorio
 py -m unittest discover -s tests -v
 ```
 
-Los checks completos, incluida la compilacion y `git diff --check`, se ejecutan localmente con:
+Los checks completos, incluidos Ruff, mypy sobre el dominio, compilacion, tests y
+`git diff --check`, se ejecutan localmente con:
 
 ```powershell
 scripts\check.ps1

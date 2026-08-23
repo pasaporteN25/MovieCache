@@ -11,7 +11,13 @@ if (-not $python) {
 
 Push-Location $root
 try {
-    & $python.Source -m pip install -e ".[test]"
+    & $python.Source -m pip install -e ".[test,dev]"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $python.Source -m ruff check src scripts tests
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $python.Source -m ruff format --check src scripts tests
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $python.Source -m mypy src/movie_inbox/domain
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $python.Source -m compileall -q src scripts tests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
