@@ -12,7 +12,7 @@ import { applyCollectionYearRange, changeRandomScope, clearFilter, clearFilters,
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
 import { activateHomeSection, addHomeCollectionItem, goToHomeCollection, loadEditorialFeaturedDate, moveSpotlight, openHomeCollectionDetail, refreshEditorialHome, selectSpotlight } from "../surfaces/home.js";
-import { changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue } from "../surfaces/inbox-curation.js";
+import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
 
@@ -201,6 +201,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         : "Sólo esta sesión";
       fields.persistCurationHistory.addEventListener("change", changeCurationHistoryMode);
       fields.clearCurationHistory.addEventListener("click", clearCurationHistory);
+      fields.autoResolveCuration.addEventListener("click", autoResolveDuplicates);
       fields.randomButton.addEventListener("click", openRandomDetail);
       fields.randomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.randomCatalogOnly));
       fields.cancelSearch.addEventListener("click", cancelExternalSearch);

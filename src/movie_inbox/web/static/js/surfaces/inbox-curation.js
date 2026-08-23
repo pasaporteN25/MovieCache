@@ -159,6 +159,33 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         }
       }
 
+      export async function autoResolveDuplicates() {
+        fields.autoResolveCuration.disabled = true;
+        setCurationFeedback("Buscando duplicados que se puedan combinar solos…", "working");
+        try {
+          const response = await apiFetch("/api/curation/auto-resolve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ history_mode: curationHistoryMode })
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          await loadCurationQueue();
+          const { resolved, needs_review: needsReview } = payload;
+          setCurationFeedback(
+            resolved
+              ? `${resolved} ${resolved === 1 ? "caso combinado automáticamente" : "casos combinados automáticamente"}${needsReview ? `. ${needsReview} ${needsReview === 1 ? "sigue necesitando" : "siguen necesitando"} tu revisión.` : "."}`
+              : "Ningún duplicado se pudo combinar solo — todos necesitan tu revisión.",
+            "success"
+          );
+        } catch (error) {
+          console.error("[catalog-viewer] auto-resolve duplicates failed", error);
+          setCurationFeedback("No se pudo resolver duplicados automáticamente.", "error");
+        } finally {
+          fields.autoResolveCuration.disabled = false;
+        }
+      }
+
       export function syncCurationCounts() {
         fields.curationPendingCount.textContent = curationCounts.pending || 0;
         fields.curationDuplicateCount.textContent = curationCounts.duplicates || 0;

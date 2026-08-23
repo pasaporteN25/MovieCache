@@ -347,6 +347,86 @@ class CurationWorkflowTests(unittest.TestCase):
             self.assertEqual(restored.imdb_url, "")
             self.assertEqual(restored.review, "Una favorita")
 
+    def test_auto_resolve_merges_an_identical_trio_down_to_one_survivor(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-c", "title": "Heat", "year": "1995"}),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            items = [item.to_dict() for item in repository.read()]
+            for item in items:
+                item["_source_file"] = str(catalog_path)
+
+            result = workflow.auto_resolve_duplicates(
+                items, history_mode="persistent", session_id="session-a"
+            )
+
+            self.assertEqual(result["resolved"], 2)
+            self.assertEqual(result["needs_review"], 1)
+            self.assertEqual(len(repository.read()), 1)
+            history = workflow.history("persistent", "session-a")
+            self.assertEqual(history["count"], 2)
+            self.assertTrue(all(op["action"] == "merge" for op in history["operations"]))
+
+    def test_auto_resolve_leaves_a_genuine_personal_conflict_for_manual_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {"id": "heat-a", "title": "Heat", "year": "1995", "rating": 9}
+                    ),
+                    normalize_item(
+                        {"id": "heat-b", "title": "Heat", "year": "1995", "rating": 4}
+                    ),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            items = [item.to_dict() for item in repository.read()]
+            for item in items:
+                item["_source_file"] = str(catalog_path)
+
+            result = workflow.auto_resolve_duplicates(
+                items, history_mode="persistent", session_id="session-a"
+            )
+
+            self.assertEqual(result, {"resolved": 0, "needs_review": 1})
+            self.assertEqual(len(repository.read()), 2)
+            self.assertEqual(workflow.history("persistent", "session-a")["count"], 0)
+
+    def test_auto_resolve_keeps_the_non_empty_rating_when_the_other_side_is_blank(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {"id": "heat-a", "title": "Heat", "year": "1995", "rating": 8}
+                    ),
+                    normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            items = [item.to_dict() for item in repository.read()]
+            for item in items:
+                item["_source_file"] = str(catalog_path)
+
+            result = workflow.auto_resolve_duplicates(
+                items, history_mode="persistent", session_id="session-a"
+            )
+
+            self.assertEqual(result, {"resolved": 1, "needs_review": 0})
+            remaining = repository.read()
+            self.assertEqual(len(remaining), 1)
+            self.assertEqual(remaining[0].rating, 8)
+
 
 if __name__ == "__main__":
     unittest.main()

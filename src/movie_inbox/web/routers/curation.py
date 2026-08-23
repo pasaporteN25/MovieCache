@@ -11,7 +11,7 @@ from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.curation_workflow import CurationWorkflowError
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain.merge_review import MergeReviewError
-from movie_inbox.web.catalog_api import build_curation_payload
+from movie_inbox.web.catalog_api import build_curation_payload, load_items
 from movie_inbox.web.dependencies import (
     authorized_json,
     catalog_pointer,
@@ -91,6 +91,30 @@ def merge_curation(
             session_id=history_session_id(request),
         )
         return JSONResponse({"ok": True, "reason": "merged", **result})
+    except (
+        ValueError,
+        MergeReviewError,
+        CurationWorkflowError,
+        CurationHistoryError,
+        CatalogRepositoryError,
+    ) as error:
+        return curation_application_error_response(error)
+
+
+@router.post("/api/curation/auto-resolve")
+def auto_resolve_curation_duplicates(
+    request: Request,
+    body: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    try:
+        catalog = session_catalog(request)
+        items = load_items(catalog.config.patterns)
+        result = request_workflow(request).auto_resolve_duplicates(
+            items,
+            history_mode=str(body.get("history_mode") or "persistent"),
+            session_id=history_session_id(request),
+        )
+        return JSONResponse({"ok": True, "reason": "auto_resolved", **result})
     except (
         ValueError,
         MergeReviewError,

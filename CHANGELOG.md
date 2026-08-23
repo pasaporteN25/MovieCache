@@ -19,6 +19,13 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   no las muestran como texto idéntico: ahora distinguen por fuente
   (Wikipedia, IMDb, FilmAffinity, archivo local...), fecha de alta y
   archivo local asociado cuando existe.
+- Nuevo botón "Resolver duplicados claros" en Curaduría: combina solo los
+  pares de duplicados que no necesitan criterio humano (idénticos, o que
+  difieren únicamente en un dato que un lado tiene vacío) y deja en la
+  cola —ya con las señales de desambiguación de arriba— los que sí
+  tienen un conflicto real (por ejemplo, dos puntajes distintos
+  cargados). Cada combinación queda en `Actividad` y puede deshacerse
+  individualmente.
 
 ### Cambiado
 

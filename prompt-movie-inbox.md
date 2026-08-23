@@ -93,16 +93,16 @@ técnico de cada uno) y la decisión es arrancar por el más difícil:
    ver la entrada de abajo) están completos, probados y verificados en
    browser real. Era el más difícil de los 4 hallazgos y el único ya
    resuelto.
-2. **Desambiguar casos duplicados con mismo título y año — fase 1
-   (mostrar señales) cerrada.** La cola, el detalle y el título del
-   comparador de fusión ya distinguen por fuente/fecha/archivo — ver la
-   entrada fechada 2026-08-22 más abajo. Queda la fase 2 (árbol de
-   auto-resolución que decidimos con Lucas, muta datos del catálogo, su
-   propio plan) y 3 puntos explícitamente pospuestos que no hay que
-   perder: empate de fecha de agregado, grupos de 3+ duplicados, y
-   visibilidad de archivos escaneados para miembros comunes — esto último
-   requeriría relajar una invariante dura de privacidad, es una decisión
-   de producto aparte.
+2. **Desambiguar casos duplicados con mismo título y año — cerrado, las
+   2 fases.** Fase 1 (mostrar señales de fuente/fecha/archivo en la cola,
+   el detalle y el comparador de fusión) y fase 2 (botón "Resolver
+   duplicados claros": combina solo los pares sin conflicto real,
+   reusando el motor de fusión existente sin lógica de decisión nueva —
+   ver la entrada fechada 2026-08-22 más abajo). Quedan 3 puntos
+   explícitamente pospuestos que no hay que perder: empate de fecha de
+   agregado, grupos de 3+ duplicados, y visibilidad de archivos
+   escaneados para miembros comunes — esto último requeriría relajar una
+   invariante dura de privacidad, es una decisión de producto aparte.
 3. Paridad de teclado/búsqueda en Curaduría respecto a Scanner.
 4. `aria-live` en el estado de decisión del comparador de fusión — el más
    simple.
@@ -115,6 +115,78 @@ requiere ninguna acción. Y sobre `scripts/`: no se borró nada, pero los
 lanzadores de compatibilidad con v0.1 y los shims de import se movieron a
 `codigoLegacy/` (fuera de Git). Detalle completo de ambas resoluciones en
 la entrada fechada 2026-08-22 más abajo.
+
+**Desambiguar duplicados — fase 2 (árbol de auto-resolución), cierre del
+hallazgo completo (2026-08-22).** Plan mode con un agente Explore para
+las dudas de wireo (¿cruza `curation_workflow.py` con `curation_service.py`
+hoy? ¿el `source_file` de un caso ya es una ruta real o un token de
+referencia? ¿hay forma de leer todos los ítems del catálogo desde el
+workflow service?) más lectura directa mía de `_default_choice()` en
+`domain/merge_review.py`.
+
+Hallazgo que simplificó toda la fase: `_default_choice()` (línea 240) ya
+implementa "el valor no vacío gana" para **todo** campo del merge,
+incluidos los personales protegidos, y `local_files`/`en_catalogo`
+siempre se combinan. Un campo protegido solo exige una decisión humana
+cuando ambos lados tienen un valor distinto y no vacío — un conflicto
+real. Esto quiere decir que todo el árbol que habíamos diseñado a mano
+con Lucas (idénticas → suprimir; difieren solo en un campo vacío →
+combinar quedándose con el dato cargado; una con archivo y otra sin
+archivo → combinar) **ya estaba implementado** en el merge existente.
+La distinción "mismo archivo vs. archivo distinto" que habíamos discutido
+dejó de hacer falta programarla aparte: alcanza con intentar
+`merge(choices={})` sobre cada par pendiente — si no hay conflicto real
+se aplica solo, si lo hay levanta `MergeReviewError` y cae al flujo
+manual (ahora con toda la desambiguación visual de la fase 1). Cero
+lógica de decisión nueva, todo el método nuevo
+(`CurationWorkflowService.auto_resolve_duplicates`) es orquestación:
+arma los casos pendientes con `build_curation_payload` (la función
+pública, no la privada `_duplicate_cases`), intenta `compare()` +
+`merge()` por par, cuenta éxitos y los que caen a revisión manual —
+incluidos los que un merge anterior de la misma tanda ya resolvió (un
+trío idéntico A/B/C: al combinar A+B, el intento posterior de A+C todavía
+funciona porque A sigue igual, pero B+C falla con `CurationItemNotFound`
+porque B ya no existe — se cuenta como "necesita revisión" sin romper el
+resto del lote; confirmado exactamente así en un test y en vivo: 3
+idénticos dan 2 resueltos y 1 a revisión, no 1 y 2 como pensé al
+principio).
+
+Detalle de plomería que hubo que resolver con el agente Explore, no
+obvio de entrada: el `source_file` que ve el frontend en un caso de
+`/api/curation` es un token de referencia ("source-1"), no una ruta real
+— lo redacta `public_rows()` antes de que el caso llegue al navegador.
+El método nuevo no puede reusar esos casos ya redactados; recibe
+`items` ya cargados por el router (`load_items(catalog.config.patterns)`,
+igual patrón que usa el router de scanner) con `_source_file` apuntando
+a la ruta real, y arma los `CatalogPointer` desde ahí. También hubo que
+mover `application/curation_workflow.py` a importar de
+`application/curation_service.py` — cruce nuevo pero no un patrón nuevo,
+`scanner_workflow.py` ya hace lo mismo con este archivo.
+
+Botón nuevo "Resolver duplicados claros" al lado de "Actualizar bandeja"
+en Curaduría, sin diálogo de confirmación previo (a diferencia de
+"Omitir" o "Limpiar historial") porque esto es reversible como cualquier
+otra decisión de Curaduría. Cada combinación generó su propia entrada de
+historial — ningún manejo especial de deshacer en lote hizo falta.
+
+Verificado: 3 tests nuevos en `test_curation_workflow.py` (trío idéntico
+resuelto a 2+1, conflicto real de puntaje que no se toca, "gana el dato
+cargado" cuando el otro lado está vacío) más 1 test HTTP end-to-end.
+Suite completa: **316/316 verde**. Browser real: catálogo sintético con
+el mismo trío de "Heat" más un par de "Sicario" con puntajes 9 y 3
+(conflicto real) — un click resolvió 2 (los Heat) y dejó 2 pendientes (el
+tercer par de Heat que ya no aplicaba, más el conflicto real de Sicario);
+Actividad mostró las 2 combinaciones nuevas; deshacer una restauró
+exactamente esa fusión (2 Heat de vuelta) sin tocar la otra ni el
+conflicto de Sicario, que siguió intacto en la cola con su
+desambiguación de la fase 1. Sin errores de consola.
+
+Con esto, **el hallazgo "desambiguar duplicados" queda cerrado por
+completo, las 2 fases**. `docs/roadmap.md` actualizado. Quedan 2 de los
+4 hallazgos originales del gate de Fase 5: paridad de teclado/búsqueda
+en Curaduría, y `aria-live` del comparador — más los 3 puntos pospuestos
+de esta fase (empate de fecha, grupos de 3+, visibilidad de archivos
+para miembros).
 
 **Desambiguar duplicados — fase 1 (mostrar señales), implementación y
 cierre (2026-08-22).** Después de la conversación de diseño (ver la

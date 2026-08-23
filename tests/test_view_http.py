@@ -1423,6 +1423,58 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200, raw_payload)
         self.assertEqual([item.id for item in repository.read()], ["heat-a", "heat-b"])
 
+    def test_auto_resolve_endpoint_merges_clear_duplicates_and_leaves_conflicts_pending(
+        self,
+    ) -> None:
+        repository = JsonCatalogRepository(self.catalog_path, normalize_item)
+        repository.write(
+            [
+                normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
+                normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+                normalize_item(
+                    {"id": "sicario-a", "title": "Sicario", "year": "2015", "rating": 9}
+                ),
+                normalize_item(
+                    {"id": "sicario-b", "title": "Sicario", "year": "2015", "rating": 3}
+                ),
+            ]
+        )
+
+        status, raw_payload = self.request(
+            "POST",
+            "/api/curation/auto-resolve",
+            json.dumps({"history_mode": "persistent"}),
+            self.post_headers(),
+        )
+        self.assertEqual(status, 200, raw_payload)
+        result = json.loads(raw_payload)
+        self.assertEqual(result["resolved"], 1)
+        self.assertEqual(result["needs_review"], 1)
+
+        remaining = {item.id for item in repository.read()}
+        self.assertEqual(remaining, {"sicario-a", "sicario-b"} | (remaining & {"heat-a", "heat-b"}))
+        self.assertEqual(len(remaining & {"heat-a", "heat-b"}), 1)
+
+        status, raw_payload = self.request(
+            "GET",
+            "/api/curation/history?mode=persistent",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(status, 200, raw_payload)
+        self.assertEqual(json.loads(raw_payload)["count"], 1)
+
+        status, raw_payload = self.request(
+            "GET", "/api/curation", headers={"X-Movie-Inbox-Token": self.config.api_token}
+        )
+        self.assertEqual(status, 200, raw_payload)
+        pending_duplicates = [
+            case
+            for case in json.loads(raw_payload)["cases"]
+            if case["type"] == "duplicate" and case["status"] == "pending"
+        ]
+        self.assertEqual(len(pending_duplicates), 1)
+        self.assertEqual(pending_duplicates[0]["primary"]["title"], "Sicario")
+
     def test_curation_endpoints_expose_availability_alongside_the_manual_flag(self) -> None:
         (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
         repository = JsonCatalogRepository(self.catalog_path, normalize_item)

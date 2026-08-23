@@ -12,6 +12,7 @@ from movie_inbox.application.curation_history import (
     CurationHistoryRepository,
     normalize_history_mode,
 )
+from movie_inbox.application.curation_service import build_curation_payload
 from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.application.repository import CatalogRepository
 from movie_inbox.domain.catalog import has_external_link, normalize_item
@@ -186,6 +187,46 @@ class CurationWorkflowService:
             "item": self._decorated_item(merged_item),
             "operation": public_operation(operation),
         }
+
+    def auto_resolve_duplicates(
+        self,
+        items: list[dict[str, Any]],
+        *,
+        history_mode: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        """Merge duplicate pairs that need no human judgment call.
+
+        A pair is safe to auto-merge exactly when plain `merge(choices={})`
+        would not have raised: every differing field either has an
+        unambiguous default (the non-empty side wins, local_files/en_catalogo
+        combine) or doesn't differ at all. A field only requires a human
+        decision when both sides hold different non-empty personal data --
+        that case is left in the queue untouched, benefiting from the
+        disambiguation added in phase 1.
+        """
+        cases = build_curation_payload(items)["cases"]
+        resolved = 0
+        needs_review = 0
+        for case in cases:
+            if case["type"] != "duplicate" or case["status"] != "pending":
+                continue
+            left = CatalogPointer(Path(case["primary"]["source_file"]), case["primary"]["id"])
+            right = CatalogPointer(Path(case["secondary"]["source_file"]), case["secondary"]["id"])
+            try:
+                review = self.compare(left, right=right)
+                self.merge(
+                    left,
+                    right=right,
+                    choices={},
+                    expected_review_id=review["review_id"],
+                    history_mode=history_mode,
+                    session_id=session_id,
+                )
+                resolved += 1
+            except (MergeReviewError, CurationConflict, CurationItemNotFound):
+                needs_review += 1
+        return {"resolved": resolved, "needs_review": needs_review}
 
     def update_link_decision(
         self,
