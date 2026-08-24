@@ -393,7 +393,11 @@ Antes de sobrescribir un JSON existente, los scripts actualizan un unico backup 
 
 El campo `kind` ya acepta `pelicula`, `serie`, `anime` y `documental`. Por ahora `serie` identifica el tipo de entrada; temporadas y capitulos quedan para una etapa posterior del modelo.
 
-Cuando se puede resolver un `wikidata_id`, el enriquecimiento intenta completar datos de obra: `genres`, `directors`, `writers`, `cast` y `year`.
+Cuando se puede resolver un `wikidata_id`, el enriquecimiento intenta completar datos de
+obra: año y fechas de estreno, duración en minutos, países, idiomas originales,
+productores, compositores, géneros, dirección, guion y reparto. Los campos con más de
+un valor se conservan como listas y la duración desconocida permanece vacía, no como
+cero minutos.
 
 Durante el merge automatico solo se combinan entradas con una senal fuerte: URL externa compartida, mismo `wikidata_id`, o titulo exacto junto con ano exacto y tipo compatible. Los titulos iguales sin ano quedan pendientes de revision. Si cualquiera de las dos entradas tiene `en_catalogo: true`, el resultado final conserva `en_catalogo: true`.
 
@@ -573,8 +577,8 @@ Un titulo exacto sin ano, con ano distinto o con tipo incompatible nunca se comb
 
 ## Esquema versionado y migracion
 
-Las escrituras nuevas usan `schema_version: 6` y guardan las entradas dentro de `items`.
-Los catalogos legacy y las versiones 1 a 5 pasan por migraciones explicitas antes de
+Las escrituras nuevas usan `schema_version: 7` y guardan las entradas dentro de `items`.
+Los catalogos legacy y las versiones 1 a 6 pasan por migraciones explicitas antes de
 usarse. Una version futura, una raiz mal formada o una fila invalida se rechazan y nunca
 se interpretan como catalogo vacio ni se reescriben silenciosamente. Cada obra puede
 tener varios archivos fisicos en `local_files`; `local_name` y `local_path` se mantienen
@@ -582,6 +586,9 @@ por compatibilidad. La version 3 sumo procedencia y bloqueos de metadata. La ver
 agrego identidad incremental a cada archivo. La version 5 agrego decisiones persistentes
 de curaduria. La version 6 incorpora `release_dates`, conservando fecha, precision, pais,
 tipo de estreno, fuente y la marca de fecha principal.
+La versión 7 incorpora `duration_minutes`, `countries`, `original_languages`,
+`producers` y `composers`; los catálogos v6 reciben `null` y listas vacías al migrar,
+sin confundir ausencia de datos con una duración de cero minutos.
 
 Para convertir un catalogo completo sin reemplazar el original:
 

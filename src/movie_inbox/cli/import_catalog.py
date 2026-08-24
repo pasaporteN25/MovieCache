@@ -35,6 +35,7 @@ from movie_inbox.domain.catalog import (
     normalize_tags as normalize_list,
 )
 from movie_inbox.domain.deduplication import deduplicate_items, merge_catalogs
+from movie_inbox.domain.metadata import normalize_optional_positive_int
 from movie_inbox.domain.models import CatalogItem, MetadataSource
 from movie_inbox.domain.titles import (
     clean_release_title,
@@ -269,6 +270,15 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
             filmaffinity_url=filmaffinity_url,
             wikipedia_title=str(row.get("wikipedia_title") or ""),
             wikidata_id=str(row.get("wikidata_id") or ""),
+            duration_minutes=normalize_optional_positive_int(
+                row.get("duration_minutes") or row.get("duration")
+            ),
+            countries=normalize_list(row.get("countries") or row.get("country")),
+            original_languages=normalize_list(
+                row.get("original_languages") or row.get("original_language")
+            ),
+            producers=normalize_list(row.get("producers") or row.get("producer")),
+            composers=normalize_list(row.get("composers") or row.get("composer")),
             genres=normalize_list(row.get("genres") or row.get("genre")),
             directors=normalize_list(row.get("directors") or row.get("director")),
             writers=normalize_list(
@@ -415,6 +425,11 @@ def build_catalog(urls: list[str], fetch: bool, delay: float, status: str) -> li
                 else metadata.get("filmaffinity_url", ""),
                 wikipedia_title=metadata.get("wikipedia_title", ""),
                 wikidata_id=metadata.get("wikidata_id", ""),
+                duration_minutes=normalize_optional_positive_int(metadata.get("duration_minutes")),
+                countries=normalize_list(metadata.get("countries")),
+                original_languages=normalize_list(metadata.get("original_languages")),
+                producers=normalize_list(metadata.get("producers")),
+                composers=normalize_list(metadata.get("composers")),
                 genres=normalize_list(metadata.get("genres")),
                 directors=normalize_list(metadata.get("directors")),
                 writers=normalize_list(metadata.get("writers")),
@@ -517,7 +532,17 @@ def enrich_item(item: CatalogItem) -> CatalogItem:
     apply_fetched_metadata(item, metadata, "year", fetched_year)
     apply_fetched_metadata(item, metadata, "wikipedia_title", metadata.get("wikipedia_title", ""))
     apply_fetched_metadata(item, metadata, "wikidata_id", metadata.get("wikidata_id", ""))
-    for field_name in ("genres", "directors", "writers", "cast"):
+    apply_fetched_metadata(item, metadata, "duration_minutes", metadata.get("duration_minutes"))
+    for field_name in (
+        "countries",
+        "original_languages",
+        "producers",
+        "composers",
+        "genres",
+        "directors",
+        "writers",
+        "cast",
+    ):
         apply_fetched_metadata(
             item, metadata, field_name, metadata.get(field_name, []), merge_values=True
         )

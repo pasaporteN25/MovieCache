@@ -71,6 +71,8 @@ class ReleaseDateTests(unittest.TestCase):
                 "id": "heat",
                 "title": "Heat",
                 "year": "1995",
+                "duration_minutes": 172,
+                "countries": ["Estados Unidos", "Italia"],
                 "release_dates": [{"date": "1995-12-15", "source": "wikidata"}],
             }
         )
@@ -80,6 +82,8 @@ class ReleaseDateTests(unittest.TestCase):
 
         self.assertEqual(dates[0]["date"], "1995-12-15")
         self.assertEqual(dates[0]["precision"], "day")
+        self.assertEqual(row["duration_minutes"], "172")
+        self.assertEqual(row["countries"], "Estados Unidos, Italia")
 
 
 if __name__ == "__main__":

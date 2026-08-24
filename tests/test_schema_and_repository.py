@@ -18,7 +18,7 @@ from movie_inbox.infrastructure.schema import (
 
 
 class SchemaAndRepositoryTests(unittest.TestCase):
-    def test_legacy_list_is_migrated_to_v6_shape(self) -> None:
+    def test_legacy_list_is_migrated_to_v7_shape(self) -> None:
         rows = extract_catalog_items([{"title": "Heat", "year": "1995", "en_catalogo": "si"}])
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["kind"], "pelicula")
@@ -29,16 +29,21 @@ class SchemaAndRepositoryTests(unittest.TestCase):
         self.assertEqual(rows[0]["link_curation_status"], "pending")
         self.assertEqual(rows[0]["duplicate_decisions"], {})
         self.assertEqual(rows[0]["release_dates"], [])
+        self.assertIsNone(rows[0]["duration_minutes"])
+        self.assertEqual(rows[0]["countries"], [])
+        self.assertEqual(rows[0]["original_languages"], [])
+        self.assertEqual(rows[0]["producers"], [])
+        self.assertEqual(rows[0]["composers"], [])
 
     def test_future_and_malformed_catalogs_are_rejected(self) -> None:
         with self.assertRaises(UnsupportedCatalogVersion):
-            extract_catalog_items({"schema_version": 7, "items": []})
+            extract_catalog_items({"schema_version": 8, "items": []})
         with self.assertRaises(CatalogSchemaError):
-            extract_catalog_items({"schema_version": 6, "items": "not-an-array"})
+            extract_catalog_items({"schema_version": 7, "items": "not-an-array"})
         with self.assertRaises(CatalogSchemaError):
-            extract_catalog_items({"schema_version": 6, "items": [], "unexpected": True})
+            extract_catalog_items({"schema_version": 7, "items": [], "unexpected": True})
         with self.assertRaises(CatalogSchemaError):
-            extract_catalog_items({"schema_version": 6, "items": [None]})
+            extract_catalog_items({"schema_version": 7, "items": [None]})
 
     def test_invalid_v6_item_cannot_be_written(self) -> None:
         with self.assertRaises(CatalogSchemaError):
@@ -51,6 +56,11 @@ class SchemaAndRepositoryTests(unittest.TestCase):
                 "title": "Heat",
                 "year": "1995",
                 "kind": "pelicula",
+                "duration_minutes": 172,
+                "countries": ["Estados Unidos"],
+                "original_languages": ["inglés"],
+                "producers": ["Art Linson"],
+                "composers": ["Elliot Goldenthal"],
                 "local_files": [{"path": "Heat.mkv", "name": "Heat.mkv", "available": "false"}],
                 "metadata_sources": {
                     "title": {"source": "manual", "url": "", "updated_at": "", "inferred": "false"}
@@ -69,9 +79,11 @@ class SchemaAndRepositoryTests(unittest.TestCase):
             repository.write([item])
             loaded = repository.read()
             self.assertEqual(loaded[0].title, "Heat")
-            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 6)
+            self.assertEqual(loaded[0].duration_minutes, 172)
+            self.assertEqual(loaded[0].countries, ["Estados Unidos"])
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 7)
 
-            path.write_text('{"schema_version": 7, "items": []}', encoding="utf-8")
+            path.write_text('{"schema_version": 8, "items": []}', encoding="utf-8")
             with self.assertRaises(CatalogFormatError):
                 repository.read()
 
@@ -93,6 +105,25 @@ class SchemaAndRepositoryTests(unittest.TestCase):
         rows = extract_catalog_items({"schema_version": 5, "items": [item]})
 
         self.assertEqual(rows[0]["release_dates"], [])
+
+    def test_v6_catalog_is_migrated_with_e6_metadata_defaults(self) -> None:
+        item = normalize_item({"id": "heat", "title": "Heat", "kind": "pelicula"}).to_dict()
+        for field in (
+            "duration_minutes",
+            "countries",
+            "original_languages",
+            "producers",
+            "composers",
+        ):
+            item.pop(field, None)
+
+        rows = extract_catalog_items({"schema_version": 6, "items": [item]})
+
+        self.assertIsNone(rows[0]["duration_minutes"])
+        self.assertEqual(rows[0]["countries"], [])
+        self.assertEqual(rows[0]["original_languages"], [])
+        self.assertEqual(rows[0]["producers"], [])
+        self.assertEqual(rows[0]["composers"], [])
 
     def test_normalization_repairs_identifier_titles_and_detects_series(self) -> None:
         item = normalize_item(

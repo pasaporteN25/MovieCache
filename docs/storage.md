@@ -86,16 +86,18 @@ La clasificacion puede consultar el catalogo del owner y catalogos de miembros c
 administrador. La serializacion compartida vuelve a retirar cualquier lista de fuentes
 como defensa adicional.
 
-## Esquema SQLite v3
+## Esquema SQLite v5
 
 La tabla `schema_migrations` gobierna la version de la base. Una version superior se rechaza; una base con tablas sin historial tampoco se interpreta como un catalogo vacio.
 
 El esquema separa:
 
-- `catalog_items`: datos escalares de la obra y campos desconocidos conservados en `extra_json`.
+- `catalog_items`: datos escalares de la obra, incluida la duración canónica en
+  minutos, y campos desconocidos conservados en `extra_json`.
 - `alternative_titles`: aliases multilenguaje.
 - `external_ids`: URLs e IDs de Wikipedia, Wikidata, IMDb y FilmAffinity.
-- `metadata_values`: generos, directores, guionistas y reparto.
+- `metadata_values`: países, idiomas originales, productores, compositores,
+  géneros, directores, guionistas y reparto.
 - `local_files`: archivos fisicos y estado de disponibilidad.
 - `metadata_provenance`, `locked_fields` y `tags`: curacion personal.
 - `duplicate_decisions`: decisiones persistentes sobre pares que se pospusieron o no son duplicados.
@@ -104,6 +106,12 @@ El esquema separa:
 La migracion v2 suma `backdrop_image` y `tmdb_id`: permite guardar arte horizontal para el reel y una identidad estable para futuros proveedores de imagenes, sin obligar a configurar una API externa para usar el catalogo.
 
 La migracion v3 agrega `link_curation_status` y `curation_updated_at` a las obras, ademas de la tabla relacional `duplicate_decisions`. De este modo `Posponer`, `No son duplicados` y `No requiere referencia` se conservan tanto en SQLite como en las exportaciones JSON v5.
+
+La migración v4 agrega fechas de estreno con precisión y procedencia. La v5 suma
+`duration_minutes` como entero positivo opcional; los cuatro campos multivalor nuevos
+reutilizan `metadata_values`, por lo que no requieren tablas específicas. El contrato
+JSON portable correspondiente es v7 y migra catálogos v6 con duración desconocida y
+listas vacías.
 
 Temporadas y episodios todavia no se importan desde JSON ni aparecen en el CRUD. Las actualizaciones de una obra preservan esas filas para que el esquema pueda evolucionar sin perderlas.
 

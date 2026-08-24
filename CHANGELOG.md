@@ -4,6 +4,14 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Agregado
+
+- El enriquecimiento de Wikidata aprovecha la entidad ya descargada para
+  incorporar duración en minutos, países, idiomas originales, productores y
+  compositores. Los cinco campos forman parte del modelo portable, conservan
+  procedencia y bloqueos, migran el JSON a schema v7 y hacen round-trip en
+  SQLite v5, importaciones y exportaciones.
+
 ## [0.5.0] - 2026-08-24
 
 ### Agregado

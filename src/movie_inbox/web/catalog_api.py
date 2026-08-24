@@ -20,7 +20,7 @@ from movie_inbox.application.curation_workflow import CurationWorkflowService
 from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain import catalog as domain
-from movie_inbox.domain.metadata import METADATA_FIELDS
+from movie_inbox.domain.metadata import METADATA_FIELDS, normalize_optional_positive_int
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.curation_history import (
     JsonCurationHistoryRepository,
@@ -349,6 +349,11 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
             result.get("wikipedia_title") or (title if source == "wikipedia" else "")
         ),
         "wikidata_id": str(result.get("wikidata_id") or ""),
+        "duration_minutes": normalize_optional_positive_int(result.get("duration_minutes")),
+        "countries": normalize_tags(result.get("countries")),
+        "original_languages": normalize_tags(result.get("original_languages")),
+        "producers": normalize_tags(result.get("producers")),
+        "composers": normalize_tags(result.get("composers")),
         "genres": normalize_tags(result.get("genres")),
         "directors": normalize_tags(result.get("directors")),
         "writers": normalize_tags(result.get("writers")),

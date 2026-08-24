@@ -7,7 +7,12 @@ from urllib.error import URLError
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.metadata import fetch_metadata_by_title
 from movie_inbox.external.registry import ExternalSourceService
-from movie_inbox.external.wikidata import fetch_wikidata_title_matches, wikidata_kind
+from movie_inbox.external.wikidata import (
+    fetch_wikidata_metadata,
+    fetch_wikidata_title_matches,
+    wikidata_claim_duration_minutes,
+    wikidata_kind,
+)
 from movie_inbox.external.wikipedia import (
     WikipediaAdapter,
     _find_synopsis_section,
@@ -44,6 +49,79 @@ _SPANISH_ARTICLE_EXTRACT_WITH_NESTED_SUBSECTION = (
 
 
 class ExternalMetadataTests(unittest.TestCase):
+    def test_wikidata_duration_is_normalized_to_integer_minutes(self) -> None:
+        claims = {
+            "P2047": [
+                {
+                    "rank": "normal",
+                    "mainsnak": {
+                        "datavalue": {
+                            "value": {
+                                "amount": "+5400",
+                                "unit": "http://www.wikidata.org/entity/Q11574",
+                            }
+                        }
+                    },
+                }
+            ]
+        }
+
+        self.assertEqual(wikidata_claim_duration_minutes(claims), 90)
+
+    @patch("movie_inbox.external.wikidata.fetch_wikidata_labels")
+    @patch("movie_inbox.external.wikidata.fetch_json_safe")
+    def test_wikidata_metadata_extracts_the_five_e6_fields(
+        self, fetch_json_safe, fetch_labels
+    ) -> None:
+        def entity_claim(item_id: str) -> dict[str, object]:
+            return {
+                "rank": "normal",
+                "mainsnak": {"datavalue": {"value": {"id": item_id}}},
+            }
+
+        fetch_json_safe.return_value = {
+            "entities": {
+                "Q1": {
+                    "labels": {},
+                    "aliases": {},
+                    "claims": {
+                        "P2047": [
+                            {
+                                "rank": "preferred",
+                                "mainsnak": {
+                                    "datavalue": {
+                                        "value": {
+                                            "amount": "+172",
+                                            "unit": "http://www.wikidata.org/entity/Q7727",
+                                        }
+                                    }
+                                },
+                            }
+                        ],
+                        "P495": [entity_claim("Q30")],
+                        "P364": [entity_claim("Q1860")],
+                        "P162": [entity_claim("Q2")],
+                        "P86": [entity_claim("Q3")],
+                    },
+                }
+            }
+        }
+        fetch_labels.return_value = {
+            "Q30": "Estados Unidos",
+            "Q1860": "inglés",
+            "Q2": "Productora",
+            "Q3": "Compositor",
+        }
+
+        metadata = fetch_wikidata_metadata("Q1")
+
+        self.assertEqual(metadata["duration_minutes"], 172)
+        self.assertEqual(metadata["countries"], ["Estados Unidos"])
+        self.assertEqual(metadata["original_languages"], ["inglés"])
+        self.assertEqual(metadata["producers"], ["Productora"])
+        self.assertEqual(metadata["composers"], ["Compositor"])
+        fetch_labels.assert_called_once_with(["Q30", "Q1860", "Q2", "Q3"])
+
     @patch("movie_inbox.external.metadata.fetch_wikipedia_by_title")
     @patch("movie_inbox.external.metadata.fetch_wikipedia_by_wikidata_title")
     def test_title_lookup_prefers_richer_wikidata_metadata(

@@ -25,6 +25,8 @@ class PrivacyTests(unittest.TestCase):
             "id": "heat",
             "title": "Heat",
             "year": "1995",
+            "duration_minutes": 172,
+            "countries": ["Estados Unidos"],
             "status": "watched",
             "watched_at": "2026-07-15",
             "rating": 9,
@@ -57,6 +59,8 @@ class PrivacyTests(unittest.TestCase):
 
         self.assertEqual(public["status"], "watched")
         self.assertEqual(public["rating"], 9)
+        self.assertEqual(public["duration_minutes"], 172)
+        self.assertEqual(public["countries"], ["Estados Unidos"])
         self.assertNotIn("watched_at", public)
         self.assertNotIn("review", public)
         self.assertNotIn("notes", public)

@@ -46,6 +46,11 @@ def sample_item(item_id: str = "heat-1995"):
             ],
             "imdb_url": "https://www.imdb.com/title/tt0113277/",
             "wikidata_id": "Q42198",
+            "duration_minutes": 172,
+            "countries": ["Estados Unidos"],
+            "original_languages": ["inglés"],
+            "producers": ["Art Linson"],
+            "composers": ["Elliot Goldenthal"],
             "genres": ["Crime", "Drama"],
             "directors": ["Michael Mann"],
             "writers": ["Michael Mann"],
@@ -105,7 +110,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 connection.commit()
 
             repository = SqliteCatalogRepository(path, normalize_item)
-            self.assertEqual(repository.database_version(), 4)
+            self.assertEqual(repository.database_version(), 5)
             with closing(sqlite3.connect(path)) as connection:
                 columns = {row[1] for row in connection.execute("PRAGMA table_info(catalog_items)")}
                 tables = {
@@ -115,7 +120,13 @@ class SqliteRepositoryTests(unittest.TestCase):
                     )
                 }
             self.assertTrue(
-                {"backdrop_image", "tmdb_id", "link_curation_status", "curation_updated_at"}
+                {
+                    "backdrop_image",
+                    "tmdb_id",
+                    "link_curation_status",
+                    "curation_updated_at",
+                    "duration_minutes",
+                }
                 <= columns
             )
             self.assertIn("duplicate_decisions", tables)
@@ -133,6 +144,11 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.genres, ["Crime", "Drama"])
             self.assertEqual(loaded.imdb_url, "https://www.imdb.com/title/tt0113277/")
             self.assertEqual(loaded.wikidata_id, "Q42198")
+            self.assertEqual(loaded.duration_minutes, 172)
+            self.assertEqual(loaded.countries, ["Estados Unidos"])
+            self.assertEqual(loaded.original_languages, ["inglés"])
+            self.assertEqual(loaded.producers, ["Art Linson"])
+            self.assertEqual(loaded.composers, ["Elliot Goldenthal"])
             self.assertEqual(loaded.backdrop_image, "https://images.example/backdrop.jpg")
             self.assertEqual(loaded.tmdb_id, "949")
             self.assertEqual(loaded.release_dates[0]["date"], "1995-12-15")
@@ -163,7 +179,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 }
                 <= tables
             )
-            self.assertEqual(repository.database_version(), 4)
+            self.assertEqual(repository.database_version(), 5)
 
     def test_catalog_service_mutates_sqlite_transactionally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -223,7 +239,11 @@ class SqliteRepositoryTests(unittest.TestCase):
 
             updated, _ = CatalogService(repository).update_metadata(
                 "heat-1995",
-                {"genres": ["Crime", "Thriller"]},
+                {
+                    "duration_minutes": "170",
+                    "countries": ["Estados Unidos", "Italia"],
+                    "genres": ["Crime", "Thriller"],
+                },
                 None,
             )
             self.assertTrue(updated)
@@ -231,7 +251,10 @@ class SqliteRepositoryTests(unittest.TestCase):
                 self.assertEqual(
                     connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0
                 )
-            self.assertEqual(repository.get("heat-1995").genres, ["Crime", "Thriller"])
+            loaded = repository.get("heat-1995")
+            self.assertEqual(loaded.duration_minutes, 170)
+            self.assertEqual(loaded.countries, ["Estados Unidos", "Italia"])
+            self.assertEqual(loaded.genres, ["Crime", "Thriller"])
 
     def test_batch_mutation_does_not_rewrite_unchanged_items(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -505,7 +528,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 self.assertEqual(import_json(source, database), 0)
                 self.assertEqual(export_json(database, exported), 0)
             payload = json.loads(exported.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema_version"], 6)
+            self.assertEqual(payload["schema_version"], 7)
             self.assertEqual(payload["items"][0]["id"], "heat-1995")
 
     def test_json_import_reads_source_without_creating_a_sidecar_lock(self) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from urllib.parse import quote
 
@@ -10,6 +11,10 @@ from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.external.common import fetch_json_safe
 
 WIKIDATA_LIST_FIELDS = {
+    "countries": ("P495", 8),
+    "original_languages": ("P364", 8),
+    "producers": ("P162", 12),
+    "composers": ("P86", 12),
     "genres": ("P136", 8),
     "directors": ("P57", 8),
     "writers": ("P58", 10),
@@ -120,6 +125,9 @@ def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
     release_dates = wikidata_claim_release_dates(claims, entity_id)
     if release_dates:
         metadata["release_dates"] = release_dates
+    duration_minutes = wikidata_claim_duration_minutes(claims)
+    if duration_minutes is not None:
+        metadata["duration_minutes"] = duration_minutes
     for field, ids in ids_by_field.items():
         values = [labels.get(item_id, item_id) for item_id in ids if labels.get(item_id, item_id)]
         if values:
@@ -258,6 +266,29 @@ def wikidata_claim_year(claims: dict[str, object], prop: str) -> str:
         if match:
             return match.group(1).lstrip("+")
     return ""
+
+
+def wikidata_claim_duration_minutes(claims: dict[str, object]) -> int | None:
+    unit_factors = {
+        "Q7727": 1.0,
+        "Q11574": 1.0 / 60.0,
+        "Q25235": 60.0,
+    }
+    for statement in _ordered_statements(claims, "P2047"):
+        value = _claim_value(statement)
+        if not isinstance(value, dict):
+            continue
+        unit_id = str(value.get("unit") or "").rstrip("/").rsplit("/", 1)[-1]
+        factor = unit_factors.get(unit_id)
+        if factor is None:
+            continue
+        try:
+            minutes = float(str(value.get("amount") or "")) * factor
+        except ValueError:
+            continue
+        if math.isfinite(minutes) and minutes > 0:
+            return max(1, int(round(minutes)))
+    return None
 
 
 def wikidata_claim_release_dates(

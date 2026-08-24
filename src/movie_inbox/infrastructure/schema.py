@@ -23,6 +23,7 @@ from movie_inbox.domain.metadata import (
     normalize_locked_fields,
     normalize_metadata_sources,
     normalize_non_negative_int,
+    normalize_optional_positive_int,
 )
 from movie_inbox.domain.normalization import (
     VALID_KINDS,
@@ -37,7 +38,7 @@ from movie_inbox.domain.releases import (
     normalize_release_dates,
 )
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 BACKUP_LIMIT = 1
 CATALOG_FIELDS = [
     "id",
@@ -60,6 +61,11 @@ CATALOG_FIELDS = [
     "filmaffinity_url",
     "wikipedia_title",
     "wikidata_id",
+    "duration_minutes",
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
     "genres",
     "directors",
     "writers",
@@ -95,6 +101,11 @@ REQUIRED_ITEM_FIELDS = {
     "link_curation_status",
     "duplicate_decisions",
     "release_dates",
+    "duration_minutes",
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
 }
 LOCAL_FILE_FIELDS = {
     "path",
@@ -110,6 +121,10 @@ LOCAL_FILE_FIELDS = {
 }
 LIST_ITEM_FIELDS = {
     "alternative_titles",
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
     "genres",
     "directors",
     "writers",
@@ -122,6 +137,7 @@ STRING_ITEM_FIELDS = (
     - LIST_ITEM_FIELDS
     - {
         "rating",
+        "duration_minutes",
         "en_catalogo",
         "local_files",
         "metadata_sources",
@@ -191,7 +207,14 @@ def migrate_catalog_document(raw: Any) -> dict[str, Any]:
     else:
         raise CatalogSchemaError("Catalog root must be an object or a legacy array")
 
-    migrations = {1: v1_to_v2, 2: v2_to_v3, 3: v3_to_v4, 4: v4_to_v5, 5: v5_to_v6}
+    migrations = {
+        1: v1_to_v2,
+        2: v2_to_v3,
+        3: v3_to_v4,
+        4: v4_to_v5,
+        5: v5_to_v6,
+        6: v6_to_v7,
+    }
     while document["schema_version"] < SCHEMA_VERSION:
         migration = migrations.get(document["schema_version"])
         if migration is None:
@@ -281,6 +304,21 @@ def v5_to_v6(document: dict[str, Any]) -> dict[str, Any]:
     return {"schema_version": 6, "items": rows}
 
 
+def v6_to_v7(document: dict[str, Any]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for row in copy_item_rows(document.get("items"), "v6"):
+        item = normalize_legacy_item(row)
+        item["local_files"] = normalize_local_files(
+            item.get("local_files"),
+            str(item.get("local_name") or ""),
+            str(item.get("local_path") or ""),
+        )
+        item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
+        item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
+        rows.append(item)
+    return {"schema_version": 7, "items": rows}
+
+
 def validate_catalog_document(document: Mapping[str, Any]) -> None:
     extra = set(document) - {"schema_version", "items"}
     if extra:
@@ -314,6 +352,15 @@ def validate_catalog_item(row: Any, index: int = 0) -> None:
     rating = row.get("rating", 0)
     if not isinstance(rating, int) or isinstance(rating, bool) or not 0 <= rating <= 10:
         raise CatalogSchemaError(f"items[{index}].rating must be an integer from 0 to 10")
+    duration_minutes = row.get("duration_minutes")
+    if duration_minutes is not None and (
+        not isinstance(duration_minutes, int)
+        or isinstance(duration_minutes, bool)
+        or duration_minutes <= 0
+    ):
+        raise CatalogSchemaError(
+            f"items[{index}].duration_minutes must be null or a positive integer"
+        )
     for field in LIST_ITEM_FIELDS:
         if field in row and not isinstance(row.get(field), list):
             raise CatalogSchemaError(f"items[{index}].{field} must be an array")
@@ -462,12 +509,26 @@ def normalize_legacy_item(row: Mapping[str, Any]) -> dict[str, Any]:
     item["status"] = normalize_status(item.get("status"))
     item["en_catalogo"] = normalize_bool(item.get("en_catalogo"), default=False)
     item["rating"] = min(10, normalize_non_negative_int(item.get("rating")))
+    item["duration_minutes"] = normalize_optional_positive_int(
+        item.get("duration_minutes") or item.get("duration")
+    )
     item["release_dates"] = normalize_release_dates(
         item.get("release_dates") or item.get("releaseDates")
     )
     for field in ("watched_at", "review", "original_title", "spanish_title", "english_title"):
         item[field] = str(item.get(field) or "")
-    for field in ("alternative_titles", "genres", "directors", "writers", "cast", "tags"):
+    for field in (
+        "alternative_titles",
+        "countries",
+        "original_languages",
+        "producers",
+        "composers",
+        "genres",
+        "directors",
+        "writers",
+        "cast",
+        "tags",
+    ):
         value = item.get(field)
         if isinstance(value, str):
             value = [part.strip() for part in value.split(",") if part.strip()]
@@ -476,6 +537,7 @@ def normalize_legacy_item(row: Mapping[str, Any]) -> dict[str, Any]:
     item["duplicate_decisions"] = normalize_duplicate_decisions(item.get("duplicate_decisions"))
     item["curation_updated_at"] = str(item.get("curation_updated_at") or "")
     item.pop("releaseDates", None)
+    item.pop("duration", None)
     return item
 
 

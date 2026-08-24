@@ -21,6 +21,11 @@ METADATA_FIELDS = (
     "description",
     "wikipedia_title",
     "wikidata_id",
+    "duration_minutes",
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
     "genres",
     "directors",
     "writers",
@@ -143,3 +148,11 @@ def normalize_non_negative_int(value: Any) -> int:
         return max(0, int(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def normalize_optional_positive_int(value: Any) -> int | None:
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError):
+        return None
+    return normalized if normalized > 0 else None

@@ -37,6 +37,7 @@ from movie_inbox.domain.metadata import (
     normalize_local_files,
     normalize_locked_fields,
     normalize_metadata_sources,
+    normalize_optional_positive_int,
 )
 from movie_inbox.domain.models import CatalogItem
 
@@ -49,6 +50,11 @@ EDITABLE_METADATA_FIELDS = {
     "kind",
     "year",
     "description",
+    "duration_minutes",
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
     "genres",
     "directors",
     "writers",
@@ -56,7 +62,17 @@ EDITABLE_METADATA_FIELDS = {
     "backdrop_image",
     "tmdb_id",
 }
-LIST_METADATA_FIELDS = {"alternative_titles", "genres", "directors", "writers", "cast"}
+LIST_METADATA_FIELDS = {
+    "alternative_titles",
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
+    "genres",
+    "directors",
+    "writers",
+    "cast",
+}
 
 
 class CatalogService:
@@ -422,6 +438,8 @@ class CatalogService:
                 value = values.get(field)
                 if field in LIST_METADATA_FIELDS:
                     normalized: Any = _normalize_list(value)
+                elif field == "duration_minutes":
+                    normalized = normalize_optional_positive_int(value)
                 elif field == "kind":
                     normalized = normalize_kind(value)
                 else:
@@ -698,6 +716,11 @@ def _new_local_item(
             "filmaffinity_url": "",
             "wikipedia_title": "",
             "wikidata_id": "",
+            "duration_minutes": None,
+            "countries": [],
+            "original_languages": [],
+            "producers": [],
+            "composers": [],
             "genres": [],
             "directors": [],
             "writers": [],

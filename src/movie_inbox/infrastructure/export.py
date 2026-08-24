@@ -24,7 +24,18 @@ def catalog_csv_text(items: list[CatalogItem]) -> str:
     for item in items:
         payload = item.to_dict()
         row = {key: payload.get(key, "") for key in CATALOG_FIELDS}
-        for key in ("alternative_titles", "genres", "directors", "writers", "cast", "tags"):
+        for key in (
+            "alternative_titles",
+            "countries",
+            "original_languages",
+            "producers",
+            "composers",
+            "genres",
+            "directors",
+            "writers",
+            "cast",
+            "tags",
+        ):
             row[key] = ", ".join(row.get(key, []))
         row["local_files"] = json.dumps(row.get("local_files", []), ensure_ascii=False)
         row["release_dates"] = json.dumps(row.get("release_dates", []), ensure_ascii=False)

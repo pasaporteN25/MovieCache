@@ -6,7 +6,7 @@
   "required": ["schema_version", "items"],
   "properties": {
     "schema_version": {
-      "const": 6
+      "const": 7
     },
     "items": {
       "type": "array",
@@ -68,7 +68,9 @@
       "type": "object",
       "required": [
         "id", "title", "kind", "status", "en_catalogo", "local_files",
-        "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions", "release_dates"
+        "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions",
+        "release_dates", "duration_minutes", "countries", "original_languages",
+        "producers", "composers"
       ],
       "properties": {
         "id": {"type": "string"},
@@ -91,6 +93,11 @@
         "filmaffinity_url": {"type": "string"},
         "wikipedia_title": {"type": "string"},
         "wikidata_id": {"type": "string"},
+        "duration_minutes": {"type": ["integer", "null"], "minimum": 1},
+        "countries": {"type": "array", "items": {"type": "string"}},
+        "original_languages": {"type": "array", "items": {"type": "string"}},
+        "producers": {"type": "array", "items": {"type": "string"}},
+        "composers": {"type": "array", "items": {"type": "string"}},
         "genres": {"type": "array", "items": {"type": "string"}},
         "directors": {"type": "array", "items": {"type": "string"}},
         "writers": {"type": "array", "items": {"type": "string"}},
@@ -112,7 +119,8 @@
             "enum": [
               "title", "original_title", "spanish_title", "english_title",
               "alternative_titles", "kind", "year", "release_dates", "description",
-              "wikipedia_title", "wikidata_id", "genres", "directors",
+              "wikipedia_title", "wikidata_id", "duration_minutes", "countries",
+              "original_languages", "producers", "composers", "genres", "directors",
               "writers", "cast", "page_image", "backdrop_image", "tmdb_id", "wikipedia_extract"
             ]
           },
@@ -124,7 +132,8 @@
             "enum": [
               "title", "original_title", "spanish_title", "english_title",
               "alternative_titles", "kind", "year", "release_dates", "description",
-              "wikipedia_title", "wikidata_id", "genres", "directors",
+              "wikipedia_title", "wikidata_id", "duration_minutes", "countries",
+              "original_languages", "producers", "composers", "genres", "directors",
               "writers", "cast", "page_image", "backdrop_image", "tmdb_id", "wikipedia_extract"
             ]
           },

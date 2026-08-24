@@ -26,8 +26,17 @@ from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.infrastructure.schema import CATALOG_FIELDS, CatalogSchemaError, catalog_document
 
-DATABASE_SCHEMA_VERSION = 4
-LIST_METADATA_FIELDS = ("genres", "directors", "writers", "cast")
+DATABASE_SCHEMA_VERSION = 5
+LIST_METADATA_FIELDS = (
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
+    "genres",
+    "directors",
+    "writers",
+    "cast",
+)
 
 SCHEMA_V1 = """
 CREATE TABLE schema_migrations (
@@ -202,6 +211,13 @@ MIGRATIONS = {
                 PRIMARY KEY (item_id, position)
             )""",
             "CREATE INDEX ix_release_dates_date ON release_dates(release_date)",
+        ),
+    ),
+    5: (
+        "runtime in canonical minutes",
+        (
+            "ALTER TABLE catalog_items ADD COLUMN duration_minutes INTEGER DEFAULT NULL "
+            "CHECK (duration_minutes IS NULL OR duration_minutes > 0)",
         ),
     ),
 }
@@ -534,6 +550,7 @@ class SqliteCatalogRepository:
             "watched_at": row["watched_at"],
             "rating": int(row["rating"]),
             "year": row["year"],
+            "duration_minutes": row["duration_minutes"],
             "release_dates": self._release_dates(connection, item_id),
             "description": row["description"],
             "wikipedia_url": "",
@@ -541,6 +558,10 @@ class SqliteCatalogRepository:
             "filmaffinity_url": "",
             "wikipedia_title": "",
             "wikidata_id": "",
+            "countries": [],
+            "original_languages": [],
+            "producers": [],
+            "composers": [],
             "genres": [],
             "directors": [],
             "writers": [],
@@ -738,13 +759,15 @@ class SqliteCatalogRepository:
             """INSERT INTO catalog_items(
                     id, position, primary_url, source, title, original_title,
                     spanish_title, english_title,
-                    kind, status, watched_at, rating, year, description, page_image,
+                    kind, status, watched_at, rating, year, duration_minutes,
+                    description, page_image,
                     backdrop_image, tmdb_id,
                     wikipedia_extract,
                     en_catalogo, local_name, local_path, notes, review, link_curation_status,
                     curation_updated_at, added_at, extra_json
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     position = excluded.position,
@@ -759,6 +782,7 @@ class SqliteCatalogRepository:
                     watched_at = excluded.watched_at,
                     rating = excluded.rating,
                     year = excluded.year,
+                    duration_minutes = excluded.duration_minutes,
                     description = excluded.description,
                     page_image = excluded.page_image,
                     backdrop_image = excluded.backdrop_image,
@@ -787,6 +811,7 @@ class SqliteCatalogRepository:
                 item.get("watched_at", ""),
                 int(item.get("rating") or 0),
                 item.get("year", ""),
+                item.get("duration_minutes"),
                 item.get("description", ""),
                 item.get("page_image", ""),
                 item.get("backdrop_image", ""),

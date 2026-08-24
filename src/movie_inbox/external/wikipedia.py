@@ -155,6 +155,11 @@ def wikipedia_results_from_query(
                 "wikipedia_url": page_url,
                 "wikipedia_title": title,
                 "wikidata_id": str(pageprops.get("wikibase_item") or ""),
+                "duration_minutes": None,
+                "countries": [],
+                "original_languages": [],
+                "producers": [],
+                "composers": [],
                 "genres": [],
                 "directors": [],
                 "writers": [],
@@ -194,6 +199,22 @@ def wikipedia_result_from_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
         "wikipedia_url": page_url,
         "wikipedia_title": title,
         "wikidata_id": str(metadata.get("wikidata_id") or ""),
+        "duration_minutes": metadata.get("duration_minutes")
+        if isinstance(metadata.get("duration_minutes"), int)
+        and not isinstance(metadata.get("duration_minutes"), bool)
+        else None,
+        "countries": metadata.get("countries")
+        if isinstance(metadata.get("countries"), list)
+        else [],
+        "original_languages": metadata.get("original_languages")
+        if isinstance(metadata.get("original_languages"), list)
+        else [],
+        "producers": metadata.get("producers")
+        if isinstance(metadata.get("producers"), list)
+        else [],
+        "composers": metadata.get("composers")
+        if isinstance(metadata.get("composers"), list)
+        else [],
         "genres": metadata.get("genres") if isinstance(metadata.get("genres"), list) else [],
         "directors": metadata.get("directors")
         if isinstance(metadata.get("directors"), list)

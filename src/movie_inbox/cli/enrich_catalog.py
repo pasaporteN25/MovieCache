@@ -23,6 +23,7 @@ from movie_inbox.domain.catalog import (
     normalize_tags as normalize_list,
 )
 from movie_inbox.domain.deduplication import deduplicate_items
+from movie_inbox.domain.metadata import normalize_optional_positive_int
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.titles import clean_release_title, infer_year
 from movie_inbox.external.metadata import fetch_metadata, fetch_wikipedia_by_title
@@ -152,7 +153,17 @@ def clean_item_title(item: CatalogItem) -> bool:
 
 def should_fetch_wikipedia(item: CatalogItem) -> bool:
     if item.wikidata_id or item.wikipedia_title:
-        if not (item.genres and item.directors and item.writers and item.cast):
+        if not (
+            item.duration_minutes
+            and item.countries
+            and item.original_languages
+            and item.producers
+            and item.composers
+            and item.genres
+            and item.directors
+            and item.writers
+            and item.cast
+        ):
             return bool(item.url or item.wikipedia_url or item.title)
         return False
     return bool(item.url or item.wikipedia_url or item.title)
@@ -193,6 +204,15 @@ def link_wikipedia(item: CatalogItem) -> bool:
     ]
     item.wikipedia_title = item.wikipedia_title or metadata.get("wikipedia_title", "")
     item.wikidata_id = item.wikidata_id or metadata.get("wikidata_id", "")
+    item.duration_minutes = item.duration_minutes or normalize_optional_positive_int(
+        metadata.get("duration_minutes")
+    )
+    item.countries = item.countries or normalize_list(metadata.get("countries"))
+    item.original_languages = item.original_languages or normalize_list(
+        metadata.get("original_languages")
+    )
+    item.producers = item.producers or normalize_list(metadata.get("producers"))
+    item.composers = item.composers or normalize_list(metadata.get("composers"))
     item.genres = item.genres or normalize_list(metadata.get("genres"))
     item.directors = item.directors or normalize_list(metadata.get("directors"))
     item.writers = item.writers or normalize_list(metadata.get("writers"))

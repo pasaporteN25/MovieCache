@@ -24,6 +24,7 @@ from movie_inbox.domain.metadata import (
     normalize_local_files,
     normalize_locked_fields,
     normalize_metadata_sources,
+    normalize_optional_positive_int,
 )
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.normalization import (
@@ -40,7 +41,17 @@ KNOWN_LINK_HOSTS = {
     "imdb": "imdb.com",
     "filmaffinity": "filmaffinity.com",
 }
-LIST_FIELDS = {"alternative_titles", "genres", "directors", "writers", "cast"}
+LIST_FIELDS = {
+    "alternative_titles",
+    "countries",
+    "original_languages",
+    "producers",
+    "composers",
+    "genres",
+    "directors",
+    "writers",
+    "cast",
+}
 
 
 def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
@@ -65,6 +76,15 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         item.get("writers") or item.get("writer") or item.get("screenwriters")
     )
     item["cast"] = normalize_tags(item.get("cast") or item.get("actors") or item.get("actor"))
+    item["countries"] = normalize_tags(item.get("countries") or item.get("country"))
+    item["original_languages"] = normalize_tags(
+        item.get("original_languages") or item.get("original_language")
+    )
+    item["producers"] = normalize_tags(item.get("producers") or item.get("producer"))
+    item["composers"] = normalize_tags(item.get("composers") or item.get("composer"))
+    item["duration_minutes"] = normalize_optional_positive_int(
+        item.get("duration_minutes") or item.get("duration")
+    )
     item["release_dates"] = normalize_release_dates(
         item.get("release_dates") or item.get("releaseDates")
     )
@@ -175,6 +195,11 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         "actors",
         "actor",
         "releaseDates",
+        "duration",
+        "country",
+        "original_language",
+        "producer",
+        "composer",
     ):
         item.pop(alias, None)
     return CatalogItem.from_mapping(item)

@@ -140,6 +140,11 @@ class ExternalCatalogServiceTests(unittest.TestCase):
             lambda _: {
                 "title": "Heat",
                 "spanish_title": "Fuego contra fuego",
+                "duration_minutes": 172,
+                "countries": ["Estados Unidos"],
+                "original_languages": ["inglés"],
+                "producers": ["Art Linson"],
+                "composers": ["Elliot Goldenthal"],
                 "genres": ["Crime"],
                 "imdb_url": "https://www.imdb.com/title/tt0113277/",
             },
@@ -154,6 +159,11 @@ class ExternalCatalogServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(result["spanish_title"], "Fuego contra fuego")
+        self.assertEqual(result["duration_minutes"], 172)
+        self.assertEqual(result["countries"], ["Estados Unidos"])
+        self.assertEqual(result["original_languages"], ["inglés"])
+        self.assertEqual(result["producers"], ["Art Linson"])
+        self.assertEqual(result["composers"], ["Elliot Goldenthal"])
         self.assertEqual(result["genres"], ["Crime"])
         self.assertEqual(result["imdb_url"], "https://www.imdb.com/title/tt0113277/")
         self.assertEqual(gateway.loader_calls, 1)

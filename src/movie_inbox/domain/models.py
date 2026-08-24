@@ -7,6 +7,7 @@ from collections.abc import Iterator, Mapping, MutableMapping
 from dataclasses import dataclass, field, fields
 from typing import TYPE_CHECKING, Any, Self, TypedDict, cast
 
+from movie_inbox.domain.metadata import normalize_optional_positive_int
 from movie_inbox.domain.normalization import normalize_bool
 
 if TYPE_CHECKING:
@@ -136,6 +137,11 @@ class CatalogItem(ModelMapping):
     filmaffinity_url: str = ""
     wikipedia_title: str = ""
     wikidata_id: str = ""
+    duration_minutes: int | None = None
+    countries: list[str] = field(default_factory=list)
+    original_languages: list[str] = field(default_factory=list)
+    producers: list[str] = field(default_factory=list)
+    composers: list[str] = field(default_factory=list)
     genres: list[str] = field(default_factory=list)
     directors: list[str] = field(default_factory=list)
     writers: list[str] = field(default_factory=list)
@@ -163,6 +169,7 @@ class CatalogItem(ModelMapping):
         from movie_inbox.domain.releases import normalize_release_dates
 
         self.release_dates = normalize_release_dates(self.release_dates)
+        self.duration_minutes = normalize_optional_positive_int(self.duration_minutes)
         self.local_files = self.coerce_field("local_files", self.local_files)
         self.metadata_sources = self.coerce_field("metadata_sources", self.metadata_sources)
         self.duplicate_decisions = self.coerce_field(
@@ -218,6 +225,11 @@ class ExternalSearchResult(TypedDict, total=False):
     filmaffinity_url: str
     wikipedia_title: str
     wikidata_id: str
+    duration_minutes: int | None
+    countries: list[str]
+    original_languages: list[str]
+    producers: list[str]
+    composers: list[str]
     genres: list[str]
     directors: list[str]
     writers: list[str]

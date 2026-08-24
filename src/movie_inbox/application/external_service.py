@@ -90,7 +90,21 @@ class ExternalCatalogService:
                 } and looks_like_external_id(value):
                     continue
                 enriched[field] = value
-        for field in ("alternative_titles", "genres", "directors", "writers", "cast"):
+        duration_minutes = metadata.get("duration_minutes")
+        if isinstance(duration_minutes, int) and not isinstance(duration_minutes, bool):
+            if duration_minutes > 0:
+                enriched["duration_minutes"] = duration_minutes
+        for field in (
+            "alternative_titles",
+            "countries",
+            "original_languages",
+            "producers",
+            "composers",
+            "genres",
+            "directors",
+            "writers",
+            "cast",
+        ):
             values = normalize_tags(metadata.get(field))
             if values:
                 enriched[field] = merge_lists(normalize_tags(enriched.get(field)), values)
