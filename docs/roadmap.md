@@ -66,17 +66,19 @@ construido hasta aca antes de seguir. Desglose de tareas concreto, con alcance d
 archivo/linea y modelo sugerido por tarea, en `tareas.md` (frentes "Cierre de
 coherencia de interfaz" e "Higiene de repositorio").
 
-- Curaduria no tiene la navegacion por flechas ni la busqueda que si tiene Scanner,
-  pese a compartir la misma forma de pantalla (`tareas.md` [V5-2], [V5-3]).
-- El estado de decision del comparador de fusion no esta anunciado para lectores de
-  pantalla (`tareas.md` [V5-1]).
+Gate de salida cumplido el 2026-08-24 (commit `ad53ec9`): 318 pruebas unitarias y 12
+pruebas de navegador en verde, mas Ruff, formato, mypy, compileall y `git diff --check`.
+
+- Curaduria tiene paridad con Scanner para busqueda libre sin acentos y navegacion
+  circular por flechas, incluida la pestaña `Actividad` (`tareas.md` [V5-2], [V5-3]).
+- El estado combinado de decision del comparador se anuncia como una sola region viva
+  y describe el boton final (`tareas.md` [V5-1]).
 - Cuando dos duplicados empatan hasta en archivo, fuente y fecha de alta —y solo
-  quedan distinguibles por un conflicto real de datos personales—, la desambiguacion
-  visual de v0.4.0 no alcanza (`tareas.md` [V5-4]).
-- Un archivo de salida de instalacion vieja y una licencia duplicada quedaron
-  trackeados por accidente en el repo (`tareas.md` [H1], [H2]).
-- Un hueco en `.gitignore` deja pasar catalogos personales anidados en subcarpetas de
-  `scripts/` — ya afecto a uno real (`tareas.md` [H3]).
+  quedan distinguibles por un conflicto real de datos personales—, cola, detalle y
+  comparador agregan un fallback posicional 1 de 2 / 2 de 2 (`tareas.md` [V5-4]).
+- La salida vieja de checks y la licencia duplicada salieron del repo; los ignores de
+  datos personales bajo `scripts/` son recursivos y el catalogo anidado que habia
+  escapado dejo de estar trackeado sin borrarse del disco (`tareas.md` [H1-H3]).
 
 Explicitamente fuera de esta version, anotado para no perderlo pero sin tomar
 todavia:

@@ -15,15 +15,46 @@ mismo — este archivo es el tablero completo, no uno por fase.
 
 ## Backlog
 
+### Frente: Enriquecimiento y cobertura de links externos
+
+Investigado a fondo en sesión 2026-08-18. Causa raíz confirmada con líneas exactas: hoy
+un ítem nunca puede terminar con más de 1 de los 3 links (IMDb/Wikipedia/FilmAffinity)
+por dos bugs estructurales independientes en `match_external_links.py`, no por falta de
+cobertura de las fuentes en sí.
+
+#### [E6] Extraer campos gratis del Wikidata ya descargado
+- **Archivos**: `src/movie_inbox/external/wikidata.py`,
+  `fetch_wikidata_metadata()` (líneas 20-53), `WIKIDATA_LIST_FIELDS` (líneas 12-17).
+- **Qué hacer**: el JSON completo de la entidad Wikidata ya se descarga por cada
+  enrichment, pero solo se leen 4 propiedades (género/director/guionista/reparto). Sin
+  llamada de red nueva se puede sumar duración (P2047), país (P495), idioma original
+  (P364), productor (P162), compositor (P86) — siguiendo el mismo patrón de
+  `WIKIDATA_LIST_FIELDS` ya existente.
+- **Depende de**: — (pero **antes de implementar, confirmar conmigo** si estos campos
+  necesitan entrar al schema de `CatalogItem`/`catalog.schema.json` o si alguno ya
+  existe sin usar, como pasó con `backdrop_image`/`tmdb_id` — no asumir schema nuevo sin
+  chequear primero).
+- **Modelo sugerido**: Chico/Medio para la extracción en sí (patrón mecánico a repetir);
+  Medio para la parte de schema si hace falta agregar campos.
+
+---
+
+## En curso
+
+*(vacío)*
+
+## Hecho
+
 ### Frente: Cierre de coherencia de interfaz (v0.5.0)
 
 Los 4 hallazgos que dejo el gate de cierre de Fase 5 (critica del 2026-08-22, 29/40)
 tenian un ranking de mas simple a mas dificil. Los 2 mas dificiles (historial/deshacer
 de Scanner, desambiguar duplicados) ya estan cerrados — ver `docs/roadmap.md` y las
-entradas fechadas 2026-08-22 en `prompt-movie-inbox.md`. Quedan los 2 mas simples mas
-un caso borde que la fase de desambiguacion dejo explicitamente pendiente. Los 4 se
-agrupan aca como el contenido de v0.5.0 (ver `docs/roadmap.md`) — un incremento chico
-a proposito, para probar bien lo construido en v0.4.0 antes de seguir.
+entradas fechadas 2026-08-22 en `prompt-movie-inbox.md`. Los 2 mas simples y el caso
+borde que la fase de desambiguacion dejo explicitamente pendiente quedaron cerrados en
+este incremento. Los 4 se agrupan aca como el contenido de v0.5.0 (ver
+`docs/roadmap.md`) — un incremento chico a proposito, para probar bien lo construido en
+v0.4.0 antes de seguir.
 
 #### [V5-1] `aria-live` en el estado de decision del comparador de fusion
 - **Archivos**: `src/movie_inbox/web/static/index.dialogs.html` (lineas 276-289, el
@@ -43,6 +74,9 @@ a proposito, para probar bien lo construido en v0.4.0 antes de seguir.
   mismo archivo, sin logica nueva.
 - **Verificacion**: `scripts\check.ps1` en verde; confirmar a mano en el navegador que
   el atributo sobrevive despues de que `merge.js` reemplaza el `textContent` del `<div>`.
+- **Cierre**: el estado combinado usa una unica region `aria-live` y el boton final la
+  referencia con `aria-describedby`; cubierto por HTTP y Playwright real.
+  2026-08-24, commit `ad53ec9`.
 
 #### [V5-2] Buscador de texto libre en la cola de Curaduria
 - **Archivos**: `src/movie_inbox/web/static/index.inbox-curation.html` (nav de tabs,
@@ -76,6 +110,9 @@ a proposito, para probar bien lo construido en v0.4.0 antes de seguir.
 - **Verificacion**: catalogo sintetico con varios casos en Curaduria, confirmar que
   escribir en el buscador filtra la cola igual que en Scanner, incluidos los acentos
   (`normalizeText` ya los maneja). `scripts\check.ps1` en verde.
+- **Cierre**: busqueda por titulo, ano y tipo portada desde Scanner, con prueba de
+  navegador que encuentra `Akira` al escribir `akira` sin acento.
+  2026-08-24, commit `ad53ec9`.
 
 #### [V5-3] Navegacion por flechas del teclado en la cola de Curaduria
 - **Archivos**: `src/movie_inbox/web/static/js/surfaces/inbox-curation.js` (nueva
@@ -110,6 +147,9 @@ a proposito, para probar bien lo construido en v0.4.0 antes de seguir.
 - **Verificacion**: catalogo sintetico con 3+ casos en Curaduria, confirmar que las
   flechas mueven la seleccion igual que en Scanner, incluida la pestaña "Actividad".
   `scripts\check.ps1` en verde.
+- **Cierre**: flechas verticales y horizontales recorren circularmente pendientes e
+  historial, conservando foco sobre `.curation-queue-item.selected`; verificado en
+  ambas ramas con Playwright. 2026-08-24, commit `ad53ec9`.
 
 #### [V5-4] Señal de respaldo cuando archivo, fuente y fecha tambien empatan entre duplicados
 - **Archivos**: `src/movie_inbox/web/static/js/surfaces/inbox-curation.js`
@@ -138,6 +178,9 @@ a proposito, para probar bien lo construido en v0.4.0 antes de seguir.
   pero con rating distinto (9 y 3) — confirmar que la cola y el comparador muestran
   ahora una numeracion en vez de dos filas indistinguibles. `scripts\check.ps1` en
   verde.
+- **Cierre**: el fallback `Duplicado 1 de 2` / `Duplicado 2 de 2` aparece unicamente
+  cuando empatan las tres senales, en cola, detalle, titulo y resumen del comparador;
+  verificado con un par sintetico de `Heat`. 2026-08-24, commit `ad53ec9`.
 
 ---
 
@@ -159,6 +202,8 @@ pedido puntual de esa sesion. Las 3 tareas son independientes entre si.
 - **Modelo sugerido**: Chico.
 - **Nota**: ya esta en `origin/master`; borrarlo solo lo saca de commits futuros, sigue
   recuperable del historial si hiciera falta. No requiere reescribir historia.
+- **Cierre**: archivo eliminado y `/check-output.txt` agregado a `.gitignore`.
+  2026-08-24, commit `ad53ec9`.
 
 #### [H2] Borrar `scripts/LICENSE` (duplicado exacto de `LICENSE`)
 - **Archivos**: `scripts/LICENSE`.
@@ -168,6 +213,8 @@ pedido puntual de esa sesion. Las 3 tareas son independientes entre si.
   borrar. `git rm scripts/LICENSE`.
 - **Depende de**: —
 - **Modelo sugerido**: Chico.
+- **Cierre**: hash identico confirmado, referencias revisadas y copia eliminada.
+  2026-08-24, commit `ad53ec9`.
 
 #### [H3] Cerrar el hueco de `.gitignore` que dejo trackeado un catalogo personal anidado
 - **Archivos**: `.gitignore` (patrones `/scripts/*.json`, `/scripts/*.csv`,
@@ -190,38 +237,13 @@ pedido puntual de esa sesion. Las 3 tareas son independientes entre si.
   2026-08-01 — purgarlo de la historia (`git filter-repo` o similar) requiere reescribir
   historia y probablemente un force-push a un repo con datos personales ya expuestos en
   el remoto. Es una decision de Lucas, no de esta tarea — ver `docs/roadmap.md`.
+- **Cierre**: patrones recursivos aplicados y el unico catalogo anidado que habia
+  escapado dejo de estar trackeado sin abrirse ni borrarse del disco. La purga del
+  historial sigue deliberadamente fuera de alcance. 2026-08-24, commit `ad53ec9`.
 
 ---
 
-### Frente: Enriquecimiento y cobertura de links externos
-
-Investigado a fondo en sesión 2026-08-18. Causa raíz confirmada con líneas exactas: hoy
-un ítem nunca puede terminar con más de 1 de los 3 links (IMDb/Wikipedia/FilmAffinity)
-por dos bugs estructurales independientes en `match_external_links.py`, no por falta de
-cobertura de las fuentes en sí.
-
-#### [E6] Extraer campos gratis del Wikidata ya descargado
-- **Archivos**: `src/movie_inbox/external/wikidata.py`, `fetch_wikidata_metadata()`
-  (líneas 20-53), `WIKIDATA_LIST_FIELDS` (líneas 12-17).
-- **Qué hacer**: el JSON completo de la entidad Wikidata ya se descarga por cada
-  enrichment, pero solo se leen 4 propiedades (género/director/guionista/reparto). Sin
-  llamada de red nueva se puede sumar duración (P2047), país (P495), idioma original
-  (P364), productor (P162), compositor (P86) — siguiendo el mismo patrón de
-  `WIKIDATA_LIST_FIELDS` ya existente.
-- **Depende de**: — (pero **antes de implementar, confirmar conmigo** si estos campos
-  necesitan entrar al schema de `CatalogItem`/`catalog.schema.json` o si alguno ya
-  existe sin usar, como pasó con `backdrop_image`/`tmdb_id` — no asumir schema nuevo sin
-  chequear primero).
-- **Modelo sugerido**: Chico/Medio para la extracción en sí (patrón mecánico a repetir);
-  Medio para la parte de schema si hace falta agregar campos.
-
----
-
-## En curso
-
-*(vacío)*
-
-## Hecho
+### Cerrado en sesiones anteriores
 
 #### [E3] Reportar cobertura en `movie-inbox db info`
 `show_info()` en `cli/database.py` suma 5 líneas nuevas usando `linked_sources()`/
