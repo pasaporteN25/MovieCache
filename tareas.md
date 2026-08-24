@@ -15,27 +15,7 @@ mismo — este archivo es el tablero completo, no uno por fase.
 
 ## Backlog
 
-### Frente: Enriquecimiento y cobertura de links externos
-
-Investigado a fondo en sesión 2026-08-18. Causa raíz confirmada con líneas exactas: hoy
-un ítem nunca puede terminar con más de 1 de los 3 links (IMDb/Wikipedia/FilmAffinity)
-por dos bugs estructurales independientes en `match_external_links.py`, no por falta de
-cobertura de las fuentes en sí.
-
-#### [E6] Extraer campos gratis del Wikidata ya descargado
-- **Archivos**: `src/movie_inbox/external/wikidata.py`,
-  `fetch_wikidata_metadata()` (líneas 20-53), `WIKIDATA_LIST_FIELDS` (líneas 12-17).
-- **Qué hacer**: el JSON completo de la entidad Wikidata ya se descarga por cada
-  enrichment, pero solo se leen 4 propiedades (género/director/guionista/reparto). Sin
-  llamada de red nueva se puede sumar duración (P2047), país (P495), idioma original
-  (P364), productor (P162), compositor (P86) — siguiendo el mismo patrón de
-  `WIKIDATA_LIST_FIELDS` ya existente.
-- **Depende de**: — (pero **antes de implementar, confirmar conmigo** si estos campos
-  necesitan entrar al schema de `CatalogItem`/`catalog.schema.json` o si alguno ya
-  existe sin usar, como pasó con `backdrop_image`/`tmdb_id` — no asumir schema nuevo sin
-  chequear primero).
-- **Modelo sugerido**: Chico/Medio para la extracción en sí (patrón mecánico a repetir);
-  Medio para la parte de schema si hace falta agregar campos.
+*(vacío)*
 
 ---
 
@@ -44,6 +24,23 @@ cobertura de las fuentes en sí.
 *(vacío)*
 
 ## Hecho
+
+### Frente: Enriquecimiento Wikidata
+
+#### [E6] Extraer campos gratis del Wikidata ya descargado
+La opción B incorpora los cinco campos acordados: `duration_minutes` desde P2047,
+`countries` desde P495, `original_languages` desde P364, `producers` desde P162 y
+`composers` desde P86. Duración es un entero positivo opcional en minutos; los otros
+cuatro campos son listas multivalor. La extracción reutiliza la entidad y el batch de
+labels existentes, respeta rangos preferidos, convierte minutos/segundos/horas y no
+entra en la evidencia de identidad ni en el ranking de búsqueda.
+
+Los campos atraviesan `CatalogItem`, procedencia y bloqueos, merge manual/automático,
+API, importación y exportación. El contrato portable migra de JSON v6 a v7 con defaults
+sin pérdida y SQLite migra de v4 a v5 con una columna nullable para la duración; las
+listas reutilizan `metadata_values`. Verificado con 325 pruebas unitarias, 13 pruebas
+reales de navegador, Ruff, mypy, compilación y Search Lab en verde.
+2026-08-24, commit `9f9ebb2`.
 
 ### Frente: Cierre de coherencia de interfaz (v0.5.0)
 
