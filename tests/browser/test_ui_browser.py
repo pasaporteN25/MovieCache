@@ -923,6 +923,29 @@ class LoginAccessibilityTests(unittest.TestCase):
         self.assertNotIn("complementary", snapshot)
         page.close()
 
+    def test_login_submit_closes_the_credential_column_at_narrow_width(self) -> None:
+        page = self.browser.new_page(viewport={"width": 480, "height": 900})
+        page.goto(f"{self.base_url}/login")
+        page.wait_for_selector("#loginForm")
+
+        password_box = page.locator("#loginPassword").bounding_box()
+        toggle_box = page.locator(".login-password-toggle").bounding_box()
+        submit_box = page.locator("#loginSubmit").bounding_box()
+        self.assertIsNotNone(password_box)
+        self.assertIsNotNone(toggle_box)
+        self.assertIsNotNone(submit_box)
+        self.assertGreaterEqual(toggle_box["height"], 44)
+        self.assertGreaterEqual(submit_box["y"], toggle_box["y"] + toggle_box["height"])
+        self.assertAlmostEqual(submit_box["width"], password_box["width"], delta=1)
+
+        page.evaluate("setFeedback('Usuario o contraseña incorrectos.')")
+        feedback_box = page.locator("#loginFeedback").bounding_box()
+        footer_box = page.locator(".login-pass-footer").bounding_box()
+        self.assertIsNotNone(feedback_box)
+        self.assertIsNotNone(footer_box)
+        self.assertLessEqual(feedback_box["y"] + feedback_box["height"], footer_box["y"])
+        page.close()
+
 
 if __name__ == "__main__":
     unittest.main()

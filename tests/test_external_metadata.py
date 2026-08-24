@@ -6,7 +6,8 @@ from urllib.error import URLError
 
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.metadata import fetch_metadata_by_title
-from movie_inbox.external.wikidata import wikidata_kind
+from movie_inbox.external.registry import ExternalSourceService
+from movie_inbox.external.wikidata import fetch_wikidata_title_matches, wikidata_kind
 from movie_inbox.external.wikipedia import (
     WikipediaAdapter,
     _find_synopsis_section,
@@ -81,6 +82,119 @@ class ExternalMetadataTests(unittest.TestCase):
 
         self.assertEqual(results[0]["kind"], "serie")
         self.assertEqual(results[1]["kind"], "pelicula")
+
+    @patch("movie_inbox.external.imdb.fetch_wikidata_title_matches")
+    @patch("movie_inbox.external.imdb.fetch_json")
+    def test_imdb_keeps_a_multilingual_alias_tied_to_the_same_imdb_id(
+        self, fetch_json, title_matches
+    ) -> None:
+        fetch_json.return_value = {
+            "d": [
+                {
+                    "id": "tt0180396",
+                    "l": "Goodbye Uncle Tom",
+                    "qid": "movie",
+                    "y": 1971,
+                }
+            ]
+        }
+        title_matches.return_value = {
+            "tt0180396": {
+                "original_title": "Addio zio Tom",
+                "spanish_title": "Adiós tío Tom",
+                "english_title": "Goodbye Uncle Tom",
+                "alternative_titles": ["Addio zio Tom", "Adiós tío Tom"],
+            }
+        }
+
+        results, _state = ExternalSourceService([ImdbAdapter()]).search("Addio zio Tom")
+
+        self.assertEqual(results[0]["url"], "https://www.imdb.com/title/tt0180396/")
+        self.assertEqual(results[0]["original_title"], "Addio zio Tom")
+        self.assertIn("Adiós tío Tom", results[0]["alternative_titles"])
+        title_matches.assert_called_once_with("Addio zio Tom")
+
+    @patch("movie_inbox.external.imdb.fetch_json")
+    def test_imdb_suggestion_key_preserves_accented_letters(self, fetch_json) -> None:
+        fetch_json.return_value = {"d": []}
+
+        ImdbAdapter().search("Adiós Tío Tom")
+
+        self.assertIn("/adios_tio_tom.json", fetch_json.call_args.args[0])
+
+    @patch("movie_inbox.external.imdb.fetch_wikidata_title_matches")
+    @patch("movie_inbox.external.imdb.fetch_json")
+    def test_imdb_does_not_borrow_an_alias_from_a_different_imdb_id(
+        self, fetch_json, title_matches
+    ) -> None:
+        fetch_json.return_value = {
+            "d": [
+                {
+                    "id": "tt0180396",
+                    "l": "Goodbye Uncle Tom",
+                    "qid": "movie",
+                    "y": 1971,
+                }
+            ]
+        }
+        title_matches.return_value = {"tt9999999": {"alternative_titles": ["Addio zio Tom"]}}
+
+        results, _state = ExternalSourceService([ImdbAdapter()]).search("Addio zio Tom")
+
+        self.assertEqual(results, [])
+
+    @patch("movie_inbox.external.wikidata.fetch_json_safe")
+    def test_wikidata_title_match_maps_the_matched_alias_to_its_imdb_id(
+        self, fetch_json_safe
+    ) -> None:
+        fetch_json_safe.side_effect = [
+            {
+                "search": [
+                    {
+                        "id": "Q3605118",
+                        "label": "Adiós tío Tom",
+                        "match": {
+                            "type": "alias",
+                            "language": "en",
+                            "text": "Addio zio Tom",
+                        },
+                        "aliases": ["Addio zio Tom"],
+                    }
+                ]
+            },
+            {
+                "entities": {
+                    "Q3605118": {
+                        "labels": {
+                            "es": {"value": "Adiós tío Tom"},
+                            "en": {"value": "Goodbye Uncle Tom"},
+                        },
+                        "aliases": {},
+                        "claims": {
+                            "P345": [{"mainsnak": {"datavalue": {"value": "tt0180396"}}}],
+                            "P1476": [
+                                {
+                                    "mainsnak": {
+                                        "datavalue": {
+                                            "value": {
+                                                "text": "Addio zio Tom",
+                                                "language": "it",
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                        },
+                    }
+                }
+            },
+        ]
+
+        matches = fetch_wikidata_title_matches("Addio zio Tom")
+
+        self.assertEqual(matches["tt0180396"]["original_title"], "Addio zio Tom")
+        self.assertEqual(matches["tt0180396"]["spanish_title"], "Adiós tío Tom")
+        self.assertEqual(matches["tt0180396"]["english_title"], "Goodbye Uncle Tom")
 
     @patch("movie_inbox.external.wikipedia.fetch_json")
     def test_wikipedia_keeps_english_result_when_spanish_lookup_fails(self, fetch_json) -> None:

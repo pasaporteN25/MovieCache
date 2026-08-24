@@ -52,6 +52,14 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Corregido
 
+- La búsqueda externa de IMDb ya conserva títulos originales, traducidos y
+  alias encontrados por Wikidata cuando todos apuntan al mismo identificador
+  de IMDb. También normaliza correctamente consultas con acentos, por lo que
+  búsquedas como `Adiós tío Tom` y `Addio zio Tom` encuentran la ficha titulada
+  `Goodbye Uncle Tom` sin usar reparto o dirección como prueba de identidad.
+- El carnet de acceso presenta `Entrar` debajo de las credenciales como franja
+  de validación, respeta el mismo orden visual y de teclado y deja el feedback
+  dentro del carnet en anchos intermedios y móviles.
 - La migracion de instancia v8 completa sin perdida las columnas de snapshot personal
   del historial de Scanner en bases que ya hubieran aplicado la definicion temprana de
   v7. Las instalaciones nuevas y las v7 ya completas convergen al mismo esquema.

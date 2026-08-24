@@ -31,7 +31,6 @@
         min-height: 470px;
       }
       .member-login-pass {
-        aspect-ratio: 1.58 / 1;
         justify-self: end;
         max-width: 560px;
         min-height: 0;
@@ -42,9 +41,11 @@
         align-items: center;
         background: var(--surface-app);
         display: flex;
+        flex-wrap: wrap;
         font-family: var(--font-label);
         font-size: var(--text-label);
         font-weight: 800;
+        gap: 6px 14px;
         justify-content: space-between;
         letter-spacing: 0.12em;
         padding: 10px 14px;
@@ -132,16 +133,37 @@
       .login-form { display: grid; gap: 14px; }
       .member-login-pass .login-form {
         gap: 9px 12px;
-        grid-template-columns: minmax(0, 1fr) 88px;
+        grid-template-columns: minmax(0, 1fr);
       }
       .member-login-pass .login-form > label:not(.login-password-toggle) { grid-column: 1; }
       .member-login-pass .login-password-toggle,
-      .member-login-pass .login-feedback { grid-column: 1 / -1; }
+      .member-login-pass .login-feedback { grid-column: 1; }
       .member-login-pass .login-submit {
-        align-self: stretch;
-        grid-column: 2;
-        grid-row: 1 / span 2;
-        min-width: 88px;
+        align-items: center;
+        display: grid;
+        font-family: var(--font-label);
+        font-size: var(--text-control);
+        font-weight: 900;
+        gap: 10px;
+        grid-column: 1;
+        grid-template-columns: auto 1fr auto;
+        letter-spacing: 0.08em;
+        margin-top: 5px;
+        min-width: 0;
+        text-align: center;
+        text-transform: uppercase;
+        width: 100%;
+      }
+      .member-login-pass .login-submit::before {
+        content: "Validar //";
+        font-size: var(--text-label);
+        letter-spacing: 0.1em;
+        opacity: 0.72;
+        text-align: left;
+      }
+      .member-login-pass .login-submit::after {
+        content: "▶";
+        font-size: var(--text-meta);
       }
       .login-form > label:not(.login-password-toggle) { display: grid; gap: 6px; }
       .login-form > label > span {
@@ -156,6 +178,7 @@
         display: flex;
         gap: 8px;
         justify-self: start;
+        min-height: 44px;
       }
       .login-password-toggle input { min-height: auto; width: auto; }
       .login-password-toggle span { color: var(--muted); font-size: var(--text-meta); }
@@ -205,13 +228,6 @@
         .login-pass-stripe,
         .login-pass-footer { font-size: var(--text-label); letter-spacing: 0.08em; padding-inline: 10px; }
         .login-pass-body { padding: 20px 16px; }
-        .member-login-pass { aspect-ratio: auto; }
         .login-member-layout { gap: 14px; grid-template-columns: 76px minmax(0, 1fr); }
         .login-member-layout > * { min-width: 0; }
-        .member-login-pass .login-form { grid-template-columns: minmax(0, 1fr); }
-        .member-login-pass .login-form > *,
-        .member-login-pass .login-submit {
-          grid-column: 1;
-          grid-row: auto;
-        }
 }

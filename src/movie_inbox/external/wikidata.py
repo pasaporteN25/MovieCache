@@ -17,6 +17,80 @@ WIKIDATA_LIST_FIELDS = {
 }
 
 
+def fetch_wikidata_title_matches(query: str) -> dict[str, dict[str, object]]:
+    """Return multilingual title evidence keyed by the entity's IMDb title id.
+
+    ``wbsearchentities`` can find a work through an alias even when its label is
+    translated (for example, ``Addio zio Tom`` resolves to ``Goodbye Uncle
+    Tom``).  The second, batched request verifies that the matching Wikidata
+    entity carries the same IMDb id before any title is used as search evidence.
+    """
+    query = " ".join(query.strip().split())
+    if len(query) < 2:
+        return {}
+    raw = fetch_json_safe(
+        "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json"
+        "&language=es&uselang=es&type=item&limit=5&search=" + quote(query),
+        timeout=5,
+    )
+    rows = raw.get("search") if isinstance(raw.get("search"), list) else []
+    matched_rows = {
+        str(row.get("id") or ""): row
+        for row in rows
+        if isinstance(row, dict) and str(row.get("id") or "").startswith("Q")
+    }
+    entity_ids = list(matched_rows)
+    if not entity_ids:
+        return {}
+    entity_raw = fetch_json_safe(
+        "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json"
+        "&props=claims%7Clabels%7Caliases&languages=es%7Cen&ids="
+        + quote("|".join(entity_ids), safe="|"),
+        timeout=5,
+    )
+    entities = entity_raw.get("entities") if isinstance(entity_raw.get("entities"), dict) else {}
+    matches: dict[str, dict[str, object]] = {}
+    for entity_id, search_row in matched_rows.items():
+        entity = entities.get(entity_id) if isinstance(entities, dict) else {}
+        if not isinstance(entity, dict):
+            continue
+        claims = entity.get("claims") if isinstance(entity.get("claims"), dict) else {}
+        imdb_id = wikidata_claim_string(claims, "P345")
+        if not re.fullmatch(r"tt\d{7,9}", imdb_id, flags=re.IGNORECASE):
+            continue
+        metadata = wikidata_title_metadata(entity)
+        match = search_row.get("match") if isinstance(search_row.get("match"), dict) else {}
+        search_aliases = search_row.get("aliases")
+        candidate_aliases = [
+            str(search_row.get("label") or ""),
+            str(match.get("text") or ""),
+            *(
+                [str(value or "") for value in search_aliases]
+                if isinstance(search_aliases, list)
+                else []
+            ),
+        ]
+        primary_keys = {
+            str(metadata.get(field) or "").casefold()
+            for field in ("original_title", "spanish_title", "english_title")
+            if metadata.get(field)
+        }
+        aliases = [
+            value
+            for value in merge_lists(
+                metadata.get("alternative_titles")
+                if isinstance(metadata.get("alternative_titles"), list)
+                else [],
+                candidate_aliases,
+            )
+            if value.casefold() not in primary_keys
+        ][:40]
+        if aliases:
+            metadata["alternative_titles"] = aliases
+        matches[imdb_id.lower()] = metadata
+    return matches
+
+
 def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
     if not entity_id:
         return {}
@@ -150,6 +224,15 @@ def wikidata_claim_monolingual_text(claims: dict[str, object], prop: str) -> str
     for statement in _ordered_statements(claims, prop):
         value = _claim_value(statement)
         text = str(value.get("text") or "").strip() if isinstance(value, dict) else ""
+        if text:
+            return text
+    return ""
+
+
+def wikidata_claim_string(claims: dict[str, object], prop: str) -> str:
+    for statement in _ordered_statements(claims, prop):
+        value = _claim_value(statement)
+        text = str(value or "").strip() if not isinstance(value, dict) else ""
         if text:
             return text
     return ""

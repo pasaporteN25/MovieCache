@@ -6,8 +6,15 @@ import re
 from typing import Any
 from urllib.parse import quote
 
-from movie_inbox.domain.search import parse_search_query
+from movie_inbox.domain.catalog import merge_lists
+from movie_inbox.domain.search import (
+    EXTERNAL_RELEVANCE_THRESHOLD,
+    external_result_score,
+    parse_search_query,
+    search_key,
+)
 from movie_inbox.external.common import fetch_json, fetch_json_safe
+from movie_inbox.external.wikidata import fetch_wikidata_title_matches
 
 
 class ImdbAdapter:
@@ -19,7 +26,7 @@ class ImdbAdapter:
         if intent.source and intent.source != self.name:
             return []
         lookup = intent.external_id or intent.title or query
-        key = re.sub(r"[^a-z0-9_ -]+", "", lookup.lower()).strip().replace(" ", "_")
+        key = search_key(lookup).replace(" ", "_")
         if not key:
             return []
         raw = fetch_json(f"https://v3.sg.media-imdb.com/suggestion/x/{quote(key)}.json")
@@ -55,6 +62,31 @@ class ImdbAdapter:
                     "page_image": str(image.get("imageUrl") or ""),
                 }
             )
+        if (
+            results
+            and not intent.external_id
+            and all(
+                external_result_score(intent, result) < EXTERNAL_RELEVANCE_THRESHOLD
+                for result in results
+            )
+        ):
+            title_matches = fetch_wikidata_title_matches(intent.title or query)
+            for result in results:
+                imdb_id = imdb_id_from_text(str(result.get("url") or ""))
+                metadata = title_matches.get(imdb_id)
+                if not metadata:
+                    continue
+                for field in ("original_title", "spanish_title", "english_title"):
+                    if metadata.get(field):
+                        result[field] = str(metadata[field])
+                result["alternative_titles"] = merge_lists(
+                    result.get("alternative_titles")
+                    if isinstance(result.get("alternative_titles"), list)
+                    else [],
+                    metadata.get("alternative_titles")
+                    if isinstance(metadata.get("alternative_titles"), list)
+                    else [],
+                )
         return results
 
 
