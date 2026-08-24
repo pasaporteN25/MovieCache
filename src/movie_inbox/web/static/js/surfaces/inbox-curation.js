@@ -3,7 +3,7 @@ import { cachedImageSrc, card } from "../core/card.js";
 import { load, loadCatalog } from "../core/catalog-data.js";
 import { openDetail } from "../core/detail.js";
 import { fields } from "../core/fields.js";
-import { asList, escapeAttr, escapeHtml, formatDateTime, localFilesText, meta, sourceLabel } from "../core/format.js";
+import { asList, escapeAttr, escapeHtml, formatDateTime, localFilesText, meta, normalizeText, sourceLabel } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
 import { mergeFieldLabel, openInternalMergeComparator } from "../core/merge.js";
 import { handleOperationFeedbackClick } from "../core/operation-feedback.js";
@@ -14,6 +14,8 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
       export let curationCases = [];
 
       export let curationFilter = "pending";
+
+      export let curationQueueQuery = "";
 
       export let selectedCurationCaseId = "";
 
@@ -267,13 +269,39 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
 
       export function visibleCurationCases() {
         if (curationFilter === "history") return [];
-        if (curationFilter === "deferred") {
-          return curationCases.filter((entry) => entry.status === "deferred");
-        }
-        const pending = curationCases.filter((entry) => entry.status === "pending");
-        if (curationFilter === "duplicate") return pending.filter((entry) => entry.type === "duplicate");
-        if (curationFilter === "missing_link") return pending.filter((entry) => entry.type === "missing_link");
-        return pending;
+        const query = normalizeText(curationQueueQuery);
+        return curationCases.filter((entry) => {
+          if (curationFilter === "deferred" && entry.status !== "deferred") return false;
+          if (curationFilter !== "deferred" && entry.status !== "pending") return false;
+          if (curationFilter === "duplicate" && entry.type !== "duplicate") return false;
+          if (curationFilter === "missing_link" && entry.type !== "missing_link") return false;
+          if (!query) return true;
+          const item = entry.primary || {};
+          return [item.title, item.year, item.kind]
+            .some((value) => normalizeText(value).includes(query));
+        });
+      }
+
+      export function searchCurationQueue(event) {
+        curationQueueQuery = event.target.value || "";
+        renderCuration();
+      }
+
+      export function moveCurationQueueSelection(event) {
+        if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(event.key)) return;
+        const visible = curationFilter === "history" ? curationHistory : visibleCurationCases();
+        if (!visible.length) return;
+        event.preventDefault();
+        const current = Math.max(0, visible.findIndex((entry) => entry.id === selectedCurationCaseId));
+        const forwards = event.key === "ArrowDown" || event.key === "ArrowRight";
+        const next = (current + (forwards ? 1 : -1) + visible.length) % visible.length;
+        selectedCurationCaseId = visible[next].id;
+        renderCuration();
+        focusSelectedCurationItem();
+      }
+
+      export function focusSelectedCurationItem() {
+        requestAnimationFrame(() => fields.curationQueue.querySelector(".curation-queue-item.selected")?.focus({ preventScroll: true }));
       }
 
       export function renderCuration() {
@@ -399,6 +427,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           && entry.secondary
           && String(item.title || "").trim() === String(entry.secondary.title || "").trim()
           && String(item.year || "") === String(entry.secondary.year || "");
+        const needsPosition = collides && duplicateSignalsCollide(item, entry.secondary);
         return `<button class="curation-queue-item ${selected ? "selected" : ""}" type="button"
           data-curation-case="${escapeAttr(entry.id)}" aria-pressed="${selected}">
           ${curationThumb(item)}
@@ -407,7 +436,9 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
             <strong>${escapeHtml(item.title || "Sin título")}</strong>
             <small>${escapeHtml([item.year, item.kind].filter(Boolean).join(" · ") || "Sin año")}</small>
             ${collides
-              ? `<small class="curation-queue-duplicate-hint">${escapeHtml(sourceLabel(item.source))} ↔ ${escapeHtml(sourceLabel(entry.secondary.source))}</small>`
+              ? `<small class="curation-queue-duplicate-hint">${needsPosition
+                  ? "Duplicado 1 de 2 ↔ Duplicado 2 de 2"
+                  : `${escapeHtml(sourceLabel(item.source))} ↔ ${escapeHtml(sourceLabel(entry.secondary.source))}`}</small>`
               : ""}
           </span>
           <span class="curation-queue-arrow" aria-hidden="true">→</span>
@@ -422,6 +453,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
 
       export function duplicateCurationDetail(entry) {
         const deferred = entry.status === "deferred";
+        const needsPosition = duplicateSignalsCollide(entry.primary, entry.secondary);
         return `
           <header class="curation-case-heading">
             <div>
@@ -432,9 +464,9 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           </header>
           ${curationEvidence(entry.evidence)}
           <div class="curation-pair">
-            ${curationRecord(entry.primary, "Entrada A", "open-primary")}
+            ${curationRecord(entry.primary, "Entrada A", "open-primary", needsPosition ? "Duplicado 1 de 2" : "")}
             <div class="curation-pair-mark" aria-hidden="true">↔</div>
-            ${curationRecord(entry.secondary, "Entrada B", "open-secondary")}
+            ${curationRecord(entry.secondary, "Entrada B", "open-secondary", needsPosition ? "Duplicado 2 de 2" : "")}
           </div>
           <footer class="curation-actions">
             ${deferred
@@ -469,10 +501,10 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         `;
       }
 
-      export function curationRecord(item, label, action) {
+      export function curationRecord(item, label, action, positionLabel = "") {
         if (!item) return "";
         return `<article class="curation-record">
-          <span class="curation-record-label">${escapeHtml(label)}</span>
+          <span class="curation-record-label">${escapeHtml(label)}${positionLabel ? ` · ${escapeHtml(positionLabel)}` : ""}</span>
           <div class="curation-record-main">
             ${curationThumb(item, true)}
             <div>
@@ -487,6 +519,17 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           </div>
           <button class="text-action curation-open-record" type="button" data-curation-action="${action}">Abrir ficha</button>
         </article>`;
+      }
+
+      export function duplicateSignalsCollide(left, right) {
+        if (!left || !right) return false;
+        const fileSignal = (item) => {
+          if (Array.isArray(item.local_files)) return localFilesText(item).trim();
+          return String(item.local_files_count || 0);
+        };
+        return fileSignal(left) === fileSignal(right)
+          && sourceLabel(left.source) === sourceLabel(right.source)
+          && formatDateTime(left.added_at) === formatDateTime(right.added_at);
       }
 
       export function curationThumb(item, large = false) {
@@ -621,4 +664,3 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           : escapeHtml(message);
         fields.curationFeedback.dataset.tone = tone;
       }
-

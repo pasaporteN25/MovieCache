@@ -278,13 +278,13 @@
         <div id="mergeComparatorFields" class="merge-comparator-fields"></div>
 
         <footer class="merge-comparator-footer">
-          <div>
+          <div aria-live="polite">
             <strong id="mergeDecisionStatus">Preparando comparación</strong>
             <span id="mergeDecisionMeta"></span>
           </div>
           <div class="merge-comparator-actions">
             <button id="cancelMergeComparator" class="quiet-action" type="button">Cancelar</button>
-            <button id="confirmReviewedMerge" type="button" disabled>Combinar entradas</button>
+            <button id="confirmReviewedMerge" type="button" aria-describedby="mergeDecisionStatus" disabled>Combinar entradas</button>
           </div>
         </footer>
       </div>

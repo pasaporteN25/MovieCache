@@ -7,7 +7,7 @@ import { asList, escapeAttr, escapeHtml, formatDateTime, normalizeText, sourceLa
 import { apiFetch } from "./http.js";
 import { items, setSelectedExistingIdForSearch } from "./state.js";
 import { isExternalResult, manualResults, renderCatalogMergeResults, renderManualResults, reportExternalResultProblem } from "../surfaces/catalog-search.js";
-import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeedback, setSelectedCurationCaseId } from "../surfaces/inbox-curation.js";
+import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignalsCollide, setCurationFeedback, setSelectedCurationCaseId } from "../surfaces/inbox-curation.js";
 
       export let mergeReview = null;
 
@@ -159,8 +159,15 @@ import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeed
         const rawLeftTitle = mergeReview.left?.title || "Entrada A";
         const rawRightTitle = mergeReview.right?.title || "Entrada B";
         const titlesCollide = Boolean(mergeReview.left && mergeReview.right) && rawLeftTitle === rawRightTitle;
-        const leftTitle = titlesCollide ? mergeTitleFragment(mergeReview.left, mergeReview.right) : rawLeftTitle;
-        const rightTitle = titlesCollide ? mergeTitleFragment(mergeReview.right, mergeReview.left) : rawRightTitle;
+        const needsPosition = titlesCollide
+          && String(mergeReview.left.year || "") === String(mergeReview.right.year || "")
+          && duplicateSignalsCollide(mergeReview.left, mergeReview.right);
+        const leftTitle = needsPosition
+          ? `${rawLeftTitle} (Duplicado 1 de 2)`
+          : (titlesCollide ? mergeTitleFragment(mergeReview.left, mergeReview.right) : rawLeftTitle);
+        const rightTitle = needsPosition
+          ? `${rawRightTitle} (Duplicado 2 de 2)`
+          : (titlesCollide ? mergeTitleFragment(mergeReview.right, mergeReview.left) : rawRightTitle);
         fields.mergeComparatorTitle.textContent = `${leftTitle} / ${rightTitle}`;
         fields.mergeComparatorSubtitle.textContent = mergeReview.can_select_survivor
           ? "Elegí qué identidad permanece y resolvé los campos señalados."
@@ -172,9 +179,9 @@ import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeed
           input.checked = input.value === mergeReview.survivor_side;
         });
         fields.mergeComparatorSummary.innerHTML = `
-          ${mergeEntrySummary(mergeReview.left, "Entrada A", mergeReview.survivor_side === "left")}
+          ${mergeEntrySummary(mergeReview.left, "Entrada A", mergeReview.survivor_side === "left", needsPosition ? "Duplicado 1 de 2" : "")}
           <span class="merge-summary-divider" aria-hidden="true">↔</span>
-          ${mergeEntrySummary(mergeReview.right, "Entrada B", mergeReview.survivor_side === "right")}
+          ${mergeEntrySummary(mergeReview.right, "Entrada B", mergeReview.survivor_side === "right", needsPosition ? "Duplicado 2 de 2" : "")}
         `;
 
         const visibleFields = mergeReview.fields.filter((field) => (
@@ -196,11 +203,11 @@ import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeed
         updateMergeDecisionStatus();
       }
 
-      export function mergeEntrySummary(item, label, survivor) {
+      export function mergeEntrySummary(item, label, survivor, positionLabel = "") {
         return `<article class="merge-entry-summary ${survivor ? "survivor" : ""}">
           ${curationThumb(item, true)}
           <div>
-            <span>${escapeHtml(label)}${survivor ? " · permanece" : ""}</span>
+            <span>${escapeHtml(label)}${positionLabel ? ` · ${escapeHtml(positionLabel)}` : ""}${survivor ? " · permanece" : ""}</span>
             <strong>${escapeHtml(item.title || "Sin título")}</strong>
             <small>${escapeHtml([item.year, item.kind, sourceLabel(item.source)].filter(Boolean).join(" · "))}</small>
             ${item.added_at ? `<small class="merge-entry-added">Agregada ${escapeHtml(formatDateTime(item.added_at))}</small>` : ""}
@@ -476,4 +483,3 @@ import { curationEmptyState, curationHistoryMode, curationThumb, setCurationFeed
         }
         await openExternalMergeComparator(index, targetId);
       }
-

@@ -87,6 +87,8 @@
         color: var(--teal);
       }
       .curation-tab.active span { border-color: rgba(34, 216, 229, 0.64); color: var(--teal); }
+      .curation-queue-search { display: block; }
+      .curation-queue-search input { min-height: 36px; width: 100%; }
       .curation-feedback {
         align-items: center;
         color: var(--muted);

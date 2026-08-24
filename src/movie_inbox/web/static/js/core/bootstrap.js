@@ -12,7 +12,7 @@ import { applyCollectionYearRange, changeRandomScope, clearFilter, clearFilters,
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
 import { activateHomeSection, addHomeCollectionItem, goToHomeCollection, loadEditorialFeaturedDate, moveSpotlight, openHomeCollectionDetail, refreshEditorialHome, selectSpotlight } from "../surfaces/home.js";
-import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue } from "../surfaces/inbox-curation.js";
+import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
 
@@ -173,6 +173,8 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       });
       fields.refreshCuration.addEventListener("click", () => loadCurationQueue({ announce: true }));
       fields.inboxView.addEventListener("click", handleCurationClick);
+      fields.curationQueue.addEventListener("keydown", moveCurationQueueSelection);
+      fields.curationQueueSearch.addEventListener("input", searchCurationQueue);
       fields.inboxModeTabs.addEventListener("click", changeInboxMode);
       fields.scannerQueue.addEventListener("click", selectScannerQueueItem);
       fields.scannerQueue.addEventListener("keydown", moveScannerQueueSelection);
@@ -303,4 +305,3 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       window.openDetail = openDetail;
       window.closeDetail = closeDetail;
       window.openSearchDescription = openSearchDescription;
-

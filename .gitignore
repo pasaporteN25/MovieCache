@@ -21,9 +21,10 @@ __pycache__/
 *.sqlite3-wal
 
 # Personal catalogs and generated reports.
-/scripts/*.json
-/scripts/*.csv
-/scripts/*.txt
+scripts/**/*.json
+scripts/**/*.csv
+scripts/**/*.txt
+/check-output.txt
 
 # v0.1 compatibility launchers and import shims, kept on disk but out of Git —
 # nobody runs them from inside the Docker deployment path.

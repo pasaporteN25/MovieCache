@@ -110,6 +110,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         curationFeedback: document.querySelector("#curationFeedback"),
         curationQueueTitle: document.querySelector("#curationQueueTitle"),
         curationQueueMeta: document.querySelector("#curationQueueMeta"),
+        curationQueueSearch: document.querySelector("#curationQueueSearch"),
         curationQueue: document.querySelector("#curationQueue"),
         curationDetail: document.querySelector("#curationDetail"),
         newImportDraft: document.querySelector("#newImportDraft"),
@@ -322,4 +323,3 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         confirmReviewedMerge: document.querySelector("#confirmReviewedMerge"),
         empty: document.querySelector("#empty")
       };
-

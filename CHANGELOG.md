@@ -26,6 +26,13 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   tienen un conflicto real (por ejemplo, dos puntajes distintos
   cargados). Cada combinación queda en `Actividad` y puede deshacerse
   individualmente.
+- Curaduría suma búsqueda libre por título, año y tipo, sin distinguir
+  mayúsculas ni acentos, y navegación circular con flechas por la cola
+  visible. El mismo control de teclado funciona en `Actividad`.
+- Si dos duplicados empatan también en archivo, fuente y fecha de alta,
+  la cola, el detalle y el comparador los identifican como `Duplicado 1
+  de 2` y `Duplicado 2 de 2` para que un conflicto personal real siga
+  siendo resoluble sin inventar una identidad nueva.
 
 ### Cambiado
 
@@ -35,6 +42,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   `catalog_*.py` se movieron de `scripts/` a `codigoLegacy/`, fuera de
   Git: nadie los ejecuta dentro de una instancia Docker, donde el camino
   es `movie-inbox <subcomando>` dentro del contenedor.
+- Los ignores de datos personales bajo `scripts/` ahora cubren cualquier
+  profundidad. El catálogo anidado que había escapado deja de estar
+  trackeado sin borrarse del disco; también se retiran una salida vieja
+  de checks y la copia redundante de la licencia.
 
 - Los checks locales instalan las dependencias de desarrollo y ejecutan el mismo gate
   Ruff/mypy que CI antes de compilar y correr la suite.
@@ -46,6 +57,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   v7. Las instalaciones nuevas y las v7 ya completas convergen al mismo esquema.
 - El smoke test de Docker Compose reintenta una unica salida transitoria de `up`, pero
   sigue fallando y mostrando estado/logs si el servicio no llega realmente a saludable.
+- El estado combinado de decisiones del comparador de fusión se anuncia
+  como una única región viva y el botón final lo usa como descripción,
+  evitando dos avisos separados para lectores de pantalla.
 
 ## [0.4.0] - 2026-08-22
 

@@ -336,6 +336,179 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIn("Disponible · Inventario verificado", akira_record)
         self.assertNotIn("manual:", akira_record)
 
+    def test_curation_search_keyboard_and_duplicate_position_fallback(self) -> None:
+        page = self.page
+        availability = {"effective": False, "manual": False, "server": False, "file_count": 0}
+        heat_a = {
+            "id": "heat-a",
+            "ref": "heat-a::catalog.json",
+            "source_file": "catalog.json",
+            "title": "Heat",
+            "year": "1995",
+            "kind": "pelicula",
+            "source": "imdb",
+            "added_at": "2026-08-24T01:00:00Z",
+            "local_files": [],
+            "status": "to_watch",
+            "_availability": availability,
+        }
+        heat_b = {**heat_a, "id": "heat-b", "ref": "heat-b::catalog.json"}
+        akira = {
+            **heat_a,
+            "id": "akira",
+            "ref": "akira::catalog.json",
+            "title": "Ákira",
+            "year": "1988",
+            "source": "wikipedia",
+        }
+        cases = [
+            {
+                "id": "duplicate-heat",
+                "type": "duplicate",
+                "status": "pending",
+                "primary": heat_a,
+                "secondary": heat_b,
+                "evidence": ["Mismo título y año"],
+            },
+            {
+                "id": "missing-akira",
+                "type": "missing_link",
+                "status": "pending",
+                "primary": akira,
+                "secondary": None,
+                "evidence": ["Sin referencia externa"],
+            },
+        ]
+        history = [
+            {
+                "id": "operation-1",
+                "action": "merge",
+                "label": "Primera combinación",
+                "created_at": "2026-08-24T02:00:00Z",
+                "status": "applied",
+                "can_undo": True,
+                "mode": "session",
+                "summary": {},
+            },
+            {
+                "id": "operation-2",
+                "action": "link_curation",
+                "label": "Segunda decisión",
+                "created_at": "2026-08-24T03:00:00Z",
+                "status": "applied",
+                "can_undo": True,
+                "mode": "session",
+                "summary": {},
+            },
+        ]
+        compare_payload = {
+            "left": {**heat_a, "local_files_count": 0},
+            "right": {**heat_b, "local_files_count": 0},
+            "fields": [],
+            "groups": [],
+            "survivor_side": "left",
+            "can_select_survivor": True,
+            "different_count": 1,
+            "review_id": "browser-position-fallback",
+        }
+
+        page.route(
+            "**/api/curation/history?*",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"operations": history, "count": len(history)}),
+            ),
+        )
+        page.route(
+            "**/api/curation/compare",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(compare_payload),
+            ),
+        )
+        page.route(
+            "**/api/curation",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "cases": cases,
+                        "counts": {
+                            "pending": 2,
+                            "duplicates": 1,
+                            "missing_link": 1,
+                            "deferred": 0,
+                        },
+                    }
+                ),
+            ),
+        )
+
+        self._open_and_wait_for_catalog(page)
+        page.locator("#inboxButton").click()
+        page.wait_for_selector("#inboxView:not([hidden])")
+
+        search = page.locator("#curationQueueSearch")
+        search.fill("akira")
+        self.assertEqual(page.locator(".curation-queue-item").count(), 1)
+        self.assertIn("Ákira", page.locator(".curation-queue-item").inner_text())
+
+        search.fill("")
+        self.assertEqual(page.locator(".curation-queue-item").count(), 2)
+        selected_before = page.locator(".curation-queue-item.selected").get_attribute(
+            "data-curation-case"
+        )
+        page.locator(".curation-queue-item.selected").focus()
+        page.keyboard.press("ArrowDown")
+        page.wait_for_function("document.activeElement.matches('.curation-queue-item.selected')")
+        self.assertNotEqual(
+            page.locator(".curation-queue-item.selected").get_attribute("data-curation-case"),
+            selected_before,
+        )
+
+        duplicate = page.locator('[data-curation-case="duplicate-heat"]')
+        self.assertIn("Duplicado 1 de 2 ↔ Duplicado 2 de 2", duplicate.inner_text())
+        duplicate.click()
+        detail_text = page.locator("#curationDetail").text_content() or ""
+        self.assertIn("Entrada A · Duplicado 1 de 2", detail_text)
+        self.assertIn("Entrada B · Duplicado 2 de 2", detail_text)
+
+        page.get_by_role("button", name="Comparar y combinar").click()
+        page.wait_for_selector("#mergeComparatorDialog[open]")
+        page.wait_for_function(
+            "document.querySelector('#mergeComparatorDialog').dataset.loading === 'false'"
+        )
+        self.assertEqual(
+            page.locator("#mergeComparatorTitle").text_content(),
+            "Heat (Duplicado 1 de 2) / Heat (Duplicado 2 de 2)",
+        )
+        summary_text = page.locator("#mergeComparatorSummary").text_content() or ""
+        self.assertIn("Entrada A · Duplicado 1 de 2", summary_text)
+        self.assertIn("Entrada B · Duplicado 2 de 2", summary_text)
+        self.assertEqual(
+            page.locator("#confirmReviewedMerge").get_attribute("aria-describedby"),
+            "mergeDecisionStatus",
+        )
+        self.assertEqual(
+            page.locator("#mergeDecisionStatus").locator("xpath=..").get_attribute("aria-live"),
+            "polite",
+        )
+        page.locator("#cancelMergeComparator").click()
+
+        page.locator('[data-curation-filter="history"]').click()
+        first_history = page.locator(".curation-queue-item.selected")
+        self.assertEqual(first_history.get_attribute("data-curation-case"), "operation-1")
+        first_history.focus()
+        page.keyboard.press("ArrowRight")
+        page.wait_for_function("document.activeElement.matches('.curation-queue-item.selected')")
+        self.assertEqual(
+            page.locator(".curation-queue-item.selected").get_attribute("data-curation-case"),
+            "operation-2",
+        )
+
 
 class ScannerBrowserTests(unittest.TestCase):
     """Bandeja > Scanner coverage. Isolated from BrowserInterfaceTests because
