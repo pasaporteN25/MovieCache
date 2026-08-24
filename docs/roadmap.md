@@ -58,7 +58,7 @@ Los dos restantes, mas un caso borde que dejo pendiente el punto anterior y una
 pasada de higiene de repositorio encontrada en el camino, pasan a formar v0.5.0 (ver
 abajo) en vez de quedar sin version asignada.
 
-### v0.5.0: cierre de coherencia de interfaz y limpieza
+### v0.5.0: cierre de coherencia de interfaz y limpieza — publicado 2026-08-24
 
 Incremento chico a proposito: agrupa lo que quedo pendiente del gate de cierre de
 v0.4.0 mas higiene de repositorio encontrada en el camino, para poder probar bien lo
@@ -66,8 +66,8 @@ construido hasta aca antes de seguir. Desglose de tareas concreto, con alcance d
 archivo/linea y modelo sugerido por tarea, en `tareas.md` (frentes "Cierre de
 coherencia de interfaz" e "Higiene de repositorio").
 
-Gate de salida cumplido el 2026-08-24 (commit `ad53ec9`): 318 pruebas unitarias y 12
-pruebas de navegador en verde, mas Ruff, formato, mypy, compileall y `git diff --check`.
+Gate final de release cumplido el 2026-08-24: 322 pruebas unitarias y 13 pruebas de
+navegador en verde, mas Ruff, formato, mypy, compileall y `git diff --check`.
 
 - Curaduria tiene paridad con Scanner para busqueda libre sin acentos y navegacion
   circular por flechas, incluida la pestaña `Actividad` (`tareas.md` [V5-2], [V5-3]).
@@ -79,6 +79,11 @@ pruebas de navegador en verde, mas Ruff, formato, mypy, compileall y `git diff -
 - La salida vieja de checks y la licencia duplicada salieron del repo; los ignores de
   datos personales bajo `scripts/` son recursivos y el catalogo anidado que habia
   escapado dejo de estar trackeado sin borrarse del disco (`tareas.md` [H1-H3]).
+- IMDb conserva titulos originales, traducidos y aliases solo cuando Wikidata los
+  vincula al mismo identificador de la obra; las consultas con acentos se normalizan
+  sin perder letras.
+- El carnet de acceso lleva la accion final debajo de las credenciales, mantiene el
+  feedback dentro del objeto y conserva el orden visual, tactil y de teclado.
 
 Explicitamente fuera de esta version, anotado para no perderlo pero sin tomar
 todavia:

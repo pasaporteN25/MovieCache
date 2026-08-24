@@ -4,6 +4,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+## [0.5.0] - 2026-08-24
+
 ### Agregado
 
 - Las 3 decisiones del Scanner (vincular a identidad existente, crear una

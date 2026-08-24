@@ -61,6 +61,9 @@ limpio.
 5. Demorar una fuente externa. Las otras estanterias deben mostrar sus resultados sin
    esperarla; la fuente demorada debe terminar con un estado propio y permitir
    reintentarla sin repetir la busqueda local ni las fuentes que ya respondieron.
+6. Buscar `Adiós tío Tom` y `Addio zio Tom`. IMDb debe devolver la misma obra
+   `tt0180396`, conservando los títulos español, original e inglés sin usar reparto o
+   dirección como prueba de identidad.
 
 ## 5. Comparador del Scanner
 

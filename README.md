@@ -4,7 +4,7 @@ Gestor self-hosted para organizar obras, disponibilidad fisica y memoria persona
 
 ## Estado del proyecto
 
-La version estable actual es **v0.4.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+La version estable actual es **v0.5.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
 
 v0.3.0 cerro el gate de calidad de busqueda (cero falsos positivos conocidos en
 auto-match y merge, con `movie-inbox search-lab run --enforce` como gate real en CI).
@@ -13,7 +13,14 @@ v0.4.0 unifico el lenguaje visual y la arquitectura de `Inicio`, `Coleccion`, `B
 `Identidad compartida` y `Ficha en tu catalogo` en cada decision; disponibilidad se
 presenta siempre como `Disponible` (o no) con su procedencia real, nunca como el flag
 manual crudo; y la cola de revision se organiza por causa y confianza en vez de una
-lista plana. Detalle completo de ambas versiones en [CHANGELOG.md](CHANGELOG.md).
+lista plana.
+
+v0.5.0 completa ese cierre: Scanner incorpora actividad y deshacer, Curaduria suma
+busqueda y navegacion por teclado, los duplicados quedan diferenciados aun en empates
+extremos y la busqueda externa reconoce titulos multilingues verificados contra el
+mismo identificador de IMDb. El acceso conserva el carnet de videoclub con una
+secuencia de credenciales mas clara y adaptable. Detalle completo de las versiones en
+[CHANGELOG.md](CHANGELOG.md).
 
 El paquete instalable y la interfaz web son el camino recomendado. Los lanzadores de
 compatibilidad con v0.1 (`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`,
