@@ -8,7 +8,7 @@ import threading
 import time
 import uuid
 from collections import defaultdict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -90,10 +90,11 @@ class _CatalogMatchIndex:
         exact: set[int] = set()
         for title in titles:
             exact.update(self.by_title.get(title, ()))
+        positions: set[int]
         if exact:
             positions = exact
         else:
-            positions: set[int] = set()
+            positions = set()
             for term in {term for title in titles for term in title.split()}:
                 positions.update(self.by_term.get(term, ()))
         return [self.items[position] for position in sorted(positions)]
@@ -642,10 +643,12 @@ class ManagedLibraryService:
             counts[state] = sum(1 for item in classified if item.state == state)
         classified_by_path = {_relative_path_key(item.relative_path): item for item in classified}
         for row in preview:
-            item = classified_by_path.get(_relative_path_key(str(row.get("relative_path") or "")))
-            if item is not None:
-                row["state"] = item.state
-                row["candidate_count"] = len(item.candidates)
+            classified_item = classified_by_path.get(
+                _relative_path_key(str(row.get("relative_path") or ""))
+            )
+            if classified_item is not None:
+                row["state"] = classified_item.state
+                row["candidate_count"] = len(classified_item.candidates)
         counts["missing"] = len(
             [item for item in previous if item.available and item.id not in claimed_ids]
         )
@@ -801,7 +804,7 @@ class AvailabilityService:
                 )
                 source["file_count"] += int(record.get("file_count") or 0)
             server = bool(sources)
-            availability = {
+            availability: dict[str, Any] = {
                 "effective": bool(manual or server),
                 "manual": manual,
                 "server": server,
@@ -967,7 +970,7 @@ def _same_file(item: LibraryFile, row: Mapping[str, Any]) -> bool:
 
 def _removal_guard(
     previous: list[LibraryFile],
-    scanned: list[Mapping[str, Any]],
+    scanned: Sequence[Mapping[str, Any]],
     maximum: float,
 ) -> str:
     previous_paths = {_relative_path_key(item.relative_path) for item in previous if item.available}

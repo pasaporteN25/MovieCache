@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, Protocol
+from collections.abc import Callable, Mapping
+from typing import Any, Protocol, cast
 
 from movie_inbox.domain.catalog import (
     canonical_url,
@@ -19,7 +19,7 @@ from movie_inbox.domain.titles import looks_like_external_id
 class ExternalSourceGateway(Protocol):
     def search(
         self, query: str, source: str = "all"
-    ) -> tuple[list[dict[str, Any]], dict[str, Any]]: ...
+    ) -> tuple[list[ExternalSearchResult], dict[str, Any]]: ...
 
     def selected_metadata(
         self,
@@ -45,8 +45,8 @@ class ExternalCatalogService:
         results, state = self.gateway.search(query, source)
         return results, state
 
-    def enrich(self, result: ExternalSearchResult | dict[str, Any]) -> ExternalSearchResult:
-        enriched: ExternalSearchResult = dict(result)
+    def enrich(self, result: Mapping[str, Any]) -> ExternalSearchResult:
+        enriched: dict[str, Any] = dict(result)
         preserved_titles = [
             *(
                 str(enriched.get(field) or "").strip()
@@ -58,13 +58,13 @@ class ExternalCatalogService:
         detected_source = external_source_name(result_url)
         source = str(enriched.get("source") or detected_source)
         if source not in {"wikipedia", "imdb", "filmaffinity"} or source != detected_source:
-            return enriched
+            return cast(ExternalSearchResult, enriched)
         cache_key = canonical_url(result_url) or result_url
         metadata, _ = self.gateway.selected_metadata(
             cache_key, lambda _: self.metadata_loader(result_url)
         )
         if not metadata:
-            return enriched
+            return cast(ExternalSearchResult, enriched)
         for field in (
             "title",
             "original_title",
@@ -125,13 +125,13 @@ class ExternalCatalogService:
         elif source == "filmaffinity":
             enriched["filmaffinity_url"] = result_url
         enriched["alternative_titles"] = _alternative_titles(enriched, preserved_titles)
-        return enriched
+        return cast(ExternalSearchResult, enriched)
 
     def snapshot(self) -> dict[str, Any]:
         return self.gateway.snapshot()
 
 
-def _alternative_titles(result: dict[str, Any], preserved_titles: list[str]) -> list[str]:
+def _alternative_titles(result: Mapping[str, Any], preserved_titles: list[str]) -> list[str]:
     primary = {
         str(result.get(field) or "").strip().casefold()
         for field in ("title", "original_title", "spanish_title", "english_title")

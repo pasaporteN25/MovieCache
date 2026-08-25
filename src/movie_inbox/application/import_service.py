@@ -272,7 +272,7 @@ class ImportService:
         collection_id = f"import-{draft.id}"
         entries = tuple(
             CollectionItem(
-                id=str(entry.item.get("id") or ""),
+                id=str((entry.item or {}).get("id") or ""),
                 position=position,
                 item=normalize_collection_item(entry.item or {}),
             )
@@ -415,9 +415,8 @@ class ImportService:
         item["local_name"] = ""
         item["local_path"] = ""
         item["added_at"] = str(item.get("added_at") or _iso_time(now))
-        provenance = (
-            item.get("import_sources") if isinstance(item.get("import_sources"), list) else []
-        )
+        raw_provenance = item.get("import_sources")
+        provenance = list(raw_provenance) if isinstance(raw_provenance, list) else []
         item["import_sources"] = [
             *provenance,
             {

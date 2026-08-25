@@ -6,7 +6,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,11 +16,8 @@ from movie_inbox.domain.catalog import (
     has_external_link,
     merge_into_existing,
     metadata_source_record,
-    normalize_bool,
     normalize_date,
     normalize_item,
-    normalize_kind,
-    normalize_rating,
     possible_duplicate_candidates,
     same_catalog_item,
     stable_id,
@@ -40,6 +37,7 @@ from movie_inbox.domain.metadata import (
     normalize_optional_positive_int,
 )
 from movie_inbox.domain.models import CatalogItem
+from movie_inbox.domain.normalization import normalize_bool, normalize_kind, normalize_rating
 
 EDITABLE_METADATA_FIELDS = {
     "title",
@@ -259,21 +257,21 @@ class CatalogService:
                         "writable": existing.id in writable_ids,
                     },
                 )
-            candidates = [
-                {**row, "catalog_origin": "own_catalog"}
-                for row in (
-                    [
-                        {
-                            **_scanner_catalog_candidate(item),
-                            "reason": decision.reason,
-                            "score": decision.score,
-                        }
-                        for item, decision in accepted[:5]
-                    ]
-                    if accepted
-                    else possible_duplicate_candidates(match_items, candidate)[:5]
-                )
-            ]
+            if accepted:
+                candidates = [
+                    {
+                        **_scanner_catalog_candidate(item),
+                        "reason": decision.reason,
+                        "score": decision.score,
+                        "catalog_origin": "own_catalog",
+                    }
+                    for item, decision in accepted[:5]
+                ]
+            else:
+                candidates = [
+                    {**row, "catalog_origin": "own_catalog"}
+                    for row in possible_duplicate_candidates(match_items, candidate)[:5]
+                ]
             if candidates:
                 review_token = _scanner_distinct_review_token(
                     candidate,
@@ -296,8 +294,8 @@ class CatalogService:
                 if not distinct_candidate_id:
                     raise ValueError("Distinct scanner item requires a stable scanner reference")
                 candidate["id"] = distinct_candidate_id
-                for existing in candidates:
-                    reference = str(existing.get("id") or "").strip()
+                for candidate_row in candidates:
+                    reference = str(candidate_row.get("id") or "").strip()
                     if reference:
                         apply_duplicate_curation_decision(candidate, reference, "not_duplicate")
                 items.insert(0, candidate)
@@ -308,9 +306,9 @@ class CatalogService:
                         "item": candidate.to_dict(),
                         "writable": True,
                         "reviewed_candidate_ids": [
-                            str(existing.get("id") or "")
-                            for existing in candidates
-                            if str(existing.get("id") or "")
+                            str(candidate_row.get("id") or "")
+                            for candidate_row in candidates
+                            if str(candidate_row.get("id") or "")
                         ],
                     },
                 )
@@ -491,8 +489,8 @@ class CatalogService:
                 "removals_skipped": not allow_removals,
             }
             changed = False
-            path_index: dict[tuple[str, str], tuple[dict[str, Any], dict[str, Any]]] = {}
-            fingerprint_index: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+            path_index: dict[tuple[str, str], tuple[CatalogItem, dict[str, Any]]] = {}
+            fingerprint_index: dict[str, list[tuple[CatalogItem, dict[str, Any]]]] = {}
             consumed_fingerprints: set[str] = set()
 
             for item in items:
@@ -680,7 +678,7 @@ def _file_content_changed(existing: dict[str, Any], scanned: dict[str, Any]) -> 
     return any(existing.get(field) != scanned.get(field) for field in fields)
 
 
-def _years_compatible(left: dict[str, Any], right: dict[str, Any]) -> bool:
+def _years_compatible(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
     left_year = str(left.get("year") or "")
     right_year = str(right.get("year") or "")
     return not left_year or not right_year or left_year == right_year
@@ -759,7 +757,7 @@ def _scanner_catalog_candidate(item: Mapping[str, Any]) -> dict[str, Any]:
 
 def _scanner_distinct_review_token(
     candidate: Mapping[str, Any],
-    candidates: list[Mapping[str, Any]],
+    candidates: Sequence[Mapping[str, Any]],
     scanner_reference: str,
 ) -> str:
     """Bind an explicit distinct-work confirmation to the reviewed identities."""

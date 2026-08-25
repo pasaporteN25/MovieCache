@@ -533,10 +533,11 @@ def _state_with_item(
     *,
     position: int | None = None,
 ) -> dict[str, Any]:
+    position_value = state.get("position") if position is None else position
     return {
         "source_file": str(state.get("source_file") or ""),
         "item_id": str(state.get("item_id") or ""),
-        "position": int(state.get("position") if position is None else position),
+        "position": int(position_value or 0),
         "item": _snapshot(item) if item is not None else None,
     }
 

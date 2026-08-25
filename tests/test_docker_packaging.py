@@ -20,24 +20,13 @@ class DockerPackagingTests(unittest.TestCase):
 
         strict_targets = (
             "src/movie_inbox/domain",
-            "src/movie_inbox/application/auth_service.py",
-            "src/movie_inbox/application/collection_repository.py",
-            "src/movie_inbox/application/curation_history.py",
-            "src/movie_inbox/application/identity_repository.py",
-            "src/movie_inbox/application/import_repository.py",
-            "src/movie_inbox/application/library_repository.py",
-            "src/movie_inbox/application/member_service.py",
-            "src/movie_inbox/application/privacy_service.py",
-            "src/movie_inbox/application/repository.py",
-            "src/movie_inbox/application/scanner_history.py",
+            "src/movie_inbox/application",
         )
         for target in strict_targets:
             for gate in (powershell, shell, workflow):
                 self.assertIn(target, gate)
         self.assertIn('module = "movie_inbox.domain.*"', mypy_configuration)
-        for target in strict_targets[1:]:
-            module = target.removeprefix("src/").removesuffix(".py").replace("/", ".")
-            self.assertIn(f'"{module}"', mypy_configuration)
+        self.assertIn('module = "movie_inbox.application.*"', mypy_configuration)
 
     def test_image_is_multi_stage_non_root_and_health_checked(self) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")

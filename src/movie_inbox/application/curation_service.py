@@ -49,7 +49,12 @@ def _duplicate_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             *[(reference, "deferred") for reference in item.get("_duplicate_deferred_refs", [])],
         ]
         for right_reference, status in candidates:
-            pair = tuple(sorted((left_reference, str(right_reference))))
+            right_key = str(right_reference)
+            pair = (
+                (left_reference, right_key)
+                if left_reference <= right_key
+                else (right_key, left_reference)
+            )
             if len(set(pair)) < 2 or pair in seen:
                 continue
             seen.add(pair)

@@ -15,16 +15,7 @@ fi
 "$PYTHON" -m ruff format --check src scripts tests
 "$PYTHON" -m mypy \
   src/movie_inbox/domain \
-  src/movie_inbox/application/auth_service.py \
-  src/movie_inbox/application/collection_repository.py \
-  src/movie_inbox/application/curation_history.py \
-  src/movie_inbox/application/identity_repository.py \
-  src/movie_inbox/application/import_repository.py \
-  src/movie_inbox/application/library_repository.py \
-  src/movie_inbox/application/member_service.py \
-  src/movie_inbox/application/privacy_service.py \
-  src/movie_inbox/application/repository.py \
-  src/movie_inbox/application/scanner_history.py
+  src/movie_inbox/application
 "$PYTHON" -m compileall -q src scripts tests
 "$PYTHON" -m unittest discover -s tests -v
 git diff --check

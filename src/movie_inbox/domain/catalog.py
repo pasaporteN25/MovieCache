@@ -405,7 +405,7 @@ def same_catalog_item(
 
 
 def possible_duplicate_candidates(
-    items: list[Mapping[str, Any]], item: Mapping[str, Any]
+    items: Sequence[Mapping[str, Any]], item: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
     item_titles = title_match_keys_for_item(item)
     item_year = str(item.get("year") or "")
@@ -463,7 +463,9 @@ def possible_duplicate_candidates(
     )
 
 
-def catalog_membership(item: Mapping[str, Any], items: list[Mapping[str, Any]]) -> dict[str, Any]:
+def catalog_membership(
+    item: Mapping[str, Any], items: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
     """Classify exact identity separately from conservative title candidates."""
     item_id = str(item.get("id") or "")
     urls = external_urls(item)
@@ -488,7 +490,7 @@ def catalog_membership(item: Mapping[str, Any], items: list[Mapping[str, Any]]) 
     return {"state": "missing", "item_id": "", "candidate_count": 0, "candidates": []}
 
 
-def annotate_duplicate_items(items: list[MutableMapping[str, Any]]) -> None:
+def annotate_duplicate_items(items: Sequence[MutableMapping[str, Any]]) -> None:
     if not items:
         return
     parents = list(range(len(items)))

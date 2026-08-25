@@ -393,12 +393,13 @@ def _scanner_results(
 
 
 def _result_summary(row: Mapping[str, Any]) -> dict[str, Any]:
-    search = row.get("_search") if isinstance(row.get("_search"), Mapping) else {}
-    match = row.get("_match") if isinstance(row.get("_match"), Mapping) else {}
+    raw_search = row.get("_search")
+    raw_match = row.get("_match")
+    search = raw_search if isinstance(raw_search, Mapping) else {}
+    match = raw_match if isinstance(raw_match, Mapping) else {}
+    search_evidence = search.get("evidence")
     evidence = (
-        search.get("evidence")
-        if isinstance(search.get("evidence"), Mapping)
-        else match.get("evidence", {})
+        search_evidence if isinstance(search_evidence, Mapping) else match.get("evidence", {})
     )
     return {
         "key": _result_key(row),
@@ -450,14 +451,16 @@ def _expectation_failures(
         )
     for key, expected in dict(case.get("expected_acceptance") or {}).items():
         row = by_key.get(str(key))
-        actual = bool(row and row.get("accepted"))
-        if actual != bool(expected):
-            failures.append(f"{key} accepted expected {bool(expected)}, got {actual}")
+        actual_accepted = bool(row and row.get("accepted"))
+        if actual_accepted != bool(expected):
+            failures.append(f"{key} accepted expected {bool(expected)}, got {actual_accepted}")
     for key, reasons in dict(case.get("required_reasons") or {}).items():
         allowed = [str(reason) for reason in (reasons if isinstance(reasons, list) else [reasons])]
-        actual = str((by_key.get(str(key)) or {}).get("reason") or "")
-        if actual not in allowed:
-            failures.append(f"{key} reason expected one of {allowed}, got {actual or 'none'}")
+        actual_reason = str((by_key.get(str(key)) or {}).get("reason") or "")
+        if actual_reason not in allowed:
+            failures.append(
+                f"{key} reason expected one of {allowed}, got {actual_reason or 'none'}"
+            )
     return failures
 
 
@@ -505,7 +508,9 @@ def _evaluate_gate(metrics: Mapping[str, Any], thresholds: Mapping[str, Any]) ->
             raise SearchCorpusError(f"Unsupported Search Lab threshold: {metric}")
         actual = metrics.get(metric)
         passed = (
-            float(actual) >= float(target) if metric in minimums else float(actual) <= float(target)
+            float(actual or 0) >= float(target)
+            if metric in minimums
+            else float(actual or 0) <= float(target)
         )
         checks.append({"metric": metric, "actual": actual, "target": target, "passed": passed})
     return {"passed": all(check["passed"] for check in checks), "checks": checks}
@@ -552,26 +557,30 @@ def compare_search_strategies(
 
 
 def _metric_deltas(baseline: Mapping[str, Any], candidate: Mapping[str, Any]) -> dict[str, Any]:
-    deltas = {
+    deltas: dict[str, Any] = {
         key: _round_delta(candidate.get(key), baseline.get(key)) for key in _COMPARISON_METRIC_KEYS
     }
-    baseline_contexts = (
-        baseline.get("by_context") if isinstance(baseline.get("by_context"), Mapping) else {}
-    )
+    raw_baseline_contexts = baseline.get("by_context")
+    raw_candidate_contexts = candidate.get("by_context")
+    baseline_contexts = raw_baseline_contexts if isinstance(raw_baseline_contexts, Mapping) else {}
     candidate_contexts = (
-        candidate.get("by_context") if isinstance(candidate.get("by_context"), Mapping) else {}
+        raw_candidate_contexts if isinstance(raw_candidate_contexts, Mapping) else {}
     )
     deltas["by_context"] = {
         name: {
             key: _round_delta(
-                (candidate_contexts.get(name) or {}).get(key),
-                (baseline_contexts.get(name) or {}).get(key),
+                _mapping(candidate_contexts.get(name)).get(key),
+                _mapping(baseline_contexts.get(name)).get(key),
             )
             for key in _COMPARISON_METRIC_KEYS
         }
         for name in sorted(set(baseline_contexts) | set(candidate_contexts))
     }
     return deltas
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
 
 
 def _round_delta(candidate_value: Any, baseline_value: Any) -> float:

@@ -142,7 +142,8 @@ class EditorialHomeService:
             item = by_id.get(item_id)
             if item is None or item_id in seen:
                 continue
-            reason = row.get("reason") if isinstance(row.get("reason"), Mapping) else {}
+            raw_reason = row.get("reason")
+            reason = raw_reason if isinstance(raw_reason, Mapping) else {}
             restored.append(
                 _catalog_entry(
                     item,

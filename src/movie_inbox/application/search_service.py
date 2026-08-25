@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from movie_inbox.domain.catalog import canonical_url, normalize_local_files, normalize_tags
+from movie_inbox.domain.catalog import canonical_url, normalize_tags
 from movie_inbox.domain.matching import decide_match
+from movie_inbox.domain.metadata import normalize_local_files
 from movie_inbox.domain.search import (
     SearchIntent,
     parse_search_query,
@@ -69,37 +70,41 @@ def rank_catalog_candidates(
     )
     by_id = {str(row.get("id") or ""): row for row in broad_candidates}
     for item in items:
-        decision = decide_match(item, candidate, strategy)
-        if decision.score <= 0:
+        match_decision = decide_match(item, candidate, strategy)
+        if match_decision.score <= 0:
             continue
         item_id = str(item.get("id") or "")
         payload = by_id.setdefault(item_id, dict(item))
-        payload["_match"] = decision.to_dict()
+        payload["_match"] = match_decision.to_dict()
 
     ranked: list[tuple[int, float, float, str, dict[str, Any]]] = []
     for item_id, payload in by_id.items():
-        decision = payload.get("_match")
-        if not isinstance(decision, dict):
-            decision = decide_match(payload, candidate, strategy).to_dict()
-            payload["_match"] = decision
-        search_score = float((payload.get("_search") or {}).get("score") or 0)
-        match_score = float(decision.get("score") or 0)
-        if str(decision.get("reason") or "") in _HARD_MISMATCH_REASONS:
+        raw_decision = payload.get("_match")
+        if isinstance(raw_decision, Mapping):
+            decision_payload = dict(raw_decision)
+        else:
+            decision_payload = decide_match(payload, candidate, strategy).to_dict()
+            payload["_match"] = decision_payload
+        raw_search = payload.get("_search")
+        search_payload = raw_search if isinstance(raw_search, Mapping) else {}
+        search_score = float(search_payload.get("score") or 0)
+        match_score = float(decision_payload.get("score") or 0)
+        if str(decision_payload.get("reason") or "") in _HARD_MISMATCH_REASONS:
             match_score = 0.0
         if search_score < strategy.catalog_admission_threshold and match_score <= 0:
             continue
         payload["_search"] = {
-            **(payload.get("_search") if isinstance(payload.get("_search"), dict) else {}),
+            **search_payload,
             "score": round(max(search_score, match_score * 100), 1),
-            "reason": str(decision.get("reason") or "insufficient_evidence"),
-            "accepted": bool(decision.get("accepted")),
-            "evidence": decision.get("evidence")
-            if isinstance(decision.get("evidence"), dict)
+            "reason": str(decision_payload.get("reason") or "insufficient_evidence"),
+            "accepted": bool(decision_payload.get("accepted")),
+            "evidence": decision_payload.get("evidence")
+            if isinstance(decision_payload.get("evidence"), Mapping)
             else {},
         }
         ranked.append(
             (
-                1 if decision.get("accepted") else 0,
+                1 if decision_payload.get("accepted") else 0,
                 match_score,
                 search_score,
                 item_id,
@@ -111,7 +116,11 @@ def rank_catalog_candidates(
 
 
 def group_external_results(results: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    groups = {"wikipedia": [], "imdb": [], "filmaffinity": []}
+    groups: dict[str, list[dict[str, Any]]] = {
+        "wikipedia": [],
+        "imdb": [],
+        "filmaffinity": [],
+    }
     for result in results:
         source = str(result.get("source") or "").casefold()
         if source in groups:
