@@ -135,15 +135,15 @@ no inmoviliza el resto de la cola.
 
 ### 1. Capacidad de entrega
 
-1. [T1] Extender el gate estricto a contratos, identidad y privacidad de Application.
-2. [T2] Completar Application.
+1. **Cerrado 2026-08-25.** [T1] extendio el gate estricto de 18 a 28 modulos.
+2. **Siguiente.** [T2] Completar Application.
 3. [T3] Completar Infrastructure y External.
 4. [T4] Completar Web y CLI, dejando todo el codigo de producto bajo mypy estricto.
 5. [T5] Decidir y cerrar el alcance de tipado para tests.
 
-El baseline diagnostico es 174 errores fuera de `domain` al revisar todo `src`; no es
-un fallo del gate publicado, que sigue verde. Se reduce por capas y sin
-`ignore_errors` globales.
+El baseline diagnostico inicial fue de 174 errores fuera de `domain` al revisar todo
+`src`; [T1] lo redujo a 173 y, mas importante, incorporo 10 modulos al gate. No era un
+fallo del gate publicado. Se reduce por capas y sin `ignore_errors` globales.
 
 ### 2. Calidad de datos y bibliotecas
 

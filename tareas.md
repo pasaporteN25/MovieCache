@@ -27,17 +27,6 @@ Diagnostico del 2026-08-25: el gate publicado no esta roto; valida en modo estri
 de ese alcance: Application 58, CLI 41, Web 34, External 28 e Infrastructure 13. El plan
 es ampliar el contrato por capas sin congelar una deuda artificial con `ignore_errors`.
 
-#### [T1] Primera ampliacion estricta: contratos, identidad y privacidad de Application
-- **Alcance**: incluir en el gate los contratos de repositorio y los servicios ya
-  tipados de autenticacion, miembros y privacidad; corregir el unico error real de
-  varianza encontrado en ese corte. Mantener la lista de targets sincronizada entre
-  `pyproject.toml`, checks locales y CI.
-- **Criterio de cierre**: el corte completo pasa con `strict = true`; una prueba protege
-  que PowerShell, shell y CI no puedan dejar de ejecutarlo silenciosamente.
-- **Depende de**: —
-- **Modelo sugerido**: Medio. Toca configuracion de calidad, scripts multiplataforma y
-  una frontera de tipos compartida con `domain`.
-
 #### [T2] Tipar el resto de Application
 - **Alcance**: cerrar por lotes acotados los servicios de catalogo, importacion,
   scanner, curaduria, home, busqueda y evaluacion. Reemplazar `Any` solamente donde
@@ -246,6 +235,20 @@ es ampliar el contrato por capas sin congelar una deuda artificial con `ignore_e
 *(vacío)*
 
 ## Hecho
+
+### Frente: Tipado y capacidad de entrega
+
+#### [T1] Primera ampliacion estricta: contratos, identidad y privacidad de Application
+El gate obligatorio pasa de 18 a 28 modulos estrictos: suma contratos de repositorio y
+servicios de autenticacion, miembros y privacidad. La lista queda protegida y
+sincronizada entre `pyproject.toml`, PowerShell, shell y CI. El unico defecto del corte
+se corrigio en la frontera compartida: `shared_watch_history()` acepta una `Sequence`
+covariante en vez de exigir una lista invariante. No se agregaron ignores ni se bajo el
+nivel de mypy. El diagnostico amplio de `src` baja de 174 a 173 avisos; los restantes
+siguen planificados por capas en [T2-T5]. Verificado con mypy estricto sobre los 28
+modulos, 334 pruebas, Ruff, formato, compileall, parser de PowerShell y
+`git diff --check`.
+2026-08-25, commit `4b0f19e`.
 
 ### Frente: Enriquecimiento Wikidata
 
