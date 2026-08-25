@@ -20,47 +20,6 @@ explicita diga lo contrario. Una tarea bloqueada por una decision externa no det
 cola: se documenta aca y se toma la siguiente accionable. Los conteos de errores son una
 foto diagnostica, no un criterio estable entre versiones de herramientas.
 
-### Frente: Tipado y capacidad de entrega
-
-Diagnostico del 2026-08-25: el gate publicado no esta roto; valida en modo estricto los
-18 modulos de `domain` y pasa. Ejecutar mypy sobre todo `src` descubre 174 errores fuera
-de ese alcance: Application 58, CLI 41, Web 34, External 28 e Infrastructure 13. El plan
-es ampliar el contrato por capas sin congelar una deuda artificial con `ignore_errors`.
-
-#### [T2] Tipar el resto de Application
-- **Alcance**: cerrar por lotes acotados los servicios de catalogo, importacion,
-  scanner, curaduria, home, busqueda y evaluacion. Reemplazar `Any` solamente donde
-  exista un contrato estable; no trasladar tipos de infraestructura hacia la capa.
-- **Criterio de cierre**: `mypy src/movie_inbox/application` en modo estricto y dentro
-  del gate obligatorio, sin ignores globales ni bajar reglas existentes.
-- **Depende de**: [T1].
-- **Modelo sugerido**: Grande. Hay protocolos, TypedDict y limites de capas cruzados.
-
-#### [T3] Tipar Infrastructure y External
-- **Alcance**: alinear implementaciones de repositorio, parsers y adaptadores externos
-  con los contratos cerrados en Application; modelar respuestas remotas solo hasta el
-  borde validado, manteniendo datos no confiables como `object` antes de normalizarlos.
-- **Criterio de cierre**: ambos paquetes pasan mypy estricto y entran en el gate; los
-  errores de red/esquema siguen cubiertos por pruebas.
-- **Depende de**: [T2].
-- **Modelo sugerido**: Grande. Une persistencia, red y contratos de aplicacion.
-
-#### [T4] Tipar Web y CLI
-- **Alcance**: cerrar dependencias FastAPI, payloads HTTP, helpers de seguridad y
-  comandos; no convertir los modelos de transporte en modelos de dominio.
-- **Criterio de cierre**: todo `src/movie_inbox` pasa mypy estricto en CI y local.
-- **Depende de**: [T2], [T3].
-- **Modelo sugerido**: Grande. Superficie amplia y varios frameworks en el borde.
-
-#### [T5] Evaluar y cerrar el tipado de tests
-- **Alcance**: tipar fixtures y helpers que aporten seguridad real, en especial pruebas
-  HTTP/browser; documentar cualquier exclusion puntual justificada por una libreria.
-- **Criterio de cierre**: decidir y aplicar un contrato estable para `tests`; si se
-  incluye todo, `mypy src tests` pasa. No usar el conteo historico como ratchet.
-- **Depende de**: [T4].
-- **Modelo sugerido**: Grande. La mayor parte de los avisos actuales esta en fixtures
-  dinamicas y clases de navegador.
-
 ### Frente: Fuentes externas y especializacion de anime
 
 #### [F1] Prototipo opcional del indice oficial no comercial de IMDb
@@ -249,6 +208,38 @@ siguen planificados por capas en [T2-T5]. Verificado con mypy estricto sobre los
 modulos, 334 pruebas, Ruff, formato, compileall, parser de PowerShell y
 `git diff --check`.
 2026-08-25, commit `4b0f19e`.
+
+#### [T2] Tipar el resto de Application
+Los servicios de catalogo, importacion, scanner, curaduria, home, busqueda y evaluacion
+quedaron bajo mypy estricto. Se corrigieron contratos invariantes para aceptar
+`Sequence`, se tiparon payloads de decision y procedencia, y se mantuvieron las
+dependencias de infraestructura fuera de Application. Verificado sobre los 22 modulos
+de la capa y sus pruebas enfocadas.
+2026-08-25, commit `2114cf6`.
+
+#### [T3] Tipar Infrastructure y External
+Los repositorios, parsers y adaptadores externos quedaron alineados con los contratos
+de Application. Las respuestas JSON remotas permanecen como `object` hasta validar su
+forma y luego se normalizan con helpers compartidos; IMDb, Wikipedia y Wikidata ya no
+suponen listas o diccionarios confiables antes de comprobarlos. Verificado sobre los 27
+modulos de ambas capas y sus pruebas de red, esquema y persistencia.
+2026-08-25, commit `d0f4b47`.
+
+#### [T4] Tipar Web y CLI
+FastAPI, payloads HTTP, seguridad, dependencias, routers y comandos CLI completaron el
+gate. `strict = true` queda como regla global de mypy y todo `src/movie_inbox` —103
+modulos de producto— pasa sin overrides por paquete ni `ignore_errors`.
+2026-08-25, commit `c32c25a`.
+
+#### [T5] Evaluar y cerrar el tipado de tests
+El contrato obligatorio ahora ejecuta `mypy src/movie_inbox tests` en PowerShell, shell
+y CI, protegido por una prueba de empaquetado. Los fixtures corrigen opcionales,
+genericos, falsos protocolos e inputs remotos ambiguos. Los cuerpos de todos los tests
+se verifican; solo se permiten helpers sin firma completa cuando imitan callbacks
+dinamicos y, dentro de `tests.browser`, `attr-defined` por los recursos que
+Playwright/unittest instala en `setUpClass`. No hay `ignore_errors`. Verificado sin
+hallazgos sobre 139 archivos.
+2026-08-25, commit `07d8850`.
 
 ### Frente: Enriquecimiento Wikidata
 
