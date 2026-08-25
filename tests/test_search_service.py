@@ -38,6 +38,17 @@ class CatalogSearchServiceTests(unittest.TestCase):
         item = {"id": "one", "title": "Amélie", "year": "2001"}
         self.assertEqual(search_catalog_items([item], "amelie")[0]["id"], "one")
 
+    def test_searches_a_native_japanese_title(self) -> None:
+        item = {
+            "id": "your-name",
+            "title": "Your Name",
+            "alternative_titles": ["君の名は。", "Kimi no Na wa"],
+            "year": "2016",
+            "kind": "anime",
+        }
+
+        self.assertEqual(search_catalog_items([item], "君の名は 2016")[0]["id"], "your-name")
+
     def test_a_higher_admission_threshold_excludes_a_borderline_match(self) -> None:
         item = {"id": "one", "title": "Amelie", "year": ""}
         baseline = search_catalog_items([item], "amelia")
@@ -79,6 +90,16 @@ class CatalogSearchServiceTests(unittest.TestCase):
         )
         self.assertFalse(results[0]["_search"]["accepted"])
         self.assertEqual(results[0]["_search"]["reason"], "exact_title_missing_year")
+
+    def test_anime_can_be_compared_with_a_movie_typed_external_result(self) -> None:
+        results = rank_catalog_candidates(
+            [{"id": "akira", "title": "Akira", "year": "1988", "kind": "anime"}],
+            {"title": "Akira", "year": "1988", "kind": "pelicula"},
+        )
+
+        self.assertEqual([row["id"] for row in results], ["akira"])
+        self.assertFalse(results[0]["_search"]["accepted"])
+        self.assertEqual(results[0]["_search"]["reason"], "exact_title_year_anime_kind_review")
 
 
 class SearchRankingPrecisionTests(unittest.TestCase):
@@ -163,6 +184,16 @@ class SearchRankingPrecisionTests(unittest.TestCase):
         items = [{"id": "odyssey", "title": "2001: A Space Odyssey", "year": "1968"}]
         results = search_catalog_items(items, "2001: A Space Odyssey")
         self.assertEqual([row["id"] for row in results], ["odyssey"])
+
+    def test_a_distinctive_token_avoids_generic_large_catalog_matches(self) -> None:
+        items = [
+            {"id": str(index), "title": f"Anime Title {index}", "kind": "anime"}
+            for index in range(300)
+        ]
+
+        results = search_catalog_items(items, "Anime Title 287")
+
+        self.assertEqual([row["id"] for row in results], ["287"])
 
 
 if __name__ == "__main__":

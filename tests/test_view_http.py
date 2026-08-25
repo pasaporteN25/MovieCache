@@ -240,6 +240,50 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(response.json()["results"][0]["id"], "heat")
         self.assertTrue(response.json()["results"][0]["_search"]["accepted"])
 
+    def test_external_movie_format_can_compare_with_a_local_anime(self) -> None:
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "akira-anime",
+                        "title": "Akira",
+                        "original_title": "アキラ",
+                        "year": "1988",
+                        "kind": "anime",
+                    }
+                )
+            ]
+        )
+        with patch(
+            "movie_inbox.web.routers.search.enrich_selected_result",
+            return_value={
+                "source": "imdb",
+                "title": "Akira",
+                "year": "1988",
+                "kind": "pelicula",
+                "url": "https://www.imdb.com/title/tt0094625/",
+            },
+        ):
+            response = self.client.post(
+                "/api/search/catalog-candidates",
+                content=json.dumps(
+                    {
+                        "result": {
+                            "source": "imdb",
+                            "title": "Akira",
+                            "url": "https://www.imdb.com/title/tt0094625/",
+                        }
+                    }
+                ),
+                headers=self.post_headers(),
+            )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        result = response.json()["results"][0]
+        self.assertEqual(result["id"], "akira-anime")
+        self.assertFalse(result["_search"]["accepted"])
+        self.assertEqual(result["_search"]["reason"], "exact_title_year_anime_kind_review")
+
     def test_image_cache_status_is_scoped_to_the_authenticated_catalog(self) -> None:
         headers = {"X-Movie-Inbox-Token": self.config.api_token}
         items = self.client.get("/api/items", headers=headers)

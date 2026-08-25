@@ -46,6 +46,50 @@ mejora el tiempo percibido y permite que una fuente falle sin bloquear a las dem
 La normalizacion de texto puede compartirse. Los campos, umbrales y significado de un
 score no deben compartirse implicitamente entre estos contextos.
 
+## Revision de anime, multilenguaje y latencia (2026-08-25)
+
+La normalizacion anterior conservaba solamente `a-z0-9`: una consulta o alias en
+japones se convertia en una clave vacia. La normalizacion productiva conserva ahora
+letras y numeros de cualquier sistema de escritura, pero sigue ignorando diacriticos
+latinos. Wikidata busca evidencia de titulo en espanol, ingles y japones y solo la
+asocia a un resultado de IMDb cuando la entidad confirma el mismo `tt...`.
+
+`anime` describe el medio en Movie Inbox, mientras que IMDb y otras fuentes suelen
+devolver solo el formato de lanzamiento (`pelicula` o `serie`). Mismo titulo y ano con
+esa unica diferencia ya no desaparece del comparador ni se presenta como una
+contradiccion generica: queda visible como
+`exact_title_year_anime_kind_review`. Sigue sin ser auto-match; la decision humana y
+el gate de cero falsos positivos se conservan.
+
+Para catalogos grandes, el ranking usa el termino exacto menos frecuente como
+prefiltro cuando existe y conserva el camino difuso completo para consultas sin un
+ancla exacta. Sobre 10.000 obras sinteticas, `Anime Title 9876` paso de unos 1.430 ms y
+60 resultados genericos a unos 170 ms y una unica coincidencia. La lectura del
+catalogo tambien queda en cache por firma de archivo; cualquier cambio de tamano o
+fecha de modificacion invalida la copia. El corpus suma titulo japones nativo y la
+taxonomia anime/formato y mantiene el gate en verde con 24 casos.
+
+### Decision sobre nuevas fuentes
+
+- AniList ofrece la mejor API en tiempo real para titulos, sinonimos y relaciones,
+  pero sus [terminos](https://docs.anilist.co/guide/terms-of-use) prohiben usarla en
+  servicios competidores de listas o seguimiento sin una autorizacion expresa.
+- Jikan es un intermediario no oficial sobre MyAnimeList y no ofrece un contrato de
+  datos mas firme que la fuente original.
+- `anime-offline-database` tiene licencia ODbL/DbCL y buenos cruces, pero su repositorio
+  fue archivado el 2026-07-04; no es una dependencia sostenible para datos nuevos.
+- Hasta contar con permiso o una fuente mantenida con licencia compatible, se mejora
+  Wikidata —ya integrado y trazable— en vez de agregar una cuarta estanteria fragil.
+
+IMDb tampoco se puede priorizar globalmente con el camino actual: la seleccion de un
+resultado de IMDb obtiene la ficha completa mediante Wikidata/Wikipedia; no extrae la
+pagina de IMDb. IMDb solo autoriza el uso no comercial gratuito de sus
+[datasets oficiales](https://www.imdb.com/interfaces/) y desaconseja scraping. Una
+integracion futura debe ser opcional, indexar localmente `title.basics`, `title.akas`,
+`title.crew`, `title.principals` y `name.basics`, mostrar atribucion y definir prioridad
+por campo. Las correcciones manuales y `locked_fields` siguen por encima de toda
+fuente externa.
+
 ## Laboratorio de busqueda
 
 El primer incremento sera un `Search Lab` de desarrollo, no destructivo y disponible

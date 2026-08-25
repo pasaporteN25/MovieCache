@@ -18,6 +18,15 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   compacto, sin la leyenda técnica `Validar //`.
 - La opción para mostrar la contraseña pasa del checkbox a un botón de ojo
   accesible integrado en el campo de contraseña.
+- La búsqueda conserva títulos japoneses y otros alfabetos en vez de reducirlos
+  a una clave vacía; la evidencia multilingüe de Wikidata consulta español,
+  inglés y japonés.
+- Una ficha `anime` y un resultado externo `película`/`serie` con el mismo
+  título y año vuelven a aparecer al comparar como revisión de formato, sin
+  convertirse en combinación automática.
+- La búsqueda local reutiliza lecturas de catálogo sin cambios y prefiltra por
+  términos distintivos en catálogos grandes. En el benchmark sintético de
+  10.000 obras, una consulta exacta baja de aproximadamente 1,43 s a 0,17 s.
 
 ## [0.5.0] - 2026-08-24
 

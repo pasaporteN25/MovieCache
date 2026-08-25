@@ -4,9 +4,7 @@
 from __future__ import annotations
 
 import hashlib
-import html
 import re
-import unicodedata
 from collections.abc import Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
@@ -31,6 +29,7 @@ from movie_inbox.domain.normalization import (
     normalize_bool,
     normalize_kind,
     normalize_rating,
+    normalize_search_text,
     normalize_status,
 )
 from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
@@ -333,11 +332,8 @@ def external_link_coverage(item: Mapping[str, Any]) -> int:
 
 
 def title_match_key(value: str) -> str:
-    value = unicodedata.normalize("NFKD", html.unescape(value).lower())
-    value = "".join(character for character in value if not unicodedata.combining(character))
     value = re.sub(r"\([^)]*\)", " ", value)
-    value = re.sub(r"[^a-z0-9]+", " ", value)
-    tokens = value.split()
+    tokens = normalize_search_text(value).split()
     # A leading year-shaped token can be the title itself (1917, 1984 or
     # 2001: A Space Odyssey). Release years elsewhere remain filename noise.
     tokens = [
@@ -349,11 +345,7 @@ def title_match_key(value: str) -> str:
 
 
 def normalize_path_text(value: str) -> str:
-    value = unicodedata.normalize("NFKD", html.unescape(value).lower())
-    value = "".join(character for character in value if not unicodedata.combining(character))
-    value = re.sub(r"[\\/]+", " ", value)
-    value = re.sub(r"[^a-z0-9]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
+    return normalize_search_text(re.sub(r"[\\/]+", " ", value))
 
 
 def title_values_for_item(item: Mapping[str, Any]) -> list[str]:

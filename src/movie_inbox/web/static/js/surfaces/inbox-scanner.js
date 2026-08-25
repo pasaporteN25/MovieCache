@@ -485,7 +485,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         if (reasons.has("exact_title_year_mismatch") || reasons.has("exact_title_kind_mismatch")) {
           return "year_type_conflict";
         }
-        if (reasons.has("exact_title_missing_year")) return "likely_existing";
+        if (reasons.has("exact_title_missing_year") || reasons.has("exact_title_year_anime_kind_review")) return "likely_existing";
         return "no_signal";
       }
 
@@ -601,6 +601,7 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           exact_title_year: "Título y año exactos",
           exact_title_missing_year: "Título exacto; falta año",
           exact_title_year_mismatch: "Título exacto; año diferente",
+          exact_title_year_anime_kind_review: "Título y año exactos; revisar formato de anime",
           exact_title_kind_mismatch: "Título exacto; tipo diferente",
           similar_title_requires_review: "Título similar",
           insufficient_evidence: "Título apenas similar"
@@ -724,4 +725,3 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           button.disabled = false;
         }
       }
-

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import glob
+import threading
 import time
+from collections import OrderedDict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -37,6 +40,11 @@ from movie_inbox.web.config import ViewerConfig
 
 _CATALOG_SERVICES: dict[str, CatalogService] = {}
 _CURATION_WORKFLOWS: dict[str, CurationWorkflowService] = {}
+_LOAD_ITEMS_CACHE_MAX_ENTRIES = 16
+_LOAD_ITEMS_CACHE: OrderedDict[
+    tuple[str, ...], tuple[tuple[tuple[int, int], ...], list[dict[str, Any]]]
+] = OrderedDict()
+_LOAD_ITEMS_CACHE_LOCK = threading.Lock()
 
 
 def first_catalog_file(patterns: list[str]) -> str:
@@ -76,8 +84,17 @@ def resolved_files(patterns: list[str]) -> list[str]:
 
 
 def load_items(patterns: list[str]) -> list[dict[str, Any]]:
+    files = resolved_files(patterns)
+    cache_key = tuple(files)
+    signature = tuple(_catalog_file_signature(Path(file)) for file in files)
+    with _LOAD_ITEMS_CACHE_LOCK:
+        cached = _LOAD_ITEMS_CACHE.get(cache_key)
+        if cached is not None and cached[0] == signature:
+            _LOAD_ITEMS_CACHE.move_to_end(cache_key)
+            return copy.deepcopy(cached[1])
+
     items: list[dict[str, Any]] = []
-    for file in resolved_files(patterns):
+    for file in files:
         try:
             rows = read_json_items(Path(file))
         except CatalogRepositoryError as error:
@@ -88,9 +105,23 @@ def load_items(patterns: list[str]) -> list[dict[str, Any]]:
             row["_source_file"] = str(file)
             items.append(row)
     annotate_duplicate_items(items)
-    return sorted(
+    result = sorted(
         items, key=lambda item: str(item.get("added_at") or item.get("addedAt") or ""), reverse=True
     )
+    with _LOAD_ITEMS_CACHE_LOCK:
+        _LOAD_ITEMS_CACHE[cache_key] = (signature, copy.deepcopy(result))
+        _LOAD_ITEMS_CACHE.move_to_end(cache_key)
+        while len(_LOAD_ITEMS_CACHE) > _LOAD_ITEMS_CACHE_MAX_ENTRIES:
+            _LOAD_ITEMS_CACHE.popitem(last=False)
+    return result
+
+
+def _catalog_file_signature(path: Path) -> tuple[int, int]:
+    try:
+        stat = path.stat()
+    except OSError:
+        return (-1, -1)
+    return stat.st_mtime_ns, stat.st_size
 
 
 def read_json_items(path: Path) -> list[CatalogItem]:

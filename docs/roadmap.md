@@ -129,6 +129,12 @@ del mismo incremento.
 
 ## Siguientes incrementos
 
+- Prototipar un indice local opcional de los datasets no comerciales oficiales de
+  IMDb, sin scraping ni descarga implicita. Debe declarar costo de disco/actualizacion,
+  atribucion y prioridad por campo; una sola prioridad global no alcanza.
+- Conseguir autorizacion escrita de AniList o identificar una fuente de anime activa
+  con licencia compatible antes de sumar una cuarta estanteria. Mientras tanto,
+  ampliar aliases multilingues mediante Wikidata y medirlos en Search Lab.
 - Mejorar el enrichment con una fuente estructurada opcional, evaluando TMDb y sus
   condiciones de uso antes de agregar una API key a la instancia.
 - Permitir reglas de exclusion configurables por biblioteca, partiendo de defaults

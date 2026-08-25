@@ -34,6 +34,13 @@ class ParseSearchQueryYearTests(unittest.TestCase):
         self.assertEqual(intent.title, "Movie Title")
         self.assertEqual(intent.year, "2019")
 
+    def test_a_japanese_title_keeps_its_characters_and_release_year(self) -> None:
+        intent = parse_search_query("君の名は。 2016")
+
+        self.assertEqual(intent.title, "君の名は。")
+        self.assertEqual(intent.title_key, "君の名は")
+        self.assertEqual(intent.year, "2016")
+
 
 class ExternalResultScoreStrategyTests(unittest.TestCase):
     def test_a_lighter_year_mismatch_penalty_keeps_a_wrong_year_result_above_the_floor(

@@ -51,6 +51,16 @@ class MatchingTests(unittest.TestCase):
                     ).accepted
                 )
 
+    def test_anime_and_release_format_mismatch_is_a_named_review_case(self) -> None:
+        decision = decide_match(
+            {"title": "Akira", "year": "1988", "kind": "anime"},
+            {"title": "Akira", "year": "1988", "kind": "pelicula"},
+        )
+
+        self.assertFalse(decision.accepted)
+        self.assertEqual(decision.reason, "exact_title_year_anime_kind_review")
+        self.assertEqual(decision.evidence["taxonomy_note"], "anime_vs_release_format")
+
     def test_exact_title_with_a_different_year_remains_a_review_candidate(self) -> None:
         candidates = possible_duplicate_candidates(
             [{"id": "legacy-1917", "title": "1917", "year": "1917", "kind": "pelicula"}],
@@ -135,6 +145,10 @@ class MatchingTests(unittest.TestCase):
                 "work:"
             )
         )
+
+    def test_japanese_titles_keep_their_identity(self) -> None:
+        self.assertEqual(title_match_key("君の名は。"), "君の名は")
+        self.assertEqual(title_match_key("がっこうぐらし!"), "がっこうぐらし")
 
 
 if __name__ == "__main__":

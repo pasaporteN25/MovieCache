@@ -16,6 +16,8 @@ from movie_inbox.domain.search import (
 from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 SEARCH_RESULT_LIMIT = 60
+_CATALOG_PREFILTER_MIN_ITEMS = 200
+_CATALOG_PREFILTER_MAX_SHARE = 0.2
 
 # decide_match still reports these with a nonzero, auditable score -- Scanner's
 # manual "confirm" review relies on that score to keep a year/kind mismatch
@@ -37,7 +39,8 @@ def search_catalog_items(
     if len(intent.title_key or intent.external_id or intent.key) < 2:
         return []
     ranked: list[tuple[float, str, dict[str, Any]]] = []
-    for item in items:
+    for position in _catalog_search_positions(items, intent):
+        item = items[position]
         score, matched_field, matched_value = _catalog_search_score(item, intent, strategy)
         if score < strategy.catalog_admission_threshold:
             continue
@@ -114,6 +117,42 @@ def group_external_results(results: Sequence[Mapping[str, Any]]) -> dict[str, li
         if source in groups:
             groups[source].append(dict(result))
     return groups
+
+
+def _catalog_search_positions(
+    items: Sequence[Mapping[str, Any]], intent: SearchIntent
+) -> range | list[int]:
+    """Use a rare exact query token as a conservative large-catalog prefilter.
+
+    Fuzzy scoring remains the authority for small catalogs and typo-only
+    queries.  On a large catalog, an exact uncommon token (usually the title's
+    distinctive word, number or external id) prevents thousands of generic
+    partial matches from reaching ``SequenceMatcher``.
+    """
+    all_positions = range(len(items))
+    if len(items) < _CATALOG_PREFILTER_MIN_ITEMS:
+        return all_positions
+    query = intent.title_key or search_key(intent.external_id) or intent.key
+    query_terms = tuple(dict.fromkeys(query.split()))
+    if not query_terms:
+        return all_positions
+
+    positions_by_term: dict[str, list[int]] = {term: [] for term in query_terms}
+    for position, item in enumerate(items):
+        value_terms: set[str] = set()
+        for field, value, _weight in _search_values(item):
+            for normalized_value in _field_values(field, value):
+                value_terms.update(normalized_value.split())
+        for term in query_terms:
+            if term in value_terms:
+                positions_by_term[term].append(position)
+
+    nonempty = [positions for positions in positions_by_term.values() if positions]
+    if not nonempty:
+        return all_positions
+    rarest = min(nonempty, key=len)
+    maximum = max(SEARCH_RESULT_LIMIT * 3, round(len(items) * _CATALOG_PREFILTER_MAX_SHARE))
+    return rarest if len(rarest) <= maximum else all_positions
 
 
 def _catalog_search_score(

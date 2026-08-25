@@ -93,6 +93,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
           exact_title_year: "título y año exactos",
           exact_title_missing_year: "título exacto; falta año",
           exact_title_year_mismatch: "título exacto; año distinto",
+          exact_title_year_anime_kind_review: "título y año; revisar formato de anime",
           exact_title_kind_mismatch: "título exacto; tipo distinto",
           similar_title_requires_review: "título similar",
           insufficient_evidence: "coincidencia posible"

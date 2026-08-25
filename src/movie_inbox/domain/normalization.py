@@ -3,10 +3,33 @@
 
 from __future__ import annotations
 
+import html
+import unicodedata
 from typing import Any
 
 VALID_KINDS = ("pelicula", "serie", "anime", "documental")
 VALID_STATUSES = ("to_watch", "watched")
+
+
+def normalize_search_text(value: Any) -> str:
+    """Fold searchable text without discarding non-Latin writing systems.
+
+    Latin diacritics remain optional (``Adiós`` matches ``Adios``), while
+    Japanese and other scripts keep their meaningful characters instead of
+    collapsing to an empty key.
+    """
+    text = unicodedata.normalize("NFKC", html.unescape(str(value or ""))).casefold()
+    folded: list[str] = []
+    for character in text:
+        decomposition = unicodedata.normalize("NFD", character)
+        base = decomposition[0] if decomposition else character
+        if "LATIN" in unicodedata.name(base, ""):
+            folded.append(base)
+        else:
+            folded.append(character)
+    return " ".join(
+        "".join(character if character.isalnum() else " " for character in folded).split()
+    )
 
 
 def normalize_bool(value: Any, default: bool = False) -> bool:

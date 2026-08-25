@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote
 
 from movie_inbox.domain.catalog import merge_lists
@@ -33,23 +34,43 @@ def fetch_wikidata_title_matches(query: str) -> dict[str, dict[str, object]]:
     query = " ".join(query.strip().split())
     if len(query) < 2:
         return {}
-    raw = fetch_json_safe(
-        "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json"
-        "&language=es&uselang=es&type=item&limit=5&search=" + quote(query),
-        timeout=5,
-    )
-    rows = raw.get("search") if isinstance(raw.get("search"), list) else []
-    matched_rows = {
-        str(row.get("id") or ""): row
-        for row in rows
-        if isinstance(row, dict) and str(row.get("id") or "").startswith("Q")
-    }
-    entity_ids = list(matched_rows)
+    languages = ("es", "en", "ja")
+    batches: dict[str, list[object]] = {language: [] for language in languages}
+    with ThreadPoolExecutor(
+        max_workers=len(languages), thread_name_prefix="wikidata-title"
+    ) as executor:
+        futures = {
+            executor.submit(
+                fetch_json_safe,
+                "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json"
+                f"&language={language}&uselang={language}&type=item&limit=5&search=" + quote(query),
+                timeout=5,
+            ): language
+            for language in languages
+        }
+        for future in as_completed(futures):
+            language = futures[future]
+            try:
+                raw = future.result()
+            except (OSError, TimeoutError, ValueError):
+                raw = {}
+            search_rows = raw.get("search")
+            batches[language] = list(search_rows) if isinstance(search_rows, list) else []
+
+    matched_rows: dict[str, dict[str, object]] = {}
+    for language in languages:
+        for row in batches[language]:
+            if not isinstance(row, dict):
+                continue
+            entity_id = str(row.get("id") or "")
+            if entity_id.startswith("Q"):
+                matched_rows.setdefault(entity_id, row)
+    entity_ids = list(matched_rows)[:12]
     if not entity_ids:
         return {}
     entity_raw = fetch_json_safe(
         "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json"
-        "&props=claims%7Clabels%7Caliases&languages=es%7Cen&ids="
+        "&props=claims%7Clabels%7Caliases&languages=es%7Cen%7Cja&ids="
         + quote("|".join(entity_ids), safe="|"),
         timeout=5,
     )

@@ -78,6 +78,15 @@ def decide_match(
         return MatchDecision(False, "exact_title_missing_year", score, evidence)
     if shared_titles and existing_year != incoming_year:
         return MatchDecision(False, "exact_title_year_mismatch", score, evidence)
+    if (
+        shared_titles
+        and existing_year
+        and incoming_year
+        and existing_year == incoming_year
+        and _anime_release_taxonomy_mismatch(existing_kind, incoming_kind)
+    ):
+        evidence["taxonomy_note"] = "anime_vs_release_format"
+        return MatchDecision(False, "exact_title_year_anime_kind_review", score, evidence)
     if shared_titles and not kinds_compatible:
         return MatchDecision(False, "exact_title_kind_mismatch", score, evidence)
     if score >= strategy.similar_title_review_threshold:
@@ -141,3 +150,7 @@ def candidate_score(
 def explicit_kind(item: Mapping[str, Any]) -> str:
     raw = str(item.get("kind") or "").strip()
     return normalize_kind(raw) if raw else ""
+
+
+def _anime_release_taxonomy_mismatch(left: str, right: str) -> bool:
+    return {left, right} in ({"anime", "pelicula"}, {"anime", "serie"})

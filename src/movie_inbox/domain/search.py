@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -11,6 +10,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from movie_inbox.domain.catalog import canonical_url, external_source_name
+from movie_inbox.domain.normalization import normalize_search_text
 from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 _MIN_SUBSTRING_LENGTH = 3
@@ -74,9 +74,7 @@ def parse_search_query(value: Any) -> SearchIntent:
 
 
 def search_key(value: Any) -> str:
-    text = unicodedata.normalize("NFKD", str(value or "").casefold())
-    text = "".join(character for character in text if not unicodedata.combining(character))
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
+    return normalize_search_text(value)
 
 
 def text_match_score(value: str, query: str, query_terms: tuple[str, ...] | list[str]) -> float:
@@ -149,7 +147,7 @@ def _split_disambiguating_year(title: str) -> tuple[str, str]:
     if not matches:
         return "", title
     candidate = matches[-1]
-    if not re.search(r"[a-zA-Z0-9]", title[: candidate.start()]):
+    if not any(character.isalnum() for character in title[: candidate.start()]):
         return "", title
     year = candidate.group(1)
     return year, title[: candidate.start()] + title[candidate.end() :]

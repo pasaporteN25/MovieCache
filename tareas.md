@@ -15,7 +15,32 @@ mismo — este archivo es el tablero completo, no uno por fase.
 
 ## Backlog
 
-*(vacío)*
+### Frente: Fuentes externas y especializacion de anime
+
+#### [F1] Prototipo opcional del indice oficial no comercial de IMDb
+- **Alcance**: disenar un comando explicito que descargue/indexe localmente los TSV
+  oficiales elegidos por el administrador; nunca incluirlos en el paquete ni activar
+  la descarga por defecto. Medir disco, primera carga y actualizacion diaria.
+- **Datos iniciales**: `title.basics` y `title.akas`; agregar
+  `title.crew`/`title.principals`/`name.basics` solo si el prototipo demuestra que la
+  instancia puede sostener el indice.
+- **Regla de merge**: prioridad por campo y completitud, nunca una prioridad global de
+  IMDb. Manual y `locked_fields` siempre ganan.
+- **Dependencias**: confirmar el modo personal/no comercial y resolver atribucion en
+  interfaz/exportacion antes de distribuir la capacidad.
+- **Modelo sugerido**: Grande. Toca licencias, almacenamiento, CLI, enrichment,
+  procedencia y migraciones.
+
+#### [F2] Autoridad de anime sostenible
+- **Alcance**: obtener permiso escrito de AniList para este producto o seleccionar una
+  fuente activa con licencia que permita catalogo/seguimiento. Repetir la evaluacion de
+  disponibilidad, limites, IDs cruzados, aliases y atribucion antes de programar un
+  adaptador.
+- **Descartes actuales**: Jikan es no oficial; `anime-offline-database` quedo archivada
+  el 2026-07-04; AniList prohibe por defecto servicios competidores de tracking.
+- **Dependencias**: decision legal/de producto externa. Hasta entonces, Wikidata
+  multilingue es el camino soportado.
+- **Modelo sugerido**: Grande. No empezar la implementacion sin cerrar la fuente.
 
 ---
 

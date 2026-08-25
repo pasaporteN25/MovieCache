@@ -168,6 +168,21 @@
       "title": "The Gift",
       "year": "2015",
       "kind": "pelicula"
+    },
+    {
+      "id": "your-name-2016",
+      "title": "Your Name",
+      "original_title": "君の名は。",
+      "alternative_titles": ["Kimi no Na wa"],
+      "year": "2016",
+      "kind": "anime"
+    },
+    {
+      "id": "akira-anime-1988",
+      "title": "Akira",
+      "original_title": "アキラ",
+      "year": "1988",
+      "kind": "anime"
     }
   ],
   "cases": [
@@ -252,6 +267,14 @@
       "forbidden_ids": ["tantei-monogatari-1983"]
     },
     {
+      "id": "catalog-japanese-native-title",
+      "label": "Anime por titulo japones nativo",
+      "context": "catalog",
+      "query": "君の名は。 2016",
+      "relevant_ids": ["your-name-2016"],
+      "forbidden_ids": []
+    },
+    {
       "id": "identity-heat-exact",
       "label": "Merge exacto con ano",
       "context": "identity",
@@ -301,6 +324,18 @@
       "relevant_ids": ["the-gift-2015"],
       "forbidden_ids": ["the-gift-2000"],
       "expected_acceptance": {"the-gift-2015": true}
+    },
+    {
+      "id": "identity-anime-release-format",
+      "label": "Anime frente al formato pelicula requiere revision visible",
+      "context": "identity",
+      "candidate": {"title": "Akira", "year": "1988", "kind": "pelicula"},
+      "relevant_ids": ["akira-anime-1988"],
+      "forbidden_ids": [],
+      "expected_acceptance": {"akira-anime-1988": false},
+      "required_reasons": {
+        "akira-anime-1988": ["exact_title_year_anime_kind_review"]
+      }
     },
     {
       "id": "external-wikipedia-recent",

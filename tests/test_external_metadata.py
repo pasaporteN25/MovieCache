@@ -225,22 +225,25 @@ class ExternalMetadataTests(unittest.TestCase):
     def test_wikidata_title_match_maps_the_matched_alias_to_its_imdb_id(
         self, fetch_json_safe
     ) -> None:
-        fetch_json_safe.side_effect = [
-            {
-                "search": [
-                    {
-                        "id": "Q3605118",
-                        "label": "Adiós tío Tom",
-                        "match": {
-                            "type": "alias",
-                            "language": "en",
-                            "text": "Addio zio Tom",
-                        },
-                        "aliases": ["Addio zio Tom"],
-                    }
-                ]
-            },
-            {
+        def response(url: str, **_kwargs: object) -> dict[str, object]:
+            if "wbsearchentities" in url:
+                if "language=en" not in url:
+                    return {"search": []}
+                return {
+                    "search": [
+                        {
+                            "id": "Q3605118",
+                            "label": "Adiós tío Tom",
+                            "match": {
+                                "type": "alias",
+                                "language": "en",
+                                "text": "Addio zio Tom",
+                            },
+                            "aliases": ["Addio zio Tom"],
+                        }
+                    ]
+                }
+            return {
                 "entities": {
                     "Q3605118": {
                         "labels": {
@@ -265,14 +268,52 @@ class ExternalMetadataTests(unittest.TestCase):
                         },
                     }
                 }
-            },
-        ]
+            }
+
+        fetch_json_safe.side_effect = response
 
         matches = fetch_wikidata_title_matches("Addio zio Tom")
 
         self.assertEqual(matches["tt0180396"]["original_title"], "Addio zio Tom")
         self.assertEqual(matches["tt0180396"]["spanish_title"], "Adiós tío Tom")
         self.assertEqual(matches["tt0180396"]["english_title"], "Goodbye Uncle Tom")
+
+    @patch("movie_inbox.external.wikidata.fetch_json_safe")
+    def test_wikidata_title_match_searches_japanese_aliases(self, fetch_json_safe) -> None:
+        def response(url: str, **_kwargs: object) -> dict[str, object]:
+            if "wbsearchentities" in url:
+                if "language=ja" not in url:
+                    return {"search": []}
+                return {"search": [{"id": "Q27419", "label": "君の名は。"}]}
+            return {
+                "entities": {
+                    "Q27419": {
+                        "labels": {
+                            "en": {"value": "Your Name"},
+                            "ja": {"value": "君の名は。"},
+                        },
+                        "aliases": {"en": [{"value": "Kimi no Na wa"}]},
+                        "claims": {
+                            "P345": [{"mainsnak": {"datavalue": {"value": "tt5311514"}}}],
+                            "P1476": [
+                                {
+                                    "mainsnak": {
+                                        "datavalue": {
+                                            "value": {"text": "君の名は。", "language": "ja"}
+                                        }
+                                    }
+                                }
+                            ],
+                        },
+                    }
+                }
+            }
+
+        fetch_json_safe.side_effect = response
+        matches = fetch_wikidata_title_matches("君の名は。")
+
+        self.assertEqual(matches["tt5311514"]["original_title"], "君の名は。")
+        self.assertIn("Kimi no Na wa", matches["tt5311514"]["alternative_titles"])
 
     @patch("movie_inbox.external.wikipedia.fetch_json")
     def test_wikipedia_keeps_english_result_when_spanish_lookup_fails(self, fetch_json) -> None:
