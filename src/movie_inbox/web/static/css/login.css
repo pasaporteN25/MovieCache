@@ -63,8 +63,8 @@
       .login-member-layout {
         align-items: center;
         display: grid;
-        gap: 20px;
-        grid-template-columns: 124px minmax(0, 1fr);
+        gap: 18px;
+        grid-template-columns: 112px minmax(0, 1fr);
       }
       .login-member-data {
         display: grid;
@@ -132,46 +132,72 @@
       }
       .login-form { display: grid; gap: 14px; }
       .member-login-pass .login-form {
-        gap: 9px 12px;
+        gap: 10px;
         grid-template-columns: minmax(0, 1fr);
       }
-      .member-login-pass .login-form > label:not(.login-password-toggle) { grid-column: 1; }
-      .member-login-pass .login-password-toggle,
+      .member-login-pass .login-pass-body { padding: 18px 24px 20px; }
+      .member-login-pass .login-form > label:not(.login-password-toggle),
+      .member-login-pass .login-field { grid-column: 1; }
       .member-login-pass .login-feedback { grid-column: 1; }
       .member-login-pass .login-submit {
         align-items: center;
-        display: grid;
+        display: inline-flex;
         font-family: var(--font-label);
         font-size: var(--text-control);
         font-weight: 900;
         gap: 10px;
         grid-column: 1;
-        grid-template-columns: auto 1fr auto;
+        justify-content: center;
+        justify-self: center;
         letter-spacing: 0.08em;
-        margin-top: 5px;
+        margin-top: 4px;
         min-width: 0;
         text-align: center;
         text-transform: uppercase;
-        width: 100%;
+        width: min(100%, 152px);
       }
-      .member-login-pass .login-submit::before {
-        content: "Validar //";
-        font-size: var(--text-label);
-        letter-spacing: 0.1em;
-        opacity: 0.72;
-        text-align: left;
-      }
-      .member-login-pass .login-submit::after {
-        content: "▶";
-        font-size: var(--text-meta);
-      }
+      .login-submit-mark { font-size: var(--text-meta); }
       .login-form > label:not(.login-password-toggle) { display: grid; gap: 6px; }
-      .login-form > label > span {
+      .login-form > label > span,
+      .login-field > label {
         color: var(--muted);
         font-size: var(--text-meta);
         font-weight: 800;
       }
       .login-form input:not([type="checkbox"]) { font-size: var(--text-body); min-height: 46px; }
+      .login-field { display: grid; gap: 6px; }
+      .login-password-field { position: relative; }
+      .login-password-field input { padding-right: 50px; }
+      .login-password-visibility {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        color: var(--muted);
+        display: inline-flex;
+        height: 44px;
+        justify-content: center;
+        min-height: 44px;
+        padding: 10px;
+        position: absolute;
+        right: 1px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+      }
+      .login-password-visibility:hover,
+      .login-password-visibility[aria-pressed="true"] { color: var(--teal); }
+      .login-password-visibility:focus-visible { outline-offset: -3px; }
+      .login-password-visibility svg {
+        fill: none;
+        height: 22px;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 1.7;
+        width: 22px;
+      }
+      .login-eye-slash { display: none; }
+      .login-password-visibility[aria-pressed="true"] .login-eye-slash { display: block; }
       .login-password-toggle {
         align-items: center;
         cursor: pointer;
@@ -195,7 +221,7 @@
         background: var(--red);
         border-color: var(--red);
         color: var(--on-accent);
-        min-height: 46px;
+        min-height: 44px;
       }
       .password-pass { min-height: 570px; }
       .login-exit {

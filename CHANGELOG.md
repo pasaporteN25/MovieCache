@@ -12,6 +12,13 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   procedencia y bloqueos, migran el JSON a schema v7 y hacen round-trip en
   SQLite v5, importaciones y exportaciones.
 
+### Corregido
+
+- El carnet de acceso recupera una proporción horizontal y un botón `Entrar`
+  compacto, sin la leyenda técnica `Validar //`.
+- La opción para mostrar la contraseña pasa del checkbox a un botón de ojo
+  accesible integrado en el campo de contraseña.
+
 ## [0.5.0] - 2026-08-24
 
 ### Agregado

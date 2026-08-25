@@ -5,9 +5,15 @@ const password = document.querySelector("#loginPassword");
 const showPassword = document.querySelector("#showPassword");
 const feedback = document.querySelector("#loginFeedback");
 const submit = document.querySelector("#loginSubmit");
+const submitLabel = document.querySelector("#loginSubmitLabel");
 
-showPassword.addEventListener("change", () => {
-  password.type = showPassword.checked ? "text" : "password";
+showPassword.addEventListener("click", () => {
+  const revealed = password.type === "password";
+  password.type = revealed ? "text" : "password";
+  showPassword.setAttribute("aria-pressed", String(revealed));
+  const label = revealed ? "Ocultar contrase\u00f1a" : "Mostrar contrase\u00f1a";
+  showPassword.setAttribute("aria-label", label);
+  showPassword.title = label;
 });
 
 form.addEventListener("submit", async (event) => {
@@ -15,7 +21,7 @@ form.addEventListener("submit", async (event) => {
   setFeedback("");
   submit.disabled = true;
   submit.setAttribute("aria-busy", "true");
-  submit.textContent = "Verificando\u2026";
+  submitLabel.textContent = "Verificando\u2026";
   try {
     const response = await fetch("/auth/login", {
       method: "POST",
@@ -41,7 +47,7 @@ form.addEventListener("submit", async (event) => {
   } finally {
     submit.disabled = false;
     submit.removeAttribute("aria-busy");
-    submit.textContent = "Entrar";
+    submitLabel.textContent = "Entrar";
   }
 });
 

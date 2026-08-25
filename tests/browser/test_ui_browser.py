@@ -923,20 +923,45 @@ class LoginAccessibilityTests(unittest.TestCase):
         self.assertNotIn("complementary", snapshot)
         page.close()
 
-    def test_login_submit_closes_the_credential_column_at_narrow_width(self) -> None:
+    def test_login_password_eye_and_compact_submit_fit_the_membership_card(self) -> None:
         page = self.browser.new_page(viewport={"width": 480, "height": 900})
         page.goto(f"{self.base_url}/login")
         page.wait_for_selector("#loginForm")
 
         password_box = page.locator("#loginPassword").bounding_box()
-        toggle_box = page.locator(".login-password-toggle").bounding_box()
+        visibility = page.locator("#showPassword")
+        visibility_box = visibility.bounding_box()
         submit_box = page.locator("#loginSubmit").bounding_box()
+        pass_box = page.locator(".member-login-pass").bounding_box()
         self.assertIsNotNone(password_box)
-        self.assertIsNotNone(toggle_box)
+        self.assertIsNotNone(visibility_box)
         self.assertIsNotNone(submit_box)
-        self.assertGreaterEqual(toggle_box["height"], 44)
-        self.assertGreaterEqual(submit_box["y"], toggle_box["y"] + toggle_box["height"])
-        self.assertAlmostEqual(submit_box["width"], password_box["width"], delta=1)
+        self.assertIsNotNone(pass_box)
+        self.assertGreaterEqual(visibility_box["height"], 44)
+        self.assertGreaterEqual(visibility_box["x"], password_box["x"] + password_box["width"] - 48)
+        self.assertLessEqual(
+            visibility_box["y"] + visibility_box["height"],
+            password_box["y"] + password_box["height"] + 1,
+        )
+        self.assertGreaterEqual(submit_box["y"], password_box["y"] + password_box["height"])
+        self.assertGreaterEqual(submit_box["width"], 132)
+        self.assertLess(submit_box["width"], password_box["width"])
+        self.assertAlmostEqual(
+            submit_box["x"] + submit_box["width"] / 2,
+            password_box["x"] + password_box["width"] / 2,
+            delta=1,
+        )
+        self.assertLess(pass_box["height"], pass_box["width"])
+        self.assertEqual(page.locator("#loginForm input[type='checkbox']").count(), 0)
+        self.assertEqual(page.get_by_role("button", name="Entrar", exact=True).count(), 1)
+        self.assertEqual(page.locator("#loginPassword").get_attribute("type"), "password")
+        self.assertEqual(visibility.get_attribute("aria-label"), "Mostrar contraseña")
+        visibility.click()
+        self.assertEqual(page.locator("#loginPassword").get_attribute("type"), "text")
+        self.assertEqual(visibility.get_attribute("aria-pressed"), "true")
+        self.assertEqual(visibility.get_attribute("aria-label"), "Ocultar contraseña")
+        visibility.click()
+        self.assertEqual(page.locator("#loginPassword").get_attribute("type"), "password")
 
         page.evaluate("setFeedback('Usuario o contraseña incorrectos.')")
         feedback_box = page.locator("#loginFeedback").bounding_box()

@@ -35,16 +35,32 @@
                     <span>Usuario</span>
                     <input id="loginUsername" name="username" autocomplete="username" required autofocus>
                   </label>
-                  <label>
-                    <span>Contrase&ntilde;a</span>
-                    <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
-                  </label>
-                  <label class="login-password-toggle">
-                    <input id="showPassword" type="checkbox">
-                    <span>Mostrar contrase&ntilde;a</span>
-                  </label>
+                  <div class="login-field">
+                    <label for="loginPassword">Contrase&ntilde;a</label>
+                    <div class="login-password-field">
+                      <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+                      <button
+                        id="showPassword"
+                        class="login-password-visibility"
+                        type="button"
+                        aria-label="Mostrar contrase&ntilde;a"
+                        aria-controls="loginPassword"
+                        aria-pressed="false"
+                        title="Mostrar contrase&ntilde;a"
+                      >
+                        <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                          <path d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"></path>
+                          <circle cx="12" cy="12" r="2.75"></circle>
+                          <path class="login-eye-slash" d="m4 4 16 16"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                   <p id="loginFeedback" class="login-feedback" role="alert" aria-live="polite" hidden></p>
-                  <button id="loginSubmit" class="login-submit" type="submit">Entrar</button>
+                  <button id="loginSubmit" class="login-submit" type="submit">
+                    <span id="loginSubmitLabel">Entrar</span>
+                    <span class="login-submit-mark" aria-hidden="true">&#9654;</span>
+                  </button>
                 </form>
               </div>
               <div class="login-member-photo" aria-hidden="true">
