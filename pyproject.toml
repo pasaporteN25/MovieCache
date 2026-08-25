@@ -61,3 +61,18 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "movie_inbox.domain.*"
 strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "movie_inbox.application.auth_service",
+    "movie_inbox.application.collection_repository",
+    "movie_inbox.application.curation_history",
+    "movie_inbox.application.identity_repository",
+    "movie_inbox.application.import_repository",
+    "movie_inbox.application.library_repository",
+    "movie_inbox.application.member_service",
+    "movie_inbox.application.privacy_service",
+    "movie_inbox.application.repository",
+    "movie_inbox.application.scanner_history",
+]
+strict = true

@@ -6,6 +6,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
+- La hoja de ruta convierte las direcciones pendientes en un backlog ordenado con
+  alcance, dependencias, criterio de cierre y decisiones bloqueantes separadas de la
+  cola ejecutable.
+- El gate de mypy estricto se amplía desde los 18 módulos de dominio a un primer corte
+  de 10 módulos de contratos, autenticación, miembros y privacidad de Application,
+  protegido de forma consistente en PowerShell, shell y CI.
 - El enriquecimiento de Wikidata aprovecha la entidad ya descargada para
   incorporar duración en minutos, países, idiomas originales, productores y
   compositores. Los cinco campos forman parte del modelo portable, conservan

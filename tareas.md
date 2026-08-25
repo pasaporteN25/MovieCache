@@ -15,6 +15,63 @@ mismo — este archivo es el tablero completo, no uno por fase.
 
 ## Backlog
 
+La cola se ejecuta en el orden de las secciones y tareas, salvo que una dependencia
+explicita diga lo contrario. Una tarea bloqueada por una decision externa no detiene la
+cola: se documenta aca y se toma la siguiente accionable. Los conteos de errores son una
+foto diagnostica, no un criterio estable entre versiones de herramientas.
+
+### Frente: Tipado y capacidad de entrega
+
+Diagnostico del 2026-08-25: el gate publicado no esta roto; valida en modo estricto los
+18 modulos de `domain` y pasa. Ejecutar mypy sobre todo `src` descubre 174 errores fuera
+de ese alcance: Application 58, CLI 41, Web 34, External 28 e Infrastructure 13. El plan
+es ampliar el contrato por capas sin congelar una deuda artificial con `ignore_errors`.
+
+#### [T1] Primera ampliacion estricta: contratos, identidad y privacidad de Application
+- **Alcance**: incluir en el gate los contratos de repositorio y los servicios ya
+  tipados de autenticacion, miembros y privacidad; corregir el unico error real de
+  varianza encontrado en ese corte. Mantener la lista de targets sincronizada entre
+  `pyproject.toml`, checks locales y CI.
+- **Criterio de cierre**: el corte completo pasa con `strict = true`; una prueba protege
+  que PowerShell, shell y CI no puedan dejar de ejecutarlo silenciosamente.
+- **Depende de**: —
+- **Modelo sugerido**: Medio. Toca configuracion de calidad, scripts multiplataforma y
+  una frontera de tipos compartida con `domain`.
+
+#### [T2] Tipar el resto de Application
+- **Alcance**: cerrar por lotes acotados los servicios de catalogo, importacion,
+  scanner, curaduria, home, busqueda y evaluacion. Reemplazar `Any` solamente donde
+  exista un contrato estable; no trasladar tipos de infraestructura hacia la capa.
+- **Criterio de cierre**: `mypy src/movie_inbox/application` en modo estricto y dentro
+  del gate obligatorio, sin ignores globales ni bajar reglas existentes.
+- **Depende de**: [T1].
+- **Modelo sugerido**: Grande. Hay protocolos, TypedDict y limites de capas cruzados.
+
+#### [T3] Tipar Infrastructure y External
+- **Alcance**: alinear implementaciones de repositorio, parsers y adaptadores externos
+  con los contratos cerrados en Application; modelar respuestas remotas solo hasta el
+  borde validado, manteniendo datos no confiables como `object` antes de normalizarlos.
+- **Criterio de cierre**: ambos paquetes pasan mypy estricto y entran en el gate; los
+  errores de red/esquema siguen cubiertos por pruebas.
+- **Depende de**: [T2].
+- **Modelo sugerido**: Grande. Une persistencia, red y contratos de aplicacion.
+
+#### [T4] Tipar Web y CLI
+- **Alcance**: cerrar dependencias FastAPI, payloads HTTP, helpers de seguridad y
+  comandos; no convertir los modelos de transporte en modelos de dominio.
+- **Criterio de cierre**: todo `src/movie_inbox` pasa mypy estricto en CI y local.
+- **Depende de**: [T2], [T3].
+- **Modelo sugerido**: Grande. Superficie amplia y varios frameworks en el borde.
+
+#### [T5] Evaluar y cerrar el tipado de tests
+- **Alcance**: tipar fixtures y helpers que aporten seguridad real, en especial pruebas
+  HTTP/browser; documentar cualquier exclusion puntual justificada por una libreria.
+- **Criterio de cierre**: decidir y aplicar un contrato estable para `tests`; si se
+  incluye todo, `mypy src tests` pasa. No usar el conteo historico como ratchet.
+- **Depende de**: [T4].
+- **Modelo sugerido**: Grande. La mayor parte de los avisos actuales esta en fixtures
+  dinamicas y clases de navegador.
+
 ### Frente: Fuentes externas y especializacion de anime
 
 #### [F1] Prototipo opcional del indice oficial no comercial de IMDb
@@ -41,6 +98,146 @@ mismo — este archivo es el tablero completo, no uno por fase.
 - **Dependencias**: decision legal/de producto externa. Hasta entonces, Wikidata
   multilingue es el camino soportado.
 - **Modelo sugerido**: Grande. No empezar la implementacion sin cerrar la fuente.
+
+#### [F3] Evaluar TMDb como fuente estructurada opcional
+- **Alcance**: revisar licencia, atribucion, limites, uso de API key, campos disponibles
+  e IDs cruzados. Comparar completitud y conflictos contra las fuentes actuales sobre
+  el corpus sintetico, sin enviar catalogos personales.
+- **Criterio de cierre**: ADR con decision integrar/no integrar, matriz de campos y
+  costos operativos; solo si se aprueba, crear una tarea separada de adaptador.
+- **Depende de**: —
+- **Modelo sugerido**: Grande. Requiere investigacion legal y criterio de producto.
+
+### Frente: Bibliotecas y curaduria
+
+#### [L1] Reglas de exclusion configurables por biblioteca
+- **Alcance**: partir de los defaults seguros actuales (`extras`, `sample`, multipartes)
+  y definir reglas adicionales por biblioteca con preview antes de aplicar. Persistir
+  configuracion sin reinterpretar inventario historico silenciosamente.
+- **Criterio de cierre**: esquema y migracion, validacion de rutas/patrones, UI owner,
+  pruebas de preview/aplicacion y recuperacion ante una regla invalida.
+- **Depende de**: [T2] para que el nuevo contrato nazca tipado.
+- **Modelo sugerido**: Grande. Toca scanner, persistencia, seguridad y UI.
+
+#### [C1] Disenar el contrato para grupos de 3+ duplicados
+- **Alcance**: reemplazar la descomposicion C(n,2) por un caso de grupo sin implementar
+  todavia el merge N-a-1. Definir identidad del caso, orden, conflictos, historial,
+  deshacer y comportamiento si el grupo cambia durante la revision.
+- **Criterio de cierre**: ADR y fixtures sinteticas de 3 y 4 entradas que permitan
+  implementar sin decisiones pendientes.
+- **Depende de**: [T2].
+- **Modelo sugerido**: Grande. Es una decision de producto y consistencia de datos.
+
+#### [C2] Implementar resolucion N-a-1 de duplicados
+- **Alcance**: cola, detalle, comparador, auto-resolucion segura, historial y deshacer
+  para el contrato aprobado en [C1]. Mantener cero merges automaticos con conflictos.
+- **Criterio de cierre**: pruebas de dominio, servicio, HTTP y navegador para 3+ items,
+  incluidos cambios concurrentes y rollback.
+- **Depende de**: [C1].
+- **Modelo sugerido**: Grande. Cambio transversal y sensible a perdida de datos.
+
+### Frente: Privacidad e historial Git
+
+#### [S1] Decidir la purga del catalogo personal del historial
+- **Alcance**: identificar commits y referencias afectadas sin abrir el catalogo,
+  documentar impacto sobre clones/forks y preparar un procedimiento reversible hasta
+  el punto del force-push.
+- **Criterio de cierre**: decision explicita de Lucas entre conservar historia o purgar,
+  con ventana de mantenimiento y plan de recuperacion si se elige purgar.
+- **Depende de**: decision del owner. No ejecutar reescritura en esta tarea.
+- **Modelo sugerido**: Grande. Seguridad y operacion destructiva del remoto.
+
+#### [S2] Ejecutar y verificar la purga del historial
+- **Alcance**: reescribir solamente las rutas aprobadas, verificar que no sobrevivan en
+  ramas/tags locales, conservar un backup y coordinar el force-push autorizado.
+- **Criterio de cierre**: auditoria por nombres/rutas sin leer datos, remoto actualizado
+  y guia de reclonado para cualquier copia existente.
+- **Depende de**: [S1] aprobada y autorizacion explicita de reescritura/force-push.
+- **Modelo sugerido**: Grande. Accion destructiva e irreversible para colaboradores.
+
+#### [P1] Decidir visibilidad opcional de archivos para miembros
+- **Alcance**: definir si el admin puede compartir existencia, nombre o ruta de archivos
+  y con que granularidad; hacer threat model antes de relajar la invariante actual.
+- **Criterio de cierre**: ADR de producto/privacidad. Si se rechaza, conservar la regla
+  dura; si se aprueba, crear contrato exacto para [P2].
+- **Depende de**: decision del owner.
+- **Modelo sugerido**: Grande. Puede exponer estructura del servidor.
+
+#### [P2] Implementar visibilidad de archivos aprobada
+- **Alcance**: aplicar exclusivamente el contrato de [P1] en servicio, API y UI, con
+  default privado y migracion segura.
+- **Criterio de cierre**: pruebas negativas por rol/campo, opt-in explicito y ninguna
+  ruta expuesta fuera del alcance aprobado.
+- **Depende de**: [P1] aprobada.
+- **Modelo sugerido**: Grande. Frontera critica de privacidad.
+
+### Frente: Superficie publica y despliegue
+
+#### [W1] Definir contrato de presentacion publica
+- **Alcance**: decidir landing estatica o endpoint de solo lectura, campos permitidos,
+  cache, revocacion, rate limit y aislamiento respecto de sesiones/CSRF privados.
+- **Criterio de cierre**: ADR, esquema versionado y threat model; ningun catalogo se
+  publica por defecto.
+- **Depende de**: [T4].
+- **Modelo sugerido**: Grande. Define una nueva frontera de confianza.
+
+#### [W2] Implementar landing publica opt-in
+- **Alcance**: construir la presentacion aprobada en [W1] sin reutilizar endpoints ni
+  tokens privados; controles owner para activar, previsualizar y revocar.
+- **Criterio de cierre**: pruebas de aislamiento/autorizacion/cache y aceptacion visual
+  responsive; instancia nueva permanece privada.
+- **Depende de**: [W1].
+- **Modelo sugerido**: Grande. Backend, seguridad y frontend publico.
+
+#### [D1] Documentar HTTPS guiado para homeservers
+- **Alcance**: receta soportada para reverse proxy (primero Nginx), certificados,
+  headers, WebSocket si aplica, renovacion y diagnostico; Movie Inbox no termina TLS.
+- **Criterio de cierre**: configuracion de ejemplo validada en un entorno descartable y
+  checklist que no exponga el servicio accidentalmente.
+- **Depende de**: —
+- **Modelo sugerido**: Medio. Documentacion operativa con impacto de seguridad.
+
+#### [W3] Disenar paquetes compartibles y sincronizacion entre homeservers
+- **Alcance**: casos de uso, identidad de instancia, export/import firmado o manual,
+  conflictos, revocacion y privacidad. No asumir un servicio central.
+- **Criterio de cierre**: ADR y prototipo descartable sin red publica involuntaria;
+  implementacion productiva queda como tarea posterior.
+- **Depende de**: [W1] y contrato portable estable.
+- **Modelo sugerido**: Grande. Distribucion, conflictos y modelo de amenazas.
+
+### Frente: Clientes, integraciones y nuevos medios
+
+#### [A1] Definir API versionada y sesiones para dispositivos
+- **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
+  busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
+- **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
+  servidor-cliente antes de iniciar una app.
+- **Depende de**: [T4], [D1].
+- **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
+
+#### [A2] Cliente Android basico
+- **Alcance**: login seguro, lectura/busqueda/detalle y edicion de estado, fecha vista,
+  puntaje y review; disponibilidad fisica solo lectura, sin offline ni administracion.
+- **Criterio de cierre**: MVP contra la API de [A1], matriz de compatibilidad y pruebas
+  de red/autenticacion/ciclo de vida.
+- **Depende de**: [A1].
+- **Modelo sugerido**: Grande. Proyecto cliente multiplataforma potencial.
+
+#### [I1] Evaluar Radarr, Sonarr y Letterboxd
+- **Alcance**: separar importacion, enlaces e inventario; revisar autenticacion,
+  licencias, IDs, webhooks/rate limits y que datos personales saldrian de la instancia.
+- **Criterio de cierre**: matriz y ADR por integracion; cada aprobada genera su propia
+  tarea de adaptador.
+- **Depende de**: [A1] para contratos externos estables y [L1] para inventario.
+- **Modelo sugerido**: Grande. Tres productos con semanticas distintas.
+
+#### [M1] Definir verticales de juegos y musica
+- **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
+  valores a `kind` ni reciclar campos audiovisuales antes de la decision.
+- **Criterio de cierre**: ADR por vertical con recomendacion avanzar/descartar y backlog
+  independiente si se aprueba.
+- **Depende de**: despues de estabilizar los frentes anteriores.
+- **Modelo sugerido**: Grande. Descubrimiento de producto, no un cambio de enum.
 
 ---
 

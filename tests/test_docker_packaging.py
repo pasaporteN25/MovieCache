@@ -10,12 +10,34 @@ class DockerPackagingTests(unittest.TestCase):
     def test_local_check_scripts_include_the_ci_lint_gate(self) -> None:
         powershell = (ROOT / "scripts" / "check.ps1").read_text(encoding="utf-8")
         shell = (ROOT / "scripts" / "check.sh").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+        mypy_configuration = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
         for script in (powershell, shell):
             self.assertIn(".[test,dev]", script)
             self.assertIn("ruff check src scripts tests", script)
             self.assertIn("ruff format --check src scripts tests", script)
-            self.assertIn("mypy src/movie_inbox/domain", script)
+
+        strict_targets = (
+            "src/movie_inbox/domain",
+            "src/movie_inbox/application/auth_service.py",
+            "src/movie_inbox/application/collection_repository.py",
+            "src/movie_inbox/application/curation_history.py",
+            "src/movie_inbox/application/identity_repository.py",
+            "src/movie_inbox/application/import_repository.py",
+            "src/movie_inbox/application/library_repository.py",
+            "src/movie_inbox/application/member_service.py",
+            "src/movie_inbox/application/privacy_service.py",
+            "src/movie_inbox/application/repository.py",
+            "src/movie_inbox/application/scanner_history.py",
+        )
+        for target in strict_targets:
+            for gate in (powershell, shell, workflow):
+                self.assertIn(target, gate)
+        self.assertIn('module = "movie_inbox.domain.*"', mypy_configuration)
+        for target in strict_targets[1:]:
+            module = target.removeprefix("src/").removesuffix(".py").replace("/", ".")
+            self.assertIn(f'"{module}"', mypy_configuration)
 
     def test_image_is_multi_stage_non_root_and_health_checked(self) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")

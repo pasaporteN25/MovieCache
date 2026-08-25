@@ -21,10 +21,11 @@ En Linux:
 bash scripts/check.sh
 ```
 
-El gate debe comprobar formato y lint con Ruff, validar el dominio con mypy, compilar
-`src`, `scripts` y `tests`, ejecutar toda la suite y terminar con `git diff --check`
-limpio. El workflow de GitHub debe construir e instalar tambien el wheel en un entorno
-limpio.
+El gate debe comprobar formato y lint con Ruff, validar con mypy estricto el dominio y
+los cortes de Application ya incorporados al contrato, compilar `src`, `scripts` y
+`tests`, ejecutar toda la suite y terminar con `git diff --check` limpio. Los targets
+de mypy deben coincidir en PowerShell, shell y CI. El workflow de GitHub debe construir
+e instalar tambien el wheel en un entorno limpio.
 
 ## 2. Preparacion segura
 

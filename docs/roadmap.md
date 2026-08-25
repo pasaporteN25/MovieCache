@@ -127,42 +127,52 @@ estreno, scanner, persistencia SQLite y seguridad de las rutas. La validacion vi
 del login, las estanterias por fuente y el explorador de carpetas forma parte del gate
 del mismo incremento.
 
-## Siguientes incrementos
+## Secuencia priorizada desde 2026-08-25
 
-- Prototipar un indice local opcional de los datasets no comerciales oficiales de
-  IMDb, sin scraping ni descarga implicita. Debe declarar costo de disco/actualizacion,
-  atribucion y prioridad por campo; una sola prioridad global no alcanza.
-- Conseguir autorizacion escrita de AniList o identificar una fuente de anime activa
-  con licencia compatible antes de sumar una cuarta estanteria. Mientras tanto,
-  ampliar aliases multilingues mediante Wikidata y medirlos en Search Lab.
-- Mejorar el enrichment con una fuente estructurada opcional, evaluando TMDb y sus
-  condiciones de uso antes de agregar una API key a la instancia.
-- Permitir reglas de exclusion configurables por biblioteca, partiendo de defaults
-  seguros.
-- Disenar una landing o endpoint publico de presentacion separado de la API privada.
-  No debe reutilizar tokens de sesion ni exponer catalogos por defecto.
-- Definir el contrato de integracion de esa futura landing. Los endpoints actuales
-  son privados, requieren sesion y token anti-CSRF, y no constituyen una API publica.
-- Mantener HTTPS en el reverse proxy del homeserver (por ejemplo, Nginx) y documentar
-  despues una opcion guiada para certificados; Movie Inbox no termina TLS por si solo.
-- Investigar paquetes compartibles y sincronizacion explicita entre homeservers sin
-  convertir una instancia en un servicio publico involuntario.
+`tareas.md` es la fuente de verdad para alcance, dependencias, criterio de cierre y
+estado. Esta hoja conserva solamente la secuencia de producto. Una decision bloqueada
+no inmoviliza el resto de la cola.
 
-## En investigacion
+### 1. Capacidad de entrega
 
-- Juegos y musica requieren modelos verticales propios. No se agregaran como valores
-  de `kind` hasta definir campos, fuentes, disponibilidad y experiencias de detalle
-  especificas para cada medio.
-- **Cliente basico (Android/Kotlin).** Hipotesis de trabajo: un primer cliente Android
-  para una instancia self-hosted, con inicio de sesion seguro contra una URL HTTPS
-  elegida por el usuario, lectura/busqueda/detalle del catalogo personal, cambio de
-  estado/fecha de vista/puntaje/review, y disponibilidad fisica en modo lectura — sin
-  administracion, Scanner, importaciones, curaduria avanzada ni uso offline en la
-  primera entrega. Movido fuera de v0.5.0 a proposito: `PRODUCT.md` ya aclaraba que no
-  es la etapa inmediata, y tiene prerequisitos propios sin empezar (API versionada y
-  documentada, sesiones aptas para dispositivos, pruebas de compatibilidad
-  servidor-cliente). Candidato natural para v0.6.0 una vez confirmada la hipotesis y
-  resueltos esos prerequisitos.
-- Radarr, Sonarr, Letterboxd y otras integraciones siguen siendo direcciones validas,
-  pero se priorizan despues de estabilizar busqueda, scanner, backup y contratos de
-  datos.
+1. [T1] Extender el gate estricto a contratos, identidad y privacidad de Application.
+2. [T2] Completar Application.
+3. [T3] Completar Infrastructure y External.
+4. [T4] Completar Web y CLI, dejando todo el codigo de producto bajo mypy estricto.
+5. [T5] Decidir y cerrar el alcance de tipado para tests.
+
+El baseline diagnostico es 174 errores fuera de `domain` al revisar todo `src`; no es
+un fallo del gate publicado, que sigue verde. Se reduce por capas y sin
+`ignore_errors` globales.
+
+### 2. Calidad de datos y bibliotecas
+
+1. [F1] Prototipo local opcional con datasets oficiales de IMDb.
+2. [L1] Exclusiones configurables por biblioteca.
+3. [F3] Evaluacion de TMDb; un adaptador solo nace si el ADR la aprueba.
+4. [F2] Fuente de anime sostenible, bloqueada hasta contar con permiso/licencia.
+5. [C1] Contrato para grupos de 3+ duplicados.
+6. [C2] Resolucion N-a-1 segun ese contrato.
+
+### 3. Superficie publica y operacion
+
+1. [W1] Contrato y threat model de presentacion publica opt-in.
+2. [W2] Landing publica aislada de sesiones y endpoints privados.
+3. [D1] HTTPS guiado mediante reverse proxy soportado.
+4. [W3] Diseno de paquetes/sincronizacion entre homeservers sin servicio central
+   involuntario.
+
+### 4. Clientes e integraciones
+
+1. [A1] API versionada y sesiones revocables para dispositivos.
+2. [A2] Cliente Android basico, candidato a un hito posterior una vez cerrado [A1].
+3. [I1] Evaluar Radarr, Sonarr y Letterboxd sobre contratos ya estables.
+4. [M1] Investigar juegos y musica como verticales propias, nunca como simples valores
+   nuevos de `kind`.
+
+### Decisiones que pueden interrumpir la cola cuando el owner las resuelva
+
+- [S1] Conservar o purgar el catalogo personal del historial Git; [S2] solo existe como
+  ejecucion condicionada a una autorizacion explicita de reescritura y force-push.
+- [P1] Mantener privada toda informacion de archivos o permitir un opt-in granular;
+  [P2] solo se implementa si el threat model y la decision de producto lo aprueban.
