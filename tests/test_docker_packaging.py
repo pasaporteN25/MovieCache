@@ -18,11 +18,14 @@ class DockerPackagingTests(unittest.TestCase):
             self.assertIn("ruff check src scripts tests", script)
             self.assertIn("ruff format --check src scripts tests", script)
 
-        strict_targets = ("src/movie_inbox",)
+        strict_targets = ("src/movie_inbox", "tests")
         for target in strict_targets:
             for gate in (powershell, shell, workflow):
                 self.assertIn(target, gate)
         self.assertIn("strict = true", mypy_configuration)
+        self.assertNotIn("ignore_errors = true", mypy_configuration)
+        self.assertIn('module = "tests.browser.*"', mypy_configuration)
+        self.assertIn('disable_error_code = ["attr-defined"]', mypy_configuration)
 
     def test_image_is_multi_stage_non_root_and_health_checked(self) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")

@@ -5,9 +5,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from movie_inbox.application.repository import CatalogFormatError
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.models import CatalogItem, LocalFile, MetadataSource
-from movie_inbox.infrastructure.json_repository import CatalogFormatError, JsonCatalogRepository
+from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.schema import (
     CatalogSchemaError,
     UnsupportedCatalogVersion,

@@ -17,7 +17,7 @@ try {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $python.Source -m ruff format --check src scripts tests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    & $python.Source -m mypy src/movie_inbox
+    & $python.Source -m mypy src/movie_inbox tests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $python.Source -m compileall -q src scripts tests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -14,6 +14,7 @@ from playwright.sync_api import sync_playwright
 
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.web.app import create_app
@@ -615,7 +616,13 @@ class ScannerBrowserTests(unittest.TestCase):
             time.sleep(0.1)
         else:
             raise RuntimeError("Scanner queue was not populated in time")
-        cls.queue_item_id = queue["items"][0]["id"]
+        queue_items = queue.get("items")
+        if not isinstance(queue_items, list) or not queue_items:
+            raise RuntimeError("Scanner queue did not include any items")
+        queue_item = queue_items[0]
+        if not isinstance(queue_item, dict) or not isinstance(queue_item.get("id"), str):
+            raise RuntimeError("Scanner queue item did not include an id")
+        cls.queue_item_id = queue_item["id"]
         setup_page.close()
 
     @classmethod
@@ -768,7 +775,7 @@ class ScannerBrowserTests(unittest.TestCase):
             b"collapsed-candidates"
         )
 
-        def add_items(items: list) -> tuple[bool, None]:
+        def add_items(items: list[CatalogItem]) -> tuple[bool, None]:
             items.extend(
                 normalize_item(row)
                 for row in [

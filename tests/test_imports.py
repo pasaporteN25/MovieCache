@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.application.catalog_service import CatalogService
@@ -31,8 +33,9 @@ class ImportParserTests(unittest.TestCase):
 
         self.assertEqual(parsed.source_name, "movies.txt")
         self.assertEqual(parsed.source_format, "txt")
-        self.assertEqual([row.item["title"] for row in parsed.items], ["Heat", "Ran (film)"])
-        self.assertEqual(parsed.items[1].item["url"], "https://en.wikipedia.org/wiki/Ran_(film)")
+        items = [row.item for row in parsed.items if row.item is not None]
+        self.assertEqual([item["title"] for item in items], ["Heat", "Ran (film)"])
+        self.assertEqual(items[1]["url"], "https://en.wikipedia.org/wiki/Ran_(film)")
 
     def test_csv_mapping_and_json_import_remove_local_paths(self) -> None:
         csv_import = parse_import_content(
@@ -48,9 +51,12 @@ class ImportParserTests(unittest.TestCase):
             '"path":"D:/Movies","_source_file":"D:/catalog.json","en_catalogo":true}]',
         )
 
-        self.assertEqual(csv_import.items[0].item["title"], "Ikiru")
-        self.assertEqual(csv_import.items[0].item["status"], "watched")
+        csv_item = csv_import.items[0].item
         item = json_import.items[0].item
+        assert csv_item is not None
+        assert item is not None
+        self.assertEqual(csv_item["title"], "Ikiru")
+        self.assertEqual(csv_item["status"], "watched")
         self.assertTrue(item["en_catalogo"])
         self.assertEqual(item["local_files"], [])
         self.assertEqual(item["local_name"], "")
@@ -75,7 +81,9 @@ class ImportParserTests(unittest.TestCase):
             '[{"title":"A title with [[brackets]] and {braces}"}]',
         )
         self.assertEqual(valid.source_format, "json")
-        self.assertEqual(valid.items[0].item["title"], "A title with [[brackets]] and {braces}")
+        item = valid.items[0].item
+        assert item is not None
+        self.assertEqual(item["title"], "A title with [[brackets]] and {braces}")
 
 
 class ImportServiceTests(unittest.TestCase):
@@ -109,7 +117,7 @@ class ImportServiceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def catalog_items(self):
+    def catalog_items(self) -> list[Mapping[str, Any]]:
         return [item.to_dict() for item in self.catalog_repository.read()]
 
     def test_preview_classifies_catalog_matches_and_source_duplicates(self) -> None:
@@ -217,6 +225,7 @@ class ImportServiceTests(unittest.TestCase):
             self.clock_value,
             self.clock_value - 300,
         )
+        assert claimed is not None
         self.assertEqual(claimed.status, "applying")
         self.clock_value += IMPORT_DRAFT_TTL_SECONDS + (15 * 60) + 1
 
@@ -326,6 +335,7 @@ class ImportServiceTests(unittest.TestCase):
             result["collection"]["id"],
         )
         self.assertIsNotNone(collection)
+        assert collection is not None
         self.assertEqual(collection.visibility, "private")
         self.assertEqual(collection.source_kind, "import")
         self.assertNotIn("status", collection.items[0].item)

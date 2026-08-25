@@ -14,12 +14,13 @@ from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.repository import CatalogFormatError, CatalogRepositoryError
 from movie_inbox.cli.database import export_json, import_json, show_info, verify_catalog_round_trip
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.infrastructure.sqlite_repository import SCHEMA_V1, SqliteCatalogRepository
 
 
-def sample_item(item_id: str = "heat-1995"):
+def sample_item(item_id: str = "heat-1995") -> CatalogItem:
     return normalize_item(
         {
             "id": item_id,
@@ -252,6 +253,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                     connection.execute("SELECT COUNT(*) FROM relation_audit").fetchone()[0], 0
                 )
             loaded = repository.get("heat-1995")
+            assert loaded is not None
             self.assertEqual(loaded.duration_minutes, 170)
             self.assertEqual(loaded.countries, ["Estados Unidos", "Italia"])
             self.assertEqual(loaded.genres, ["Crime", "Thriller"])
@@ -480,6 +482,7 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertTrue(repository.attach_local_file("heat-1995", local_file))
             loaded = repository.get("heat-1995")
             self.assertIsNotNone(loaded)
+            assert loaded is not None
             self.assertEqual(len(loaded.local_files), 1)
             self.assertTrue(loaded.en_catalogo)
 
@@ -541,7 +544,7 @@ class SqliteRepositoryTests(unittest.TestCase):
 
             original_open = os.open
 
-            def reject_source_lock(path, flags, mode=0o777):  # type: ignore[no-untyped-def]
+            def reject_source_lock(path, flags, mode=0o777):
                 if Path(path) == lock_path:
                     raise OSError(30, "Read-only file system", str(path))
                 return original_open(path, flags, mode)

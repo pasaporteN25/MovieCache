@@ -3,12 +3,14 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, cast
 
 from movie_inbox.application.curation_workflow import (
     CatalogPointer,
     CurationConflict,
     CurationWorkflowService,
 )
+from movie_inbox.application.library_repository import LibraryRepository
 from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.curation_history import (
@@ -22,10 +24,10 @@ class _FakeLibraryRepository:
     """Minimal LibraryRepository stand-in: AvailabilityService only ever calls
     .availability_records() on it."""
 
-    def __init__(self, records: list[dict]) -> None:
+    def __init__(self, records: list[dict[str, Any]]) -> None:
         self._records = records
 
-    def availability_records(self) -> list[dict]:
+    def availability_records(self) -> list[dict[str, Any]]:
         return self._records
 
 
@@ -35,10 +37,10 @@ class CurationWorkflowTests(unittest.TestCase):
         catalog_path: Path,
         *,
         availability_service: AvailabilityService | None = None,
-    ):
-        repositories = {}
+    ) -> tuple[CurationWorkflowService, Path]:
+        repositories: dict[str, JsonCatalogRepository] = {}
 
-        def repository(path: Path):
+        def repository(path: Path) -> JsonCatalogRepository:
             key = str(Path(path).resolve())
             if key not in repositories:
                 repositories[key] = JsonCatalogRepository(Path(key), normalize_item)
@@ -160,15 +162,18 @@ class CurationWorkflowTests(unittest.TestCase):
                 ]
             )
             availability_service = AvailabilityService(
-                _FakeLibraryRepository(
-                    [
-                        {
-                            "identity": {"title": "Heat", "year": "1995", "kind": "pelicula"},
-                            "library_id": "lib-1",
-                            "library_name": "Biblioteca de prueba",
-                            "file_count": 1,
-                        }
-                    ]
+                cast(
+                    LibraryRepository,
+                    _FakeLibraryRepository(
+                        [
+                            {
+                                "identity": {"title": "Heat", "year": "1995", "kind": "pelicula"},
+                                "library_id": "lib-1",
+                                "library_name": "Biblioteca de prueba",
+                                "file_count": 1,
+                            }
+                        ]
+                    ),
                 )
             )
             workflow, _ = self.workflow(catalog_path, availability_service=availability_service)
@@ -230,7 +235,9 @@ class CurationWorkflowTests(unittest.TestCase):
                     history_mode="persistent",
                     session_id="session-a",
                 )
-            self.assertEqual(repository.get("heat").review, "Cambio posterior")
+            stored = repository.get("heat")
+            assert stored is not None
+            self.assertEqual(stored.review, "Cambio posterior")
 
     def test_session_history_can_be_cleared_without_touching_the_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -252,7 +259,9 @@ class CurationWorkflowTests(unittest.TestCase):
                 1,
             )
             self.assertEqual(workflow.history("session", "browser-session")["count"], 0)
-            self.assertEqual(repository.get("heat").link_curation_status, "not_required")
+            stored = repository.get("heat")
+            assert stored is not None
+            self.assertEqual(stored.link_curation_status, "not_required")
 
     def test_external_metadata_does_not_create_a_fake_personal_conflict(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -330,6 +339,7 @@ class CurationWorkflowTests(unittest.TestCase):
 
             merged = repository.get("heat-local")
             self.assertIsNotNone(merged)
+            assert merged is not None
             self.assertEqual(merged.status, "watched")
             self.assertEqual(merged.rating, 9)
             self.assertEqual(merged.review, "Una favorita")
@@ -343,6 +353,7 @@ class CurationWorkflowTests(unittest.TestCase):
             )
             restored = repository.get("heat-local")
             self.assertIsNotNone(restored)
+            assert restored is not None
             self.assertEqual(restored.spanish_title, "")
             self.assertEqual(restored.imdb_url, "")
             self.assertEqual(restored.review, "Una favorita")

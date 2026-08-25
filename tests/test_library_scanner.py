@@ -24,7 +24,7 @@ class LibraryScannerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
 
-            def denied_walk(*_args, **kwargs):  # type: ignore[no-untyped-def]
+            def denied_walk(*_args, **kwargs):
                 kwargs["onerror"](PermissionError(13, "Permission denied", str(root)))
                 return iter(())
 

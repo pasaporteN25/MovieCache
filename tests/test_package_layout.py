@@ -113,7 +113,11 @@ class PackageLayoutTests(unittest.TestCase):
                     instance_db=str(instance),
                 )
             )
-            paths = {route.path for route in app.routes}
+            paths = {
+                path
+                for route in app.routes
+                if isinstance(path := getattr(route, "path", None), str)
+            }
             self.assertNotIn("/docs", paths)
             self.assertNotIn("/openapi.json", paths)
             self.assertIn("/healthz", paths)

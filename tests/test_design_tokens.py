@@ -40,6 +40,8 @@ class DesignTokenTests(unittest.TestCase):
     tokens, not copy or markup structure, so they don't need a browser --
     behavioral guarantees live in tests/browser/test_ui_browser.py instead."""
 
+    css: str
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.css = _effective_stylesheet()

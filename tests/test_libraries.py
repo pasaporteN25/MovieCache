@@ -6,6 +6,7 @@ import threading
 import unittest
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.application.library_repository import LibraryRunBusy
@@ -17,6 +18,7 @@ from movie_inbox.application.library_service import (
     _CatalogMatchIndex,
 )
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.libraries import LibraryScanRun, ManagedLibrary
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
@@ -30,12 +32,14 @@ class ManagedLibraryTests(unittest.TestCase):
         self.media = self.root / "media"
         self.media.mkdir()
         self.catalog = self.root / "catalog.json"
-        self.catalog_items = [
+        self.catalog_items: list[dict[str, Any]] = [
             normalize_item(
                 {"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}
             ).to_dict()
         ]
-        JsonCatalogRepository(self.catalog, normalize_item).write(self.catalog_items)
+        JsonCatalogRepository(self.catalog, normalize_item).write(
+            [normalize_item(item) for item in self.catalog_items]
+        )
         self.instance = self.root / "instance.db"
         self.identity = SqliteIdentityRepository(self.instance)
         self.owner, _ = AuthService(self.identity).bootstrap_owner(
@@ -58,7 +62,7 @@ class ManagedLibraryTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def create_library(self, **values):  # type: ignore[no-untyped-def]
+    def create_library(self, **values: object) -> ManagedLibrary:
         return self.service.create_library(
             self.owner.id,
             {
@@ -69,10 +73,12 @@ class ManagedLibraryTests(unittest.TestCase):
             },
         )
 
-    def execute(self, library_id: str, mode: str):  # type: ignore[no-untyped-def]
+    def execute(self, library_id: str, mode: str) -> LibraryScanRun:
         run = self.service.queue_scan(library_id, mode)
         self.service.execute_run(run.id)
-        return self.repository.get_run(run.id)
+        completed = self.repository.get_run(run.id)
+        assert completed is not None
+        return completed
 
     def test_paths_must_be_absolute_and_inside_the_server_allowlist(self) -> None:
         outside = self.root / "outside"
@@ -354,6 +360,7 @@ class ManagedLibraryTests(unittest.TestCase):
         self.service.execute_run(scheduled[0].id)
 
         completed = self.repository.get_run(scheduled[0].id)
+        assert completed is not None
         final_detail = self.service.library_detail(library.id)
         self.assertEqual(completed.status, "completed")
         self.assertEqual(final_detail["counts"]["files"], 2)
@@ -515,7 +522,9 @@ class ManagedLibraryTests(unittest.TestCase):
         self.execute(library.id, "dry_run")
         self.execute(library.id, "apply")
         self.service.set_active(library.id, True)
-        last_scan_at = self.repository.get_library(library.id).last_scan_at
+        stored_library = self.repository.get_library(library.id)
+        assert stored_library is not None
+        last_scan_at = stored_library.last_scan_at
         self.media.rename(self.root / "detached-media")
 
         failed = self.execute(library.id, "apply")
@@ -536,7 +545,7 @@ class ManagedLibraryTests(unittest.TestCase):
         self.execute(library.id, "dry_run")
         self.execute(library.id, "apply")
 
-        def partial_scan(*args, **kwargs):  # type: ignore[no-untyped-def]
+        def partial_scan(*args, **kwargs):
             rows, _ = scan_media_files(*args, **kwargs)
             return rows[:1], ["Permission denied while reading a subdirectory"]
 
@@ -551,10 +560,13 @@ class ManagedLibraryTests(unittest.TestCase):
         partial_service.execute_run(run.id)
 
         completed = self.repository.get_run(run.id)
+        stored_library = self.repository.get_library(library.id)
+        assert completed is not None
+        assert stored_library is not None
         inventory = self.repository.previous_files(library.id)
         self.assertEqual(completed.status, "partial")
         self.assertTrue(completed.summary["removals_skipped"])
-        self.assertEqual(self.repository.get_library(library.id).status, "warning")
+        self.assertEqual(stored_library.status, "warning")
         self.assertEqual(len(inventory), 2)
         self.assertTrue(all(item.available for item in inventory))
 
@@ -564,7 +576,7 @@ class ManagedLibraryTests(unittest.TestCase):
         self.execute(library.id, "dry_run")
         self.execute(library.id, "apply")
 
-        def denied_scan(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        def denied_scan(*_args, **_kwargs):
             raise PermissionError("Permission denied while opening the library")
 
         denied_service = ManagedLibraryService(
@@ -578,16 +590,19 @@ class ManagedLibraryTests(unittest.TestCase):
         denied_service.execute_run(run.id)
 
         failed = self.repository.get_run(run.id)
+        stored_library = self.repository.get_library(library.id)
+        assert failed is not None
+        assert stored_library is not None
         inventory = self.repository.previous_files(library.id)
         self.assertEqual(failed.status, "failed")
-        self.assertEqual(self.repository.get_library(library.id).status, "error")
+        self.assertEqual(stored_library.status, "error")
         self.assertEqual(len(inventory), 1)
         self.assertTrue(inventory[0].available)
 
     def test_permission_warning_does_not_verify_an_unreadable_library(self) -> None:
         library = self.create_library()
 
-        def warning_scan(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        def warning_scan(*_args, **_kwargs):
             return [], ["Permission denied while traversing the library"]
 
         warning_service = ManagedLibraryService(
@@ -601,6 +616,7 @@ class ManagedLibraryTests(unittest.TestCase):
         warning_service.execute_run(run.id)
 
         completed = self.repository.get_run(run.id)
+        assert completed is not None
         detail = warning_service.library_detail(library.id)
         self.assertEqual(completed.status, "partial")
         self.assertEqual(detail["status"], "warning")
@@ -619,11 +635,14 @@ class ManagedLibraryTests(unittest.TestCase):
         recovered = self.repository.recover_interrupted_runs(self.now + 1)
 
         failed = self.repository.get_run(interrupted.id)
+        stored_library = self.repository.get_library(library.id)
+        assert failed is not None
+        assert stored_library is not None
         inventory = self.repository.previous_files(library.id)
         self.assertEqual(recovered, 1)
         self.assertEqual(failed.status, "failed")
         self.assertIn("Server restarted", failed.errors[0])
-        self.assertEqual(self.repository.get_library(library.id).status, "warning")
+        self.assertEqual(stored_library.status, "warning")
         self.assertEqual(len(inventory), 1)
         self.assertTrue(inventory[0].available)
 
@@ -653,7 +672,7 @@ class ManagedLibraryTests(unittest.TestCase):
         self.now += 3600
         scanned = threading.Event()
 
-        def observed_scan(*args, **kwargs):  # type: ignore[no-untyped-def]
+        def observed_scan(*args, **kwargs):
             result = scan_media_files(*args, **kwargs)
             scanned.set()
             return result
@@ -682,7 +701,9 @@ class ManagedLibraryTests(unittest.TestCase):
         library = self.create_library(schedule="hourly")
         self.execute(library.id, "dry_run")
         run = self.service.queue_scan(library.id, "apply")
-        self.assertEqual(self.repository.get_library(library.id).status, "scanning")
+        stored_library = self.repository.get_library(library.id)
+        assert stored_library is not None
+        self.assertEqual(stored_library.status, "scanning")
 
         with self.assertRaises(LibraryRunBusy):
             self.service.set_active(library.id, True)
@@ -690,7 +711,9 @@ class ManagedLibraryTests(unittest.TestCase):
             self.service.update_library(library.id, {"name": "Otro nombre"})
 
         self.service.execute_run(run.id)
-        self.assertEqual(self.repository.get_library(library.id).status, "ready")
+        stored_library = self.repository.get_library(library.id)
+        assert stored_library is not None
+        self.assertEqual(stored_library.status, "ready")
         updated = self.service.set_active(library.id, True)
         self.assertTrue(updated.active)
 

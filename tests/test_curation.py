@@ -197,6 +197,7 @@ class CurationTests(unittest.TestCase):
 
             loaded = repository.get("heat-a")
             self.assertIsNotNone(loaded)
+            assert loaded is not None
             self.assertEqual(loaded.link_curation_status, "not_required")
             self.assertEqual(loaded.duplicate_decisions["heat-b::catalog.db"]["status"], "deferred")
 

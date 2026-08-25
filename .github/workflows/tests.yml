@@ -29,7 +29,7 @@ jobs:
       - name: ruff format --check
         run: ruff format --check src scripts tests
       - name: mypy (strict gate)
-        run: mypy src/movie_inbox
+        run: mypy src/movie_inbox tests
 
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}

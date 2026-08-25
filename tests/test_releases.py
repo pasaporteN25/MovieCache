@@ -41,7 +41,7 @@ class ReleaseDateTests(unittest.TestCase):
         self.assertEqual(rows[0]["source_url"], "https://example.test")
 
     def test_wikidata_precision_is_not_invented(self) -> None:
-        claims = {
+        claims: dict[str, object] = {
             "P577": [
                 {
                     "rank": "preferred",

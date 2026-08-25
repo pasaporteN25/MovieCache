@@ -50,7 +50,7 @@ _SPANISH_ARTICLE_EXTRACT_WITH_NESTED_SUBSECTION = (
 
 class ExternalMetadataTests(unittest.TestCase):
     def test_wikidata_duration_is_normalized_to_integer_minutes(self) -> None:
-        claims = {
+        claims: dict[str, object] = {
             "P2047": [
                 {
                     "rank": "normal",
@@ -313,7 +313,10 @@ class ExternalMetadataTests(unittest.TestCase):
         matches = fetch_wikidata_title_matches("君の名は。")
 
         self.assertEqual(matches["tt5311514"]["original_title"], "君の名は。")
-        self.assertIn("Kimi no Na wa", matches["tt5311514"]["alternative_titles"])
+        alternative_titles = matches["tt5311514"]["alternative_titles"]
+        self.assertIsInstance(alternative_titles, list)
+        assert isinstance(alternative_titles, list)
+        self.assertIn("Kimi no Na wa", alternative_titles)
 
     @patch("movie_inbox.external.wikipedia.fetch_json")
     def test_wikipedia_keeps_english_result_when_spanish_lookup_fails(self, fetch_json) -> None:
@@ -581,7 +584,7 @@ class ExternalMetadataTests(unittest.TestCase):
         self.assertEqual(_find_synopsis_section(sections, "en"), "")
 
     def test_wikidata_instance_type_detects_series(self) -> None:
-        claims = {
+        claims: dict[str, object] = {
             "P31": [
                 {
                     "mainsnak": {

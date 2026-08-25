@@ -13,7 +13,7 @@ fi
 "$PYTHON" -m pip install -e ".[test,dev]"
 "$PYTHON" -m ruff check src scripts tests
 "$PYTHON" -m ruff format --check src scripts tests
-"$PYTHON" -m mypy src/movie_inbox
+"$PYTHON" -m mypy src/movie_inbox tests
 "$PYTHON" -m compileall -q src scripts tests
 "$PYTHON" -m unittest discover -s tests -v
 git diff --check

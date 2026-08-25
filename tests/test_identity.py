@@ -351,7 +351,9 @@ class IdentityTests(unittest.TestCase):
             archived = members.archive_member(owner, member.user.id, confirmed_username="maria")
             self.assertIsNone(repository.account(member.user.id))
             self.assertTrue(Path(archived.sources[0].path).exists())
-            self.assertEqual(member_repository.get("heat").title, "Heat")
+            archived_item = member_repository.get("heat")
+            assert archived_item is not None
+            self.assertEqual(archived_item.title, "Heat")
 
             restored = members.restore_member(
                 owner,
@@ -360,7 +362,9 @@ class IdentityTests(unittest.TestCase):
             )
             self.assertEqual(restored.member.user.username, "maria")
             self.assertEqual(restored.member.catalog.write_path, member.catalog.write_path)
-            self.assertEqual(member_repository.get("heat").rating, 9)
+            restored_item = member_repository.get("heat")
+            assert restored_item is not None
+            self.assertEqual(restored_item.rating, 9)
             _, restored_identity = auth.login("maria", "a-restored-password")
             self.assertTrue(restored_identity.user.must_change_password)
             self.assertEqual(repository.list_archived_members(), [])

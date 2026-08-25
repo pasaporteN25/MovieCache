@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import socket
 import unittest
+from email.message import Message
 from unittest.mock import patch
 from urllib.error import HTTPError
 
@@ -89,11 +90,13 @@ class HttpSecurityTests(unittest.TestCase):
     def test_redirect_target_is_validated_again(self) -> None:
         class RedirectingOpener:
             def open(self, request, timeout=0):
+                response_headers = Message()
+                response_headers["Location"] = "http://127.0.0.1/private"
                 raise HTTPError(
                     request.full_url,
                     302,
                     "Found",
-                    {"Location": "http://127.0.0.1/private"},
+                    response_headers,
                     None,
                 )
 
@@ -110,11 +113,13 @@ class HttpSecurityTests(unittest.TestCase):
     def test_redirect_cannot_leave_the_image_allowlist(self) -> None:
         class RedirectingOpener:
             def open(self, request, timeout=0):
+                response_headers = Message()
+                response_headers["Location"] = "https://attacker.example/private.jpg"
                 raise HTTPError(
                     request.full_url,
                     302,
                     "Found",
-                    {"Location": "https://attacker.example/private.jpg"},
+                    response_headers,
                     None,
                 )
 

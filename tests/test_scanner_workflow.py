@@ -36,7 +36,9 @@ class ScannerWorkflowTests(unittest.TestCase):
                 {"id": "heat-1970", "title": "Heat", "year": "1970", "kind": "pelicula"}
             ).to_dict()
         ]
-        JsonCatalogRepository(self.catalog, normalize_item).write(self.catalog_items)
+        JsonCatalogRepository(self.catalog, normalize_item).write(
+            [normalize_item(item) for item in self.catalog_items]
+        )
         self.instance = self.root / "instance.db"
         self.identity = SqliteIdentityRepository(self.instance)
         self.owner, _ = AuthService(self.identity).bootstrap_owner(
@@ -229,6 +231,7 @@ class ScannerWorkflowTests(unittest.TestCase):
         # The enrichment must survive: undo refused rather than clobbering it.
         surviving = catalog_repository.get(catalog_item_id)
         self.assertIsNotNone(surviving)
+        assert surviving is not None
         self.assertEqual(surviving.description, "Enriched")
 
     def test_create_of_a_genuinely_new_work_can_be_undone(self) -> None:

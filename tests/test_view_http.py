@@ -491,6 +491,7 @@ class ViewerHttpTests(unittest.TestCase):
         identity_repository = SqliteIdentityRepository(self.instance_path)
         member_catalog = identity_repository.default_catalog_for(member_payload["id"])
         self.assertIsNotNone(member_catalog)
+        assert member_catalog is not None
         member_repository = open_catalog_repository(Path(member_catalog.write_path), normalize_item)
         member_repository.write(
             [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "status": "to_watch"})]
@@ -582,6 +583,8 @@ class ViewerHttpTests(unittest.TestCase):
 
         owner_item = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
         member_item = member_repository.get("heat")
+        assert owner_item is not None
+        assert member_item is not None
         self.assertEqual(owner_item.status, "to_watch")
         self.assertEqual(member_item.status, "watched")
 
@@ -628,6 +631,7 @@ class ViewerHttpTests(unittest.TestCase):
         identity_repository = SqliteIdentityRepository(self.instance_path)
         original_catalog = identity_repository.default_catalog_for(member_id)
         self.assertIsNotNone(original_catalog)
+        assert original_catalog is not None
         original_catalog_path = Path(original_catalog.write_path)
 
         updated = self.client.post(
@@ -706,6 +710,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertGreaterEqual(len(restored.json()["temporary_password"]), 12)
         restored_catalog = identity_repository.default_catalog_for(restored.json()["member"]["id"])
         self.assertIsNotNone(restored_catalog)
+        assert restored_catalog is not None
         self.assertEqual(Path(restored_catalog.write_path), original_catalog_path)
         self.assertFalse(
             identity_repository.privacy_for(restored.json()["member"]["id"]).catalog_shared
@@ -884,6 +889,7 @@ class ViewerHttpTests(unittest.TestCase):
 
         item = JsonCatalogRepository(self.catalog_path, normalize_item).get(rashomon["id"])
         self.assertIsNotNone(item)
+        assert item is not None
         self.assertEqual(item.status, "to_watch")
         self.assertEqual(item.rating, 0)
         self.assertEqual(item.review, "")
@@ -1324,6 +1330,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(payload["counts"]["missing_link"], 0)
         self.assertEqual(payload["counts"]["deferred"], 1)
         item = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
+        assert item is not None
         self.assertEqual(item.link_curation_status, "deferred")
 
     def test_items_response_exposes_external_link_counts(self) -> None:
@@ -1444,7 +1451,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200, raw_payload)
         merged_payload = json.loads(raw_payload)
         self.assertEqual([item.id for item in repository.read()], ["heat-a"])
-        self.assertEqual(repository.get("heat-a").spanish_title, "Fuego contra fuego")
+        merged = repository.get("heat-a")
+        assert merged is not None
+        self.assertEqual(merged.spanish_title, "Fuego contra fuego")
 
         status, raw_payload = self.request(
             "GET",
@@ -1623,7 +1632,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200, raw_payload)
         merged_payload = json.loads(raw_payload)
         self.assertTrue(merged_payload["item"]["_availability"]["effective"])
-        self.assertTrue(repository.get("heat-scanned").en_catalogo)
+        merged = repository.get("heat-scanned")
+        assert merged is not None
+        self.assertTrue(merged.en_catalogo)
 
     @patch("movie_inbox.web.catalog_api.external_metadata_by_title")
     def test_background_enrichment_updates_the_existing_item(self, title_lookup) -> None:
@@ -2380,6 +2391,7 @@ class ViewerHttpTests(unittest.TestCase):
         identity_repository = SqliteIdentityRepository(self.instance_path)
         member_catalog = identity_repository.default_catalog_for(member_id)
         self.assertIsNotNone(member_catalog)
+        assert member_catalog is not None
         open_catalog_repository(Path(member_catalog.write_path), normalize_item).write(
             [
                 normalize_item(
@@ -2443,6 +2455,7 @@ class ViewerHttpTests(unittest.TestCase):
         identity_repository.update_privacy(member_id, PrivacyPreferences(catalog_shared=True))
         member_catalog = identity_repository.default_catalog_for(member_id)
         self.assertIsNotNone(member_catalog)
+        assert member_catalog is not None
         open_catalog_repository(Path(member_catalog.write_path), normalize_item).write(
             [
                 normalize_item(

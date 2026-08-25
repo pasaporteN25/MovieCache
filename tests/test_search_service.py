@@ -8,7 +8,7 @@ from movie_inbox.domain.search_strategy import SearchStrategy
 
 class CatalogSearchServiceTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.items = [
+        self.items: list[dict[str, object]] = [
             {
                 "id": "beautiful-person",
                 "title": "The Beautiful Person",
@@ -107,7 +107,7 @@ class SearchRankingPrecisionTests(unittest.TestCase):
     docs/search-quality.md problems #1 (short tokens) and #2 (secondary metadata)."""
 
     def test_short_title_does_not_match_as_a_substring_of_a_longer_title(self) -> None:
-        items = [
+        items: list[dict[str, object]] = [
             {"id": "up-2009", "title": "Up", "year": "2009"},
             {"id": "setup-2011", "title": "Setup", "year": "2011"},
         ]
@@ -131,7 +131,7 @@ class SearchRankingPrecisionTests(unittest.TestCase):
         self.assertEqual([row["id"] for row in results], ["heat-1995"])
 
     def test_cast_and_description_do_not_count_as_title_search_evidence(self) -> None:
-        items = [
+        items: list[dict[str, object]] = [
             {"id": "heat-1995", "title": "Heat", "year": "1995"},
             {
                 "id": "different-film",

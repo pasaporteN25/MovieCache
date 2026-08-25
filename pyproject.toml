@@ -58,3 +58,16 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.11"
 ignore_missing_imports = true
 strict = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+# Test doubles intentionally mirror dynamic third-party callbacks. Their bodies
+# are still checked; only annotations and calls between those helpers are optional.
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = "tests.browser.*"
+# unittest class fixtures install Playwright resources during setUpClass.
+disable_error_code = ["attr-defined"]

@@ -156,7 +156,9 @@ class MatchExternalLinksTests(unittest.TestCase):
     @patch("movie_inbox.cli.match_external_links.enrich_external_result", side_effect=lambda r: r)
     @patch("movie_inbox.cli.match_external_links.search_external_sources")
     def test_unmatched_and_needs_review_are_reported_distinctly(self, search, _enrich) -> None:
-        def fake_search(query: str, source: str) -> tuple[list[dict[str, object]], dict]:
+        def fake_search(
+            query: str, source: str
+        ) -> tuple[list[dict[str, object]], dict[str, object]]:
             if "Heat" in query:
                 return (
                     [
