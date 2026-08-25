@@ -37,7 +37,20 @@ def fetch_text(
     )
     with urlopen(request, timeout=timeout) as response:
         charset = response.headers.get_content_charset() or "utf-8"
-        return response.read(800_000).decode(charset, errors="replace")
+        text: str = response.read(800_000).decode(charset, errors="replace")
+        return text
+
+
+def object_dict(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def object_list(value: Any) -> list[Any]:
+    return list(value) if isinstance(value, list) else []
+
+
+def string_list(value: Any) -> list[str]:
+    return [str(row) for row in object_list(value)]
 
 
 def dedupe_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:

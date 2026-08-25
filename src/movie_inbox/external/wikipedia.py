@@ -22,6 +22,8 @@ from movie_inbox.external.common import (
     fetch_json,
     fetch_json_safe,
     interleave_batches,
+    object_dict,
+    object_list,
     result_index,
 )
 from movie_inbox.external.wikidata import (
@@ -119,10 +121,8 @@ def wikipedia_results_from_query(
     raw: dict[str, Any],
     language: str,
 ) -> list[dict[str, Any]]:
-    query_data = raw.get("query") if isinstance(raw.get("query"), dict) else {}
-    rows = query_data.get("pages") if isinstance(query_data, dict) else []
-    if not isinstance(rows, list):
-        return []
+    query_data = object_dict(raw.get("query"))
+    rows = object_list(query_data.get("pages"))
     rows.sort(key=result_index)
     results: list[dict[str, Any]] = []
     for row in rows:
@@ -132,8 +132,8 @@ def wikipedia_results_from_query(
         if not title:
             continue
         extract = str(row.get("extract") or "")
-        thumbnail = row.get("thumbnail") if isinstance(row.get("thumbnail"), dict) else {}
-        pageprops = row.get("pageprops") if isinstance(row.get("pageprops"), dict) else {}
+        thumbnail = object_dict(row.get("thumbnail"))
+        pageprops = object_dict(row.get("pageprops"))
         kind = infer_kind_from_text(title, extract)
         if "disambiguation" in pageprops or not kind:
             continue
@@ -250,13 +250,17 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
         f"&titles={quote(page_title.replace('_', ' '))}"
     )
     raw = fetch_json_safe(api_url, timeout=5)
-    query = raw.get("query") if isinstance(raw.get("query"), dict) else {}
-    pages = query.get("pages") if isinstance(query, dict) else {}
-    if not isinstance(pages, dict):
-        return {}
-    page = next(
-        (value for value in pages.values() if isinstance(value, dict) and "missing" not in value),
-        {},
+    query = object_dict(raw.get("query"))
+    pages = object_dict(query.get("pages"))
+    page = object_dict(
+        next(
+            (
+                value
+                for value in pages.values()
+                if isinstance(value, dict) and "missing" not in value
+            ),
+            {},
+        )
     )
     if not page:
         return {}
@@ -266,8 +270,8 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
     intro, sections = _split_wikipedia_sections(str(page.get("extract") or ""))
     intro = clean_whitespace(intro)
     synopsis = _find_synopsis_section(sections, language) or intro
-    thumbnail = page.get("thumbnail") if isinstance(page.get("thumbnail"), dict) else {}
-    pageprops = page.get("pageprops") if isinstance(page.get("pageprops"), dict) else {}
+    thumbnail = object_dict(page.get("thumbnail"))
+    pageprops = object_dict(page.get("pageprops"))
     wikidata_id = str(pageprops.get("wikibase_item") or "")
     canonical_url = str(
         page.get("canonicalurl")
@@ -383,7 +387,7 @@ def fetch_wikipedia_by_wikidata_title(title: str, year: str = "") -> dict[str, A
             f"?action=wbsearchentities&format=json&language={language}&limit=5&search={quote(title)}"
         )
         raw = fetch_json_safe(search_url, timeout=5)
-        results = raw.get("search") if isinstance(raw.get("search"), list) else []
+        results = object_list(raw.get("search"))
         for result in results:
             if not isinstance(result, dict):
                 continue

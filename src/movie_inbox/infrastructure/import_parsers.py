@@ -237,15 +237,17 @@ def _parse_json(content: str) -> list[ParsedImportItem]:
         raise ImportParseError(f"JSON import exceeds the depth limit of {MAX_IMPORT_JSON_DEPTH}")
 
     version: int | None = None
+    rows: list[Any]
     if isinstance(raw, list):
-        rows = raw
+        rows = list(raw)
     elif isinstance(raw, Mapping):
         extra = set(raw) - {"schema_version", "items"}
         if extra:
             raise ImportParseError("JSON catalog contains unsupported root fields")
-        rows = raw.get("items")
-        if not isinstance(rows, list):
+        raw_rows = raw.get("items")
+        if not isinstance(raw_rows, list):
             raise ImportParseError("JSON catalog must contain an items array")
+        rows = list(raw_rows)
         if "schema_version" in raw:
             version = raw.get("schema_version")
             if (

@@ -13,7 +13,13 @@ from movie_inbox.domain.search import (
     parse_search_query,
     search_key,
 )
-from movie_inbox.external.common import fetch_json, fetch_json_safe
+from movie_inbox.external.common import (
+    fetch_json,
+    fetch_json_safe,
+    object_dict,
+    object_list,
+    string_list,
+)
 from movie_inbox.external.wikidata import fetch_wikidata_title_matches
 
 
@@ -30,7 +36,7 @@ class ImdbAdapter:
         if not key:
             return []
         raw = fetch_json(f"https://v3.sg.media-imdb.com/suggestion/x/{quote(key)}.json")
-        rows = raw.get("d") if isinstance(raw.get("d"), list) else []
+        rows = object_list(raw.get("d"))
         results: list[dict[str, Any]] = []
         for row in rows[:8]:
             if not isinstance(row, dict) or row.get("qid") not in {
@@ -44,7 +50,7 @@ class ImdbAdapter:
             title = str(row.get("l") or "")
             if not imdb_id or not title:
                 continue
-            image = row.get("i") if isinstance(row.get("i"), dict) else {}
+            image = object_dict(row.get("i"))
             results.append(
                 {
                     "source": self.name,
@@ -80,12 +86,8 @@ class ImdbAdapter:
                     if metadata.get(field):
                         result[field] = str(metadata[field])
                 result["alternative_titles"] = merge_lists(
-                    result.get("alternative_titles")
-                    if isinstance(result.get("alternative_titles"), list)
-                    else [],
-                    metadata.get("alternative_titles")
-                    if isinstance(metadata.get("alternative_titles"), list)
-                    else [],
+                    string_list(result.get("alternative_titles")),
+                    string_list(metadata.get("alternative_titles")),
                 )
         return results
 
@@ -106,11 +108,11 @@ def fetch_wikipedia_by_imdb_id(imdb_id: str) -> dict[str, Any]:
     raw = fetch_json_safe(
         "https://query.wikidata.org/sparql?format=json&query=" + quote(query), timeout=5
     )
-    results = raw.get("results") if isinstance(raw.get("results"), dict) else {}
-    bindings = results.get("bindings") if isinstance(results, dict) else []
-    if not isinstance(bindings, list) or not bindings:
+    results = object_dict(raw.get("results"))
+    bindings = object_list(results.get("bindings"))
+    if not bindings:
         return {}
-    binding = bindings[0]
-    article = binding.get("article") if isinstance(binding, dict) else {}
-    article_url = article.get("value") if isinstance(article, dict) else ""
+    binding = object_dict(bindings[0])
+    article = object_dict(binding.get("article"))
+    article_url = article.get("value")
     return fetch_wikipedia_metadata(str(article_url)) if article_url else {}

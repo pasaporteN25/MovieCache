@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from movie_inbox.domain.catalog import merge_lists
 from movie_inbox.domain.releases import normalize_release_dates
-from movie_inbox.external.common import fetch_json_safe
+from movie_inbox.external.common import fetch_json_safe, object_dict, string_list
 
 WIKIDATA_LIST_FIELDS = {
     "countries": ("P495", 8),
@@ -74,18 +74,18 @@ def fetch_wikidata_title_matches(query: str) -> dict[str, dict[str, object]]:
         + quote("|".join(entity_ids), safe="|"),
         timeout=5,
     )
-    entities = entity_raw.get("entities") if isinstance(entity_raw.get("entities"), dict) else {}
+    entities = object_dict(entity_raw.get("entities"))
     matches: dict[str, dict[str, object]] = {}
     for entity_id, search_row in matched_rows.items():
-        entity = entities.get(entity_id) if isinstance(entities, dict) else {}
-        if not isinstance(entity, dict):
+        entity = object_dict(entities.get(entity_id))
+        if not entity:
             continue
-        claims = entity.get("claims") if isinstance(entity.get("claims"), dict) else {}
+        claims = object_dict(entity.get("claims"))
         imdb_id = wikidata_claim_string(claims, "P345")
         if not re.fullmatch(r"tt\d{7,9}", imdb_id, flags=re.IGNORECASE):
             continue
         metadata = wikidata_title_metadata(entity)
-        match = search_row.get("match") if isinstance(search_row.get("match"), dict) else {}
+        match = object_dict(search_row.get("match"))
         search_aliases = search_row.get("aliases")
         candidate_aliases = [
             str(search_row.get("label") or ""),
@@ -104,9 +104,7 @@ def fetch_wikidata_title_matches(query: str) -> dict[str, dict[str, object]]:
         aliases = [
             value
             for value in merge_lists(
-                metadata.get("alternative_titles")
-                if isinstance(metadata.get("alternative_titles"), list)
-                else [],
+                string_list(metadata.get("alternative_titles")),
                 candidate_aliases,
             )
             if value.casefold() not in primary_keys
@@ -123,11 +121,11 @@ def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
     raw = fetch_json_safe(
         f"https://www.wikidata.org/wiki/Special:EntityData/{quote(entity_id)}.json", timeout=5
     )
-    entities = raw.get("entities") if isinstance(raw.get("entities"), dict) else {}
-    entity = entities.get(entity_id) if isinstance(entities, dict) else {}
-    if not isinstance(entity, dict):
+    entities = object_dict(raw.get("entities"))
+    entity = object_dict(entities.get(entity_id))
+    if not entity:
         return {}
-    claims = entity.get("claims") if isinstance(entity.get("claims"), dict) else {}
+    claims = object_dict(entity.get("claims"))
     ids_by_field: dict[str, list[str]] = {}
     all_ids: list[str] = []
     for field, (prop, limit) in WIKIDATA_LIST_FIELDS.items():
@@ -170,9 +168,9 @@ def wikidata_kind(claims: dict[str, object]) -> str:
 
 
 def wikidata_title_metadata(entity: dict[str, object]) -> dict[str, object]:
-    labels = entity.get("labels") if isinstance(entity.get("labels"), dict) else {}
-    aliases = entity.get("aliases") if isinstance(entity.get("aliases"), dict) else {}
-    claims = entity.get("claims") if isinstance(entity.get("claims"), dict) else {}
+    labels = object_dict(entity.get("labels"))
+    aliases = object_dict(entity.get("aliases"))
+    claims = object_dict(entity.get("claims"))
     original_title = wikidata_claim_monolingual_text(claims, "P1476")
     spanish_title = wikidata_label_value(labels, "es")
     english_title = wikidata_label_value(labels, "en")
@@ -361,13 +359,11 @@ def fetch_wikidata_labels(entity_ids: list[str]) -> dict[str, str]:
             f"&props=labels&languages=es|en&ids={quote('|'.join(chunk), safe='|')}",
             timeout=5,
         )
-        entities = raw.get("entities") if isinstance(raw.get("entities"), dict) else {}
+        entities = object_dict(raw.get("entities"))
         for item_id, entity in entities.items():
             if not isinstance(entity, dict):
                 continue
-            label = wikidata_label(
-                entity.get("labels") if isinstance(entity.get("labels"), dict) else {}
-            )
+            label = wikidata_label(object_dict(entity.get("labels")))
             if label:
                 labels[str(item_id)] = label
     return labels
@@ -387,25 +383,23 @@ def fetch_wikidata_article_url(entity_id: str) -> str:
     raw = fetch_json_safe(
         f"https://www.wikidata.org/wiki/Special:EntityData/{quote(entity_id)}.json", timeout=5
     )
-    entities = raw.get("entities") if isinstance(raw.get("entities"), dict) else {}
-    entity = entities.get(entity_id) if isinstance(entities, dict) else {}
-    if not isinstance(entity, dict):
+    entities = object_dict(raw.get("entities"))
+    entity = object_dict(entities.get(entity_id))
+    if not entity:
         return ""
-    claims = entity.get("claims") if isinstance(entity.get("claims"), dict) else {}
+    claims = object_dict(entity.get("claims"))
     if not wikidata_claims_include(claims, "P31", {"Q11424", "Q5398426", "Q24862", "Q506240"}):
-        description_rows = (
-            entity.get("descriptions") if isinstance(entity.get("descriptions"), dict) else {}
-        )
+        description_rows = object_dict(entity.get("descriptions"))
         descriptions = " ".join(
-            str(value.get("value") or "")
+            str(object_dict(value).get("value") or "")
             for value in description_rows.values()
             if isinstance(value, dict)
         ).casefold()
         if not any(marker in descriptions for marker in ["film", "movie", "pelicula"]):
             return ""
-    sitelinks = entity.get("sitelinks") if isinstance(entity.get("sitelinks"), dict) else {}
+    sitelinks = object_dict(entity.get("sitelinks"))
     for key in ["enwiki", "eswiki"]:
-        link = sitelinks.get(key) if isinstance(sitelinks, dict) else {}
+        link = object_dict(sitelinks.get(key))
         if isinstance(link, dict) and link.get("url"):
             return str(link["url"])
     return ""

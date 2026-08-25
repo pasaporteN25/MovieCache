@@ -15,7 +15,9 @@ fi
 "$PYTHON" -m ruff format --check src scripts tests
 "$PYTHON" -m mypy \
   src/movie_inbox/domain \
-  src/movie_inbox/application
+  src/movie_inbox/application \
+  src/movie_inbox/infrastructure \
+  src/movie_inbox/external
 "$PYTHON" -m compileall -q src scripts tests
 "$PYTHON" -m unittest discover -s tests -v
 git diff --check

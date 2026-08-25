@@ -20,6 +20,8 @@ try {
     $mypyTargets = @(
         "src/movie_inbox/domain"
         "src/movie_inbox/application"
+        "src/movie_inbox/infrastructure"
+        "src/movie_inbox/external"
     )
     & $python.Source -m mypy @mypyTargets
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

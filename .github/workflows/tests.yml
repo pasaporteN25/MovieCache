@@ -32,7 +32,9 @@ jobs:
         run: |
           mypy \
             src/movie_inbox/domain \
-            src/movie_inbox/application
+            src/movie_inbox/application \
+            src/movie_inbox/infrastructure \
+            src/movie_inbox/external
 
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}

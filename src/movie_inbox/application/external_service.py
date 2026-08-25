@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol, cast
 
 from movie_inbox.domain.catalog import (
@@ -19,7 +19,7 @@ from movie_inbox.domain.titles import looks_like_external_id
 class ExternalSourceGateway(Protocol):
     def search(
         self, query: str, source: str = "all"
-    ) -> tuple[list[ExternalSearchResult], dict[str, Any]]: ...
+    ) -> tuple[Sequence[Mapping[str, Any]], dict[str, Any]]: ...
 
     def selected_metadata(
         self,
@@ -43,7 +43,7 @@ class ExternalCatalogService:
         self, query: str, source: str = "all"
     ) -> tuple[list[ExternalSearchResult], dict[str, Any]]:
         results, state = self.gateway.search(query, source)
-        return results, state
+        return [cast(ExternalSearchResult, dict(result)) for result in results], state
 
     def enrich(self, result: Mapping[str, Any]) -> ExternalSearchResult:
         enriched: dict[str, Any] = dict(result)

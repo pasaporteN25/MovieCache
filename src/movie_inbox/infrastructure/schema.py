@@ -7,7 +7,7 @@ import json
 import os
 import shutil
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -155,7 +155,7 @@ class UnsupportedCatalogVersion(CatalogSchemaError):
     """Raised when a catalog is newer than this application can safely read."""
 
 
-def catalog_document(items: list[Mapping[str, Any]]) -> dict[str, Any]:
+def catalog_document(items: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     clean_items = [
         {key: plain_value(value) for key, value in item.items() if not str(key).startswith("_")}
         for item in items

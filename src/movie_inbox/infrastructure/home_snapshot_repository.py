@@ -98,7 +98,8 @@ def _encode_entries(entries: Sequence[Mapping[str, Any]]) -> str:
         item_id = str(entry.get("item_id") or "").strip()
         if not item_id:
             continue
-        reason = entry.get("reason") if isinstance(entry.get("reason"), Mapping) else {}
+        raw_reason = entry.get("reason")
+        reason = raw_reason if isinstance(raw_reason, Mapping) else {}
         clean.append(
             {
                 "item_id": item_id,

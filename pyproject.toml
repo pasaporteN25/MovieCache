@@ -65,3 +65,7 @@ strict = true
 [[tool.mypy.overrides]]
 module = "movie_inbox.application.*"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["movie_inbox.infrastructure.*", "movie_inbox.external.*"]
+strict = true

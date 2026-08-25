@@ -15,6 +15,7 @@ from movie_inbox.application.curation_history import (
 )
 
 HISTORY_DOCUMENT_VERSION = 1
+HistoryRows = list[dict[str, Any]]
 
 
 class JsonCurationHistoryRepository:
@@ -23,7 +24,7 @@ class JsonCurationHistoryRepository:
         self.limit = max(1, int(limit))
         self._lock = threading.RLock()
 
-    def list(self, namespace: str = "") -> list[dict[str, Any]]:
+    def list(self, namespace: str = "") -> HistoryRows:
         del namespace
         with self._lock:
             return self._read()
@@ -31,7 +32,7 @@ class JsonCurationHistoryRepository:
     def append(self, operation: dict[str, Any], namespace: str = "") -> None:
         del namespace
         with self._lock:
-            operations = [
+            operations: HistoryRows = [
                 dict(operation),
                 *(row for row in self._read() if row.get("id") != operation.get("id")),
             ][: self.limit]
@@ -60,7 +61,7 @@ class JsonCurationHistoryRepository:
                 raise CurationHistoryError(f"Cannot clear curation history: {self.path}") from error
             return count
 
-    def _read(self) -> list[dict[str, Any]]:
+    def _read(self) -> HistoryRows:
         if not self.path.exists():
             return []
         try:
@@ -74,7 +75,7 @@ class JsonCurationHistoryRepository:
             raise CurationHistoryError(f"Invalid curation history document: {self.path}")
         return [dict(row) for row in operations[: self.limit]]
 
-    def _write(self, operations: list[dict[str, Any]]) -> None:
+    def _write(self, operations: HistoryRows) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         document = {
             "version": HISTORY_DOCUMENT_VERSION,
@@ -108,10 +109,10 @@ class JsonCurationHistoryRepository:
 class MemoryCurationHistoryRepository:
     def __init__(self, limit: int = HISTORY_LIMIT) -> None:
         self.limit = max(1, int(limit))
-        self._operations: dict[str, list[dict[str, Any]]] = {}
+        self._operations: dict[str, HistoryRows] = {}
         self._lock = threading.RLock()
 
-    def list(self, namespace: str = "") -> list[dict[str, Any]]:
+    def list(self, namespace: str = "") -> HistoryRows:
         with self._lock:
             return [dict(row) for row in self._operations.get(namespace, [])]
 
