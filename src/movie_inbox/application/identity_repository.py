@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 from movie_inbox.domain.identity import (
@@ -42,7 +43,7 @@ class IdentityMemberActive(IdentityRepositoryError):
 
 
 class IdentityRepository(Protocol):
-    path: object
+    path: Path
 
     def initialize(self) -> None: ...
 

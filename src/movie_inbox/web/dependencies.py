@@ -6,13 +6,13 @@ import secrets
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Depends, Request, Response
 
 from movie_inbox.application.collection_repository import CollectionRepositoryError
 from movie_inbox.application.curation_workflow import CatalogPointer
-from movie_inbox.application.home_service import home_image_items
+from movie_inbox.application.home_service import EditorialHomeService, home_image_items
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.home_snapshot_repository import HomeSnapshotRepositoryError
@@ -222,7 +222,7 @@ def editorial_home_payload(
     *,
     saved_featured: bool = False,
 ) -> dict[str, Any]:
-    home_service = request.app.state.home_service
+    home_service = cast(EditorialHomeService, request.app.state.home_service)
     home_snapshot_repository = request.app.state.home_snapshot_repository
     image_warmer = request.app.state.image_warmer
     collection_service = request.app.state.collection_service
@@ -270,7 +270,7 @@ def editorial_home_payload(
 
 
 def requested_home_date(request: Request, value: str) -> str:
-    home_service = request.app.state.home_service
+    home_service = cast(EditorialHomeService, request.app.state.home_service)
     requested = str(value or "").strip() or datetime.now(UTC).date().isoformat()
     return home_service.validate_date(requested)
 

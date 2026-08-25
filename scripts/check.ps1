@@ -17,13 +17,7 @@ try {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $python.Source -m ruff format --check src scripts tests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    $mypyTargets = @(
-        "src/movie_inbox/domain"
-        "src/movie_inbox/application"
-        "src/movie_inbox/infrastructure"
-        "src/movie_inbox/external"
-    )
-    & $python.Source -m mypy @mypyTargets
+    & $python.Source -m mypy src/movie_inbox
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & $python.Source -m compileall -q src scripts tests
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

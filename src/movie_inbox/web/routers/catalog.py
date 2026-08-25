@@ -199,7 +199,8 @@ def add(
 ) -> JSONResponse:
     try:
         catalog = session_catalog(request)
-        result = body.get("result") if isinstance(body.get("result"), dict) else body
+        selected_result = body.get("result")
+        result = selected_result if isinstance(selected_result, dict) else body
         result = enrich_selected_result(result)
         item = item_from_search_result(result)
         write_path = write_path_for(
@@ -332,13 +333,15 @@ def personal(request: Request, body: dict[str, Any] = Depends(authorized_json)) 
 def metadata(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
     try:
         catalog = session_catalog(request)
+        raw_values = body.get("values")
+        values = raw_values if isinstance(raw_values, dict) else {}
         updated, reason = update_item_metadata(
             write_path_for(
                 catalog.config,
                 catalog.source_path(str(body.get("source_file") or "")),
             ),
             item_id=str(body.get("id") or ""),
-            values=body.get("values") if isinstance(body.get("values"), dict) else {},
+            values=values,
             locked_fields=body.get("locked_fields"),
         )
         return operation_response(updated, reason)

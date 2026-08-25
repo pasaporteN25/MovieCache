@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from movie_inbox.application.collection_repository import CollectionRepositoryError
+from movie_inbox.application.import_repository import ImportRepositoryError
 from movie_inbox.application.import_service import (
     ImportDraftBusy,
     ImportDraftExpired,
@@ -18,7 +19,6 @@ from movie_inbox.application.import_service import (
 )
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.infrastructure.import_parsers import ImportParseError
-from movie_inbox.infrastructure.import_repository import ImportRepositoryError
 from movie_inbox.web.catalog_api import catalog_service, load_items
 from movie_inbox.web.dependencies import (
     SessionCatalog,

@@ -24,9 +24,6 @@ from movie_inbox.domain.catalog import (
     merge_lists,
     normalize_date,
     normalize_item,
-    normalize_kind,
-    normalize_rating,
-    normalize_status,
     source_url_field,
     stable_id,
     title_match_key,
@@ -35,8 +32,20 @@ from movie_inbox.domain.catalog import (
     normalize_tags as normalize_list,
 )
 from movie_inbox.domain.deduplication import deduplicate_items, merge_catalogs
-from movie_inbox.domain.metadata import normalize_optional_positive_int
-from movie_inbox.domain.models import CatalogItem, MetadataSource
+from movie_inbox.domain.metadata import (
+    METADATA_FIELDS,
+    normalize_local_files,
+    normalize_locked_fields,
+    normalize_metadata_sources,
+    normalize_optional_positive_int,
+)
+from movie_inbox.domain.models import CatalogItem, LocalFile, MetadataSource
+from movie_inbox.domain.normalization import (
+    normalize_bool,
+    normalize_kind,
+    normalize_rating,
+    normalize_status,
+)
 from movie_inbox.domain.titles import (
     clean_release_title,
     clean_whitespace,
@@ -52,14 +61,9 @@ from movie_inbox.external.metadata import (
 from movie_inbox.infrastructure.export import write_catalog_csv as write_csv
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.infrastructure.schema import (
-    METADATA_FIELDS,
     atomic_write_json,
     catalog_document,
     extract_catalog_items,
-    normalize_bool,
-    normalize_local_files,
-    normalize_locked_fields,
-    normalize_metadata_sources,
 )
 from movie_inbox.infrastructure.schema import (
     backup_json_file as create_json_backup,
@@ -288,14 +292,17 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
             page_image=str(row.get("page_image") or ""),
             wikipedia_extract=str(row.get("wikipedia_extract") or ""),
             en_catalogo=normalize_bool(row.get("en_catalogo"), default=False),
-            local_files=local_files,
+            local_files=[LocalFile.from_mapping(local_file) for local_file in local_files],
             local_name=local_name,
             local_path=local_path,
             tags=tags,
             notes=str(row.get("notes") or ""),
             review=str(row.get("review") or ""),
             added_at=added_at,
-            metadata_sources=normalize_metadata_sources(row.get("metadata_sources")),
+            metadata_sources={
+                field: MetadataSource.from_mapping(source)
+                for field, source in normalize_metadata_sources(row.get("metadata_sources")).items()
+            },
             locked_fields=normalize_locked_fields(row.get("locked_fields")),
         )
     )
@@ -477,6 +484,7 @@ def apply_fetched_metadata(
     if field_name in set(item.locked_fields):
         return
     before = getattr(item, field_name)
+    after: object
     if merge_values:
         after = merge_lists(before, normalize_list(incoming))
     else:

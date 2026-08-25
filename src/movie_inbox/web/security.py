@@ -9,12 +9,13 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable, Collection
+from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 MAX_REDIRECTS = 3
-Resolver = Callable[..., list[tuple[object, ...]]]
+Resolver = Callable[..., Collection[tuple[Any, ...]]]
 
 
 class UnsafeRemoteUrl(ValueError):
@@ -192,7 +193,7 @@ def open_public_url(
     timeout: float,
     resolver: Resolver = socket.getaddrinfo,
     allowed_hosts: Collection[str] | None = None,
-):
+) -> Any:
     opener = build_opener(NoRedirectHandler())
     current_url = validate_public_http_url(url, resolver, allowed_hosts)
     for redirect_count in range(MAX_REDIRECTS + 1):

@@ -14,6 +14,7 @@ import argparse
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 from movie_inbox.domain.catalog import (
     external_source_name,
@@ -67,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
 
     items = open_catalog_repository(args.catalog, normalize_item).read()
 
-    report = {
+    report: dict[str, Any] = {
         "input_items": len(items),
         "titles_cleaned": 0,
         "status_normalized": 0,

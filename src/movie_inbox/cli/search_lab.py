@@ -227,12 +227,12 @@ def render_html_report(report: Mapping[str, Any]) -> str:
         summary = _inspection_summary_html(report)
         cases = _results_table(report.get("results") or [])
     elif report_type == "search_comparison":
-        corpus = report.get("corpus") if isinstance(report.get("corpus"), Mapping) else {}
+        corpus = _mapping(report.get("corpus"))
         title = f"Search Lab: {corpus.get('name') or 'corpus'} comparación"
         summary = _comparison_summary_html(report)
         cases = _comparison_tables_html(report)
     else:
-        corpus = report.get("corpus") if isinstance(report.get("corpus"), Mapping) else {}
+        corpus = _mapping(report.get("corpus"))
         title = f"Search Lab: {corpus.get('name') or 'corpus'}"
         summary = _corpus_summary_html(report)
         cases = "".join(_case_html(case) for case in report.get("cases") or [])
@@ -295,8 +295,8 @@ def render_html_report(report: Mapping[str, Any]) -> str:
 
 
 def _corpus_summary_html(report: Mapping[str, Any]) -> str:
-    metrics = report.get("metrics") if isinstance(report.get("metrics"), Mapping) else {}
-    gate = report.get("gate") if isinstance(report.get("gate"), Mapping) else {}
+    metrics = _mapping(report.get("metrics"))
+    gate = _mapping(report.get("gate"))
     values = (
         ("Casos estrictos", f"{metrics.get('passed_cases', 0)}/{metrics.get('case_count', 0)}"),
         ("Precision@5", _number(metrics.get("precision_at_5"))),
@@ -338,12 +338,13 @@ _COMPARISON_LOWER_IS_BETTER = {
 
 
 def _comparison_summary_html(report: Mapping[str, Any]) -> str:
-    baseline = report.get("baseline") if isinstance(report.get("baseline"), Mapping) else {}
-    candidate = report.get("candidate") if isinstance(report.get("candidate"), Mapping) else {}
+    baseline = _mapping(report.get("baseline"))
+    candidate = _mapping(report.get("candidate"))
+    corpus = _mapping(report.get("corpus"))
     values = (
         ("Baseline", baseline.get("algorithm", "")),
         ("Candidato", candidate.get("algorithm", "")),
-        ("Casos", report.get("corpus", {}).get("case_count", 0)),
+        ("Casos", corpus.get("case_count", 0)),
         ("Duración", f"{report.get('duration_ms', 0)} ms"),
     )
     cards = "".join(
@@ -354,20 +355,22 @@ def _comparison_summary_html(report: Mapping[str, Any]) -> str:
 
 
 def _comparison_tables_html(report: Mapping[str, Any]) -> str:
-    baseline_metrics = (report.get("baseline") or {}).get("metrics") or {}
-    candidate_metrics = (report.get("candidate") or {}).get("metrics") or {}
-    deltas = report.get("deltas") if isinstance(report.get("deltas"), Mapping) else {}
-    sections = [("General", baseline_metrics, candidate_metrics, deltas)]
-    baseline_contexts = baseline_metrics.get("by_context") or {}
-    candidate_contexts = candidate_metrics.get("by_context") or {}
-    context_deltas = deltas.get("by_context") or {}
+    baseline_metrics = _mapping(_mapping(report.get("baseline")).get("metrics"))
+    candidate_metrics = _mapping(_mapping(report.get("candidate")).get("metrics"))
+    deltas = _mapping(report.get("deltas"))
+    sections: list[tuple[str, Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]] = [
+        ("General", baseline_metrics, candidate_metrics, deltas)
+    ]
+    baseline_contexts = _mapping(baseline_metrics.get("by_context"))
+    candidate_contexts = _mapping(candidate_metrics.get("by_context"))
+    context_deltas = _mapping(deltas.get("by_context"))
     for name in sorted(set(baseline_contexts) | set(candidate_contexts)):
         sections.append(
             (
                 name,
-                baseline_contexts.get(name) or {},
-                candidate_contexts.get(name) or {},
-                context_deltas.get(name) or {},
+                _mapping(baseline_contexts.get(name)),
+                _mapping(candidate_contexts.get(name)),
+                _mapping(context_deltas.get(name)),
             )
         )
     return "".join(_comparison_section_html(*section) for section in sections)
@@ -421,7 +424,7 @@ def _inspection_summary_html(report: Mapping[str, Any]) -> str:
 
 def _case_html(case: Mapping[str, Any]) -> str:
     state = "pass" if case.get("passed") else "fail"
-    metrics = case.get("metrics") if isinstance(case.get("metrics"), Mapping) else {}
+    metrics = _mapping(case.get("metrics"))
     failures = "".join(
         f"<li>{_escape(value)}</li>" for value in case.get("expectation_failures") or []
     )
@@ -458,6 +461,10 @@ def _results_table(results: Sequence[Mapping[str, Any]]) -> str:
         "<th>Campo</th><th>Razón</th><th>Aceptada</th><th>Clave</th></tr></thead>"
         f"<tbody>{rows}</tbody></table></div>"
     )
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
 
 
 def _number(value: Any) -> str:

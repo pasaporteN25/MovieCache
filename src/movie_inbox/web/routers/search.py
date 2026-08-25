@@ -70,7 +70,8 @@ def search_catalog_candidates(
     body: dict[str, Any] = Depends(authorized_json),
 ) -> JSONResponse:
     identity = require_ready_identity(request)
-    raw_result = body.get("result") if isinstance(body.get("result"), dict) else body
+    selected_result = body.get("result")
+    raw_result = selected_result if isinstance(selected_result, dict) else body
     enriched = enrich_selected_result(raw_result)
     _, _, rows = session_catalog_rows(request, identity)
     candidates = rank_catalog_candidates(rows, enriched)

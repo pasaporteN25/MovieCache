@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 from movie_inbox.domain.collections import CuratedCollection
@@ -12,7 +13,7 @@ class CollectionRepositoryError(RuntimeError):
 
 
 class CollectionRepository(Protocol):
-    path: object
+    path: Path
 
     def install_once(
         self,

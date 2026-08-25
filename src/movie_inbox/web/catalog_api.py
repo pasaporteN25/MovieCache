@@ -25,6 +25,7 @@ from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain import catalog as domain
 from movie_inbox.domain.metadata import METADATA_FIELDS, normalize_optional_positive_int
 from movie_inbox.domain.models import CatalogItem
+from movie_inbox.domain.normalization import normalize_kind, normalize_rating
 from movie_inbox.infrastructure.curation_history import (
     JsonCurationHistoryRepository,
     MemoryCurationHistoryRepository,
@@ -168,11 +169,8 @@ external_urls = domain.external_urls
 has_external_link = domain.has_external_link
 merge_lists = domain.merge_lists
 metadata_source_record = domain.metadata_source_record
-normalize_bool = domain.normalize_bool
 normalize_date = domain.normalize_date
 normalize_item = domain.normalize_item
-normalize_kind = domain.normalize_kind
-normalize_rating = domain.normalize_rating
 normalize_tags = domain.normalize_tags
 source_url_field = domain.source_url_field
 stable_id = domain.stable_id
@@ -336,7 +334,7 @@ def search_sources(query: str, source: str = "all") -> list[dict[str, Any]]:
         f"seconds={time.monotonic() - started:.2f} count={len(results)} cache_hit={cache_hit}",
         flush=True,
     )
-    return results
+    return [dict(result) for result in results]
 
 
 def enrich_selected_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -357,7 +355,7 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
     }
     if link_field:
         source_links[link_field] = source_links.get(link_field) or url
-    item = {
+    item: dict[str, Any] = {
         "id": stable_id(url),
         "url": url,
         "source": source,

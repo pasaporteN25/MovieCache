@@ -18,19 +18,11 @@ class DockerPackagingTests(unittest.TestCase):
             self.assertIn("ruff check src scripts tests", script)
             self.assertIn("ruff format --check src scripts tests", script)
 
-        strict_targets = (
-            "src/movie_inbox/domain",
-            "src/movie_inbox/application",
-            "src/movie_inbox/infrastructure",
-            "src/movie_inbox/external",
-        )
+        strict_targets = ("src/movie_inbox",)
         for target in strict_targets:
             for gate in (powershell, shell, workflow):
                 self.assertIn(target, gate)
-        self.assertIn('module = "movie_inbox.domain.*"', mypy_configuration)
-        self.assertIn('module = "movie_inbox.application.*"', mypy_configuration)
-        self.assertIn('"movie_inbox.infrastructure.*"', mypy_configuration)
-        self.assertIn('"movie_inbox.external.*"', mypy_configuration)
+        self.assertIn("strict = true", mypy_configuration)
 
     def test_image_is_multi_stage_non_root_and_health_checked(self) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")

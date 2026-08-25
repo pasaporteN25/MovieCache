@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 from movie_inbox.domain.imports import ImportDraft
@@ -12,7 +13,7 @@ class ImportRepositoryError(RuntimeError):
 
 
 class ImportDraftRepository(Protocol):
-    path: object
+    path: Path
 
     def create(self, draft: ImportDraft) -> None: ...
 

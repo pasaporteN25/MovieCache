@@ -95,20 +95,21 @@ def decide_match(
 
 
 def rank_candidates(
-    existing: Mapping[str, Any], results: list[dict[str, Any]]
+    existing: Mapping[str, Any], results: Sequence[Mapping[str, Any]]
 ) -> list[RankedCandidate]:
     ranked: list[RankedCandidate] = []
     for result in results:
         if not external_urls(result):
             continue
-        decision = decide_match(existing, result)
+        result_payload = dict(result)
+        decision = decide_match(existing, result_payload)
         if decision.score <= 0:
             continue
         ranked.append(
             {
                 "score": round(decision.score, 3),
                 "decision": decision.to_dict(),
-                "result": result,
+                "result": result_payload,
             }
         )
     return sorted(

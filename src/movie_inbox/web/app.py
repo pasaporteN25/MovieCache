@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -91,7 +92,8 @@ STATIC_CACHE_CONTROL = "public, max-age=3600, must-revalidate"
 def create_app(config: ViewerConfig) -> FastAPI:
     if not config.instance_db:
         raise RuntimeError("ViewerConfig.instance_db is required")
-    identity_repository = SqliteIdentityRepository(config.instance_db)
+    instance_db = Path(config.instance_db)
+    identity_repository = SqliteIdentityRepository(instance_db)
     identity_repository.initialize()
     if not identity_repository.has_users():
         raise RuntimeError("Movie Inbox owner account has not been bootstrapped")
@@ -99,14 +101,12 @@ def create_app(config: ViewerConfig) -> FastAPI:
         identity_repository,
         session_ttl_seconds=config.session_ttl_seconds,
     )
-    member_catalog_dir = Path(
-        config.member_catalog_dir or Path(config.instance_db).parent / "catalogs"
-    )
+    member_catalog_dir = Path(config.member_catalog_dir or instance_db.parent / "catalogs")
     member_service = MemberService(
         identity_repository,
         SqlitePersonalCatalogProvisioner(member_catalog_dir),
     )
-    library_repository = SqliteLibraryRepository(config.instance_db)
+    library_repository = SqliteLibraryRepository(instance_db)
     owner = identity_repository.owner()
     if owner is None:
         raise RuntimeError("Movie Inbox owner account is unavailable")
@@ -139,7 +139,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     scanner_workflow = ScannerWorkflowService(
         library_service,
         library_repository,
-        SqliteScannerHistoryRepository(config.instance_db),
+        SqliteScannerHistoryRepository(instance_db),
         MemoryCurationHistoryRepository(),
         catalog_service_factory=catalog_service,
     )
@@ -150,15 +150,15 @@ def create_app(config: ViewerConfig) -> FastAPI:
             include_sources=False,
         ),
     )
-    collection_repository = SqliteCollectionRepository(config.instance_db)
+    collection_repository = SqliteCollectionRepository(instance_db)
     collection_repository.install_once(
         AKIRA_KUROSAWA_SEED_KEY,
         akira_kurosawa_collection(owner.id),
     )
     collection_service = CollectionService(collection_repository)
     home_service = EditorialHomeService()
-    home_snapshot_repository = SqliteHomeSnapshotRepository(config.instance_db)
-    import_repository = SqliteImportDraftRepository(config.instance_db)
+    home_snapshot_repository = SqliteHomeSnapshotRepository(instance_db)
+    import_repository = SqliteImportDraftRepository(instance_db)
     import_service = ImportService(
         import_repository,
         collection_repository,
@@ -172,7 +172,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     image_warmer = ImageCacheWarmer(config)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI):
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         library_scheduler.start()
         try:
             yield
@@ -212,6 +212,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     async def security_and_authentication(request: Request, call_next):  # type: ignore[no-untyped-def]
         path = request.url.path
         identity: AuthenticatedIdentity | None = None
+        response: Response
         token = str(request.cookies.get(AUTH_SESSION_COOKIE) or "")
         if token and not path.startswith("/static/") and path != "/healthz":
             try:
