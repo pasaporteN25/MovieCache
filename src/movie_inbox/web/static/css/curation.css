@@ -176,7 +176,7 @@
       .curation-thumb-frame.large { height: 144px; width: 96px; }
       .curation-thumb {
         align-items: center;
-        background: linear-gradient(145deg, #242957, #0b0d21);
+        background: linear-gradient(145deg, #242957, var(--poster-deep));
         color: var(--text-highlight);
         display: flex;
         font-family: var(--font-display);
@@ -416,7 +416,7 @@
       .history-field-list span {
         background: rgba(120, 92, 255, 0.12);
         border: 1px solid rgba(139, 124, 255, 0.34);
-        color: #e6e3ff;
+        color: var(--chip-tint-violet);
         font-size: var(--text-caption);
         padding: 5px 7px;
       }
