@@ -165,7 +165,7 @@ jobs:
           curl --fail --silent http://127.0.0.1:8765/healthz | grep -q '"status":"ok"'
           docker compose exec -T movie-inbox sh -c 'test ! -w /media/library/disco1'
           docker compose exec -T movie-inbox sh -c 'test ! -w /imports'
-          docker compose exec -T movie-inbox movie-inbox db info /var/lib/movie-inbox/movie-inbox.db | grep -q -- '- Items: 1'
+          docker compose exec -T movie-inbox movie-inbox db info /var/lib/movie-inbox/movie-inbox.db | tee /dev/stderr | grep -q -- '- Items: 1'
           docker compose restart movie-inbox
           for attempt in $(seq 1 60); do
             status="$(docker inspect --format '{{.State.Health.Status}}' "$container_id")"
@@ -173,7 +173,7 @@ jobs:
             sleep 1
           done
           test "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" = "healthy"
-          docker compose exec -T movie-inbox movie-inbox db info /var/lib/movie-inbox/movie-inbox.db | grep -q -- '- Items: 1'
+          docker compose exec -T movie-inbox movie-inbox db info /var/lib/movie-inbox/movie-inbox.db | tee /dev/stderr | grep -q -- '- Items: 1'
       - name: Create and verify instance backup
         shell: bash
         run: |
