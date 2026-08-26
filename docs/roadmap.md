@@ -145,16 +145,22 @@ no inmoviliza el resto de la cola.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
 `ignore_errors` ni overrides sobre codigo de producto. El siguiente item ejecutable de
-la hoja de ruta es [F1].
+la hoja de ruta es [Q1].
 
 ### 2. Calidad de datos y bibliotecas
 
-1. [F1] Prototipo local opcional con datasets oficiales de IMDb.
-2. [L1] Exclusiones configurables por biblioteca.
-3. [F3] Evaluacion de TMDb; un adaptador solo nace si el ADR la aprueba.
-4. [F2] Fuente de anime sostenible, bloqueada hasta contar con permiso/licencia.
-5. [C1] Contrato para grupos de 3+ duplicados.
-6. [C2] Resolucion N-a-1 segun ese contrato.
+1. [Q1] Conservar la intencion al refinar una busqueda de Comparar.
+2. [Q2] Corpus y diagnostico reproducible de recuperacion multilenguaje por fuente.
+3. [Q3] Planificador acotado de aliases/idiomas, incluido el fallback vacio de IMDb.
+4. [Q4] Busqueda por direccion como descubrimiento separado del matching de identidad.
+5. [F1] Prototipo local opcional con datasets oficiales de IMDb.
+6. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente.
+7. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
+8. [L1] Exclusiones configurables por biblioteca.
+9. [F3] Evaluacion de TMDb; un adaptador solo nace si el ADR la aprueba.
+10. [F2] Fuente de anime sostenible, bloqueada hasta contar con permiso/licencia.
+11. [C1] Contrato para grupos de 3+ duplicados.
+12. [C2] Resolucion N-a-1 segun ese contrato.
 
 ### 3. Superficie publica y operacion
 

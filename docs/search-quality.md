@@ -141,9 +141,14 @@ ano/tipo opcionales y evidencia requerida. El corpus inicial debe incluir:
 
 - Titulos cortos y ambiguos: `It`, `Up`, `Us`, `Heat`, `Crash`, `The Gift`.
 - Titulos numericos: `1917`, `1984`, `2001: A Space Odyssey`.
+- Anos que pertenecen al titulo: `Verano 1993` no se reduce a `Verano` + ano 1993, y
+  `Verano 1993 (2017)` conserva el primer numero como titulo y toma 2017 como estreno.
 - Remakes: `The Fly`, `Suspiria`, `Dune` y obras con igual titulo y distinto ano.
 - Titulos multilenguaje: `La Belle Personne`, `La bella persona`,
-  `The Beautiful Person`.
+  `The Beautiful Person`; `Fanny & Alexander`, `Fanny and Alexander`,
+  `Fanny och Alexander`, `Fanny y Alexander`; y `Estiu 1993`/`Verano 1993`.
+- Puntuacion significativa y variantes de conjuncion: `&`, `and`, `och` e `y` deben
+  resolverse mediante aliases confirmados, no sustituyendose globalmente entre idiomas.
 - Obras recientes o con metadata incompleta, comenzando por `Evil Dead Burn`.
 - Series y anime, comenzando por `Tantei Monogatari`.
 - Nombres de archivo con release, codec, resolucion, grupo y multipartes.

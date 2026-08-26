@@ -20,6 +20,111 @@ explicita diga lo contrario. Una tarea bloqueada por una decision externa no det
 cola: se documenta aca y se toma la siguiente accionable. Los conteos de errores son una
 foto diagnostica, no un criterio estable entre versiones de herramientas.
 
+### Frente: Busqueda, comparacion y composicion de fuentes
+
+Diagnostico del 2026-08-26: la busqueda local principal usa titulos, aliases, IDs y
+archivos; `directors` existe en el modelo pero se excluye deliberadamente de la
+evidencia de identidad. Las tres fuentes externas reciben hoy casi la misma consulta:
+IMDb hace una sola llamada al endpoint de sugerencias, Wikipedia busca en ingles y
+espanol agregando `film`/`pelicula`, y FilmAffinity envia el texto literal. El puente de
+aliases de Wikidata para IMDb se activa solo si IMDb devolvio filas pero todas quedaron
+debajo del umbral; no se activa cuando la sugerencia vino vacia. Esto explica por que
+agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb o
+Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
+consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
+
+#### [Q1] Mantener el contexto al refinar una busqueda de Comparar
+- **Alcance**: separar la intencion (`browse`, comparar un resultado externo o buscar
+  referencia para una ficha local) del texto editable. Al presionar Enter o Buscar en
+  modo comparacion, conservar la ficha ya seleccionada y volver a consultar solamente
+  el lado opuesto; salir del modo solo mediante una accion explicita de volver/limpiar.
+- **Archivos probables**: `web/static/js/surfaces/catalog-search.js`,
+  `catalog-grid.js`, `core/search-bridge.js`, `core/router.js` y pruebas de navegador.
+- **Criterio de cierre**: cubrir externo -> local y local -> externo; editar la query,
+  reintentar una fuente, recibir cero resultados y navegar atras no deben convertir la
+  operacion silenciosamente en una busqueda normal ni perder la seleccion original.
+- **Depende de**: —
+- **Modelo sugerido**: Medio. Es un bug de estado acotado, pero cruza busqueda, rutas y
+  navegacion asincronica. **Siguiente accionable.**
+
+#### [Q2] Hacer reproducible el diagnostico multilenguaje por fuente
+- **Alcance**: ampliar Search Lab con respuestas externas grabadas y una traza local
+  por fuente: intencion normalizada, variantes consultadas, cantidad antes/despues del
+  umbral, fallback utilizado y causa de descarte. No registrar catalogos, rutas ni
+  consultas personales fuera de la instancia.
+- **Corpus inicial**:
+  - `Adios tio Tom`, `Adiós tío Tom`, `Addio zio Tom` y `Goodbye Uncle Tom` deben
+    apuntar a `tt0180396` sin exigir el apellido del director.
+  - `Fanny & Alexander` debe encontrar la misma obra que `Fanny and Alexander`,
+    `Fanny och Alexander` y `Fanny y Alexander`: puntuacion y conjunciones traducidas
+    no pueden cortar la recuperacion de aliases.
+  - `Verano 1993` no debe interpretarse como titulo `Verano` estrenado en 1993;
+    `Verano 1993 (2017)` debe conservar `1993` dentro del titulo y usar solamente
+    `2017` como ano de estreno para encontrar `Estiu 1993`.
+  - Sumar obras cuyo titulo conocido en espanol o ingles no es el original y consultas
+    negativas que compartan palabras o personas.
+- **Criterio de cierre**: un reporte permite distinguir "la fuente no devolvio la obra"
+  de "Movie Inbox la descarto", mide Recall@5 por idioma/fuente y corre en CI sin red.
+  Las pruebas separan normalizacion de puntuacion, expansion de aliases y parsing de
+  ano para saber cual de las tres etapas produjo cada regresion.
+- **Depende de**: —
+- **Modelo sugerido**: Grande. Define el gate que debe proteger los cambios siguientes.
+
+#### [Q3] Planificador acotado de consultas multilenguaje
+- **Alcance**: generar variantes por obra y por capacidad de fuente, usando aliases
+  confirmados por Wikidata/IDs y el idioma preferido de la instancia; no traducir texto
+  libre ni concatenar personas a ciegas. Corregir especialmente el camino de IMDb para
+  que una sugerencia vacia pueda activar la resolucion por alias/ID, no solo una tanda
+  de resultados con score bajo. Deduplicar por identidad fuerte y respetar un
+  presupuesto de llamadas, timeout y cache por plan.
+- **Regla de seguridad**: un alias aumenta recall, pero no habilita auto-match sin ID
+  compartido o titulo, ano y tipo compatibles. Un fallo de una variante no invalida las
+  demas ni queda cacheado como vacio valido.
+- **Criterio de cierre**: el corpus de [Q2] cumple Recall@5 sin director, Wikipedia puede
+  aprovechar aliases fuera del titulo de articulo en ingles/espanol e IMDb conserva el
+  `tt...` correcto; latencia y cantidad maxima de requests quedan presupuestadas.
+- **Depende de**: [Q2].
+- **Modelo sugerido**: Grande. Cambia recuperacion, ranking, cache y concurrencia.
+
+#### [Q4] Agregar busqueda por direccion como descubrimiento explicito
+- **Alcance**: permitir buscar la filmografia local por una sintaxis/campo visible como
+  `director:Jacopetti` y evaluar la misma pista para fuentes externas. Una coincidencia
+  por direccion debe rotularse como descubrimiento y nunca mezclarse con el score de
+  titulo usado por Comparar, merge o Scanner.
+- **UX**: ofrecer una forma descubrible de activar/quitar el filtro y mostrar
+  "coincide por direccion"; el texto libre actual conserva precision por titulo.
+- **Criterio de cierre**: encontrar obras locales por director, combinar
+  titulo+director como pista externa sin degradar los negativos de [Q2], y garantizar
+  que compartir director no produzca una candidata segura ni una fusion automatica.
+- **Depende de**: [Q2], [Q3].
+- **Modelo sugerido**: Grande. Introduce un segundo contrato de busqueda, no otro peso
+  dentro del matching de identidad.
+
+#### [Q5] Definir autoridad y conflicto campo por campo
+- **Alcance**: crear una matriz versionada para titulo/aliases, ano/tipo, creditos,
+  imagenes, fechas y descripcion. Manual y `locked_fields` ganan siempre; IMDb puede ser
+  autoridad de identidad y datos estructurados cuando [F1] demuestre disponibilidad,
+  mientras Wikipedia puede aportar la descripcion/sinopsis mas completa. FilmAffinity
+  y futuras fuentes solo completan los campos autorizados, con procedencia y frescura.
+- **Criterio de cierre**: ADR y fixtures de conflicto para cada familia de campos,
+  incluyendo vacios, listas, valores divergentes, fuente caida y dato manual. No existe
+  una prioridad global de fuente ni un overwrite silencioso.
+- **Depende de**: resultados de [F1]; [F3] extiende la matriz si TMDb se aprueba.
+- **Modelo sugerido**: Grande. Es una decision de producto y preservacion de datos.
+
+#### [Q6] Crear una ficha compuesta sin altas manuales duplicadas
+- **Alcance**: agrupar resultados externos solo mediante identidad fuerte y presentar
+  una candidata unificada con procedencia por campo. Agregar una vez debe crear o
+  enriquecer una unica ficha: por ejemplo, identidad/titulos estructurados desde IMDb y
+  sinopsis desde Wikipedia. Si las fuentes no pueden vincularse con seguridad,
+  permanecen separadas y se ofrece Comparar en lugar de combinarlas.
+- **Criterio de cierre**: al agregar `tt0180396` desde cualquiera de sus nombres, la
+  ficha conserva aliases espanol/original/ingles, links confirmados y la mejor
+  descripcion disponible sin pedir tres altas ni una fusion manual; el historial,
+  `locked_fields`, deshacer e idempotencia siguen protegidos.
+- **Depende de**: [Q3], [Q5].
+- **Modelo sugerido**: Grande. Une identidad, enrichment, procedencia, UX e historial.
+
 ### Frente: Fuentes externas y especializacion de anime
 
 #### [F1] Prototipo opcional del indice oficial no comercial de IMDb
@@ -29,8 +134,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 - **Datos iniciales**: `title.basics` y `title.akas`; agregar
   `title.crew`/`title.principals`/`name.basics` solo si el prototipo demuestra que la
   instancia puede sostener el indice.
-- **Regla de merge**: prioridad por campo y completitud, nunca una prioridad global de
-  IMDb. Manual y `locked_fields` siempre ganan.
+- **Regla de uso**: el prototipo mide y expone datos; la autoridad y el merge se
+  deciden en [Q5], nunca mediante una prioridad global de IMDb. Manual y
+  `locked_fields` siempre ganan.
 - **Dependencias**: confirmar el modo personal/no comercial y resolver atribucion en
   interfaz/exportacion antes de distribuir la capacidad.
 - **Modelo sugerido**: Grande. Toca licencias, almacenamiento, CLI, enrichment,
