@@ -18,7 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 test = ["httpx2>=2,<3"]
 browser-test = ["playwright>=1.48,<2"]
-dev = ["ruff>=0.6,<1", "mypy>=1.11,<2"]
+dev = ["ruff==0.16.4", "mypy>=1.11,<2"]
 
 [project.scripts]
 movie-inbox = "movie_inbox.cli.main:main"
