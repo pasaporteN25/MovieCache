@@ -86,23 +86,6 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 ### Frente: Privacidad e historial Git
 
-#### [S1] Decidir la purga del catalogo personal del historial
-- **Alcance**: identificar commits y referencias afectadas sin abrir el catalogo,
-  documentar impacto sobre clones/forks y preparar un procedimiento reversible hasta
-  el punto del force-push.
-- **Criterio de cierre**: decision explicita de Lucas entre conservar historia o purgar,
-  con ventana de mantenimiento y plan de recuperacion si se elige purgar.
-- **Depende de**: decision del owner. No ejecutar reescritura en esta tarea.
-- **Modelo sugerido**: Grande. Seguridad y operacion destructiva del remoto.
-
-#### [S2] Ejecutar y verificar la purga del historial
-- **Alcance**: reescribir solamente las rutas aprobadas, verificar que no sobrevivan en
-  ramas/tags locales, conservar un backup y coordinar el force-push autorizado.
-- **Criterio de cierre**: auditoria por nombres/rutas sin leer datos, remoto actualizado
-  y guia de reclonado para cualquier copia existente.
-- **Depende de**: [S1] aprobada y autorizacion explicita de reescritura/force-push.
-- **Modelo sugerido**: Grande. Accion destructiva e irreversible para colaboradores.
-
 #### [P1] Decidir visibilidad opcional de archivos para miembros
 - **Alcance**: definir si el admin puede compartir existencia, nombre o ruta de archivos
   y con que granularidad; hacer threat model antes de relajar la invariante actual.
@@ -240,6 +223,28 @@ dinamicos y, dentro de `tests.browser`, `attr-defined` por los recursos que
 Playwright/unittest instala en `setUpClass`. No hay `ignore_errors`. Verificado sin
 hallazgos sobre 139 archivos.
 2026-08-25, commit `07d8850`.
+
+### Frente: Privacidad e historial Git
+
+#### [S1] Decidir la purga del catalogo personal del historial
+Lucas confirmo la purga tras verificar que `scripts/scripts/catalogv4.json` seguia
+alcanzable desde `origin/master` (commits `a21314a` y `ad53ec9`) en un repositorio
+publico. Decision: purgar, no conservar la historia.
+2026-08-26.
+
+#### [S2] Ejecutar y verificar la purga del historial
+`git filter-branch --index-filter 'git rm -r --cached --ignore-unmatch ...'` sobre un
+clon espejo aislado (nunca el repositorio de trabajo), sin abrir el archivo en ningun
+momento. Backup completo (`git bundle create --all`) guardado antes de reescribir.
+Verificado con `git rev-list --objects` contra las referencias reales (rama y tags,
+excluyendo los refs de respaldo de `filter-branch`) que el blob queda inalcanzable.
+128 commits y 5 tags (`v0.2.0`, `v0.2.1`, `v0.3.0`, `v0.4.0`, `v0.5.0`; `v0.1.0` es
+anterior al archivo y no cambio) reescritos con force-push coordinado. El repositorio
+de trabajo local se resincronizo (`fetch` + `reset --hard` + retag) sin perder cambios
+pendientes reales, que se conservaron con `git stash` durante la resincronizacion.
+- **Fuera de alcance, ejecutado aparte**: el archivo sigue en disco, sin tocar, fuera
+  de Git — es dato personal real de Lucas.
+2026-08-26.
 
 ### Frente: Enriquecimiento Wikidata
 

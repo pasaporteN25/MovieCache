@@ -174,7 +174,8 @@ la hoja de ruta es [F1].
 
 ### Decisiones que pueden interrumpir la cola cuando el owner las resuelva
 
-- [S1] Conservar o purgar el catalogo personal del historial Git; [S2] solo existe como
-  ejecucion condicionada a una autorizacion explicita de reescritura y force-push.
+- **Resuelta 2026-08-26.** [S1]/[S2]: Lucas eligio purgar. El catalogo personal
+  anidado quedo inalcanzable en rama y tags de `origin/master` (128 commits y 5 tags
+  reescritos con backup previo); ver `tareas.md`.
 - [P1] Mantener privada toda informacion de archivos o permitir un opt-in granular;
   [P2] solo se implementa si el threat model y la decision de producto lo aprueban.
