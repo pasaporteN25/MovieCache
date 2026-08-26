@@ -86,6 +86,10 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           return;
         }
         activeQuery = requestedQuery.length >= 2 ? requestedQuery : "";
+        if (collectionSearchMode !== "browse") {
+          await refineComparisonSearch(requestedQuery, { updateHistory });
+          return;
+        }
         selectedManualIndex = null;
         setSelectedExistingIdForSearch(null);
         manualResults = [];
@@ -114,6 +118,30 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         }
         if (updateHistory) syncCollectionRoute("push");
         showView("catalog", { updateHistory: false, scroll: false });
+        await searchManual("all");
+      }
+
+      // Refina la busqueda sin abandonar "compare"/"link": conserva el lado ya
+      // fijado (resultado externo elegido, o ficha local elegida) y vuelve a
+      // consultar solamente el lado opuesto. Salir del modo sigue siendo
+      // responsabilidad exclusiva de clearManualSearch()/goToCollectionRoot().
+      export async function refineComparisonSearch(requestedQuery, { updateHistory = true } = {}) {
+        if (requestedQuery.length < 2) {
+          setSearchState("error", "La búsqueda necesita al menos 2 caracteres.");
+          if (updateHistory) syncCollectionRoute("push");
+          return;
+        }
+        if (updateHistory) syncCollectionRoute("push");
+        if (collectionSearchMode === "compare") {
+          await searchCatalogForMerge(requestedQuery);
+          return;
+        }
+        manualResults = [];
+        manualSourceVisibleCounts = {};
+        externalSourcesLastUsed = [];
+        externalSourcesAttempted = [];
+        fields.manualSearchStatus.textContent = "";
+        fields.manualSearchResults.innerHTML = "";
         await searchManual("all");
       }
 
@@ -405,18 +433,22 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         if (focus) fields.query.focus();
       }
 
+      export function showFixedLocalItemForLink(itemId) {
+        setCollectionSearchMode("link");
+        const item = items.find((entry) => entry.id === itemId);
+        catalogMergeResults = item ? [item] : [];
+        catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
+        fields.catalogMergeSection.classList.add("active");
+        fields.catalogMergeKicker.textContent = "Comparación";
+        fields.catalogMergeTitle.textContent = "Entrada seleccionada";
+        fields.catalogMergeStatus.textContent = item ? "Entrada seleccionada para comparar." : "No se encontró la entrada seleccionada.";
+        renderCatalogMergeResults();
+      }
+
       export async function prepareManualMerge(index) {
         selectedManualIndex = index;
         if (selectedExistingIdForSearch) {
-          setCollectionSearchMode("link");
-          const item = items.find((entry) => entry.id === selectedExistingIdForSearch);
-          catalogMergeResults = item ? [item] : [];
-          catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
-          fields.catalogMergeSection.classList.add("active");
-          fields.catalogMergeKicker.textContent = "Comparación";
-          fields.catalogMergeTitle.textContent = "Entrada seleccionada";
-          fields.catalogMergeStatus.textContent = item ? "Entrada seleccionada para comparar." : "No se encontró la entrada seleccionada.";
-          renderCatalogMergeResults();
+          showFixedLocalItemForLink(selectedExistingIdForSearch);
           setSearchState("results", comparisonSearchMessage());
           fields.searchContext.scrollIntoView({ behavior: "smooth", block: "start" });
           return;

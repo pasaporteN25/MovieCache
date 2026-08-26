@@ -7,6 +7,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from typing import Any
 from urllib.request import urlopen
 
 import uvicorn
@@ -509,6 +510,121 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.locator(".curation-queue-item.selected").get_attribute("data-curation-case"),
             "operation-2",
         )
+
+    def test_catalog_compare_mode_refine_keeps_external_pick_and_searches_local_only(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        def handle_search(route) -> None:
+            url = route.request.url
+            body: dict[str, Any]
+            if "external=true" in url:
+                body = {"results": []}
+                if "source=wikipedia" in url:
+                    body = {
+                        "results": [
+                            {
+                                "title": "Heat",
+                                "year": "1995",
+                                "source": "wikipedia",
+                                "url": "https://es.wikipedia.org/wiki/Heat",
+                            }
+                        ]
+                    }
+            else:
+                body = {"catalog": {"results": []}}
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+        page.route("**/api/search?*", handle_search)
+        candidate = {"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}
+        page.route(
+            "**/api/search/catalog-candidates",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"results": [candidate]}),
+            ),
+        )
+
+        page.locator("#catalogButton").click()
+        page.locator("#externalSource").check()
+        page.locator("#query").fill("Heat")
+        page.locator("#searchButton").click()
+        page.wait_for_selector('[data-click="prepare-merge"][data-index="0"]')
+
+        page.locator('[data-click="prepare-merge"][data-index="0"]').click()
+        page.wait_for_function(
+            "(document.querySelector('#catalogMergeResults').textContent || '').includes('Heat')"
+        )
+        external_before = page.locator("#manualSearchResults").inner_text()
+        self.assertIn("Heat", external_before)
+
+        page.route(
+            "**/api/search?*",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"catalog": {"results": []}}),
+            ),
+        )
+        page.locator("#query").fill("Heat edición restaurada")
+        page.locator("#searchButton").click()
+        page.wait_for_function(
+            "document.querySelector('#catalogMergeStatus').textContent.includes('0 entradas')"
+        )
+
+        # El lado externo (ya fijo) no debe haberse vuelto a pedir ni a perder.
+        self.assertEqual(page.locator("#manualSearchResults").inner_text(), external_before)
+        self.assertFalse(page.locator("#backToCollection").is_hidden())
+        merge_section_class = page.locator("#catalogMergeSection").get_attribute("class") or ""
+        self.assertIn("active", merge_section_class)
+
+    def test_catalog_link_mode_refine_keeps_local_item_and_searches_external_only(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        def handle_search(route) -> None:
+            url = route.request.url
+            body: dict[str, Any] = {"results": []}
+            if "source=wikipedia" in url and "restaurada" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Heat (edición restaurada)",
+                            "year": "1995",
+                            "source": "wikipedia",
+                            "url": "https://es.wikipedia.org/wiki/Heat_restaurada",
+                        }
+                    ]
+                }
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+        page.route("**/api/search?*", handle_search)
+
+        page.evaluate("openDetail('heat')")
+        page.wait_for_selector("#detailDrawer[open]")
+        page.get_by_text("Disponibilidad y fuentes").click()
+        page.locator('[data-click="find-link"]').click()
+        page.wait_for_selector("#catalogMergeSection.active")
+        local_before = page.locator("#catalogMergeResults").inner_text()
+        self.assertIn("Heat", local_before)
+
+        page.locator("#query").fill("Heat edición restaurada")
+        page.locator("#searchButton").click()
+        page.wait_for_function(
+            "document.querySelector('#manualSearchResults').textContent.includes('restaurada')"
+        )
+
+        # El lado local (ya fijo) no debe haberse alterado por refinar la query.
+        self.assertEqual(page.locator("#catalogMergeResults").inner_text(), local_before)
+        self.assertFalse(page.locator("#backToCollection").is_hidden())
+
+        page.go_back()
+        page.wait_for_function(
+            "document.querySelector('#catalogMergeSection').classList.contains('active')"
+        )
+        self.assertIn("Heat", page.locator("#catalogMergeResults").inner_text())
+        self.assertFalse(page.locator("#backToCollection").is_hidden())
 
 
 class ScannerBrowserTests(unittest.TestCase):

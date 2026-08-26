@@ -5,14 +5,14 @@ import { currentIdentity, currentView, inboxMode, items, setCurrentView, setInbo
 import { loadLibraries } from "../surfaces/admin-libraries.js";
 import { loadImageCacheStatus, loadMembers, syncImageCacheStatusPolling } from "../surfaces/admin-members.js";
 import { COLLECTION_MULTI_FILTER_KEYS, applyCollectionRoute, collectionRouteValues, collectionSearchMessage, render, renderHeaderStats, resetCollectionFilters, setCollectionSearchMode } from "../surfaces/catalog-grid.js";
-import { activeQuery, clearManualSearch, manualResults, renderManualResults, runSearch, setCatalogMergeResults, setManualResults, setSearchState, setSelectedManualIndex } from "../surfaces/catalog-search.js";
+import { activeQuery, clearManualSearch, manualResults, renderManualResults, runSearch, setCatalogMergeResults, setManualResults, setSearchState, setSelectedManualIndex, showFixedLocalItemForLink } from "../surfaces/catalog-search.js";
 import { loadClub } from "../surfaces/club.js";
 import { loadCurationQueue, setCurationFilter } from "../surfaces/inbox-curation.js";
 import { loadImportDrafts } from "../surfaces/inbox-imports.js";
 import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
 
       export const COLLECTION_ROUTE_KEYS = [
-        "q", ...COLLECTION_MULTI_FILTER_KEYS, "year_from", "year_to", "sort", "duplicates", "external"
+        "q", ...COLLECTION_MULTI_FILTER_KEYS, "year_from", "year_to", "sort", "duplicates", "external", "mode", "link_id"
       ];
 
       export function goHome() {
@@ -199,14 +199,22 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         const query = requestedView === "catalog" ? rawQuery : "";
         if (requestedView === "catalog") {
           setSelectedManualIndex(null);
-          setSelectedExistingIdForSearch(null);
-          setCatalogMergeResults([]);
-          fields.catalogMergeResults.innerHTML = "";
-          fields.catalogMergeSection.classList.remove("active");
           fields.reviewPrevious.hidden = true;
           fields.reviewNext.hidden = true;
-          setCollectionSearchMode("browse");
           applyCollectionRoute(params);
+          const mode = params.get("mode") || "";
+          const linkId = params.get("link_id") || "";
+          const linkedItem = mode === "link" && linkId ? items.find((item) => item.id === linkId) : null;
+          if (linkedItem) {
+            setSelectedExistingIdForSearch(linkId);
+            showFixedLocalItemForLink(linkId);
+          } else {
+            setSelectedExistingIdForSearch(null);
+            setCatalogMergeResults([]);
+            fields.catalogMergeResults.innerHTML = "";
+            fields.catalogMergeSection.classList.remove("active");
+            setCollectionSearchMode(mode === "compare" ? "compare" : "browse");
+          }
           if (!fields.externalSource.checked) {
             setManualResults([]);
             fields.manualSearchResults.innerHTML = "";

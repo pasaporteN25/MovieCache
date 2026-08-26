@@ -33,20 +33,6 @@ agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb
 Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
 consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
-#### [Q1] Mantener el contexto al refinar una busqueda de Comparar
-- **Alcance**: separar la intencion (`browse`, comparar un resultado externo o buscar
-  referencia para una ficha local) del texto editable. Al presionar Enter o Buscar en
-  modo comparacion, conservar la ficha ya seleccionada y volver a consultar solamente
-  el lado opuesto; salir del modo solo mediante una accion explicita de volver/limpiar.
-- **Archivos probables**: `web/static/js/surfaces/catalog-search.js`,
-  `catalog-grid.js`, `core/search-bridge.js`, `core/router.js` y pruebas de navegador.
-- **Criterio de cierre**: cubrir externo -> local y local -> externo; editar la query,
-  reintentar una fuente, recibir cero resultados y navegar atras no deben convertir la
-  operacion silenciosamente en una busqueda normal ni perder la seleccion original.
-- **Depende de**: —
-- **Modelo sugerido**: Medio. Es un bug de estado acotado, pero cruza busqueda, rutas y
-  navegacion asincronica. **Siguiente accionable.**
-
 #### [Q2] Hacer reproducible el diagnostico multilenguaje por fuente
 - **Alcance**: ampliar Search Lab con respuestas externas grabadas y una traza local
   por fuente: intencion normalizada, variantes consultadas, cantidad antes/despues del
@@ -283,6 +269,35 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 *(vacío)*
 
 ## Hecho
+
+### Frente: Busqueda, comparacion y composicion de fuentes
+
+#### [Q1] Mantener el contexto al refinar una busqueda de Comparar
+`runSearch()` ahora ramifica por `collectionSearchMode` antes de resetear nada: en
+`compare` reusa `searchCatalogForMerge(query)` (ya hacia busqueda local pura sin
+`incomingResult`, solo no se llamaba desde aca) para refinar unicamente el catalogo
+local, sin tocar `selectedManualIndex`/`manualResults` (el resultado externo fijo). En
+`link` reusa `searchManual("all")` (ya evitaba `loadLocalSearchResults` fuera de modo
+`browse`) para refinar solo fuentes externas, sin tocar `selectedExistingIdForSearch`/
+`catalogMergeResults` (la ficha local fija). Cero resultados no saca del modo porque
+ninguna de las dos funciones reusadas resetea `collectionSearchMode` por si misma.
+`clearManualSearch()` (boton "Volver a la coleccion" y Escape) sigue siendo la unica
+salida explicita, sin cambios.
+
+Un segundo punto de reset independiente, no listado en el diagnostico original:
+`restoreRoute()` forzaba `browse` en cada `popstate` porque el modo nunca viajaba en
+la URL. Se sumaron `mode`/`link_id` a `COLLECTION_ROUTE_KEYS`; en `link` restaura con
+fidelidad completa (la ficha local es un id estable); en `compare` restaura el modo y
+re-busca localmente por texto, aceptando como limite conocido que el resultado externo
+puntual (efimero, no tiene id estable) no se reconstruye cruzando una navegacion real
+— documentado en el plan, no una omision.
+
+Verificado con 2 pruebas de navegador nuevas (externo→local conservando el resultado
+fijo hasta con cero resultados; local→externo conservando la ficha fija, incluida
+navegacion atras real del browser) mas toda la suite existente sin tocar un assert:
+15 pruebas de navegador, 334 pruebas unitarias, Ruff, formato, mypy y `compileall`
+en verde.
+2026-08-26.
 
 ### Frente: Tipado y capacidad de entrega
 

@@ -92,7 +92,9 @@ import { renderEditorialHome } from "./home.js";
           year_to: collectionYearRange.to,
           sort: fields.sort.value && fields.sort.value !== "original" ? fields.sort.value : "",
           duplicates: duplicatesOnly ? "1" : "",
-          external: activeQuery && fields.externalSource.checked ? "1" : ""
+          external: activeQuery && fields.externalSource.checked ? "1" : "",
+          mode: collectionSearchMode !== "browse" ? collectionSearchMode : "",
+          link_id: collectionSearchMode === "link" ? selectedExistingIdForSearch || "" : ""
         };
         for (const key of COLLECTION_MULTI_FILTER_KEYS) {
           values[key] = [...collectionFilters[key]].sort((left, right) => left.localeCompare(right, "es"));
