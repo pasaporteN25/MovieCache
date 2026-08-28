@@ -15,7 +15,7 @@ from movie_inbox.application.search_evaluation import (
 )
 from movie_inbox.cli.search_lab import main, render_html_report
 from movie_inbox.domain.search_strategy import SearchStrategy
-from movie_inbox.search_lab import load_builtin_corpus
+from movie_inbox.search_lab import load_builtin_corpus, load_builtin_external_diagnostics_corpus
 
 
 class SearchLabTests(unittest.TestCase):
@@ -49,6 +49,67 @@ class SearchLabTests(unittest.TestCase):
 
         self.assertEqual(baseline_status, 0)
         self.assertEqual(enforced_status, 0)
+
+    def test_external_diagnostics_enforced_run_passes_with_no_network(self) -> None:
+        with redirect_stdout(io.StringIO()):
+            status = main(["external-diagnostics", "--enforce"])
+
+        self.assertEqual(status, 0)
+
+    def test_external_diagnostics_reports_do_not_modify_the_input_corpus(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            corpus_path = root / "corpus.json"
+            json_report = root / "report.json"
+            html_report = root / "report.html"
+            original = (
+                json.dumps(load_builtin_external_diagnostics_corpus(), ensure_ascii=False, indent=2)
+                + "\n"
+            )
+            corpus_path.write_text(original, encoding="utf-8")
+
+            with redirect_stdout(io.StringIO()):
+                status = main(
+                    [
+                        "external-diagnostics",
+                        "--corpus",
+                        str(corpus_path),
+                        "--json",
+                        str(json_report),
+                        "--html",
+                        str(html_report),
+                    ]
+                )
+
+            self.assertEqual(status, 0)
+            self.assertEqual(corpus_path.read_text(encoding="utf-8"), original)
+            self.assertEqual(
+                json.loads(json_report.read_text(encoding="utf-8"))["report_type"],
+                "search_external_diagnostics",
+            )
+            self.assertIn(
+                "Movie Inbox / lectura solamente", html_report.read_text(encoding="utf-8")
+            )
+
+    def test_external_diagnostics_report_target_cannot_overwrite_the_read_only_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            corpus_path = Path(temporary) / "corpus.json"
+            original = json.dumps(load_builtin_external_diagnostics_corpus(), ensure_ascii=False)
+            corpus_path.write_text(original, encoding="utf-8")
+
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                status = main(
+                    [
+                        "external-diagnostics",
+                        "--corpus",
+                        str(corpus_path),
+                        "--json",
+                        str(corpus_path),
+                    ]
+                )
+
+            self.assertEqual(status, 2)
+            self.assertEqual(corpus_path.read_text(encoding="utf-8"), original)
 
     def test_reports_do_not_modify_the_input_corpus(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

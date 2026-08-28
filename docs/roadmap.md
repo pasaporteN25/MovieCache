@@ -144,13 +144,15 @@ no inmoviliza el resto de la cola.
    CI con excepciones acotadas para callbacks dinamicos y fixtures Playwright.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
-`ignore_errors` ni overrides sobre codigo de producto. El siguiente item ejecutable de
-la hoja de ruta es [Q1].
+`ignore_errors` ni overrides sobre codigo de producto. [Q1] y [Q2] tambien cerraron
+(ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [Q3].
 
 ### 2. Calidad de datos y bibliotecas
 
-1. [Q1] Conservar la intencion al refinar una busqueda de Comparar.
-2. [Q2] Corpus y diagnostico reproducible de recuperacion multilenguaje por fuente.
+1. **Cerrado.** [Q1] Conservar la intencion al refinar una busqueda de Comparar.
+2. **Cerrado.** [Q2] Corpus y diagnostico reproducible de recuperacion multilenguaje
+   por fuente. De paso encontro y caracterizo (sin arreglar, ver `tareas.md` [Q7]) que
+   `"Verano 1993"` sin calificar se lee como titulo `Verano` + año `1993`.
 3. [Q3] Planificador acotado de aliases/idiomas, incluido el fallback vacio de IMDb.
 4. [Q4] Busqueda por direccion como descubrimiento separado del matching de identidad.
 5. [F1] Prototipo local opcional con datasets oficiales de IMDb.

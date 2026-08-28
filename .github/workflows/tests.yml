@@ -66,6 +66,8 @@ jobs:
         run: python -m pip install -e .
       - name: Enforce the v0.3.0 search-quality gate
         run: movie-inbox search-lab run --enforce
+      - name: Enforce the multilingual external-search diagnostic gate
+        run: movie-inbox search-lab external-diagnostics --enforce
 
   wheel-smoke:
     name: built wheel / clean environment

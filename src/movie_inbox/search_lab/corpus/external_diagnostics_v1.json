@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "name": "movie-inbox-external-diagnostics-v1",
+  "description": "Corre IMDb/Wikipedia/FilmAffinity de verdad contra respuestas HTTP grabadas -- no candidatos precocinados -- para medir Recall@5 por idioma y fuente, y distinguir 'la fuente no devolvio la obra' de 'Movie Inbox la descarto'. Ver docs/search-quality.md y tareas.md [Q2].",
+  "thresholds": {
+    "recall_at_5": 1.0,
+    "forbidden_hits": 0
+  },
+  "cases": [
+    {
+      "id": "external-addio-zio-tom",
+      "label": "Titulo traducido resuelve via el puente de alias de Wikidata solo cuando hace falta",
+      "language": "it",
+      "stage": "alias_expansion",
+      "top_k": 5,
+      "queries": ["Addio zio Tom", "Goodbye Uncle Tom"],
+      "sources": {
+        "imdb": {
+          "expected_key": "tt0180396",
+          "recorded_responses": {
+            "https://v3.sg.media-imdb.com/suggestion/x/addio_zio_tom.json": {
+              "d": [{"id": "tt0180396", "l": "Goodbye Uncle Tom", "qid": "movie", "y": 1971}]
+            },
+            "https://v3.sg.media-imdb.com/suggestion/x/goodbye_uncle_tom.json": {
+              "d": [{"id": "tt0180396", "l": "Goodbye Uncle Tom", "qid": "movie", "y": 1971}]
+            },
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=es&uselang=es&type=item&limit=5&search=Addio%20zio%20Tom": {
+              "search": [{"id": "Q1200631", "label": "Adiós, tío Tom"}]
+            },
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&uselang=en&type=item&limit=5&search=Addio%20zio%20Tom": {
+              "search": [{"id": "Q1200631", "label": "Goodbye Uncle Tom"}]
+            },
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=ja&uselang=ja&type=item&limit=5&search=Addio%20zio%20Tom": {
+              "search": []
+            },
+            "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims%7Clabels%7Caliases&languages=es%7Cen%7Cja&ids=Q1200631": {
+              "entities": {
+                "Q1200631": {
+                  "claims": {
+                    "P345": [{"mainsnak": {"datavalue": {"value": "tt0180396"}}, "rank": "normal"}],
+                    "P1476": [
+                      {
+                        "mainsnak": {"datavalue": {"value": {"text": "Addio zio Tom", "language": "it"}}},
+                        "rank": "normal"
+                      }
+                    ]
+                  },
+                  "labels": {
+                    "es": {"value": "Adiós, tío Tom"},
+                    "en": {"value": "Goodbye Uncle Tom"}
+                  },
+                  "aliases": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "external-city-of-god-known-name",
+      "label": "Titulo conocido en ingles no es el original (Cidade de Deus)",
+      "language": "pt",
+      "stage": "alias_expansion",
+      "top_k": 5,
+      "queries": ["City of God"],
+      "sources": {
+        "imdb": {
+          "expected_key": "tt0317248",
+          "recorded_responses": {
+            "https://v3.sg.media-imdb.com/suggestion/x/city_of_god.json": {
+              "d": [{"id": "tt0317248", "l": "City of God", "qid": "movie", "y": 2002}]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "external-fly-remake-negative",
+      "label": "Consulta con ano descarta el original y la secuela, no solo por texto",
+      "language": "en",
+      "stage": "punctuation",
+      "top_k": 5,
+      "queries": ["The Fly 1986"],
+      "sources": {
+        "imdb": {
+          "expected_key": "tt0091064",
+          "forbidden_keys": ["tt0051622", "tt0097368"],
+          "recorded_responses": {
+            "https://v3.sg.media-imdb.com/suggestion/x/the_fly.json": {
+              "d": [
+                {"id": "tt0051622", "l": "The Fly", "qid": "movie", "y": 1958},
+                {"id": "tt0091064", "l": "The Fly", "qid": "movie", "y": 1986},
+                {"id": "tt0097368", "l": "The Fly II", "qid": "movie", "y": 1989}
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

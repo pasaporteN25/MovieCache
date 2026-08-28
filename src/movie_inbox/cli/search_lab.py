@@ -18,7 +18,8 @@ from movie_inbox.application.search_evaluation import (
 )
 from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 from movie_inbox.infrastructure.schema import CatalogSchemaError, extract_catalog_items
-from movie_inbox.search_lab import load_builtin_corpus
+from movie_inbox.search_lab import load_builtin_corpus, load_builtin_external_diagnostics_corpus
+from movie_inbox.search_lab.external_diagnostics import evaluate_external_diagnostics
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -76,6 +77,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     add_report_arguments(compare_parser)
 
+    diagnostics_parser = commands.add_parser(
+        "external-diagnostics",
+        help=(
+            "Run IMDb/Wikipedia/FilmAffinity for real against recorded HTTP fixtures "
+            "and report per-source, per-language Recall@5 -- no network."
+        ),
+    )
+    diagnostics_parser.add_argument(
+        "--corpus", type=Path, help="Optional external-diagnostics corpus JSON."
+    )
+    add_report_arguments(diagnostics_parser)
+    diagnostics_parser.add_argument(
+        "--enforce",
+        action="store_true",
+        help="Return exit code 1 when the diagnostics gate fails.",
+    )
+
     args = parser.parse_args(argv)
     try:
         if args.command == "run":
@@ -94,6 +112,18 @@ def main(argv: list[str] | None = None) -> int:
             write_reports(report, args.json_report, args.html_report, protected)
             print_comparison_summary(report)
             return 0
+
+        if args.command == "external-diagnostics":
+            corpus = (
+                read_json_object(args.corpus)
+                if args.corpus
+                else load_builtin_external_diagnostics_corpus()
+            )
+            report = evaluate_external_diagnostics(corpus)
+            protected = [args.corpus] if args.corpus else []
+            write_reports(report, args.json_report, args.html_report, protected)
+            print_diagnostics_summary(report)
+            return 1 if args.enforce and not report["gate"]["passed"] else 0
 
         if args.limit < 1:
             parser.error("--limit must be greater than zero")
@@ -203,6 +233,29 @@ def print_comparison_summary(report: Mapping[str, Any]) -> None:
         )
 
 
+def print_diagnostics_summary(report: Mapping[str, Any]) -> None:
+    metrics = report["metrics"]
+    gate = report["gate"]
+    print("Search Lab external diagnostics (real adapters, recorded HTTP)")
+    print(f"- Corpus: {report['corpus']['name']}")
+    print(f"- Cases: {metrics['passed_cases']}/{metrics['case_count']} passed")
+    print(
+        f"- Recall@5: {float(metrics['recall_at_5']):.3f} ({metrics['graded_trial_count']} trials)"
+    )
+    for language, by_source in sorted(metrics["recall_at_5_by_language_source"].items()):
+        for source, recall in sorted(by_source.items()):
+            print(f"    {language}/{source}: {float(recall):.3f}")
+    print(f"- Fuente no devolvio la obra: {metrics['source_did_not_return_it']}")
+    print(f"- Descartada por umbral: {metrics['discarded_by_threshold']}")
+    print(f"- Falsos positivos aceptados: {metrics['forbidden_hits']}")
+    print(f"- Fallback usado: {metrics['fallback_used_count']} veces")
+    print(f"- Quality gate: {'PASS' if gate['passed'] else 'FAIL'}")
+    for case in report["cases"]:
+        if case["passed"]:
+            continue
+        print(f"  FAIL {case['id']}: {'; '.join(case['failures'])}")
+
+
 def print_inspection_summary(report: Mapping[str, Any]) -> None:
     print("Search Lab read-only inspection")
     print(f"- Query: {report['query']}")
@@ -231,6 +284,11 @@ def render_html_report(report: Mapping[str, Any]) -> str:
         title = f"Search Lab: {corpus.get('name') or 'corpus'} comparación"
         summary = _comparison_summary_html(report)
         cases = _comparison_tables_html(report)
+    elif report_type == "search_external_diagnostics":
+        corpus = _mapping(report.get("corpus"))
+        title = f"Search Lab: {corpus.get('name') or 'corpus'} diagnóstico externo"
+        summary = _diagnostics_summary_html(report)
+        cases = "".join(_diagnostics_case_html(case) for case in report.get("cases") or [])
     else:
         corpus = _mapping(report.get("corpus"))
         title = f"Search Lab: {corpus.get('name') or 'corpus'}"
@@ -420,6 +478,66 @@ def _inspection_summary_html(report: Mapping[str, Any]) -> str:
         for label, value in values
     )
     return f'<section class="metrics">{cards}</section>'
+
+
+def _diagnostics_summary_html(report: Mapping[str, Any]) -> str:
+    metrics = _mapping(report.get("metrics"))
+    gate = _mapping(report.get("gate"))
+    values = (
+        ("Casos", f"{metrics.get('passed_cases', 0)}/{metrics.get('case_count', 0)}"),
+        ("Recall@5", _number(metrics.get("recall_at_5"))),
+        ("Fuente ausente", str(metrics.get("source_did_not_return_it", 0))),
+        ("Descartada", str(metrics.get("discarded_by_threshold", 0))),
+        ("Falso positivo", str(metrics.get("forbidden_hits", 0))),
+        ("Fallback usado", str(metrics.get("fallback_used_count", 0))),
+        ("Gate", "PASS" if gate.get("passed") else "FAIL"),
+    )
+    cards = "".join(
+        f'<div class="metric"><strong>{_escape(value)}</strong><span>{_escape(label)}</span></div>'
+        for label, value in values
+    )
+    rows = "".join(
+        f"<tr><td>{_escape(language)}</td><td>{_escape(source)}</td><td>{_number(recall)}</td></tr>"
+        for language, by_source in sorted(
+            _mapping(metrics.get("recall_at_5_by_language_source")).items()
+        )
+        for source, recall in sorted(_mapping(by_source).items())
+    )
+    table = (
+        '<div class="table-wrap"><table><thead><tr>'
+        "<th>Idioma</th><th>Fuente</th><th>Recall@5</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div>"
+        if rows
+        else ""
+    )
+    return f'<section class="metrics">{cards}</section>{table}'
+
+
+def _diagnostics_case_html(case: Mapping[str, Any]) -> str:
+    state = "pass" if case.get("passed") else "fail"
+    trial_rows = "".join(
+        "<tr>"
+        f"<td>{_escape(trial.get('query'))}</td><td>{_escape(trial.get('source'))}</td>"
+        f"<td>{'sí' if trial.get('found') else 'no'}</td>"
+        f"<td>{'sí' if trial.get('fallback_used') else 'no'}</td>"
+        f"<td>{_escape(trial.get('failure') or '')}</td>"
+        f"<td><code>{_escape(', '.join(trial.get('requested_urls') or []))}</code></td>"
+        "</tr>"
+        for trial in case.get("trials") or []
+    )
+    table = (
+        '<div class="table-wrap"><table><thead><tr>'
+        "<th>Query</th><th>Fuente</th><th>Encontrada</th><th>Fallback</th>"
+        "<th>Motivo</th><th>URLs consultadas</th></tr></thead>"
+        f"<tbody>{trial_rows}</tbody></table></div>"
+    )
+    return (
+        f'<details class="case"><summary>'
+        f'<span class="{state}">{"PASS" if case.get("passed") else "FAIL"}</span> '
+        f"{_escape(case.get('label'))} <code>{_escape(case.get('language'))}/"
+        f"{_escape(case.get('stage'))}</code></summary>"
+        f'<div class="case-body">{table}</div></details>'
+    )
 
 
 def _case_html(case: Mapping[str, Any]) -> str:

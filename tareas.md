@@ -33,29 +33,6 @@ agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb
 Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
 consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
-#### [Q2] Hacer reproducible el diagnostico multilenguaje por fuente
-- **Alcance**: ampliar Search Lab con respuestas externas grabadas y una traza local
-  por fuente: intencion normalizada, variantes consultadas, cantidad antes/despues del
-  umbral, fallback utilizado y causa de descarte. No registrar catalogos, rutas ni
-  consultas personales fuera de la instancia.
-- **Corpus inicial**:
-  - `Adios tio Tom`, `Adiós tío Tom`, `Addio zio Tom` y `Goodbye Uncle Tom` deben
-    apuntar a `tt0180396` sin exigir el apellido del director.
-  - `Fanny & Alexander` debe encontrar la misma obra que `Fanny and Alexander`,
-    `Fanny och Alexander` y `Fanny y Alexander`: puntuacion y conjunciones traducidas
-    no pueden cortar la recuperacion de aliases.
-  - `Verano 1993` no debe interpretarse como titulo `Verano` estrenado en 1993;
-    `Verano 1993 (2017)` debe conservar `1993` dentro del titulo y usar solamente
-    `2017` como ano de estreno para encontrar `Estiu 1993`.
-  - Sumar obras cuyo titulo conocido en espanol o ingles no es el original y consultas
-    negativas que compartan palabras o personas.
-- **Criterio de cierre**: un reporte permite distinguir "la fuente no devolvio la obra"
-  de "Movie Inbox la descarto", mide Recall@5 por idioma/fuente y corre en CI sin red.
-  Las pruebas separan normalizacion de puntuacion, expansion de aliases y parsing de
-  ano para saber cual de las tres etapas produjo cada regresion.
-- **Depende de**: —
-- **Modelo sugerido**: Grande. Define el gate que debe proteger los cambios siguientes.
-
 #### [Q3] Planificador acotado de consultas multilenguaje
 - **Alcance**: generar variantes por obra y por capacidad de fuente, usando aliases
   confirmados por Wikidata/IDs y el idioma preferido de la instancia; no traducir texto
@@ -317,6 +294,51 @@ fijo hasta con cero resultados; local→externo conservando la ficha fija, inclu
 navegacion atras real del browser) mas toda la suite existente sin tocar un assert:
 15 pruebas de navegador, 334 pruebas unitarias, Ruff, formato, mypy y `compileall`
 en verde.
+2026-08-26.
+
+#### [Q2] Hacer reproducible el diagnostico multilenguaje por fuente
+El contexto `external` de Search Lab nunca ejecutaba codigo real de `external/*.py`
+— puntuaba una lista de candidatos ya escrita a mano, sin paso de construccion de
+consulta ni fallback. `tests/test_layering.py` prohibe importar `external` desde
+`application/`, asi que el mecanismo nuevo (`search_lab/recorded_responses.py`) vive
+en `search_lab/`, no ahi: parchea `fetch_text` en dos lugares, no uno —
+`external.common.fetch_text` cubre IMDb/Wikipedia/Wikidata (que resuelven `fetch_text`
+via los globals de `common.py` en tiempo de llamada), pero FilmAffinity hace
+`from ... import fetch_text` y llama el nombre suelto, un binding independiente que
+solo se corrige parcheando `external.filmaffinity.fetch_text` tambien — confirmado
+leyendo como `test_external_filmaffinity.py` ya lo hace asi, no como el diseño
+original del agente de plan asumia.
+
+`search_lab/external_diagnostics.py` corre los adaptadores reales contra las
+respuestas grabadas, puntua cada candidato crudo con el mismo `external_result_score`
+que ya usa produccion, y distingue "la fuente no la devolvio" de "la descarto por
+umbral" de "aceptada fuera del top-k" — sin reimplementar el filtro de
+`registry.py::_rank_batch`. `fallback_used` sale de las URLs efectivamente pedidas
+(gratis, sin instrumentar los adaptadores): confirmado que Wikipedia tiene su propio
+fallback (`_resolve_title`, `redirects=1&titles=`), no solo IMDb con el puente de
+Wikidata — hallazgo nuevo, no estaba en el diagnostico original. `evaluate_gate`
+(antes `_evaluate_gate`, promovida publica) se reusa tal cual para el nuevo umbral
+`recall_at_5`, sin duplicar "pasa si se cumple cada umbral declarado".
+
+Corpus nuevo (`external_diagnostics_v1.json`, separado de `v1.json` — formas
+incompatibles, ver el hallazgo de layering) con 3 casos reales verificados en vivo:
+Addio zio Tom (dispara el puente de Wikidata solo cuando hace falta — "Goodbye Uncle
+Tom" no lo necesita, ya puntua 100 directo), City of God (titulo conocido en ingles
+distinto del original), y The Fly 1986 (descarta el original de 1958 y la secuela de
+1989 por año, no solo por texto). Fanny & Alexander y "Verano 1993 (2017)" no
+necesitaron el harness nuevo — ya pasaban contra candidatos puntuados a mano, sumados
+a `v1.json` en la fase 0 de este mismo trabajo, junto con la caracterizacion del
+hallazgo de `"Verano 1993"` sin calificar (ver `[Q7]` mas abajo, en el frente de
+bibliotecas).
+
+Nuevo subcomando `movie-inbox search-lab external-diagnostics --enforce`, mismo
+patron que `run`/`compare`; segundo paso agregado al job `search-lab` ya existente en
+CI. Verificado con 12 pruebas nuevas de la logica de diagnostico (incluida una que
+parchea `urlopen` para confirmar que "corre sin red" es algo que un test realmente
+verifica, no solo cierto por omision), 7 del mecanismo de respuestas grabadas
+(concurrencia real via `ThreadPoolExecutor`, restauracion del parche tras una
+excepcion, el caso de FilmAffinity que expuso el bug de un solo punto de parche), y 3
+de cobertura CLI — mas la suite completa sin tocar un assert existente.
 2026-08-26.
 
 ### Frente: Tipado y capacidad de entrega

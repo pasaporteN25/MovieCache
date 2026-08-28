@@ -35,7 +35,7 @@ def evaluate_search_corpus(
     case_results = [_evaluate_case(case, items, strategy) for case in corpus["cases"]]
     metrics = _aggregate_metrics(case_results)
     thresholds = dict(corpus.get("thresholds") or {})
-    gate = _evaluate_gate(metrics, thresholds)
+    gate = evaluate_gate(metrics, thresholds)
     return {
         "report_type": "search_corpus",
         "schema_version": CORPUS_SCHEMA_VERSION,
@@ -499,7 +499,7 @@ def _metric_summary(cases: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _evaluate_gate(metrics: Mapping[str, Any], thresholds: Mapping[str, Any]) -> dict[str, Any]:
+def evaluate_gate(metrics: Mapping[str, Any], thresholds: Mapping[str, Any]) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     minimums = {"precision_at_5", "mrr", "recall_at_5", "auto_match_precision"}
     maximums = {"forbidden_hits", "auto_match_false_positives", "expectation_failures"}
@@ -604,6 +604,7 @@ __all__ = [
     "CORPUS_SCHEMA_VERSION",
     "SearchCorpusError",
     "compare_search_strategies",
+    "evaluate_gate",
     "evaluate_search_corpus",
     "inspect_catalog_search",
     "validate_search_corpus",
