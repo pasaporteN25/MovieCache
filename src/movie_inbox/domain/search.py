@@ -40,6 +40,13 @@ class SearchIntent:
     source: str
     external_id: str
     canonical_url: str
+    # Populated only when a single unqualified year-shaped token made the
+    # title/year split ambiguous ("Verano 1993": disambiguating suffix, or
+    # part of the title? see _split_disambiguating_year). Holds the reading
+    # that keeps the year merged into the title, for scoring functions that
+    # want to consider both without guessing which one is "the" title.
+    alternate_title: str = ""
+    alternate_title_key: str = ""
 
 
 def parse_search_query(value: Any) -> SearchIntent:
@@ -51,10 +58,17 @@ def parse_search_query(value: Any) -> SearchIntent:
     qualifier_match = _MEDIA_QUALIFIER_PATTERN.search(title)
     qualifier_year = _YEAR_PATTERN.search(qualifier_match.group(0)) if qualifier_match else None
     title = _MEDIA_QUALIFIER_PATTERN.sub(" ", title)
-    year, title = _split_disambiguating_year(title)
+    pre_split_title = title
+    year, title, year_is_ambiguous = _split_disambiguating_year(title)
     if qualifier_year is not None:
         year = qualifier_year.group(1)
+        year_is_ambiguous = False
     title = " ".join(title.split()).strip(" -")
+    alternate_title = ""
+    alternate_title_key = ""
+    if year_is_ambiguous:
+        alternate_title = " ".join(pre_split_title.split()).strip(" -")
+        alternate_title_key = search_key(alternate_title)
     key = search_key(canonical or raw)
     title_key = search_key(title)
     external_id_match = _EXTERNAL_ID_PATTERN.search(raw)
@@ -70,6 +84,8 @@ def parse_search_query(value: Any) -> SearchIntent:
         source=source,
         external_id=external_id,
         canonical_url=canonical,
+        alternate_title=alternate_title,
+        alternate_title_key=alternate_title_key,
     )
 
 
@@ -109,6 +125,20 @@ def external_result_score(
         return 140.0
 
     title_query = intent.title_key or search_key(intent.external_id) or intent.key
+    score = _score_title_and_year(title_query, intent.year, result, strategy)
+    if intent.alternate_title_key:
+        alternate_score = _score_title_and_year(intent.alternate_title_key, "", result, strategy)
+        if alternate_score >= strategy.ambiguous_year_alternate_floor:
+            score = max(score, alternate_score)
+    return score
+
+
+def _score_title_and_year(
+    title_query: str,
+    year: str,
+    result: Mapping[str, Any],
+    strategy: SearchStrategy,
+) -> float:
     title_terms = tuple(title_query.split())
     alternative_titles = result.get("alternative_titles")
     extra_titles = alternative_titles if isinstance(alternative_titles, list) else []
@@ -129,28 +159,35 @@ def external_result_score(
         default=0.0,
     )
     result_year = str(result.get("year") or "").strip()
-    if intent.year:
-        if result_year == intent.year:
+    if year:
+        if result_year == year:
             score += strategy.year_match_bonus
         elif result_year:
             score -= strategy.year_mismatch_penalty
     return max(0.0, score)
 
 
-def _split_disambiguating_year(title: str) -> tuple[str, str]:
+def _split_disambiguating_year(title: str) -> tuple[str, str, bool]:
     """Split a trailing release-year token from a title, unless it's the only
     meaningful content: a numeric title like "1917", "1984", or "2001: A Space
     Odyssey" keeps its year-shaped token instead of losing it as if it were a
     disambiguating suffix (mirrors the leading-token exception in
-    movie_inbox.domain.catalog.title_match_key)."""
+    movie_inbox.domain.catalog.title_match_key).
+
+    The third element flags a genuinely ambiguous split: exactly one
+    year-shaped token, with real title text before it. With two or more year
+    tokens the last one is unambiguously the disambiguator (e.g. "Verano 1993
+    (2017)"); with none, or with the numeric-title exception above, there is
+    nothing to be ambiguous about."""
     matches = list(_YEAR_PATTERN.finditer(title))
     if not matches:
-        return "", title
+        return "", title, False
     candidate = matches[-1]
     if not any(character.isalnum() for character in title[: candidate.start()]):
-        return "", title
+        return "", title, False
     year = candidate.group(1)
-    return year, title[: candidate.start()] + title[candidate.end() :]
+    split_title = title[: candidate.start()] + title[candidate.end() :]
+    return year, split_title, len(matches) == 1
 
 
 def _title_from_url(value: str, source: str) -> str:

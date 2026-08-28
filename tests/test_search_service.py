@@ -155,12 +155,66 @@ class SearchRankingPrecisionTests(unittest.TestCase):
         self.assertEqual(search_catalog_items(items, "Horror"), [])
 
     def test_a_year_disambiguated_query_drops_the_wrong_year_title_match(self) -> None:
+        # Also guards [Q7]'s alternate-reading rescue: "It 2017" is itself an
+        # "ambiguous" single-year-token query by that fix's own definition,
+        # so a naive rescue could have let the unsplit reading ("it 2017",
+        # scored with no year signal) resurrect it-1990. It doesn't, because
+        # that reading's raw text match against "It" alone never clears
+        # SearchStrategy.ambiguous_year_alternate_floor.
         items = [
             {"id": "it-2017", "title": "It", "year": "2017"},
             {"id": "it-1990", "title": "It", "year": "1990"},
         ]
         results = search_catalog_items(items, "It 2017")
         self.assertEqual([row["id"] for row in results], ["it-2017"])
+
+    def test_a_verbatim_alias_rescues_a_result_the_year_split_would_otherwise_discard(
+        self,
+    ) -> None:
+        # Catalog-search counterpart of the [Q7] fix in
+        # tests/test_search.py's ExternalResultScoreStrategyTests -- same
+        # underlying ambiguity, but through _catalog_search_score's own
+        # separate year-bonus/penalty logic rather than external_result_score.
+        items = [
+            {"id": "decoy", "title": "Verano", "year": "1993", "kind": "pelicula"},
+            {
+                "id": "real-target",
+                "title": "Estiu 1993",
+                "spanish_title": "Verano 1993",
+                "year": "2017",
+                "kind": "pelicula",
+            },
+        ]
+        results = search_catalog_items(items, "Verano 1993")
+        self.assertEqual({row["id"] for row in results}, {"decoy", "real-target"})
+
+    def test_a_verbatim_alias_rescue_still_works_past_the_large_catalog_prefilter(
+        self,
+    ) -> None:
+        # The >=200 item prefilter (_catalog_search_positions) picks
+        # candidate positions by the rarest exact query token. Untested
+        # before [Q7]: it must union the primary and alternate readings'
+        # rarest positions separately, not merge their terms into one pool --
+        # merging risks a rare alternate-only token like "1993" winning the
+        # single-rarest-term selection and excluding every primary-reading
+        # match that doesn't happen to share it (the decoy below, whose only
+        # "1993" is in its year field, never its title text).
+        filler = [
+            {"id": f"filler-{index}", "title": f"Filler Title Number {index}", "year": "2010"}
+            for index in range(250)
+        ]
+        items = filler + [
+            {"id": "decoy", "title": "Verano", "year": "1993", "kind": "pelicula"},
+            {
+                "id": "real-target",
+                "title": "Estiu 1993",
+                "spanish_title": "Verano 1993",
+                "year": "2017",
+                "kind": "pelicula",
+            },
+        ]
+        results = search_catalog_items(items, "Verano 1993")
+        self.assertEqual({row["id"] for row in results}, {"decoy", "real-target"})
 
     def test_comparing_a_remake_does_not_surface_the_wrong_year_original(self) -> None:
         items = [

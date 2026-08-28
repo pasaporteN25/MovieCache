@@ -501,6 +501,25 @@
       "forbidden_ids": []
     },
     {
+      "id": "external-verano-1993-unqualified-year",
+      "label": "Un solo token de ano ambiguo ya no descarta el alias verbatim ([Q7])",
+      "context": "external",
+      "query": "Verano 1993",
+      "results": [
+        {
+          "id": "wiki-estiu-1993",
+          "source": "wikipedia",
+          "title": "Estiu 1993",
+          "spanish_title": "Verano 1993",
+          "english_title": "Summer 1993",
+          "year": "2017",
+          "url": "https://es.wikipedia.org/wiki/Estiu_1993"
+        }
+      ],
+      "relevant_ids": ["wiki-estiu-1993"],
+      "forbidden_ids": []
+    },
+    {
       "id": "scanner-1917",
       "label": "Scanner vincula el titulo numerico correcto",
       "context": "scanner",

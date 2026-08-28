@@ -20,6 +20,20 @@ SEARCH_RESULT_LIMIT = 60
 _CATALOG_PREFILTER_MIN_ITEMS = 200
 _CATALOG_PREFILTER_MAX_SHARE = 0.2
 
+# Fields _search_values() also reports metadata/URL/file evidence under --
+# a rescue for an ambiguous year-shaped token only makes sense against actual
+# title text.
+_TITLE_FIELDS = frozenset(
+    {
+        "title",
+        "original_title",
+        "spanish_title",
+        "english_title",
+        "wikipedia_title",
+        "alternative_titles",
+    }
+)
+
 # decide_match still reports these with a nonzero, auditable score -- Scanner's
 # manual "confirm" review relies on that score to keep a year/kind mismatch
 # selectable for human review (see tests/test_libraries.py's "1917" legacy-year
@@ -143,25 +157,50 @@ def _catalog_search_positions(
         return all_positions
     query = intent.title_key or search_key(intent.external_id) or intent.key
     query_terms = tuple(dict.fromkeys(query.split()))
-    if not query_terms:
+    alternate_terms = (
+        tuple(dict.fromkeys(intent.alternate_title_key.split()))
+        if intent.alternate_title_key
+        else ()
+    )
+    all_terms = tuple(dict.fromkeys((*query_terms, *alternate_terms)))
+    if not all_terms:
         return all_positions
 
-    positions_by_term: dict[str, list[int]] = {term: [] for term in query_terms}
+    positions_by_term: dict[str, list[int]] = {term: [] for term in all_terms}
     for position, item in enumerate(items):
         value_terms: set[str] = set()
         for field, value, _weight in _search_values(item):
             for normalized_value in _field_values(field, value):
                 value_terms.update(normalized_value.split())
-        for term in query_terms:
+        for term in all_terms:
             if term in value_terms:
                 positions_by_term[term].append(position)
 
-    nonempty = [positions for positions in positions_by_term.values() if positions]
-    if not nonempty:
+    # Rarity is picked independently per interpretation, never by comparing a
+    # primary term's rarity against an alternate term's: mixing the two into
+    # one pool could let a rare alternate-only token (e.g. "1993" in "Verano
+    # 1993") win the single-rarest-term selection and silently exclude every
+    # primary-interpretation match that doesn't happen to share it.
+    candidates = _rarest_term_positions(positions_by_term, query_terms)
+    if alternate_terms:
+        alternate_candidates = _rarest_term_positions(positions_by_term, alternate_terms)
+        if alternate_candidates is not None:
+            candidates = (
+                alternate_candidates
+                if candidates is None
+                else sorted(set(candidates) | set(alternate_candidates))
+            )
+    if candidates is None:
         return all_positions
-    rarest = min(nonempty, key=len)
     maximum = max(SEARCH_RESULT_LIMIT * 3, round(len(items) * _CATALOG_PREFILTER_MAX_SHARE))
-    return rarest if len(rarest) <= maximum else all_positions
+    return candidates if len(candidates) <= maximum else all_positions
+
+
+def _rarest_term_positions(
+    positions_by_term: Mapping[str, list[int]], terms: tuple[str, ...]
+) -> list[int] | None:
+    nonempty = [positions_by_term[term] for term in terms if positions_by_term[term]]
+    return min(nonempty, key=len) if nonempty else None
 
 
 def _catalog_search_score(
@@ -193,7 +232,40 @@ def _catalog_search_score(
             best_score += strategy.year_match_bonus
         elif item_year:
             best_score -= strategy.year_mismatch_penalty
-    return max(0.0, min(best_score, 100.0)), best_field, best_value
+    best_score = max(0.0, min(best_score, 100.0))
+
+    if intent.alternate_title_key:
+        alt_score, alt_field, alt_value = _best_title_field_match(item, intent.alternate_title_key)
+        if alt_score >= strategy.ambiguous_year_alternate_floor and alt_score > best_score:
+            return min(alt_score, 100.0), alt_field, alt_value
+
+    return best_score, best_field, best_value
+
+
+def _best_title_field_match(
+    item: Mapping[str, Any], alternate_title_key: str
+) -> tuple[float, str, str]:
+    """Score an ambiguous query's unsplit reading against title text only --
+    never external_id/external_link/local_file, where a bare alternate title
+    key like "verano 1993" has no meaning. Weighted the same way the primary
+    per-field loop above is, so a merely-"contains"-tier match on a lower
+    weighted field (alternative_titles, wikipedia_title) can't clear the
+    strategy floor when the same raw match on the primary title field
+    wouldn't have either."""
+    best_score = 0.0
+    best_field = ""
+    best_value = ""
+    query_terms = tuple(alternate_title_key.split())
+    for field, value, weight in _search_values(item):
+        if field not in _TITLE_FIELDS:
+            continue
+        normalized_value = search_key(value)
+        if not normalized_value:
+            continue
+        score = text_match_score(normalized_value, alternate_title_key, query_terms) * weight
+        if score > best_score:
+            best_score, best_field, best_value = score, field, value
+    return best_score, best_field, best_value
 
 
 def _search_values(item: Mapping[str, Any]) -> list[tuple[str, str, float]]:

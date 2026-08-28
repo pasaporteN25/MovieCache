@@ -88,26 +88,6 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 - **Depende de**: [Q3], [Q5].
 - **Modelo sugerido**: Grande. Une identidad, enrichment, procedencia, UX e historial.
 
-#### [Q7] Desambiguar un ano sin calificar dentro del titulo
-- **Alcance**: `domain/search.py::_split_disambiguating_year` no puede distinguir "año
-  parte del título" de "año que desambigua" cuando la consulta trae un solo token con
-  forma de año — `"Verano 1993"` se lee como título `Verano` + año `1993`, mientras que
-  la forma calificada `"Verano 1993 (2017)"` ya funciona bien porque el segundo token
-  desambigua sin ambigüedad. Encontrado y caracterizado al alcanzar [Q2] (ver
-  `docs/search-quality.md`, sección "Hallazgo abierto"), no arreglado ahí — ninguna
-  tarea de este tablero declaraba el parser de año en su alcance.
-- **Evidencia concreta**: `external_result_score("Verano 1993", ...)` puntúa 112.0
-  contra una obra homónima no relacionada y solo 13.0 contra la obra real con alias
-  perfecto — un falso positivo con confianza, no solo un falso negativo.
-- **Riesgo**: ningún fix basado en regex distingue los dos casos sin una señal externa
-  (una referencia de títulos, o preferir la interpretación que realmente encuentra
-  candidatas); hay que evitar romper `catalog-it-remake` (`"It 2017"`, donde sacar el
-  año sí es correcto) al resolver esto.
-- **Depende de**: —
-- **Modelo sugerido**: Grande. Toca el parser compartido por catálogo, comparación y
-  Scanner — un cambio ciego ahí es exactamente el tipo de regresión silenciosa que
-  `docs/search-quality.md` pide evitar.
-
 ### Frente: Fuentes externas y especializacion de anime
 
 #### [F1] Prototipo opcional del indice oficial no comercial de IMDb
@@ -340,6 +320,49 @@ verifica, no solo cierto por omision), 7 del mecanismo de respuestas grabadas
 excepcion, el caso de FilmAffinity que expuso el bug de un solo punto de parche), y 3
 de cobertura CLI — mas la suite completa sin tocar un assert existente.
 2026-08-26.
+
+#### [Q7] Desambiguar un ano sin calificar dentro del titulo
+Sin una referencia de titulos no hay forma de saber de antemano si un token de año
+ambiguo (`"Verano 1993"`) desambigua o es parte del titulo, asi que
+`parse_search_query` dejo de elegir una sola lectura: `SearchIntent` conserva la
+primaria sin cambios (`.title`/`.year`, igual que siempre para "Heat 1995" y para
+cualquier consulta con 0 o 2+ tokens de año) y suma `alternate_title`/
+`alternate_title_key` — la lectura sin dividir — solo cuando el split fue
+genuinamente ambiguo. `external_result_score` (`domain/search.py`) y
+`_catalog_search_score` (`application/search_service.py`, la ruta paralela de
+Catálogo/Comparar — problema y fix independientes, `_catalog_search_score` no llama a
+`external_result_score`) puntúan contra las dos lecturas y toman el máximo, pero solo
+si la alternativa alcanza `SearchStrategy.ambiguous_year_alternate_floor` (82.0, el
+mismo corte que `text_match_score` ya usa para su nivel "contains") — sin ese piso, la
+alternativa podria rescatar un candidato de año equivocado pero titulo parecido
+(verificado que no lo hace: `"It 2017"` contra `it-1990` sigue en 25.0).
+
+Criterio de cierre mas modesto que "gana el ranking": la obra real deja de
+descartarse por debajo del umbral de aceptacion (13.0 → 100.0 en el caso Verano), no
+necesariamente supera a un homonimo con match exacto de titulo+año (ese homonimo
+sigue en 112.0, legitimamente — sin señal para preferir uno u otro, los dos quedan
+visibles para revision humana, que es la invariante real). Confirmado leyendo
+`domain/matching.py`/`application/library_service.py` que ninguno importa
+`domain.search` — el gate de auto-match y la clasificacion real de Scanner quedan
+fuera del alcance de este fix por completo, no solo en la practica sino en el codigo.
+
+Fix chico adicional, mismo problema en otro lugar: el prefiltro de catalogos grandes
+(`_catalog_search_positions`, ≥200 items, sin cobertura de tests hasta ahora) elegia
+posiciones por el termino exacto mas raro de un solo pool de terminos: mezclar ahi los
+terminos de la lectura alternativa arriesgaba que un termino raro solo-alternativo
+(`"1993"`) ganara la seleccion y excluyera candidatos primarios legitimos que no lo
+comparten. Se eligen posiciones mas raras por interpretacion por separado y se unen,
+protegido con un caso nuevo de 250+ items.
+
+Caso nuevo en el corpus dorado (`external-verano-1993-unqualified-year`, contexto
+`external`) protegido por `movie-inbox search-lab run --enforce` (26→29 casos totales,
+26→26 estrictos — las 3 fallas estrictas restantes son preexistentes, confirmado
+corriendo el gate antes de este cambio: mismos 3 casos de identidad de remakes, sin
+relacion con año). Ademas, 2 pruebas de caracterizacion de `tests/test_search.py`
+pasaron a afirmar el comportamiento corregido en vez de solo documentarlo, y 2 pruebas
+nuevas en `tests/test_search_service.py` (rescate vía catalogo, y el mismo rescate
+cruzando el prefiltro de catalogos grandes).
+2026-08-28.
 
 ### Frente: Tipado y capacidad de entrega
 

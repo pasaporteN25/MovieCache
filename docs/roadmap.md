@@ -144,25 +144,30 @@ no inmoviliza el resto de la cola.
    CI con excepciones acotadas para callbacks dinamicos y fixtures Playwright.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
-`ignore_errors` ni overrides sobre codigo de producto. [Q1] y [Q2] tambien cerraron
-(ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [Q3].
+`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2] y [Q7] tambien
+cerraron (ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [Q3].
 
 ### 2. Calidad de datos y bibliotecas
 
 1. **Cerrado.** [Q1] Conservar la intencion al refinar una busqueda de Comparar.
 2. **Cerrado.** [Q2] Corpus y diagnostico reproducible de recuperacion multilenguaje
-   por fuente. De paso encontro y caracterizo (sin arreglar, ver `tareas.md` [Q7]) que
-   `"Verano 1993"` sin calificar se lee como titulo `Verano` + año `1993`.
-3. [Q3] Planificador acotado de aliases/idiomas, incluido el fallback vacio de IMDb.
-4. [Q4] Busqueda por direccion como descubrimiento separado del matching de identidad.
-5. [F1] Prototipo local opcional con datasets oficiales de IMDb.
-6. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente.
-7. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
-8. [L1] Exclusiones configurables por biblioteca.
-9. [F3] Evaluacion de TMDb; un adaptador solo nace si el ADR la aprueba.
-10. [F2] Fuente de anime sostenible, bloqueada hasta contar con permiso/licencia.
-11. [C1] Contrato para grupos de 3+ duplicados.
-12. [C2] Resolucion N-a-1 segun ese contrato.
+   por fuente. De paso encontro que `"Verano 1993"` sin calificar se leia como titulo
+   `Verano` + año `1993` — cerrado por separado en [Q7] (ver abajo).
+3. **Cerrado 2026-08-28.** [Q7] Un año sin calificar dentro del titulo ya no descarta
+   en silencio el resultado real: `parse_search_query` ofrece la lectura sin dividir
+   como alternativa cuando el split es ambiguo, y el scoring de externas y catalogo la
+   toma en cuenta solo si el match de texto es casi verbatim — sin tocar el gate de
+   auto-match ni la clasificacion real de Scanner. Detalle en `tareas.md`.
+4. [Q3] Planificador acotado de aliases/idiomas, incluido el fallback vacio de IMDb.
+5. [Q4] Busqueda por direccion como descubrimiento separado del matching de identidad.
+6. [F1] Prototipo local opcional con datasets oficiales de IMDb.
+7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente.
+8. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
+9. [L1] Exclusiones configurables por biblioteca.
+10. [F3] Evaluacion de TMDb; un adaptador solo nace si el ADR la aprueba.
+11. [F2] Fuente de anime sostenible, bloqueada hasta contar con permiso/licencia.
+12. [C1] Contrato para grupos de 3+ duplicados.
+13. [C2] Resolucion N-a-1 segun ese contrato.
 
 ### 3. Superficie publica y operacion
 

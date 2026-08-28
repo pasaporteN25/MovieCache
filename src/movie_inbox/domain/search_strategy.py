@@ -25,6 +25,14 @@ class SearchStrategy:
     year_mismatch_penalty: float = 75.0
     external_relevance_threshold: float = 28.0
 
+    # domain/search.py's SearchIntent.alternate_title_key: a single unqualified
+    # year-shaped token ("Verano 1993") is ambiguous between "year disambiguates"
+    # and "year is part of the title", so both readings get scored and the
+    # alternate (title kept whole, no year signal) only counts when its raw
+    # title-text match clears this floor -- text_match_score()'s own "contains"
+    # tier boundary, not a new number invented for this field.
+    ambiguous_year_alternate_floor: float = 82.0
+
     # application/search_service.py: search_catalog_items()'s and
     # rank_catalog_candidates()'s admission floor. Kept independent from
     # external_relevance_threshold even though both start at 28.0, so the

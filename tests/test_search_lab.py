@@ -30,7 +30,7 @@ class SearchLabTests(unittest.TestCase):
         report = evaluate_search_corpus(corpus)
 
         self.assertEqual(report["algorithm"], "production-baseline")
-        self.assertEqual(report["corpus"]["case_count"], 28)
+        self.assertEqual(report["corpus"]["case_count"], 29)
         self.assertEqual(
             set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"}
         )

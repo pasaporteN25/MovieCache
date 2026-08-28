@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from movie_inbox.domain.search import external_result_score, parse_search_query
-from movie_inbox.domain.search_strategy import SearchStrategy
+from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 
 class ParseSearchQueryYearTests(unittest.TestCase):
@@ -18,6 +18,9 @@ class ParseSearchQueryYearTests(unittest.TestCase):
         self.assertEqual(intent.title, "1984")
         self.assertEqual(intent.title_key, "1984")
         self.assertEqual(intent.year, "")
+        # Nothing was actually ambiguous here (the numeric-title exception
+        # applied, no split happened) -- no alternate reading to offer.
+        self.assertEqual(intent.alternate_title_key, "")
 
     def test_a_leading_year_shaped_title_is_not_treated_as_a_release_year(self) -> None:
         intent = parse_search_query("2001: A Space Odyssey")
@@ -42,26 +45,33 @@ class ParseSearchQueryYearTests(unittest.TestCase):
         self.assertEqual(intent.year, "2016")
 
     def test_an_unqualified_trailing_year_still_reads_as_a_release_year(self) -> None:
-        # Known gap, found while scoping [Q2] (tareas.md): with only one
-        # year-shaped token there is no local signal distinguishing "year
-        # that's part of the title" from "year that's a disambiguating
-        # suffix" -- contrast test_a_trailing_year_disambiguates_a_numeric_
-        # title above, where stripping it is exactly the wanted behavior.
-        # Characterizing today's behavior on purpose, not asserting it's
-        # correct; see test_external_result_score_favors_an_unrelated_work_
-        # over_the_real_target_below for the downstream consequence. Fixing
-        # this needs a titles reference, out of scope for [Q2] and not
-        # claimed by [Q3]-[Q6] either -- tracked as its own backlog item.
+        # [Q7] (tareas.md): with only one year-shaped token there is no local
+        # signal distinguishing "year that's part of the title" from "year
+        # that's a disambiguating suffix" -- contrast
+        # test_a_trailing_year_disambiguates_a_numeric_title above, where
+        # stripping it is exactly the wanted behavior. The primary reading
+        # stays the year-stripped one (unchanged, still the right default for
+        # "Heat 1995"-shaped queries), but parse_search_query now also
+        # offers the unsplit reading as alternate_title/alternate_title_key,
+        # so scoring functions can consider both instead of committing to a
+        # guess with no signal to base it on -- see
+        # test_a_verbatim_alias_match_rescues_a_result_the_year_split_would_
+        # otherwise_discard for the downstream fix this enables.
         intent = parse_search_query("Verano 1993")
 
         self.assertEqual(intent.title, "Verano")
         self.assertEqual(intent.year, "1993")
+        self.assertEqual(intent.alternate_title, "Verano 1993")
+        self.assertEqual(intent.alternate_title_key, "verano 1993")
 
     def test_a_parenthesized_year_disambiguates_a_year_shaped_title_token(self) -> None:
         intent = parse_search_query("Verano 1993 (2017)")
 
         self.assertIn("1993", intent.title)
         self.assertEqual(intent.year, "2017")
+        # Two year-shaped tokens: the last one is unambiguously the
+        # disambiguator, so there's nothing for an alternate reading to add.
+        self.assertEqual(intent.alternate_title_key, "")
 
 
 class ExternalResultScoreStrategyTests(unittest.TestCase):
@@ -79,15 +89,23 @@ class ExternalResultScoreStrategyTests(unittest.TestCase):
         self.assertLess(baseline, 28.0)
         self.assertGreaterEqual(lenient, 28.0)
 
-    def test_external_result_score_favors_an_unrelated_work_over_the_real_target_below(
+    def test_a_verbatim_alias_match_rescues_a_result_the_year_split_would_otherwise_discard(
         self,
     ) -> None:
-        # Direct consequence of the parse gap above: "Verano 1993" the query
-        # reads as title "Verano" + year "1993", so an unrelated work
-        # actually titled "Verano" (1993) outscores the real target -- whose
-        # only shared text is the alias "Verano 1993" -- because the real
-        # target's true year (2017) reads as a mismatch. Characterization,
-        # not an assertion that this is acceptable.
+        # [Q7] fix: "Verano 1993" the query reads as title "Verano" + year
+        # "1993" (see ParseSearchQueryYearTests above), so under the primary
+        # reading alone, a real target whose only shared text is the alias
+        # "Verano 1993" scores just 13.0 -- silently discarded, well below
+        # external_relevance_threshold (28.0), because its true year (2017)
+        # reads as a mismatch. The fix isn't "make the real target always
+        # outrank a same-titled decoy" -- with no signal to tell the two
+        # apart, an unrelated work actually titled "Verano" (1993) legitimately
+        # scores just as high (112.0, an exact title+year match) and nothing
+        # here should suppress that. The bar is that the real target stops
+        # being invisible: once its alias match is verbatim enough to trust
+        # (SearchStrategy.ambiguous_year_alternate_floor), it clears the
+        # acceptance threshold too, so a human comparing results sees both
+        # legitimate candidates instead of only the decoy.
         unrelated_decoy = {"title": "Verano", "year": "1993"}
         real_target_with_alias = {
             "title": "Estiu 1993",
@@ -98,7 +116,8 @@ class ExternalResultScoreStrategyTests(unittest.TestCase):
         decoy_score = external_result_score("Verano 1993", unrelated_decoy)
         real_target_score = external_result_score("Verano 1993", real_target_with_alias)
 
-        self.assertGreater(decoy_score, real_target_score)
+        self.assertEqual(decoy_score, 112.0)
+        self.assertGreaterEqual(real_target_score, PRODUCTION_BASELINE.external_relevance_threshold)
 
 
 if __name__ == "__main__":

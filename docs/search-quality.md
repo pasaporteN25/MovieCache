@@ -90,7 +90,7 @@ integracion futura debe ser opcional, indexar localmente `title.basics`, `title.
 por campo. Las correcciones manuales y `locked_fields` siguen por encima de toda
 fuente externa.
 
-### Hallazgo abierto: un ano sin calificar dentro del titulo (2026-08-26)
+### Hallazgo cerrado: un ano sin calificar dentro del titulo ([Q7], 2026-08-28)
 
 Al alcanzar [Q2] (`tareas.md`), verificado directamente corriendo
 `parse_search_query`/`external_result_score`: `"Verano 1993"` sin calificar
@@ -100,20 +100,45 @@ mal-parseo que el corpus ya evita para su forma calificada,
 disambiguador). Con un solo token no hay señal sintactica local que
 distinga "año parte del titulo" de "año que desambigua": el mismo patron
 que hace bien `"It 2017"` (`catalog-it-remake`, quitar el año final es lo
-correcto) hace mal `"Verano 1993"` (quitarlo no lo es). La consecuencia es
+correcto) hace mal `"Verano 1993"` (quitarlo no lo es). La consecuencia era
 real, no cosmetica: contra una obra distinta homonima ("Verano", 1993) la
-consulta sin calificar puntua 112.0; contra la obra real, con un alias
-perfecto (`spanish_title: "Verano 1993"`, año real 2017), puntua apenas
-13.0 — el año mal separado dispara la penalidad de año distinto.
+consulta sin calificar puntuaba 112.0; contra la obra real, con un alias
+perfecto (`spanish_title: "Verano 1993"`, año real 2017), puntuaba apenas
+13.0 — el año mal separado disparaba la penalidad de año distinto,
+descartando la obra real por debajo del umbral de aceptación (28.0).
 
-Caracterizado en `tests/test_search.py`
-(`test_an_unqualified_trailing_year_still_reads_as_a_release_year`,
-`test_external_result_score_favors_an_unrelated_work_over_the_real_target_below`),
-no arreglado: ninguna de las tareas de `tareas.md` que tocan busqueda
-declara el parser de año en su alcance. Arreglarlo sin una referencia de
-titulos (o sin poder distinguir "1993" titulo de "1993" año por otra vía)
-arriesga romper el caso que ya funciona hoy. Backlog aparte, no absorbido
-por [Q2]-[Q6].
+**Fix**: sin una referencia de titulos, no hay forma de saber de antemano
+cual de las dos lecturas es la correcta — así que `parse_search_query` ya
+no elige una sola. `SearchIntent` conserva la lectura primaria (año
+separado, sin cambios para "Heat 1995" ni para ninguna consulta con 0 o 2+
+tokens de año) y agrega `alternate_title`/`alternate_title_key` — la
+lectura sin dividir — solo cuando el split fue genuinamente ambiguo (un
+solo token de año, con texto real antes). `external_result_score` y
+`_catalog_search_score` (`application/search_service.py`, la ruta paralela
+de Catálogo/Comparar) puntúan un candidato contra las dos lecturas y toman
+el máximo, pero solo si la lectura alternativa alcanza
+`SearchStrategy.ambiguous_year_alternate_floor` (82.0 — el mismo corte que
+`text_match_score` ya usa para su nivel "contains", no un número nuevo
+inventado para esto). Ese piso es lo que evita que la alternativa rescate
+un candidato con año equivocado pero titulo parecido (`"It 2017"` contra el
+`it-1990` de año distinto sigue puntuando 25.0, por debajo del piso) — solo
+un alias verbatim o casi verbatim cruza la barrera.
+
+**Criterio de cierre real, más modesto que "gana el ranking"**: la obra real
+deja de descartarse por debajo del umbral (13.0 → 100.0 en el caso Verano).
+No es criterio que supere siempre a un homonimo con match exacto de
+titulo+año — ese homonimo (`"Verano"`, 1993) sigue puntuando 112.0,
+legitimamente, porque para esa consulta es un match tan valido como el
+otro sin señal para preferir uno u otro. Ambos quedan visibles para
+revision humana, que es la invariante real que importa (`CLAUDE.md`:
+coincidencia dudosa = revisión humana, nunca auto-match) — y ese camino
+(`domain/matching.py::decide_match`, la clasificación real de Scanner) no
+importa `domain.search` en absoluto, así que este fix no lo toca.
+
+Caso nuevo en el corpus dorado (`external-verano-1993-unqualified-year`,
+`search_lab/corpus/v1.json`) protege el fix vía
+`movie-inbox search-lab run --enforce`, no solo pruebas unitarias.
+Detalle completo en `tareas.md`, [Q7].
 
 ## Laboratorio de busqueda
 
