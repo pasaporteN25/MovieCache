@@ -425,6 +425,82 @@
       "forbidden_ids": ["fa-beautiful-mind"]
     },
     {
+      "id": "external-fanny-alexander-ampersand",
+      "label": "Puntuacion (&) no corta la recuperacion del alias en ingles",
+      "context": "external",
+      "query": "Fanny & Alexander",
+      "results": [
+        {
+          "id": "wiki-fanny-and-alexander",
+          "source": "wikipedia",
+          "title": "Fanny and Alexander",
+          "original_title": "Fanny och Alexander",
+          "spanish_title": "Fanny y Alexander",
+          "year": "1982",
+          "url": "https://en.wikipedia.org/wiki/Fanny_and_Alexander"
+        }
+      ],
+      "relevant_ids": ["wiki-fanny-and-alexander"],
+      "forbidden_ids": []
+    },
+    {
+      "id": "external-fanny-alexander-swedish",
+      "label": "Conjuncion sueca (och) encuentra el alias en ingles",
+      "context": "external",
+      "query": "Fanny och Alexander",
+      "results": [
+        {
+          "id": "wiki-fanny-and-alexander-2",
+          "source": "wikipedia",
+          "title": "Fanny and Alexander",
+          "original_title": "Fanny och Alexander",
+          "spanish_title": "Fanny y Alexander",
+          "year": "1982",
+          "url": "https://en.wikipedia.org/wiki/Fanny_and_Alexander"
+        }
+      ],
+      "relevant_ids": ["wiki-fanny-and-alexander-2"],
+      "forbidden_ids": []
+    },
+    {
+      "id": "external-fanny-alexander-spanish",
+      "label": "Conjuncion espanola (y) encuentra el alias en ingles",
+      "context": "external",
+      "query": "Fanny y Alexander",
+      "results": [
+        {
+          "id": "wiki-fanny-and-alexander-3",
+          "source": "wikipedia",
+          "title": "Fanny and Alexander",
+          "original_title": "Fanny och Alexander",
+          "spanish_title": "Fanny y Alexander",
+          "year": "1982",
+          "url": "https://en.wikipedia.org/wiki/Fanny_and_Alexander"
+        }
+      ],
+      "relevant_ids": ["wiki-fanny-and-alexander-3"],
+      "forbidden_ids": []
+    },
+    {
+      "id": "external-verano-1993-qualified-year",
+      "label": "Ano calificado entre parentesis no se confunde con el ano dentro del titulo",
+      "context": "external",
+      "query": "Verano 1993 (2017)",
+      "results": [
+        {
+          "id": "wiki-estiu-1993",
+          "source": "wikipedia",
+          "title": "Estiu 1993",
+          "spanish_title": "Verano 1993",
+          "english_title": "Summer 1993",
+          "year": "2017",
+          "url": "https://es.wikipedia.org/wiki/Estiu_1993"
+        }
+      ],
+      "relevant_ids": ["wiki-estiu-1993"],
+      "forbidden_ids": []
+    },
+    {
       "id": "scanner-1917",
       "label": "Scanner vincula el titulo numerico correcto",
       "context": "scanner",

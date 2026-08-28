@@ -111,6 +111,26 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 - **Depende de**: [Q3], [Q5].
 - **Modelo sugerido**: Grande. Une identidad, enrichment, procedencia, UX e historial.
 
+#### [Q7] Desambiguar un ano sin calificar dentro del titulo
+- **Alcance**: `domain/search.py::_split_disambiguating_year` no puede distinguir "año
+  parte del título" de "año que desambigua" cuando la consulta trae un solo token con
+  forma de año — `"Verano 1993"` se lee como título `Verano` + año `1993`, mientras que
+  la forma calificada `"Verano 1993 (2017)"` ya funciona bien porque el segundo token
+  desambigua sin ambigüedad. Encontrado y caracterizado al alcanzar [Q2] (ver
+  `docs/search-quality.md`, sección "Hallazgo abierto"), no arreglado ahí — ninguna
+  tarea de este tablero declaraba el parser de año en su alcance.
+- **Evidencia concreta**: `external_result_score("Verano 1993", ...)` puntúa 112.0
+  contra una obra homónima no relacionada y solo 13.0 contra la obra real con alias
+  perfecto — un falso positivo con confianza, no solo un falso negativo.
+- **Riesgo**: ningún fix basado en regex distingue los dos casos sin una señal externa
+  (una referencia de títulos, o preferir la interpretación que realmente encuentra
+  candidatas); hay que evitar romper `catalog-it-remake` (`"It 2017"`, donde sacar el
+  año sí es correcto) al resolver esto.
+- **Depende de**: —
+- **Modelo sugerido**: Grande. Toca el parser compartido por catálogo, comparación y
+  Scanner — un cambio ciego ahí es exactamente el tipo de regresión silenciosa que
+  `docs/search-quality.md` pide evitar.
+
 ### Frente: Fuentes externas y especializacion de anime
 
 #### [F1] Prototipo opcional del indice oficial no comercial de IMDb

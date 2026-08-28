@@ -67,7 +67,7 @@ ancla exacta. Sobre 10.000 obras sinteticas, `Anime Title 9876` paso de unos 1.4
 60 resultados genericos a unos 170 ms y una unica coincidencia. La lectura del
 catalogo tambien queda en cache por firma de archivo; cualquier cambio de tamano o
 fecha de modificacion invalida la copia. El corpus suma titulo japones nativo y la
-taxonomia anime/formato y mantiene el gate en verde con 24 casos.
+taxonomia anime/formato y mantiene el gate en verde con 28 casos.
 
 ### Decision sobre nuevas fuentes
 
@@ -89,6 +89,31 @@ integracion futura debe ser opcional, indexar localmente `title.basics`, `title.
 `title.crew`, `title.principals` y `name.basics`, mostrar atribucion y definir prioridad
 por campo. Las correcciones manuales y `locked_fields` siguen por encima de toda
 fuente externa.
+
+### Hallazgo abierto: un ano sin calificar dentro del titulo (2026-08-26)
+
+Al alcanzar [Q2] (`tareas.md`), verificado directamente corriendo
+`parse_search_query`/`external_result_score`: `"Verano 1993"` sin calificar
+se interpreta como titulo `Verano` estrenado en 1993 — exactamente el
+mal-parseo que el corpus ya evita para su forma calificada,
+`"Verano 1993 (2017)"` (dos tokens de año, el ultimo es inequivocamente el
+disambiguador). Con un solo token no hay señal sintactica local que
+distinga "año parte del titulo" de "año que desambigua": el mismo patron
+que hace bien `"It 2017"` (`catalog-it-remake`, quitar el año final es lo
+correcto) hace mal `"Verano 1993"` (quitarlo no lo es). La consecuencia es
+real, no cosmetica: contra una obra distinta homonima ("Verano", 1993) la
+consulta sin calificar puntua 112.0; contra la obra real, con un alias
+perfecto (`spanish_title: "Verano 1993"`, año real 2017), puntua apenas
+13.0 — el año mal separado dispara la penalidad de año distinto.
+
+Caracterizado en `tests/test_search.py`
+(`test_an_unqualified_trailing_year_still_reads_as_a_release_year`,
+`test_external_result_score_favors_an_unrelated_work_over_the_real_target_below`),
+no arreglado: ninguna de las tareas de `tareas.md` que tocan busqueda
+declara el parser de año en su alcance. Arreglarlo sin una referencia de
+titulos (o sin poder distinguir "1993" titulo de "1993" año por otra vía)
+arriesga romper el caso que ya funciona hoy. Backlog aparte, no absorbido
+por [Q2]-[Q6].
 
 ## Laboratorio de busqueda
 
