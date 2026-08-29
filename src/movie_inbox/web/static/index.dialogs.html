@@ -88,6 +88,13 @@
               </div>
               <small>Si desaparece una proporción mayor, Movie Inbox conservará el último inventario válido.</small>
             </label>
+            <div class="library-exclusion-rules">
+              <span>Reglas de exclusión adicionales</span>
+              <small>Además de "extras", "sample" y similares, que siempre se excluyen. Un nombre de carpeta o un patrón con asterisco, sin barras (ej. "bonus*").</small>
+              <div id="libraryExclusionRuleRows" class="library-exclusion-rule-rows"></div>
+              <button id="addLibraryExclusionRule" class="quiet-action" type="button">Agregar regla</button>
+              <p id="libraryExclusionRulesFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+            </div>
           </details>
           <p id="libraryDialogFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
         </div>

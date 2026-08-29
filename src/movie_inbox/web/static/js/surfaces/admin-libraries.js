@@ -260,6 +260,7 @@ import { loadScannerQueue } from "./inbox-scanner.js";
       export function libraryRunResult(run, library, workflow, resultOwnsPrimary) {
         const summary = run.summary || {};
         const preview = run.preview || [];
+        const newlyExcluded = run.newly_excluded || [];
         const parts = [
           `${Number(summary.discovered || 0)} archivos`,
           `${Number(summary.matched || 0)} vinculados`,
@@ -285,6 +286,12 @@ import { loadScannerQueue } from "./inbox-scanner.js";
               <span class="scanner-queue-state">${escapeHtml(libraryPreviewStateLabel(item.state))}</span>
               <strong>${escapeHtml(item.title || "Sin título detectado")}</strong>
               <span>${escapeHtml([item.year, importKindLabel(item.kind)].filter(Boolean).join(" · "))}</span>
+              <code>${escapeHtml(item.relative_path || "")}</code>
+            </div>`).join("")}</div></details>` : ""}
+          ${newlyExcluded.length ? `<details class="library-run-preview library-run-newly-excluded"><summary>${newlyExcluded.length} ${newlyExcluded.length === 1 ? "archivo ya registrado quedó excluido por una regla" : "archivos ya registrados quedaron excluidos por una regla"}</summary><div class="library-run-preview-list">${newlyExcluded.map((item) => `
+            <div class="library-run-preview-row">
+              <strong>${escapeHtml(item.title || "Sin título detectado")}</strong>
+              <span>${escapeHtml(item.year || "")}</span>
               <code>${escapeHtml(item.relative_path || "")}</code>
             </div>`).join("")}</div></details>` : ""}
           <div class="library-run-outcome">
@@ -405,11 +412,61 @@ import { loadScannerQueue } from "./inbox-scanner.js";
         }
       }
 
+      export function renderLibraryExclusionRuleRows(patterns) {
+        fields.libraryExclusionRuleRows.innerHTML = patterns.length
+          ? patterns.map((pattern) => libraryExclusionRuleRow(pattern)).join("")
+          : libraryExclusionRuleRow("");
+        setInlineFeedback(fields.libraryExclusionRulesFeedback, "");
+      }
+
+      function libraryExclusionRuleRow(pattern) {
+        return `<div class="library-exclusion-rule-row">
+          <input type="text" class="library-exclusion-rule-input" value="${escapeAttr(pattern)}" placeholder="bonus*" maxlength="255">
+          <button type="button" class="quiet-action" data-exclusion-remove>Quitar</button>
+        </div>`;
+      }
+
+      export function addLibraryExclusionRuleRow() {
+        fields.libraryExclusionRuleRows.insertAdjacentHTML("beforeend", libraryExclusionRuleRow(""));
+        const inputs = fields.libraryExclusionRuleRows.querySelectorAll(".library-exclusion-rule-input");
+        inputs[inputs.length - 1]?.focus();
+      }
+
+      export function handleLibraryExclusionRuleRowClick(event) {
+        const button = event.target.closest("[data-exclusion-remove]");
+        if (!button) return;
+        const row = button.closest(".library-exclusion-rule-row");
+        row?.remove();
+        if (!fields.libraryExclusionRuleRows.children.length) {
+          fields.libraryExclusionRuleRows.insertAdjacentHTML("beforeend", libraryExclusionRuleRow(""));
+        }
+      }
+
+      function collectLibraryExclusionPatterns() {
+        return [...fields.libraryExclusionRuleRows.querySelectorAll(".library-exclusion-rule-input")]
+          .map((input) => input.value.trim())
+          .filter(Boolean);
+      }
+
+      export function libraryExclusionRulesErrorMessage(payload) {
+        const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+        if (!errors.length) return libraryErrorMessage(payload?.reason);
+        const reasons = {
+          empty: "no puede estar vacío",
+          too_long: "es demasiado largo",
+          has_path_separator: "no puede tener \"/\" ni \"\\\\\"",
+          excludes_everything: "excluiría toda la biblioteca",
+          too_many_rules: "hay demasiadas reglas"
+        };
+        return errors.map((error) => `"${error.pattern}": ${reasons[error.reason] || "no es válido"}`).join(" · ");
+      }
+
       export function openLibraryDialog(library = null) {
         editingLibraryId = library?.id || "";
         browsedLibraryPath = "";
         parentLibraryPath = "";
         fields.libraryForm.reset();
+        renderLibraryExclusionRuleRows(library?.exclusion_patterns || []);
         fields.libraryDialogTitle.textContent = library ? "Editar biblioteca" : "Agregar biblioteca";
         fields.libraryName.value = library?.name || "";
         fields.libraryRootPath.value = library?.root_path || "";
@@ -522,6 +579,27 @@ import { loadScannerQueue } from "./inbox-scanner.js";
         fields.libraryPathFeedback.dataset.state = state;
       }
 
+      async function saveLibraryExclusionRules(libraryId) {
+        const patterns = collectLibraryExclusionPatterns();
+        try {
+          const response = await apiFetch(`/api/libraries/${encodeURIComponent(libraryId)}/exclusion-rules`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ patterns })
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            setInlineFeedback(fields.libraryExclusionRulesFeedback, libraryExclusionRulesErrorMessage(payload), "error");
+            return false;
+          }
+          setInlineFeedback(fields.libraryExclusionRulesFeedback, "");
+          return true;
+        } catch (error) {
+          setInlineFeedback(fields.libraryExclusionRulesFeedback, libraryErrorMessage(error.message), "error");
+          return false;
+        }
+      }
+
       export async function saveManagedLibrary(event) {
         event.preventDefault();
         fields.submitLibrary.disabled = true;
@@ -544,7 +622,9 @@ import { loadScannerQueue } from "./inbox-scanner.js";
           const payload = await response.json();
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           const name = payload.library?.name || body.name;
-          selectedLibraryId = payload.library?.id || editingLibraryId;
+          const libraryId = payload.library?.id || editingLibraryId;
+          selectedLibraryId = libraryId;
+          if (!(await saveLibraryExclusionRules(libraryId))) return;
           closeLibraryDialog();
           setLibraryFeedback(`${name} quedó guardada. ${payload.reason === "library_created" ? "Ejecutá ahora el recorrido de prueba." : ""}`.trim());
           await loadLibraries();

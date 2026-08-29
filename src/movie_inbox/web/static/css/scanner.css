@@ -207,6 +207,7 @@
       }
       .library-run-preview-row > span:nth-of-type(2) { color: var(--muted); text-align: right; }
       .library-run-preview-row code { color: var(--muted); grid-column: 2 / -1; overflow-wrap: anywhere; }
+      .library-run-newly-excluded { color: var(--gold) !important; }
       .library-run-history { max-width: 820px; }
       .library-run-history summary { color: var(--teal); cursor: pointer; font-size: var(--text-meta); }
       .library-run-history > div { border-top: 1px solid var(--line); margin-top: 8px; }
@@ -283,6 +284,11 @@
       .library-advanced-options > label { display: grid; gap: 7px; margin-top: 13px; }
       .library-ratio-control { align-items: center; display: grid; gap: 10px; grid-template-columns: 90px minmax(0, 1fr); }
       .library-ratio-control > span { color: var(--muted); font-size: var(--text-meta); }
+      .library-exclusion-rules { display: grid; gap: 7px; margin-top: 13px; }
+      .library-exclusion-rule-rows { display: grid; gap: 7px; }
+      .library-exclusion-rule-row { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; }
+      .library-exclusion-rule-row button,
+      .library-exclusion-rules > .quiet-action { min-height: 34px; width: auto; }
 
       .scanner-workbench {
         border-block: 1px solid var(--line);
