@@ -33,22 +33,6 @@ agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb
 Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
 consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
-#### [Q3] Planificador acotado de consultas multilenguaje
-- **Alcance**: generar variantes por obra y por capacidad de fuente, usando aliases
-  confirmados por Wikidata/IDs y el idioma preferido de la instancia; no traducir texto
-  libre ni concatenar personas a ciegas. Corregir especialmente el camino de IMDb para
-  que una sugerencia vacia pueda activar la resolucion por alias/ID, no solo una tanda
-  de resultados con score bajo. Deduplicar por identidad fuerte y respetar un
-  presupuesto de llamadas, timeout y cache por plan.
-- **Regla de seguridad**: un alias aumenta recall, pero no habilita auto-match sin ID
-  compartido o titulo, ano y tipo compatibles. Un fallo de una variante no invalida las
-  demas ni queda cacheado como vacio valido.
-- **Criterio de cierre**: el corpus de [Q2] cumple Recall@5 sin director, Wikipedia puede
-  aprovechar aliases fuera del titulo de articulo en ingles/espanol e IMDb conserva el
-  `tt...` correcto; latencia y cantidad maxima de requests quedan presupuestadas.
-- **Depende de**: [Q2].
-- **Modelo sugerido**: Grande. Cambia recuperacion, ranking, cache y concurrencia.
-
 #### [Q4] Agregar busqueda por direccion como descubrimiento explicito
 - **Alcance**: permitir buscar la filmografia local por una sintaxis/campo visible como
   `director:Jacopetti` y evaluar la misma pista para fuentes externas. Una coincidencia
@@ -363,6 +347,57 @@ pasaron a afirmar el comportamiento corregido en vez de solo documentarlo, y 2 p
 nuevas en `tests/test_search_service.py` (rescate vía catalogo, y el mismo rescate
 cruzando el prefiltro de catalogos grandes).
 2026-08-28.
+
+#### [Q3] Planificador acotado de consultas multilenguaje
+IMDb tenia un puente propio a Wikidata para rescatar resultados de baja puntuacion con
+alias confirmados, pero `if (results and ...)` (`imdb.py:71-78`) cortaba en el primer
+operando falso — una sugerencia vacia nunca llegaba a llamar
+`fetch_wikidata_title_matches`. Wikipedia y FilmAffinity no tenian ningun mecanismo de
+respaldo propio fuera del fan-out en/es existente de Wikipedia.
+
+Diseno descartado antes de escribir codigo: una orquestacion nueva en `registry.py`
+(segunda ronda de `ThreadPoolExecutor` solo para fuentes debiles). Un agente Plan
+encontro 2 problemas reales verificando el codigo real: `_run_adapter` ya actualiza
+`self._health` internamente sin relanzar, asi que capturar la excepcion en la ronda
+nueva no evita que el estado de salud quede pisado por una race entre variantes
+concurrentes de la misma fuente; y el harness de diagnostico de [Q2]
+(`search_lab/external_diagnostics.py`) llama a los adaptadores directo, nunca pasa por
+`registry.py` — un mecanismo ahi hubiera quedado invisible para su propio gate.
+
+Diseno final: cada adaptador se auto-contiene, mismo patron que IMDb ya tenia.
+`registry.py` no cambio en absoluto. IMDb ahora tambien dispara el puente con
+sugerencia vacia, sintetizando una fila nueva por cada alias confirmado (antes solo
+enriquecia filas que la sugerencia ya habia devuelto) — `fetch_wikidata_title_matches`
+(`external/wikidata.py`) gano `year`/`kind` gratis, reusando `wikidata_kind`/
+`wikidata_claim_year` contra `claims` ya en memoria, sin llamada de red nueva.
+Wikipedia y FilmAffinity ganan un mecanismo compartido nuevo,
+`external/query_variants.py::alias_variants()`: hasta 2 alias confirmados por
+Wikidata como reintento cuando su propia busqueda vuelve vacia, ordenados por
+capacidad de fuente (FilmAffinity prioriza `spanish_title`, Wikipedia prioriza
+`original_title` porque ya cubre en/es por si solo) y con un piso de confianza
+textual reusado de `EXTERNAL_RELEVANCE_THRESHOLD` — nunca traduce texto libre ni
+concatena director/reparto, por construccion. "Idioma preferido de la instancia" es
+la constante `PREFERRED_ALIAS_LANGUAGES = ("es", "en")`, decision explicita del owner
+tras confirmar que no existe ningun mecanismo de configuracion por instancia en el
+proyecto y que ningun criterio de cierre exige que sea editable.
+
+Presupuesto explicito: maximo 2 variantes extra por fuente debil, timeout de 4s para
+esas llamadas (mitad del default de 8s). Un fallo de variante nunca invalida las
+demas (try/except aislado por intento) ni queda cacheado como vacio valido (la cache
+de `registry.py` sigue sin tocar, con su TTL corto de 30s para vacio ya existente).
+
+Verificado con 12 pruebas nuevas contra codigo real (sintesis de IMDb, alias/año/tipo
+de Wikidata, reintento de Wikipedia/FilmAffinity, ordenamiento y piso de
+`query_variants.py`), 2 pruebas de [Q2] arregladas por el mismo motivo que un gap de
+fixture encontrado en esa misma tarea, y ambos gates de Search Lab en verde sin
+regresiones (26/29 casos estrictos, mismos 3 preexistentes sin relacion con esta
+tarea). Limitacion documentada a proposito: el corpus de diagnostico de [Q2] no gano
+casos nuevos para el camino de Wikipedia/FilmAffinity — construir uno contra datos
+reales resulto mas dificil de lo esperado (la busqueda de Wikipedia rara vez vuelve
+genuinamente vacia contra titulos reales conocidos) y se paro la exploracion en vivo
+antes de gastar mas cupo de API publica en algo no critico; la logica queda cubierta
+por pruebas unitarias directas contra codigo real, no por el corpus con datos en vivo.
+2026-08-29.
 
 ### Frente: Tipado y capacidad de entrega
 

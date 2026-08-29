@@ -10,6 +10,7 @@ from movie_inbox.domain.catalog import external_source_name
 from movie_inbox.domain.search import parse_search_query
 from movie_inbox.domain.titles import infer_year
 from movie_inbox.external.common import clean_text, fetch_text
+from movie_inbox.external.query_variants import VARIANT_RETRY_TIMEOUT_SECONDS, alias_variants
 
 
 class FilmAffinityAdapter:
@@ -20,9 +21,30 @@ class FilmAffinityAdapter:
         intent = parse_search_query(query)
         if intent.source:
             return []
-        query = intent.title or query
+        search_text = intent.title or query
+        results = self._fetch(search_text)
+        if results:
+            return results
+        # [Q3] tareas.md: the only source with no fallback of its own -- a
+        # Wikidata-confirmed alias (prioritized towards its Spanish market
+        # title, see query_variants._priority_order) gets one retry each.
+        for variant in alias_variants(self.name, search_text):
+            try:
+                results = self._fetch(variant, timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
+            except Exception:
+                continue
+            if results:
+                return results
+        return results
+
+    def _fetch(self, text: str, timeout: float = 8.0) -> list[dict[str, Any]]:
         parser = FilmAffinityParser()
-        parser.feed(fetch_text(f"https://www.filmaffinity.com/es/search.php?stext={quote(query)}"))
+        parser.feed(
+            fetch_text(
+                f"https://www.filmaffinity.com/es/search.php?stext={quote(text)}",
+                timeout=timeout,
+            )
+        )
         return parser.results[:8]
 
 

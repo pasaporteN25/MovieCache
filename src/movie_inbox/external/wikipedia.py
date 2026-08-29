@@ -26,6 +26,7 @@ from movie_inbox.external.common import (
     object_list,
     result_index,
 )
+from movie_inbox.external.query_variants import VARIANT_RETRY_TIMEOUT_SECONDS, alias_variants
 from movie_inbox.external.wikidata import (
     fetch_wikidata_article_url,
     fetch_wikidata_metadata,
@@ -73,7 +74,22 @@ class WikipediaAdapter:
                     errors.append(error)
         if not completed and errors:
             raise errors[0]
-        return dedupe_results(interleave_batches([batches[language] for language in languages]))
+        results = dedupe_results(interleave_batches([batches[language] for language in languages]))
+        if results or intent.source:
+            return results
+        # [Q3] tareas.md: en/es cover a lot, but not every work's Wikipedia
+        # article uses one of those two titles. A Wikidata-confirmed alias
+        # (often the original-language title) gets one exact-title lookup
+        # each, not another fuzzy search -- a confirmed alias deserves a
+        # direct check, not a second fuzzy pass.
+        for variant in alias_variants(self.name, search_title):
+            try:
+                direct = self._resolve_title(variant, "en", timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
+            except Exception:
+                continue
+            if direct:
+                return dedupe_results(direct)
+        return results
 
     def _search_language(self, query: str, language: str) -> list[dict[str, Any]]:
         film_word = "pelicula" if language == "es" else "film"
@@ -107,14 +123,16 @@ class WikipediaAdapter:
             raise
         return dedupe_results([*direct, *results])
 
-    def _resolve_title(self, query: str, language: str) -> list[dict[str, Any]]:
+    def _resolve_title(
+        self, query: str, language: str, timeout: float = 8.0
+    ) -> list[dict[str, Any]]:
         url = (
             f"https://{language}.wikipedia.org/w/api.php?action=query&redirects=1"
             "&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&exintro=1&explaintext=1"
             "&pithumbsize=480&inprop=url&format=json&formatversion=2"
             f"&titles={quote(query)}"
         )
-        return wikipedia_results_from_query(fetch_json(url), language)
+        return wikipedia_results_from_query(fetch_json(url, timeout=timeout), language)
 
 
 def wikipedia_results_from_query(

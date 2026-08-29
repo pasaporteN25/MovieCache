@@ -16,6 +16,21 @@ from movie_inbox.search_lab.recorded_responses import (
 
 IMDB_SUGGESTION_URL = "https://v3.sg.media-imdb.com/suggestion/x/heat.json"
 IMDB_SUGGESTION_BODY = {"d": [{"id": "tt0113277", "l": "Heat", "qid": "movie", "y": 1995}]}
+_WIKIDATA_SEARCH_URL = (
+    "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json"
+    "&language={lang}&uselang={lang}&type=item&limit=5&search={query}"
+)
+
+
+def _empty_wikidata_searches(quoted_query: str) -> dict[str, object]:
+    """[Q3]: Wikipedia/FilmAffinity now retry via alias_variants() when their
+    own search comes back empty, which calls fetch_wikidata_title_matches --
+    fill out its 3 (es/en/ja) recorded responses so a genuinely-empty search
+    resolves cleanly instead of raising UnrecordedRequestError."""
+    return {
+        _WIKIDATA_SEARCH_URL.format(lang=lang, query=quoted_query): {"search": []}
+        for lang in ("es", "en", "ja")
+    }
 
 
 class ReplayRecordedResponsesTests(unittest.TestCase):
@@ -55,12 +70,19 @@ class ReplayRecordedResponsesTests(unittest.TestCase):
         # attribute. Patching only external_common.fetch_text would leave
         # this call going out to the real network.
         with replay_recorded_responses(
-            {"https://www.filmaffinity.com/es/search.php?stext=Heat": ""}
+            {
+                "https://www.filmaffinity.com/es/search.php?stext=Heat": "",
+                **_empty_wikidata_searches("Heat"),
+            }
         ) as log:
             results = FilmAffinityAdapter().search("Heat")
 
         self.assertEqual(results, [])
-        self.assertEqual(log.urls, ["https://www.filmaffinity.com/es/search.php?stext=Heat"])
+        # [Q3]: a genuinely empty result now also triggers the alias-variant
+        # retry (3 concurrent Wikidata searches, non-deterministic order) --
+        # the invariant this test actually guards is that FilmAffinity's own
+        # direct-import fetch_text call was intercepted at all.
+        self.assertIn("https://www.filmaffinity.com/es/search.php?stext=Heat", log.urls)
 
     def test_an_unrecorded_url_raises_and_names_the_exact_url(self) -> None:
         with replay_recorded_responses({}):
@@ -106,7 +128,14 @@ class ReplayRecordedResponsesTests(unittest.TestCase):
             "&pithumbsize=480&inprop=url&format=json&formatversion=2"
             "&titles=Heat": empty_query_result,
         }
-        responses = {en_url: empty_query_result, es_url: empty_query_result, **resolve_title_bodies}
+        responses = {
+            en_url: empty_query_result,
+            es_url: empty_query_result,
+            **resolve_title_bodies,
+            # [Q3]: a genuinely empty result now also triggers the
+            # alias-variant retry, which calls fetch_wikidata_title_matches.
+            **_empty_wikidata_searches("Heat"),
+        }
 
         with replay_recorded_responses(responses) as log:
             WikipediaAdapter().search("Heat")

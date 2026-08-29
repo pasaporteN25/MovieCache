@@ -140,6 +140,62 @@ Caso nuevo en el corpus dorado (`external-verano-1993-unqualified-year`,
 `movie-inbox search-lab run --enforce`, no solo pruebas unitarias.
 Detalle completo en `tareas.md`, [Q7].
 
+### Planificador de variantes multilenguaje ([Q3], 2026-08-29)
+
+IMDb tenía un puente propio a Wikidata que rescataba resultados de baja
+puntuación con alias confirmados, pero solo si la sugerencia inicial no
+volvía vacía (`if (results and ...)` cortaba en el primer operando falso
+antes de siquiera llamar a `fetch_wikidata_title_matches`). Wikipedia
+cubre en/es por sí mismo cada llamada, pero nunca intentaba un alias fuera
+de esas dos ediciones. FilmAffinity no tenía ningún mecanismo de respaldo.
+
+**Fix**: cada adaptador se auto-contiene, mismo patrón que IMDb ya tenía —
+`registry.py` no cambió en absoluto, sigue llamando `adapter.search(query)`
+una vez por fuente sin saber si el adaptador hizo trabajo extra por dentro.
+IMDb ahora también dispara el puente con sugerencia vacía, sintetizando una
+fila nueva por cada alias confirmado en vez de solo enriquecer filas que la
+sugerencia ya había devuelto. Wikipedia y FilmAffinity ganan un mecanismo
+nuevo compartido (`external/query_variants.py::alias_variants()`): cuando
+su propia búsqueda vuelve vacía, hasta 2 alias confirmados por Wikidata se
+prueban como reintento — ordenados por capacidad de fuente (FilmAffinity,
+sitio solo en español, prioriza `spanish_title`; Wikipedia, que ya cubre
+en/es, prioriza `original_title`, que es justo lo que le falta). Nunca
+traduce texto libre ni concatena director/reparto — la regla se cumple por
+construcción, solo se leen campos de alias ya confirmados por Wikidata.
+
+**Constante de idioma, no setting nuevo**: "idioma preferido de la
+instancia" es `PREFERRED_ALIAS_LANGUAGES = ("es", "en")` fijo en código
+(`query_variants.py`), decisión explícita del owner — no existe ningún
+mecanismo de configuración por instancia en el proyecto hoy (confirmado
+buscando en todo `application/`/`infrastructure`/`web`: sin tabla, sin
+servicio, sin UI), y ningún criterio de cierre de esta tarea exige que sea
+editable. Si más adelante hace falta (instancia con biblioteca no
+hispanohablante), es una decisión de producto aparte, no una que esta
+tarea deba resolver por adelantado.
+
+**Presupuesto**: como máximo 2 variantes extra por fuente débil, solo
+cuando esa fuente volvió vacía. Las llamadas de reintento usan un timeout
+de 4s (`VARIANT_RETRY_TIMEOUT_SECONDS`, la mitad del default de 8s) por
+ser una mejora de mejor esfuerzo sobre una búsqueda que ya falló. Peor caso
+por fuente: Wikipedia y FilmAffinity ~8s + hasta 2×4s = 16s; IMDb sin
+cambio de presupuesto (~8s + hasta 10s de puente, ya existente). Como las 3
+fuentes corren en paralelo (`ThreadPoolExecutor` de `registry.py`, sin
+tocar), el techo real de `GET /api/search` es el máximo de los tres, no la
+suma.
+
+**Limitación conocida, documentada a propósito**: el corpus dorado de [Q2]
+(`external_diagnostics_v1.json`) no ganó casos nuevos para el mecanismo de
+Wikipedia/FilmAffinity — se intentó construir uno contra datos reales
+(mismo estándar que los 3 casos existentes), pero encontrar una búsqueda
+que la propia cobertura de Wikipedia deje genuinamente vacía (no solo
+irrelevante: `gsrsearch` casi siempre devuelve algo) resultó más difícil de
+lo esperado contra títulos reales, y se paró la exploración en vivo contra
+la API pública antes de gastar más cupo en algo no crítico. El mecanismo sí
+queda cubierto por pruebas unitarias directas contra el código real
+(`tests/test_external_metadata.py`, `tests/test_external_query_variants.py`),
+verificadas por ejecución, no solo revisadas — la brecha es puntual al
+corpus con datos en vivo, no a la cobertura de la lógica en sí.
+
 ## Laboratorio de busqueda
 
 El primer incremento sera un `Search Lab` de desarrollo, no destructivo y disponible

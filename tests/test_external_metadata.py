@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import URLError
 
+from movie_inbox.external.filmaffinity import FilmAffinityAdapter
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.metadata import fetch_metadata_by_title
 from movie_inbox.external.registry import ExternalSourceService
@@ -479,6 +480,71 @@ class ExternalMetadataTests(unittest.TestCase):
 
         self.assertEqual(results[0]["title"], "Evil Dead Burn")
         self.assertEqual(fetch_json.call_count, 2)
+
+    @patch("movie_inbox.external.wikipedia.alias_variants")
+    @patch("movie_inbox.external.wikipedia.fetch_json")
+    def test_wikipedia_retries_with_a_confirmed_alias_when_en_and_es_find_nothing(
+        self, fetch_json, variants
+    ) -> None:
+        # [Q3] tareas.md: en/es cover a lot, but a Wikidata-confirmed alias
+        # (often the original-language title) can still find an article
+        # neither edition's own fuzzy search surfaced.
+        empty_query_result: dict[str, object] = {"query": {"pages": []}}
+
+        def response(url: str, **_kwargs: object) -> dict[str, object]:
+            if "titles=Estiu%201993" in url:
+                return {
+                    "query": {
+                        "pages": [
+                            {
+                                "title": "Estiu 1993",
+                                "canonicalurl": "https://en.wikipedia.org/wiki/Estiu_1993",
+                                "extract": "Estiu 1993 is a 2017 Catalan drama film.",
+                            }
+                        ]
+                    }
+                }
+            return empty_query_result
+
+        fetch_json.side_effect = response
+        variants.return_value = ["Estiu 1993"]
+
+        results = WikipediaAdapter().search("Verano 1993")
+
+        self.assertEqual(results[0]["title"], "Estiu 1993")
+        variants.assert_called_once_with("wikipedia", "Verano")
+
+    @patch("movie_inbox.external.filmaffinity.alias_variants")
+    @patch("movie_inbox.external.filmaffinity.fetch_text")
+    def test_filmaffinity_retries_with_a_confirmed_alias_when_its_own_search_is_empty(
+        self, fetch_text, variants
+    ) -> None:
+        # [Q3] tareas.md: the only source with no fallback of its own.
+        def response(url: str, **_kwargs: object) -> str:
+            if "stext=Estiu" in url:
+                return '<a href="/film123456.html">Estiu 1993</a>'
+            return "<html>no results</html>"
+
+        fetch_text.side_effect = response
+        variants.return_value = ["Estiu 1993"]
+
+        results = FilmAffinityAdapter().search("Verano 1993")
+
+        self.assertEqual(results[0]["title"], "Estiu 1993")
+        variants.assert_called_once_with("filmaffinity", "Verano")
+
+    @patch("movie_inbox.external.filmaffinity.alias_variants")
+    @patch("movie_inbox.external.filmaffinity.fetch_text")
+    def test_filmaffinity_reports_nothing_when_every_alias_variant_also_fails(
+        self, fetch_text, variants
+    ) -> None:
+        fetch_text.return_value = "<html>no results</html>"
+        variants.return_value = ["Estiu 1993", "Summer 1993"]
+
+        results = FilmAffinityAdapter().search("Verano 1993")
+
+        self.assertEqual(results, [])
+        self.assertEqual(fetch_text.call_count, 3)
 
     @patch("movie_inbox.external.wikipedia.fetch_wikipedia_metadata")
     def test_wikipedia_url_is_resolved_directly(self, fetch_metadata) -> None:

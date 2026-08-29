@@ -144,8 +144,8 @@ no inmoviliza el resto de la cola.
    CI con excepciones acotadas para callbacks dinamicos y fixtures Playwright.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
-`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2] y [Q7] tambien
-cerraron (ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [Q3].
+`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7] y [Q3] tambien
+cerraron (ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [Q4].
 
 ### 2. Calidad de datos y bibliotecas
 
@@ -158,7 +158,13 @@ cerraron (ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [
    como alternativa cuando el split es ambiguo, y el scoring de externas y catalogo la
    toma en cuenta solo si el match de texto es casi verbatim — sin tocar el gate de
    auto-match ni la clasificacion real de Scanner. Detalle en `tareas.md`.
-4. [Q3] Planificador acotado de aliases/idiomas, incluido el fallback vacio de IMDb.
+4. **Cerrado 2026-08-29.** [Q3] IMDb dispara su puente de Wikidata tambien con
+   sugerencia vacia (antes solo con resultados de score bajo); Wikipedia y
+   FilmAffinity ganan un reintento acotado con alias confirmados
+   (`external/query_variants.py`) cuando su propia busqueda vuelve vacia. Idioma
+   preferido de la instancia queda como constante fija (`("es", "en")`), decision
+   explicita del owner — no existe infraestructura de settings en el proyecto y
+   ningun criterio de cierre exigia que fuera editable. Detalle en `tareas.md`.
 5. [Q4] Busqueda por direccion como descubrimiento separado del matching de identidad.
 6. [F1] Prototipo local opcional con datasets oficiales de IMDb.
 7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente.
