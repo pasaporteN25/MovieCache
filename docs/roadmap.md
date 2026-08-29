@@ -144,11 +144,12 @@ no inmoviliza el resto de la cola.
    CI con excepciones acotadas para callbacks dinamicos y fixtures Playwright.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
-`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3], [Q4] y
-[L1] tambien cerraron (ver `tareas.md`). [F1] y [F2] ya tienen decision del owner
-tomada (2026-08-29) y quedan listos para prototipar/diseñar; [Q5] sigue esperando los
-resultados reales de [F1] (no solo la decision), no solo su posicion en esta lista —
-confirmar el estado de cada uno en `tareas.md` antes de tomar el siguiente item.
+`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3], [Q4],
+[L1] y [F1] tambien cerraron (ver `tareas.md`). [F2] ya tiene decision del owner
+tomada (2026-08-29) y queda lista para una pasada de diseño; [Q5] ahora puede
+arrancar con los resultados reales de [F1] (12,7M titulos indexados, ~24 min de build,
+~8,1 GB en disco) — confirmar el estado de cada uno en `tareas.md` antes de tomar el
+siguiente item.
 
 ### 2. Calidad de datos y bibliotecas
 
@@ -176,12 +177,15 @@ confirmar el estado de cada uno en `tareas.md` antes de tomar el siguiente item.
    apellido no aparece en un titulo por diseño). `domain/matching.py` queda sin
    ninguna referencia a `director` — verificado en vivo que compartir director no
    produce match ni fusion automatica. Detalle en `tareas.md`.
-6. **Decision tomada 2026-08-29.** [F1] Prototipo local opcional con datasets
-   oficiales de IMDb. Uso personal/no comercial confirmado; atribucion resuelta con
-   una mencion en "Acerca de" mas procedencia conservada en los campos que llene.
-   Listo para prototipar.
-7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente. Espera
-   los resultados reales de [F1], ya desbloqueado pero todavia no ejecutado.
+6. **Cerrado 2026-08-29.** [F1] `movie-inbox imdb-dataset sync/stats/lookup` descarga
+   `title.basics`/`title.akas` y arma un `.db` SQLite propio, sin tocar el catalogo
+   real. Medidas reales: descarga 704 MB en ~8s, indexado de 12,7M titulos + 59,1M
+   alias en ~24 min, `.db` resultante de ~8,1 GB. Dos bugs que solo una corrida real
+   encontro (TLS estricto de Python 3.13+ contra la cadena de CloudFront del sitio,
+   `UnicodeEncodeError` imprimiendo alias fuera de cp1252) quedaron corregidos.
+   Detalle en `tareas.md`.
+7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente. Ya
+   puede arrancar con los resultados reales de [F1].
 8. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
 9. **Cerrado 2026-08-29.** [L1] Reglas de exclusion adicionales por biblioteca, encima
    de los defaults seguros existentes (`extras`, `sample`, etc.): patrones tipo glob

@@ -60,27 +60,6 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
 ### Frente: Fuentes externas y especializacion de anime
 
-#### [F1] Prototipo opcional del indice oficial no comercial de IMDb
-- **Alcance**: disenar un comando explicito que descargue/indexe localmente los TSV
-  oficiales elegidos por el administrador; nunca incluirlos en el paquete ni activar
-  la descarga por defecto. Medir disco, primera carga y actualizacion diaria.
-- **Datos iniciales**: `title.basics` y `title.akas`; agregar
-  `title.crew`/`title.principals`/`name.basics` solo si el prototipo demuestra que la
-  instancia puede sostener el indice.
-- **Regla de uso**: el prototipo mide y expone datos; la autoridad y el merge se
-  deciden en [Q5], nunca mediante una prioridad global de IMDb. Manual y
-  `locked_fields` siempre ganan.
-- **Decision del owner (2026-08-29)**: uso personal/no comercial confirmado — el
-  proyecto es abierto y funciona como una mini biblioteca personal, no como un
-  servicio distribuido comercialmente. Atribucion resuelta: una mencion visible en
-  "Acerca de" del panel de administracion citando el dataset no comercial de IMDb, mas
-  conservar la procedencia (mismo mecanismo que ya usan los campos que llena Wikidata)
-  en cualquier campo que este dataset complete, para que sobreviva a exportaciones
-  JSON/CSV y a una futura coleccion compartida via [P2]. Sin bloqueo pendiente: listo
-  para prototipar.
-- **Modelo sugerido**: Grande. Toca licencias, almacenamiento, CLI, enrichment,
-  procedencia y migraciones.
-
 #### [F2] Autoridad de anime sostenible
 - **Decision del owner (2026-08-29)**: Jikan (envoltorio no oficial de MyAnimeList)
   como fuente primaria en vivo — trade-off consciente y aceptado para un uso
@@ -811,6 +790,69 @@ reglas por endpoints separados, un endpoint de preview sincrono aparte del dry r
 existente, y una prueba de navegador Playwright nueva para este dialogo (no tenia
 cobertura de ese tipo antes tampoco; verificacion manual con servidor real, mismo
 criterio que [Q4]).
+2026-08-29.
+
+---
+
+### Frente: Fuentes externas y especializacion de anime
+
+#### [F1] Prototipo del indice no comercial de IMDb
+Comando nuevo `movie-inbox imdb-dataset sync/stats/lookup` que descarga
+`title.basics.tsv.gz`/`title.akas.tsv.gz` desde `datasets.imdbws.com` y los indexa en
+un `.db` SQLite propio, separado de `catalog.db` e `instance.db` — deliberadamente
+desconectado del catalogo real: no toca `domain/catalog.py`, `metadata_sources` ni
+ningun merge, eso es trabajo de [Q5]. Un agente Plan encontro una violacion de
+layering real en el primer diseño (`application/` importando `infrastructure`/
+`external` directo) — se elimino la capa `application/` por completo, siguiendo el
+mismo patron que `cli/database.py`/`cli/backup.py` ya usan para herramientas sin nada
+mas que inyectar. Tambien encontro que cada `sync` reconstruye el indice entero desde
+cero, asi que no hace falta una tabla de migraciones — un `PRAGMA user_version` simple
+alcanza (`stats`/`lookup` piden re-correr `sync` si no coincide, en vez de migrar en
+el lugar), y que la descarga en si (no solo el build del indice) necesitaba el mismo
+patron atomico de archivo temporal + `os.replace()` que ya usan `schema.py`/
+`image_proxy.py`/`backup.py`, para que una conexion cortada a mitad de descarga no
+deje un `.tsv.gz` truncado en la ruta final.
+
+Verifique yo mismo los terminos reales de IMDb contra su Help Center (no asumidos):
+la atribucion exigida es el string exacto "Information courtesy of IMDb
+(https://www.imdb.com). Used with permission." — aparece en la salida de `sync` y de
+`lookup` cada vez que se muestran datos reales. El uso personal para armar un indice
+offline propio esta explicitamente permitido ("except for individual personal use").
+
+Dos bugs reales que ningun test sintetico iba a encontrar, solo la corrida real contra
+datos reales los mostro: (1) la cadena de certificados de CloudFront de
+`datasets.imdbws.com` tiene un CA intermedio sin "Basic Constraints" marcado como
+critico — Python 3.13+ activa `VERIFY_X509_STRICT` por defecto y rechaza el
+handshake (confirmado que curl acepta el mismo sitio sin problema); se relaja
+unicamente esa bandera, solo para este host, sin tocar cadena de confianza ni
+verificacion de hostname. (2) `lookup` reventaba con `UnicodeEncodeError` imprimiendo
+el primer aka fuera de cp1252 (la codepage por defecto de consola en Windows) —
+`title.akas` tiene titulos en todos los alfabetos que IMDb rastrea; `main()` ahora
+reconfigura `stdout` a UTF-8 antes de imprimir. Test de regresion nuevo que reproduce
+el crash con un `TextIOWrapper` real en cp1252, sin depender de una consola real.
+
+Medidas reales obtenidas (permiso explicito del owner antes de descargar, dado que el
+tamaño exacto era justamente lo que faltaba medir): `title.basics.tsv.gz` 215.6 MB en
+2.6s, `title.akas.tsv.gz` 488.4 MB en 5.2s — la descarga en si es rapida y barata.
+12.749.320 titulos y 59.128.959 alias indexados; el build del indice tardo 1433.8s
+(~24 minutos) y el `.db` resultante ocupa 8102.6 MB en disco — bastante mas grande que
+los ~704 MB descargados, por el texto descomprimido mas los indices sobre ~72 millones
+de filas. Verificado con `lookup --title "Heat" --year 1995` contra el indice real:
+encuentra la pelicula y un episodio de TV homonimo de 1995 por separado, con docenas
+de alias reales en cirilico/CJK/griego/etc. renderizando correctamente tras el fix de
+codificacion.
+
+435 pruebas (crecio desde 421 al empezar, en 3 fases mas los 2 fixes), mypy estricto,
+Ruff, `compileall` y `git diff --check` en verde en cada fase — todas con datasets
+sinteticos chicos, sin tocar la red; ningun test real descarga nada. Fuera de alcance,
+explicito desde el diseño: tocar el catalogo real o `metadata_sources` (es [Q5]),
+`title.crew`/`title.principals`/`name.basics` (solo si esta base demuestra que la
+instancia los sostiene), actualizacion incremental real (cada `sync` reconstruye
+entero a proposito, para medir si eso es viable a diario — 24 minutos de CPU sugiere
+que en produccion conviene correrlo en un horario programado, no bajo demanda), y
+locking entre procesos para `sync` corriendo a la vez que `lookup`/`stats` (riesgo
+real mencionado por el agente Plan — puede fallar con `PermissionError` en Windows,
+sin riesgo de corrupcion; documentado como restriccion de uso).
 2026-08-29.
 
 ---
