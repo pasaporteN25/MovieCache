@@ -68,28 +68,60 @@ class ImdbAdapter:
                     "page_image": str(image.get("imageUrl") or ""),
                 }
             )
-        if (
-            results
-            and not intent.external_id
-            and all(
+        is_empty = not results
+        needs_bridge = not intent.external_id and (
+            is_empty
+            or all(
                 external_result_score(intent, result) < EXTERNAL_RELEVANCE_THRESHOLD
                 for result in results
             )
-        ):
+        )
+        if needs_bridge:
             title_matches = fetch_wikidata_title_matches(intent.title or query)
-            for result in results:
-                imdb_id = imdb_id_from_text(str(result.get("url") or ""))
-                metadata = title_matches.get(imdb_id)
-                if not metadata:
-                    continue
-                for field in ("original_title", "spanish_title", "english_title"):
-                    if metadata.get(field):
-                        result[field] = str(metadata[field])
-                result["alternative_titles"] = merge_lists(
-                    string_list(result.get("alternative_titles")),
-                    string_list(metadata.get("alternative_titles")),
-                )
+            if is_empty:
+                # [Q3] tareas.md: an empty suggestion response used to mean the
+                # bridge never even ran (the old condition short-circuited on
+                # `results` being falsy). A Wikidata-confirmed alias can still
+                # name the right tt-id here, so synthesize a fresh row for each
+                # match instead of only ever enriching rows IMDb's own
+                # suggestion endpoint happened to return.
+                for imdb_id, alias_metadata in title_matches.items():
+                    results.append(_result_from_wikidata_match(imdb_id, alias_metadata))
+            else:
+                for result in results:
+                    imdb_id = imdb_id_from_text(str(result.get("url") or ""))
+                    metadata = title_matches.get(imdb_id)
+                    if not metadata:
+                        continue
+                    for field in ("original_title", "spanish_title", "english_title"):
+                        if metadata.get(field):
+                            result[field] = str(metadata[field])
+                    result["alternative_titles"] = merge_lists(
+                        string_list(result.get("alternative_titles")),
+                        string_list(metadata.get("alternative_titles")),
+                    )
         return results
+
+
+def _result_from_wikidata_match(imdb_id: str, metadata: dict[str, Any]) -> dict[str, Any]:
+    title = (
+        str(metadata.get("original_title") or "")
+        or str(metadata.get("spanish_title") or "")
+        or str(metadata.get("english_title") or "")
+    )
+    return {
+        "source": "imdb",
+        "title": title,
+        "original_title": str(metadata.get("original_title") or ""),
+        "spanish_title": str(metadata.get("spanish_title") or ""),
+        "english_title": str(metadata.get("english_title") or ""),
+        "alternative_titles": string_list(metadata.get("alternative_titles")),
+        "kind": str(metadata.get("kind") or ""),
+        "year": str(metadata.get("year") or ""),
+        "url": f"https://www.imdb.com/title/{imdb_id}/",
+        "description": "",
+        "page_image": "",
+    }
 
 
 def imdb_id_from_text(value: str) -> str:

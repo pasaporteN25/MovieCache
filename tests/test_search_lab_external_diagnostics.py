@@ -126,6 +126,10 @@ class EvaluateExternalDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["metrics"]["source_did_not_return_it"], 0)
 
     def test_a_missing_candidate_is_reported_as_source_did_not_return_it(self) -> None:
+        # [Q3]: an empty suggestion response now also triggers IMDb's Wikidata
+        # bridge (imdb.py), so this needs empty search fixtures too, or the
+        # harness raises UnrecordedRequestError instead of exercising the
+        # "genuinely nothing found" path this test means to cover.
         case = {
             "id": "empty-source",
             "label": "Source returns nothing at all",
@@ -135,7 +139,10 @@ class EvaluateExternalDiagnosticsTests(unittest.TestCase):
             "sources": {
                 "imdb": {
                     "expected_key": "tt0113277",
-                    "recorded_responses": {IMDB_URL: {"d": []}},
+                    "recorded_responses": {
+                        IMDB_URL: {"d": []},
+                        **_empty_wikidata_searches("Heat"),
+                    },
                 }
             },
         }
@@ -229,7 +236,10 @@ class EvaluateExternalDiagnosticsTests(unittest.TestCase):
             "sources": {
                 "imdb": {
                     "expected_key": "tt0113277",
-                    "recorded_responses": {IMDB_URL: {"d": []}},
+                    "recorded_responses": {
+                        IMDB_URL: {"d": []},
+                        **_empty_wikidata_searches("Heat"),
+                    },
                 }
             },
         }

@@ -85,6 +85,12 @@ def fetch_wikidata_title_matches(query: str) -> dict[str, dict[str, object]]:
         if not re.fullmatch(r"tt\d{7,9}", imdb_id, flags=re.IGNORECASE):
             continue
         metadata = wikidata_title_metadata(entity)
+        kind = wikidata_kind(claims)
+        if kind:
+            metadata["kind"] = kind
+        year = wikidata_claim_year(claims, "P577")
+        if year:
+            metadata["year"] = year
         match = object_dict(search_row.get("match"))
         search_aliases = search_row.get("aliases")
         candidate_aliases = [

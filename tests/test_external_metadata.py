@@ -192,9 +192,15 @@ class ExternalMetadataTests(unittest.TestCase):
         self.assertIn("Adiós tío Tom", results[0]["alternative_titles"])
         title_matches.assert_called_once_with("Addio zio Tom")
 
+    @patch("movie_inbox.external.imdb.fetch_wikidata_title_matches")
     @patch("movie_inbox.external.imdb.fetch_json")
-    def test_imdb_suggestion_key_preserves_accented_letters(self, fetch_json) -> None:
+    def test_imdb_suggestion_key_preserves_accented_letters(
+        self, fetch_json, title_matches
+    ) -> None:
         fetch_json.return_value = {"d": []}
+        # [Q3]: an empty suggestion now also triggers the Wikidata bridge --
+        # mock it out so this test never depends on the real network.
+        title_matches.return_value = {}
 
         ImdbAdapter().search("Adiós Tío Tom")
 
@@ -218,6 +224,48 @@ class ExternalMetadataTests(unittest.TestCase):
         title_matches.return_value = {"tt9999999": {"alternative_titles": ["Addio zio Tom"]}}
 
         results, _state = ExternalSourceService([ImdbAdapter()]).search("Addio zio Tom")
+
+        self.assertEqual(results, [])
+
+    @patch("movie_inbox.external.imdb.fetch_wikidata_title_matches")
+    @patch("movie_inbox.external.imdb.fetch_json")
+    def test_imdb_synthesizes_a_result_from_wikidata_when_the_suggestion_is_empty(
+        self, fetch_json, title_matches
+    ) -> None:
+        # [Q3] tareas.md: an empty suggestion response used to mean the
+        # Wikidata bridge never ran at all -- now a confirmed alias can
+        # surface a result IMDb's own suggestion endpoint never returned.
+        fetch_json.return_value = {"d": []}
+        title_matches.return_value = {
+            "tt5678901": {
+                "original_title": "Estiu 1993",
+                "spanish_title": "Verano 1993",
+                "english_title": "Summer 1993",
+                "alternative_titles": ["Summer 1993"],
+                "kind": "pelicula",
+                "year": "2017",
+            }
+        }
+
+        results = ImdbAdapter().search("Verano 1993")
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["url"], "https://www.imdb.com/title/tt5678901/")
+        self.assertEqual(results[0]["title"], "Estiu 1993")
+        self.assertEqual(results[0]["spanish_title"], "Verano 1993")
+        self.assertEqual(results[0]["year"], "2017")
+        self.assertEqual(results[0]["kind"], "pelicula")
+        title_matches.assert_called_once_with("Verano")
+
+    @patch("movie_inbox.external.imdb.fetch_wikidata_title_matches")
+    @patch("movie_inbox.external.imdb.fetch_json")
+    def test_imdb_reports_nothing_when_the_suggestion_and_wikidata_are_both_empty(
+        self, fetch_json, title_matches
+    ) -> None:
+        fetch_json.return_value = {"d": []}
+        title_matches.return_value = {}
+
+        results = ImdbAdapter().search("Some Completely Unknown Title")
 
         self.assertEqual(results, [])
 
@@ -277,6 +325,45 @@ class ExternalMetadataTests(unittest.TestCase):
         self.assertEqual(matches["tt0180396"]["original_title"], "Addio zio Tom")
         self.assertEqual(matches["tt0180396"]["spanish_title"], "Adiós tío Tom")
         self.assertEqual(matches["tt0180396"]["english_title"], "Goodbye Uncle Tom")
+
+    @patch("movie_inbox.external.wikidata.fetch_json_safe")
+    def test_wikidata_title_match_also_carries_year_and_kind_when_the_entity_has_them(
+        self, fetch_json_safe
+    ) -> None:
+        # [Q3]: needed so ImdbAdapter can synthesize a year/kind-aware result
+        # from an empty suggestion response -- zero extra network calls,
+        # since claims for the matched entity are already fetched above.
+        def response(url: str, **_kwargs: object) -> dict[str, object]:
+            if "wbsearchentities" in url:
+                if "language=en" not in url:
+                    return {"search": []}
+                return {"search": [{"id": "Q3605118", "label": "Estiu 1993"}]}
+            return {
+                "entities": {
+                    "Q3605118": {
+                        "labels": {"es": {"value": "Verano 1993"}},
+                        "aliases": {},
+                        "claims": {
+                            "P345": [{"mainsnak": {"datavalue": {"value": "tt5678901"}}}],
+                            "P31": [{"mainsnak": {"datavalue": {"value": {"id": "Q11424"}}}}],
+                            "P577": [
+                                {
+                                    "mainsnak": {
+                                        "datavalue": {"value": {"time": "+2017-00-00T00:00:00Z"}}
+                                    }
+                                }
+                            ],
+                        },
+                    }
+                }
+            }
+
+        fetch_json_safe.side_effect = response
+
+        matches = fetch_wikidata_title_matches("Verano 1993")
+
+        self.assertEqual(matches["tt5678901"]["year"], "2017")
+        self.assertEqual(matches["tt5678901"]["kind"], "pelicula")
 
     @patch("movie_inbox.external.wikidata.fetch_json_safe")
     def test_wikidata_title_match_searches_japanese_aliases(self, fetch_json_safe) -> None:
