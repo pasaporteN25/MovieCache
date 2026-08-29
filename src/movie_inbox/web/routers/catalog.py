@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
+from movie_inbox.application.curation_workflow import CatalogPointer, CurationConflict
 from movie_inbox.application.identity_repository import IdentityRepositoryError
 from movie_inbox.application.library_repository import LibraryRepositoryError
 from movie_inbox.application.repository import CatalogRepositoryError
@@ -39,6 +40,8 @@ from movie_inbox.web.dependencies import (
     SessionCatalog,
     authorized_json,
     editorial_home_payload,
+    history_session_id,
+    request_workflow,
     requested_home_date,
     require_ready_identity,
     require_token,
@@ -215,9 +218,36 @@ def add(
             target_id=target_id,
             expected_source=str(body.get("expected_source") or ""),
         )
+        if reason == "strong_match":
+            existing_id = str(extra.get("existing_id") or "")
+            try:
+                merge_result = request_workflow(request).auto_merge_on_add(
+                    CatalogPointer(write_path, existing_id),
+                    item,
+                    history_mode="persistent",
+                    session_id=history_session_id(request),
+                )
+                added, reason, target_id = True, "merged_into_existing", existing_id
+                extra = {"operation": merge_result["operation"]}
+                item = merge_result["item"]
+            except CurationConflict:
+                added, reason, extra = append_item(
+                    write_path,
+                    item,
+                    action="force",
+                    expected_source=str(body.get("expected_source") or ""),
+                )
         background_enrichment = "not_needed"
-        if added and reason in {"added", "merged"} and needs_background_title_enrichment(item):
-            effective_item_id = target_id if reason == "merged" else str(item.get("id") or "")
+        if (
+            added
+            and reason in {"added", "merged", "merged_into_existing"}
+            and needs_background_title_enrichment(item)
+        ):
+            effective_item_id = (
+                target_id
+                if reason in {"merged", "merged_into_existing"}
+                else str(item.get("id") or "")
+            )
             background_tasks.add_task(
                 background_enrich_catalog_item,
                 write_path,

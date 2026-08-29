@@ -1726,6 +1726,77 @@ class ViewerHttpTests(unittest.TestCase):
         background_enrichment.assert_called_once()
         self.assertEqual(len(JsonCatalogRepository(self.catalog_path, normalize_item).read()), 2)
 
+    @patch("movie_inbox.web.routers.catalog.background_enrich_catalog_item")
+    @patch(
+        "movie_inbox.web.routers.catalog.enrich_selected_result",
+        side_effect=lambda result: result,
+    )
+    def test_adding_the_same_title_from_a_different_source_merges_instead_of_duplicating(
+        self, _, __
+    ) -> None:
+        # [Q6]: the seeded catalog item is {"id": "heat", "title": "Heat", "year":
+        # "1995"} with no external links yet -- an IMDb-sourced add for the exact
+        # same title+year should fold into it (decide_match's exact_title_year
+        # acceptance) instead of prompting for a manual merge or creating a
+        # second, unlinked entry.
+        body = json.dumps(
+            {
+                "title": "Heat",
+                "spanish_title": "Fuego contra fuego",
+                "year": "1995",
+                "source": "imdb",
+                "url": "https://www.imdb.com/title/tt0113277/",
+                "imdb_url": "https://www.imdb.com/title/tt0113277/",
+            }
+        )
+
+        status, raw_payload = self.request("POST", "/api/add", body, self.post_headers())
+        payload = json.loads(raw_payload)
+
+        self.assertEqual(status, 200, raw_payload)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["reason"], "merged_into_existing")
+        self.assertEqual(payload["item"]["id"], "heat")
+        self.assertEqual(payload["item"]["spanish_title"], "Fuego contra fuego")
+        self.assertEqual(payload["item"]["imdb_url"], "https://www.imdb.com/title/tt0113277/")
+        self.assertTrue(payload["operation"]["can_undo"])
+
+        items = JsonCatalogRepository(self.catalog_path, normalize_item).read()
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].spanish_title, "Fuego contra fuego")
+
+        # A third add, from yet another source, keeps accumulating into the same
+        # item -- exactly "sin pedir tres altas ni una fusion manual".
+        third_body = json.dumps(
+            {
+                "title": "Heat",
+                "year": "1995",
+                "source": "filmaffinity",
+                "url": "https://www.filmaffinity.com/es/film267267.html",
+                "filmaffinity_url": "https://www.filmaffinity.com/es/film267267.html",
+                "description": "Un detective y un ladron chocan en Los Angeles.",
+            }
+        )
+        third_status, third_raw = self.request("POST", "/api/add", third_body, self.post_headers())
+        third_payload = json.loads(third_raw)
+
+        self.assertEqual(third_status, 200, third_raw)
+        self.assertEqual(third_payload["reason"], "merged_into_existing")
+        self.assertEqual(third_payload["item"]["id"], "heat")
+        self.assertEqual(
+            third_payload["item"]["description"],
+            "Un detective y un ladron chocan en Los Angeles.",
+        )
+        self.assertEqual(
+            third_payload["item"]["filmaffinity_url"],
+            "https://www.filmaffinity.com/es/film267267.html",
+        )
+        # The IMDb link from the second add survives the third merge untouched.
+        self.assertEqual(third_payload["item"]["imdb_url"], "https://www.imdb.com/title/tt0113277/")
+
+        final_items = JsonCatalogRepository(self.catalog_path, normalize_item).read()
+        self.assertEqual(len(final_items), 1)
+
     def test_owner_can_test_apply_and_read_shared_scanner_availability(self) -> None:
         (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
         created = self.client.post(

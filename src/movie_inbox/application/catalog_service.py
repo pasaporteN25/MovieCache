@@ -98,6 +98,12 @@ class CatalogService:
                 for existing in items
             ):
                 return False, (False, "duplicate", {})
+            if action == "check":
+                strong_matches = [
+                    existing for existing in items if decide_match(existing, normalized).accepted
+                ]
+                if len(strong_matches) == 1:
+                    return False, (False, "strong_match", {"existing_id": strong_matches[0].id})
             candidates = possible_duplicate_candidates(items, normalized)
             if action == "check" and candidates:
                 return False, (False, "possible_duplicate", {"candidates": candidates[:5]})
