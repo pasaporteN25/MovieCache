@@ -145,11 +145,10 @@ no inmoviliza el resto de la cola.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
 `ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3], [Q4],
-[L1] y [F1] tambien cerraron (ver `tareas.md`). [F2] ya tiene decision del owner
-tomada (2026-08-29) y queda lista para una pasada de diseño; [Q5] ahora puede
-arrancar con los resultados reales de [F1] (12,7M titulos indexados, ~24 min de build,
-~8,1 GB en disco) — confirmar el estado de cada uno en `tareas.md` antes de tomar el
-siguiente item.
+[L1], [F1] y [Q5] tambien cerraron (ver `tareas.md`). [F2] ya tiene decision del owner
+tomada (2026-08-29) y queda lista para una pasada de diseño; [Q6] ahora tiene la
+matriz de autoridad de [Q5] lista para usar — confirmar el estado de cada uno en
+`tareas.md` antes de tomar el siguiente item.
 
 ### 2. Calidad de datos y bibliotecas
 
@@ -184,9 +183,14 @@ siguiente item.
    encontro (TLS estricto de Python 3.13+ contra la cadena de CloudFront del sitio,
    `UnicodeEncodeError` imprimiendo alias fuera de cp1252) quedaron corregidos.
    Detalle en `tareas.md`.
-7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente. Ya
-   puede arrancar con los resultados reales de [F1].
-8. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
+7. **Cerrado 2026-08-29.** [Q5] Matriz de autoridad por familia de campo: define qué
+   fuente se prueba primero cuando un campo está vacío (`[F1]` → Wikipedia → IMDb →
+   FilmAffinity, según la familia), pero un campo ya completado nunca se pisa —
+   decisión explícita del owner. Sin cambios a `domain/catalog.py`; `tests/
+   test_metadata_authority.py` prueba la política contra las funciones de merge ya
+   existentes. Detalle en `tareas.md`.
+8. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas. Ya tiene la
+   matriz de [Q5] lista para usar.
 9. **Cerrado 2026-08-29.** [L1] Reglas de exclusion adicionales por biblioteca, encima
    de los defaults seguros existentes (`extras`, `sample`, etc.): patrones tipo glob
    validados en `domain/libraries.py` y persistidos por biblioteca, aplicados por

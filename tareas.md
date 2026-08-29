@@ -33,18 +33,6 @@ agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb
 Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
 consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
-#### [Q5] Definir autoridad y conflicto campo por campo
-- **Alcance**: crear una matriz versionada para titulo/aliases, ano/tipo, creditos,
-  imagenes, fechas y descripcion. Manual y `locked_fields` ganan siempre; IMDb puede ser
-  autoridad de identidad y datos estructurados cuando [F1] demuestre disponibilidad,
-  mientras Wikipedia puede aportar la descripcion/sinopsis mas completa. FilmAffinity
-  y futuras fuentes solo completan los campos autorizados, con procedencia y frescura.
-- **Criterio de cierre**: ADR y fixtures de conflicto para cada familia de campos,
-  incluyendo vacios, listas, valores divergentes, fuente caida y dato manual. No existe
-  una prioridad global de fuente ni un overwrite silencioso.
-- **Depende de**: resultados de [F1]; [F3] extiende la matriz si TMDb se aprueba.
-- **Modelo sugerido**: Grande. Es una decision de producto y preservacion de datos.
-
 #### [Q6] Crear una ficha compuesta sin altas manuales duplicadas
 - **Alcance**: agrupar resultados externos solo mediante identidad fuerte y presentar
   una candidata unificada con procedencia por campo. Agregar una vez debe crear o
@@ -428,6 +416,98 @@ terreno que una mockeada tipica, y el cambio es un toggle mas una etiqueta, no u
 maquina de estados nueva como el trabajo de modo comparar/vincular de [Q1] que
 justifico cobertura Playwright nueva ahi. Suite completa, ambos gates de Search Lab,
 Ruff y mypy estricto en verde sin regresiones.
+2026-08-29.
+
+#### [Q5] Definir autoridad y conflicto campo por campo
+`merge_metadata_field()` (`domain/catalog.py:619-644`) es hoy "solo llena vacios" para
+todo campo simple (`after = before or incoming_value`, verificado ejecutandolo): una
+vez que un campo tiene cualquier valor, ninguna fuente nueva lo cambia jamas, sin
+importar cual sea mas confiable — solo `locked_fields` (revisado primero, incluso
+sobre un campo vacio) o una edicion manual (que no pasa por esta funcion) pueden
+pisarlo. Esto choca con como suena "IMDb es autoridad" en el alcance original de la
+tarea, asi que se lo señale al owner antes de diseñar nada. **Decision explicita del
+owner (2026-08-29): autoridad = orden de relleno, nunca pisa lo ya completado.** La
+matriz de abajo define que fuente se prueba primero cuando un campo esta vacio; el
+comportamiento actual de "una vez lleno, queda asi salvo `locked_fields`/edicion
+manual" no cambia.
+
+Las 24 `METADATA_FIELDS` en 7 familias (la tarea nombraba 6; sumo "Datos
+estructurados" porque duracion/paises/idiomas/genero no encajaban en ninguna de las
+otras sin forzarla):
+1. **Identidad** (title, original_title, alternative_titles): [F1] → Wikipedia
+   (incluye lo que trae de Wikidata; ambos quedan como `source: wikipedia` en
+   `metadata_sources`, nunca como `wikidata` — la unica llamada a
+   `fetch_wikidata_metadata()` vive adentro de `external/wikipedia.py:316` y hereda su
+   `source` — verificado por grep) → IMDb (cliente en vivo) → FilmAffinity.
+   `alternative_titles` es list-field (union, nunca pisa nada) y se arma con los akas
+   de [F1] filtrados por `region` a mercados hispano/anglofonos (no por `language`: en
+   la prueba real contra "Heat" ningun aka tenia `language` poblado, todas se
+   distinguian solo por `region`).
+   - `spanish_title`/`english_title`: [F1] NO participa (`TitleLookupResult` solo
+     expone `primary_title`/`original_title` como escalares) — Wikipedia (label por
+     idioma via Wikidata) → FilmAffinity (`spanish_title` unicamente).
+2. **Clasificacion** (year, kind): [F1] → Wikipedia → IMDb. FilmAffinity no aporta
+   `kind` (confirmado leyendo `filmaffinity.py`: no hay ninguna extraccion de tipo en
+   todo el archivo), si aporta `year`. **Regla obligatoria**: el `title_type` crudo de
+   IMDb jamas se pasa directo a `incoming["kind"]` — `domain/normalization.py::
+   normalize_kind()` tiene su propio vocabulario hardcodeado, separado e incompleto, y
+   nunca devuelve "sin opinion": confirme ejecutandolo que `normalize_kind("tvMiniSeries")`
+   y `normalize_kind("tvEpisode")` devuelven ambos `"pelicula"` (no un error, un
+   default silenciosamente incorrecto). Traduccion antes de tocar `kind`:
+   `movie`/`tvMovie`/`short`/`tvShort`/`tvSpecial` → `pelicula`;
+   `tvSeries`/`tvMiniSeries` → `serie`; `tvEpisode`/`tvPilot`/`videoGame`/cualquier
+   otro → excluido (nunca fija el `kind` de la ficha entera a partir de un episodio
+   suelto; este catalogo no trackea episodios individuales). La regla existente de que
+   `kind` solo sube de `pelicula` a `{serie,anime,documental}`, nunca baja, no cambia.
+3. **Datos estructurados** (duration_minutes, countries, original_languages, genres):
+   `duration_minutes` ← [F1] (`runtime_minutes`, rename directo) → Wikipedia. `genres`
+   ← [F1] (string separado por comas) → Wikipedia → FilmAffinity — el string de [F1]
+   se une sin ningun codigo nuevo, `merge_lists`/`normalize_tags` ya hacen
+   `.split(",")` sobre cualquier string crudo (`domain/catalog.py:216-223`, probado en
+   vivo). `countries`/`original_languages`: solo Wikipedia hoy, ni FilmAffinity ni [F1]
+   los aportan.
+4. **Creditos** (producers, composers, directors, writers, cast): `producers`/
+   `composers`: solo Wikipedia (FilmAffinity no los aporta, confirmado — su unico mapeo
+   de nombres es `{"director": "directors", "actor": "cast"}`). `directors`/`writers`/
+   `cast`: Wikipedia → FilmAffinity. [F1] no aporta nada aca (`title.crew`/
+   `title.principals` quedan fuera de alcance — las medidas reales de [F1], 8,1 GB para
+   2 de 7 datasets posibles, desaconsejan sumarlos sin una razon de mucho peso).
+5. **Imagenes** (page_image, backdrop_image): Wikipedia → IMDb. FilmAffinity no aporta
+   ninguna imagen hoy. `backdrop_image`/`tmdb_id` no tienen fuente real todavia —
+   reservados para si [F3] aprueba TMDb, sin decision pendiente ahora.
+6. **Fechas** (release_dates): sin cambios — ya tiene su propio mecanismo
+   (`merge_release_dates`) con procedencia por fila y su propio "solo llena lo vacio"
+   por subcampo, correcto y suficiente. Solo Wikipedia lo alimenta hoy.
+7. **Descripcion** (description, wikipedia_extract): Wikipedia (articulo) → IMDb
+   (snippet corto) → FilmAffinity (sinopsis). `wikipedia_extract` es exclusivo de
+   Wikipedia por definicion.
+
+**Identificadores cruzados, excluidos de la matriz** (wikipedia_title, wikidata_id,
+tmdb_id): cada uno pertenece a una sola fuente por definicion, sin conflicto posible.
+
+Criterio de cierre cumplido con "ADR y fixtures", no una implementacion: este repo no
+tiene un formato de ADR separado (confirmado — ningun `docs/adr/` ni archivo `*adr*`
+existe; el precedente real de [P1]/[Q3]/[F1] es escribir la decision como esta misma
+prosa). `tests/test_metadata_authority.py` (10 tests nuevos) ejercita solo funciones
+ya existentes (`merge_metadata_field`, `merge_lists`, `normalize_kind`,
+`normalize_item`) con datos sinteticos — cero cambios a `domain/catalog.py` ni a
+ningun camino de produccion — cubriendo las 5 categorias del cierre: vacios, listas
+(incluido el genero de [F1] uniendose sin codigo nuevo), valores divergentes (la
+prueba concreta de la politica elegida), fuente caida (un `incoming` normalizado sin
+nada que aportar no toca el valor existente — encontre y arregle un bug real en mi
+propio diseño de este fixture antes de escribirlo: llamar `merge_metadata_field` con
+un diccionario armado a mano que OMITE una clave en vez de setearla en `""` hace que
+`after = "" or None` de `None`, que `!= ""`, y dispara una escritura falsa atribuida a
+una fuente que nunca menciono el campo — no pasa en produccion porque
+`merge_into_existing` siempre normaliza `incoming` primero, asi que los fixtures
+rutean por `normalize_item()` para reflejar esa precondicion real) y dato manual (dos
+fixtures: bloquear un campo vacio con `locked_fields` impide incluso su primer
+llenado, y el tag `source: "manual"` sobrevive intacto a un merge automatico
+posterior). Un fixture extra prueba en vivo la trampa de `normalize_kind()` descrita
+arriba. Fuera de alcance, explicito: decidir si una fila de una fuente corresponde a
+una ficha dada (eso ya lo gobierna `domain/matching.py` y el invariante de matching
+conservador de `CLAUDE.md`); escribir el codigo real que orqueste el orden de esta
+matriz (trabajo de quien integre esto al catalogo real, probablemente junto con [Q6]).
 2026-08-29.
 
 ### Frente: Tipado y capacidad de entrega
