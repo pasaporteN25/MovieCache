@@ -102,6 +102,69 @@ class CatalogSearchServiceTests(unittest.TestCase):
         self.assertEqual(results[0]["_search"]["reason"], "exact_title_year_anime_kind_review")
 
 
+class DirectorSearchTests(unittest.TestCase):
+    """[Q4] tareas.md: "director:X" is explicit discovery, never blended
+    into the title-scoring path above."""
+
+    def setUp(self) -> None:
+        self.items: list[dict[str, object]] = [
+            {
+                "id": "mondo-cane",
+                "title": "Mondo Cane",
+                "year": "1962",
+                "directors": ["Gualtiero Jacopetti", "Paolo Cavara"],
+            },
+            {
+                "id": "africa-addio",
+                "title": "Africa Addio",
+                "year": "1966",
+                "directors": ["Gualtiero Jacopetti", "Franco Prosperi"],
+            },
+            {"id": "heat-1995", "title": "Heat", "year": "1995", "directors": ["Michael Mann"]},
+        ]
+
+    def test_finds_every_work_by_a_director_regardless_of_co_director_order(self) -> None:
+        results = search_catalog_items(self.items, "director:Jacopetti")
+
+        self.assertEqual({row["id"] for row in results}, {"mondo-cane", "africa-addio"})
+
+    def test_a_director_match_is_labeled_as_discovery_not_a_title_match(self) -> None:
+        results = search_catalog_items(self.items, "director:Jacopetti")
+
+        for row in results:
+            self.assertEqual(row["_search"]["matched_field"], "director")
+            self.assertEqual(row["_search"]["reason"], "director_match")
+            self.assertEqual(row["_search"]["matched_value"], "Gualtiero Jacopetti")
+
+    def test_a_director_query_never_matches_by_title_text(self) -> None:
+        # "director:Heat" must not fall back to matching the title "Heat" --
+        # it's a name lookup, not title text with a stripped prefix.
+        results = search_catalog_items(self.items, "director:Heat")
+
+        self.assertEqual(results, [])
+
+    def test_a_title_query_never_reads_the_directors_field(self) -> None:
+        # Searching "Jacopetti" as a plain title query (no prefix) must not
+        # surface his films -- directors stay excluded from ordinary search.
+        self.assertEqual(search_catalog_items(self.items, "Jacopetti"), [])
+
+    def test_the_full_given_name_also_matches(self) -> None:
+        results = search_catalog_items(self.items, "director:Gualtiero Jacopetti")
+
+        self.assertEqual({row["id"] for row in results}, {"mondo-cane", "africa-addio"})
+
+    def test_a_stricter_admission_threshold_can_exclude_a_borderline_director_match(self) -> None:
+        loose = search_catalog_items(self.items, "director:Jacopetti")
+        strict = search_catalog_items(
+            self.items,
+            "director:Jacopetti",
+            strategy=SearchStrategy(catalog_admission_threshold=99.0),
+        )
+
+        self.assertEqual(len(loose), 2)
+        self.assertEqual(strict, [])
+
+
 class SearchRankingPrecisionTests(unittest.TestCase):
     """Regression coverage for the golden-corpus false positives fixed alongside
     docs/search-quality.md problems #1 (short tokens) and #2 (secondary metadata)."""

@@ -31,7 +31,7 @@ class ImdbAdapter:
         intent = parse_search_query(query)
         if intent.source and intent.source != self.name:
             return []
-        lookup = intent.external_id or intent.title or query
+        lookup = intent.external_id or intent.title or intent.director_query or query
         key = search_key(lookup).replace(" ", "_")
         if not key:
             return []
@@ -77,7 +77,9 @@ class ImdbAdapter:
             )
         )
         if needs_bridge:
-            title_matches = fetch_wikidata_title_matches(intent.title or query)
+            title_matches = fetch_wikidata_title_matches(
+                intent.title or intent.director_query or query
+            )
             if is_empty:
                 # [Q3] tareas.md: an empty suggestion response used to mean the
                 # bridge never even ran (the old condition short-circuited on

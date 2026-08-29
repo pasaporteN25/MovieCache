@@ -568,6 +568,45 @@ class ExternalMetadataTests(unittest.TestCase):
 
         self.assertIn("/tt0091064.json", fetch_json.call_args.args[0])
 
+    @patch("movie_inbox.external.imdb.fetch_wikidata_title_matches")
+    @patch("movie_inbox.external.imdb.fetch_json")
+    def test_imdb_uses_the_director_name_as_its_lookup_for_a_director_query(
+        self, fetch_json, title_matches
+    ) -> None:
+        # [Q4]: a director query must never reach the wire as the literal
+        # "director:Jacopetti" text.
+        fetch_json.return_value = {"d": []}
+        title_matches.return_value = {}
+
+        ImdbAdapter().search("director:Jacopetti")
+
+        self.assertIn("/jacopetti.json", fetch_json.call_args.args[0])
+        title_matches.assert_called_once_with("Jacopetti")
+
+    @patch("movie_inbox.external.wikipedia.alias_variants")
+    @patch("movie_inbox.external.wikipedia.fetch_json")
+    def test_wikipedia_uses_the_director_name_as_its_search_text(
+        self, fetch_json, variants
+    ) -> None:
+        fetch_json.return_value = {"query": {"pages": []}}
+        variants.return_value = []
+
+        WikipediaAdapter().search("director:Jacopetti")
+
+        self.assertIn("gsrsearch=Jacopetti", fetch_json.call_args_list[0].args[0])
+
+    @patch("movie_inbox.external.filmaffinity.alias_variants")
+    @patch("movie_inbox.external.filmaffinity.fetch_text")
+    def test_filmaffinity_uses_the_director_name_as_its_search_text(
+        self, fetch_text, variants
+    ) -> None:
+        fetch_text.return_value = "<html>no results</html>"
+        variants.return_value = []
+
+        FilmAffinityAdapter().search("director:Jacopetti")
+
+        self.assertIn("stext=Jacopetti", fetch_text.call_args_list[0].args[0])
+
     @patch("movie_inbox.external.wikipedia.fetch_wikipedia_metadata")
     def test_fetch_wikipedia_by_title_accepts_a_genuine_title_and_year_match(
         self, fetch_metadata

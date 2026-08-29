@@ -47,7 +47,7 @@ class WikipediaAdapter:
             if metadata:
                 return [wikipedia_result_from_metadata(metadata)]
 
-        search_title = intent.title or query.strip()
+        search_title = intent.title or intent.director_query or query.strip()
         if not search_title:
             return []
         languages = ["en", "es"]

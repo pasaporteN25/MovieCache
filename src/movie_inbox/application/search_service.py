@@ -51,6 +51,8 @@ def search_catalog_items(
 ) -> list[dict[str, Any]]:
     """Rank a personal catalog without applying the viewer's active filters."""
     intent = parse_search_query(query)
+    if intent.director_query_key:
+        return _search_by_director(items, intent, limit, strategy)
     if len(intent.title_key or intent.external_id or intent.key) < 2:
         return []
     ranked: list[tuple[float, str, dict[str, Any]]] = []
@@ -67,6 +69,43 @@ def search_catalog_items(
             "reason": _search_reason(score, matched_field),
         }
         ranked.append((score, str(item.get("id") or ""), payload))
+    ranked.sort(key=lambda row: (-row[0], row[1]))
+    return [row[2] for row in ranked[: max(1, limit)]]
+
+
+def _search_by_director(
+    items: Sequence[Mapping[str, Any]],
+    intent: SearchIntent,
+    limit: int,
+    strategy: SearchStrategy,
+) -> list[dict[str, Any]]:
+    """[Q4] tareas.md: explicit discovery by director, never blended into
+    the title-scoring path above -- a separate function, not a branch inside
+    _catalog_search_score/_search_values, so "nunca mezclarse con el score
+    de titulo" holds structurally. Never read by decide_match, so it can
+    never produce identity evidence or an automatic merge."""
+    query_terms = tuple(intent.director_query_key.split())
+    ranked: list[tuple[float, str, dict[str, Any]]] = []
+    for item in items:
+        directors = [str(value or "").strip() for value in (item.get("directors") or [])]
+        best_score = 0.0
+        best_value = ""
+        for director in directors:
+            if not director:
+                continue
+            score = text_match_score(search_key(director), intent.director_query_key, query_terms)
+            if score > best_score:
+                best_score, best_value = score, director
+        if best_score < strategy.catalog_admission_threshold:
+            continue
+        payload = dict(item)
+        payload["_search"] = {
+            "score": round(best_score, 1),
+            "matched_field": "director",
+            "matched_value": best_value,
+            "reason": "director_match",
+        }
+        ranked.append((best_score, str(item.get("id") or ""), payload))
     ranked.sort(key=lambda row: (-row[0], row[1]))
     return [row[2] for row in ranked[: max(1, limit)]]
 

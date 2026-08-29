@@ -176,6 +176,46 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(payload["sources"]["imdb"]["count"], 1)
         self.assertEqual(payload["sources"]["filmaffinity"]["count"], 1)
 
+    def test_a_director_query_labels_both_local_and_external_results_as_discovery(self) -> None:
+        # [Q4] tareas.md: "director:X" is a distinct discovery match, never
+        # a title match, in both the local catalog and external sources.
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "mondo-cane",
+                        "title": "Mondo Cane",
+                        "year": "1962",
+                        "kind": "pelicula",
+                        "directors": ["Gualtiero Jacopetti"],
+                    }
+                )
+            ]
+        )
+        external = [
+            {
+                "source": "wikipedia",
+                "title": "Africa Addio",
+                "url": "https://en.wikipedia.org/wiki/Africa_Addio",
+            }
+        ]
+
+        with patch("movie_inbox.web.routers.search.search_sources", return_value=external):
+            response = self.client.get(
+                "/api/search",
+                params={"q": "director:Jacopetti", "external": "true"},
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = response.json()
+        self.assertEqual(payload["catalog"]["results"][0]["id"], "mondo-cane")
+        self.assertEqual(payload["catalog"]["results"][0]["_search"]["reason"], "director_match")
+        self.assertEqual(payload["results"][0]["_search"]["reason"], "director_match")
+        self.assertEqual(
+            payload["sources"]["wikipedia"]["results"][0]["_search"]["reason"], "director_match"
+        )
+
     def test_progressive_external_search_can_skip_catalog_lookup(self) -> None:
         external = [
             {

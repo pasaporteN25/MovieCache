@@ -16,6 +16,7 @@ from movie_inbox.application.search_service import (
     search_catalog_items,
 )
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.domain.search import parse_search_query
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.web.catalog_api import enrich_selected_result, search_sources
 from movie_inbox.web.dependencies import (
@@ -42,6 +43,13 @@ def search(
         _, _, rows = session_catalog_rows(request, identity)
         catalog_results = search_catalog_items(rows, q)
     results = search_sources(q, source) if external else []
+    if parse_search_query(q).director_query_key:
+        # [Q4] tareas.md: external results carry no `directors` field of
+        # their own to check per-row (only single-item metadata fetches
+        # populate it, never a source's plain search-result list), so the
+        # discovery label is applied once, from the query itself.
+        for result in results:
+            result["_search"] = {"reason": "director_match", "matched_field": "director"}
     source_groups = group_external_results(results)
     print(
         f"[catalog-viewer] search query={q!r} source={source} "

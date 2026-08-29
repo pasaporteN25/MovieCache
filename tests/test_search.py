@@ -120,5 +120,51 @@ class ExternalResultScoreStrategyTests(unittest.TestCase):
         self.assertGreaterEqual(real_target_score, PRODUCTION_BASELINE.external_relevance_threshold)
 
 
+class DirectorQueryTests(unittest.TestCase):
+    """[Q4] tareas.md: "director:X" is explicit discovery, parsed as its
+    own kind of query rather than an empty title query."""
+
+    def test_a_director_query_is_recognized_and_consumes_the_whole_value(self) -> None:
+        intent = parse_search_query("director:Jacopetti")
+
+        self.assertEqual(intent.director_query, "Jacopetti")
+        self.assertEqual(intent.director_query_key, "jacopetti")
+        self.assertEqual(intent.title, "")
+        self.assertEqual(intent.title_key, "")
+        self.assertEqual(intent.year, "")
+
+    def test_the_prefix_is_case_insensitive_and_trims_surrounding_space(self) -> None:
+        intent = parse_search_query("DIRECTOR:  Jacopetti  ")
+
+        self.assertEqual(intent.director_query, "Jacopetti")
+
+    def test_a_normal_query_never_populates_the_director_fields(self) -> None:
+        intent = parse_search_query("Heat 1995")
+
+        self.assertEqual(intent.director_query, "")
+        self.assertEqual(intent.director_query_key, "")
+
+    def test_external_result_score_trusts_the_source_for_any_named_candidate(self) -> None:
+        # A surname has nothing sensible to compare against title text --
+        # any candidate carrying a recognizable title is accepted at a
+        # score that clears the admission threshold everywhere it's used
+        # (registry.py's _rank_batch, imdb.py's own bridge gate).
+        named_result = {"title": "Mondo Cane"}
+
+        score = external_result_score("director:Jacopetti", named_result)
+
+        self.assertGreaterEqual(score, PRODUCTION_BASELINE.external_relevance_threshold)
+
+    def test_external_result_score_rejects_a_result_with_no_title_at_all(self) -> None:
+        self.assertEqual(external_result_score("director:Jacopetti", {}), 0.0)
+
+    def test_a_bare_title_query_never_scores_as_a_director_match(self) -> None:
+        # The old title/year-based scoring path is untouched for anything
+        # that isn't a director query -- confirms the branch is additive.
+        score = external_result_score("Heat 1995", {"title": "Heat", "year": "1986"})
+
+        self.assertLess(score, PRODUCTION_BASELINE.external_relevance_threshold)
+
+
 if __name__ == "__main__":
     unittest.main()

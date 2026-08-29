@@ -21,7 +21,7 @@ class FilmAffinityAdapter:
         intent = parse_search_query(query)
         if intent.source:
             return []
-        search_text = intent.title or query
+        search_text = intent.title or intent.director_query or query
         results = self._fetch(search_text)
         if results:
             return results

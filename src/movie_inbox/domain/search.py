@@ -27,6 +27,7 @@ _MEDIA_QUALIFIER_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 _EXTERNAL_ID_PATTERN = re.compile(r"\b(?:tt\d{7,9}|q\d+|film\d+)\b", flags=re.IGNORECASE)
+_DIRECTOR_QUERY_PATTERN = re.compile(r"^director:\s*(.+)$", flags=re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -47,10 +48,33 @@ class SearchIntent:
     # want to consider both without guessing which one is "the" title.
     alternate_title: str = ""
     alternate_title_key: str = ""
+    # [Q4] tareas.md: "director:Jacopetti" is explicit discovery, not a title
+    # query that happens to be empty. Populated only by the early-return
+    # branch in parse_search_query() below; every other field stays at its
+    # normal empty/"" default for a director query (no title, no year).
+    director_query: str = ""
+    director_query_key: str = ""
 
 
 def parse_search_query(value: Any) -> SearchIntent:
     raw = " ".join(str(value or "").strip().split())
+    director_match = _DIRECTOR_QUERY_PATTERN.match(raw)
+    if director_match:
+        director_query = director_match.group(1).strip()
+        director_query_key = search_key(director_query)
+        return SearchIntent(
+            raw=raw,
+            key=director_query_key,
+            title="",
+            title_key="",
+            terms=tuple(director_query_key.split()),
+            year="",
+            source="",
+            external_id="",
+            canonical_url="",
+            director_query=director_query,
+            director_query_key=director_query_key,
+        )
     source = external_source_name(raw)
     canonical = canonical_url(raw) if source else ""
     title = _title_from_url(raw, source) if source else raw
@@ -120,6 +144,19 @@ def external_result_score(
     strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> float:
     intent = query if isinstance(query, SearchIntent) else parse_search_query(query)
+    if intent.director_query_key:
+        # [Q4]: director search is explicit discovery, not title identity --
+        # a surname has nothing sensible to compare against title text, so
+        # trust the source's own relevance ranking (why it returned this
+        # candidate at all) instead of re-scoring locally. 0.0 only filters
+        # genuinely empty/garbage rows, never "less relevant" ones -- that
+        # call already belongs to the source. Never identity evidence:
+        # domain/matching.py doesn't read this field at all.
+        has_title = any(
+            str(result.get(field) or "").strip()
+            for field in ("title", "original_title", "spanish_title", "english_title")
+        )
+        return 100.0 if has_title else 0.0
     result_url = canonical_url(str(result.get("url") or ""))
     if intent.canonical_url and result_url == intent.canonical_url:
         return 140.0

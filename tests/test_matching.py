@@ -150,6 +150,18 @@ class MatchingTests(unittest.TestCase):
         self.assertEqual(title_match_key("君の名は。"), "君の名は")
         self.assertEqual(title_match_key("がっこうぐらし!"), "がっこうぐらし")
 
+    def test_sharing_a_director_never_produces_a_match_on_its_own(self) -> None:
+        # [Q4] tareas.md safety rule: a shared director must never enable an
+        # automatic merge. decide_match doesn't read "directors" at all --
+        # two clearly different works by the same person stay unmatched.
+        decision = decide_match(
+            {"title": "Mondo Cane", "year": "1962", "directors": ["Gualtiero Jacopetti"]},
+            {"title": "Africa Addio", "year": "1966", "directors": ["Gualtiero Jacopetti"]},
+        )
+
+        self.assertFalse(decision.accepted)
+        self.assertLessEqual(decision.score, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
