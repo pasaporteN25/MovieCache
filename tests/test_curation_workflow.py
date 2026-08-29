@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, cast
+from unittest.mock import patch
 
 from movie_inbox.application.curation_workflow import (
     CatalogPointer,
@@ -431,6 +432,137 @@ class CurationWorkflowTests(unittest.TestCase):
             remaining = repository.read()
             self.assertEqual(len(remaining), 1)
             self.assertEqual(remaining[0].rating, 8)
+
+    def test_auto_merge_on_add_fills_empty_fields_and_records_history(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat-wikipedia",
+                            "title": "Heat",
+                            "year": "1995",
+                            "source": "wikipedia",
+                            "url": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+                            "wikipedia_url": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+                            "wikidata_id": "Q846982",
+                            "description": "",
+                        }
+                    )
+                ]
+            )
+            workflow, history_path = self.workflow(catalog_path)
+            pointer = CatalogPointer(catalog_path, "heat-wikipedia")
+
+            incoming = {
+                "source": "imdb",
+                "url": "https://www.imdb.com/title/tt0113277/",
+                "imdb_url": "https://www.imdb.com/title/tt0113277/",
+                "wikidata_id": "Q846982",
+                "spanish_title": "Fuego contra fuego",
+                "description": "Un detective y un ladron chocan en Los Angeles.",
+            }
+            result = workflow.auto_merge_on_add(
+                pointer, incoming, history_mode="persistent", session_id="session-a"
+            )
+
+            self.assertEqual(result["item"]["spanish_title"], "Fuego contra fuego")
+            self.assertEqual(
+                result["item"]["description"],
+                "Un detective y un ladron chocan en Los Angeles.",
+            )
+            self.assertEqual(result["item"]["imdb_url"], "https://www.imdb.com/title/tt0113277/")
+            self.assertTrue(result["operation"]["can_undo"])
+            self.assertEqual(result["operation"]["action"], "auto_merge_on_add")
+
+            persisted = repository.get("heat-wikipedia")
+            assert persisted is not None
+            self.assertEqual(persisted.spanish_title, "Fuego contra fuego")
+            self.assertEqual(len(repository.read()), 1)
+            self.assertTrue(history_path.exists())
+
+    def test_auto_merge_on_add_never_overwrites_a_locked_empty_field(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat-wikipedia",
+                            "title": "Heat",
+                            "description": "",
+                            "locked_fields": ["description"],
+                        }
+                    )
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            pointer = CatalogPointer(catalog_path, "heat-wikipedia")
+
+            result = workflow.auto_merge_on_add(
+                pointer,
+                {"source": "imdb", "description": "Una sinopsis que no deberia entrar"},
+                history_mode="persistent",
+                session_id="session-a",
+            )
+
+            self.assertEqual(result["item"]["description"], "")
+
+    def test_auto_merge_on_add_can_be_undone(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write([normalize_item({"id": "heat", "title": "Heat", "description": ""})])
+            workflow, _ = self.workflow(catalog_path)
+            pointer = CatalogPointer(catalog_path, "heat")
+
+            result = workflow.auto_merge_on_add(
+                pointer,
+                {"source": "imdb", "description": "Sinopsis nueva"},
+                history_mode="persistent",
+                session_id="session-a",
+            )
+            merged = repository.get("heat")
+            assert merged is not None
+            self.assertEqual(merged.description, "Sinopsis nueva")
+
+            workflow.undo(
+                result["operation"]["id"], history_mode="persistent", session_id="session-a"
+            )
+            reverted = repository.get("heat")
+            assert reverted is not None
+            self.assertEqual(reverted.description, "")
+
+    def test_auto_merge_on_add_raises_conflict_if_the_catalog_changed_concurrently(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write([normalize_item({"id": "heat", "title": "Heat", "description": ""})])
+            workflow, _ = self.workflow(catalog_path)
+            pointer = CatalogPointer(catalog_path, "heat")
+
+            # Simulate a write landing between this method's own capture and its
+            # commit by handing it a snapshot from before that write happened.
+            stale_before = workflow._capture(pointer)
+            repository.update_item(
+                "heat", lambda item: item.__setitem__("review", "Cambio concurrente")
+            )
+
+            with patch.object(workflow, "_capture", return_value=stale_before):
+                with self.assertRaises(CurationConflict):
+                    workflow.auto_merge_on_add(
+                        pointer,
+                        {"source": "imdb", "description": "Sinopsis nueva"},
+                        history_mode="persistent",
+                        session_id="session-a",
+                    )
+            stored = repository.get("heat")
+            assert stored is not None
+            self.assertEqual(stored.review, "Cambio concurrente")
+            self.assertEqual(stored.description, "")
 
 
 if __name__ == "__main__":

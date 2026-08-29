@@ -15,7 +15,7 @@ from movie_inbox.application.curation_history import (
 from movie_inbox.application.curation_service import build_curation_payload
 from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.application.repository import CatalogRepository
-from movie_inbox.domain.catalog import has_external_link, normalize_item
+from movie_inbox.domain.catalog import has_external_link, merge_into_existing, normalize_item
 from movie_inbox.domain.curation import (
     apply_duplicate_curation_decision,
     apply_link_curation_decision,
@@ -291,6 +291,41 @@ class CurationWorkflowService:
             },
         )
         return {"operation": public_operation(operation)}
+
+    def auto_merge_on_add(
+        self,
+        pointer: CatalogPointer,
+        incoming: Mapping[str, Any],
+        *,
+        history_mode: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        """Fold a newly-added external result into an existing item [Q6] already
+        matched by `decide_match` -- deliberately uses `merge_into_existing`
+        (fill-only, `locked_fields`-safe, proven by [Q5]'s fixtures), never
+        `apply_reviewed_merge`, which has its own separate, unrelated field-choice
+        logic that can override a locked-but-empty field (tracked separately, not
+        this method's concern)."""
+        before = self._capture(pointer)
+        merged_item = dict(before["item"])
+        merge_into_existing([merged_item], incoming, pointer.item_id)
+        after = _state_with_item(before, merged_item)
+        operation = self._commit_operation(
+            action="auto_merge_on_add",
+            label=f"Combinacion automatica al agregar: {_state_title(before)}",
+            before=[before],
+            after=[after],
+            history_mode=history_mode,
+            session_id=session_id,
+            summary={
+                "primary_title": _state_title(before),
+                "source": str(incoming.get("source") or ""),
+            },
+        )
+        return {
+            "item": self._decorated_item(merged_item),
+            "operation": public_operation(operation),
+        }
 
     def history(self, history_mode: str, session_id: str) -> dict[str, Any]:
         mode, repository, namespace = self._history_repository(history_mode, session_id)
