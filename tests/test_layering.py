@@ -30,7 +30,12 @@ class LayeringTests(unittest.TestCase):
 
     def test_batch_commands_do_not_import_web_or_importer_entrypoints(self) -> None:
         forbidden_prefixes = ("movie_inbox.web",)
-        for name in ("match_external_links.py", "enrich_catalog.py", "scan_library.py"):
+        for name in (
+            "match_external_links.py",
+            "enrich_catalog.py",
+            "scan_library.py",
+            "imdb_dataset.py",
+        ):
             path = ROOT / "src" / "movie_inbox" / "cli" / name
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             imported: set[str] = set()

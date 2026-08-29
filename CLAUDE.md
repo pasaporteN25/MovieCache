@@ -49,7 +49,7 @@ Si una tarea parece exigir romper alguna, parar y preguntar en vez de decidir so
 - `external/` — clientes de Wikipedia, Wikidata, IMDb, FilmAffinity.
 - `web/` — FastAPI, Uvicorn, proxy de imágenes, assets estáticos, seguridad HTTP.
 - `cli/` — subcomandos de `movie-inbox`. Los comandos batch (`match_external_links.py`,
-  `enrich_catalog.py`, `scan_library.py`) no pueden importar `web`.
+  `enrich_catalog.py`, `scan_library.py`, `imdb_dataset.py`) no pueden importar `web`.
 
 Los lanzadores finos de compatibilidad con v0.1 (`view_catalog.py`, `txt_to_catalog.py`,
 `scan_library.py`, `enrich_catalog.py`, `match_external_links.py`, `migrate_catalog.py`)
