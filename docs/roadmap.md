@@ -145,10 +145,10 @@ no inmoviliza el resto de la cola.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
 `ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3], [Q4] y
-[L1] tambien cerraron (ver `tareas.md`). De los items restantes de la seccion 2 de
-abajo, [F1] y [Q5] quedan bloqueados por decisiones/resultados externos a esta cola —
-confirmar el estado de cada uno en `tareas.md` antes de tomar el siguiente item, no
-asumir por el orden de esta lista.
+[L1] tambien cerraron (ver `tareas.md`). [F1] y [F2] ya tienen decision del owner
+tomada (2026-08-29) y quedan listos para prototipar/diseñar; [Q5] sigue esperando los
+resultados reales de [F1] (no solo la decision), no solo su posicion en esta lista —
+confirmar el estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 
 ### 2. Calidad de datos y bibliotecas
 
@@ -176,8 +176,12 @@ asumir por el orden de esta lista.
    apellido no aparece en un titulo por diseño). `domain/matching.py` queda sin
    ninguna referencia a `director` — verificado en vivo que compartir director no
    produce match ni fusion automatica. Detalle en `tareas.md`.
-6. [F1] Prototipo local opcional con datasets oficiales de IMDb.
-7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente.
+6. **Decision tomada 2026-08-29.** [F1] Prototipo local opcional con datasets
+   oficiales de IMDb. Uso personal/no comercial confirmado; atribucion resuelta con
+   una mencion en "Acerca de" mas procedencia conservada en los campos que llene.
+   Listo para prototipar.
+7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente. Espera
+   los resultados reales de [F1], ya desbloqueado pero todavia no ejecutado.
 8. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
 9. **Cerrado 2026-08-29.** [L1] Reglas de exclusion adicionales por biblioteca, encima
    de los defaults seguros existentes (`extras`, `sample`, etc.): patrones tipo glob
@@ -186,9 +190,14 @@ asumir por el orden de esta lista.
    a excluir se distingue en el mismo dry run existente (`run.newly_excluded`) en vez
    de confundirse en silencio con uno borrado del disco. Detalle en `tareas.md`.
 10. [F3] Evaluacion de TMDb; un adaptador solo nace si el ADR la aprueba.
-11. [F2] Fuente de anime sostenible, bloqueada hasta contar con permiso/licencia.
+11. **Decision tomada 2026-08-29.** [F2] Jikan como fuente de anime primaria,
+    `anime-offline-database` como secundaria/offline. Falta una pasada de diseño corta
+    (como componen las dos) antes de programar el adaptador.
 12. [C1] Contrato para grupos de 3+ duplicados.
 13. [C2] Resolucion N-a-1 segun ese contrato.
+14. [F4] API keys opcionales por fuente (ej. TMDb), sin dejar de ser abierto por
+    default. Prioridad baja a pedido del owner — necesita su propio analisis de diseño
+    antes de poder tomar tamaño.
 
 ### 3. Superficie publica y operacion
 
@@ -211,5 +220,8 @@ asumir por el orden de esta lista.
 - **Resuelta 2026-08-26.** [S1]/[S2]: Lucas eligio purgar. El catalogo personal
   anidado quedo inalcanzable en rama y tags de `origin/master` (128 commits y 5 tags
   reescritos con backup previo); ver `tareas.md`.
-- [P1] Mantener privada toda informacion de archivos o permitir un opt-in granular;
-  [P2] solo se implementa si el threat model y la decision de producto lo aprueban.
+- **Resuelta 2026-08-29.** [P1]: ruta, archivo, nota y estado operativo del escaneo
+  siguen sin exponerse nunca en una vista compartida — la regla dura no cambia. Unico
+  carve-out aprobado: el admin puede compartir la disponibilidad fisica (`en_catalogo`)
+  como una coleccion de Club mas. Contrato exacto para implementar, en [P2] de
+  `tareas.md`.

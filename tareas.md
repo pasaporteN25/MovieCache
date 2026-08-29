@@ -70,21 +70,33 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 - **Regla de uso**: el prototipo mide y expone datos; la autoridad y el merge se
   deciden en [Q5], nunca mediante una prioridad global de IMDb. Manual y
   `locked_fields` siempre ganan.
-- **Dependencias**: confirmar el modo personal/no comercial y resolver atribucion en
-  interfaz/exportacion antes de distribuir la capacidad.
+- **Decision del owner (2026-08-29)**: uso personal/no comercial confirmado — el
+  proyecto es abierto y funciona como una mini biblioteca personal, no como un
+  servicio distribuido comercialmente. Atribucion resuelta: una mencion visible en
+  "Acerca de" del panel de administracion citando el dataset no comercial de IMDb, mas
+  conservar la procedencia (mismo mecanismo que ya usan los campos que llena Wikidata)
+  en cualquier campo que este dataset complete, para que sobreviva a exportaciones
+  JSON/CSV y a una futura coleccion compartida via [P2]. Sin bloqueo pendiente: listo
+  para prototipar.
 - **Modelo sugerido**: Grande. Toca licencias, almacenamiento, CLI, enrichment,
   procedencia y migraciones.
 
 #### [F2] Autoridad de anime sostenible
-- **Alcance**: obtener permiso escrito de AniList para este producto o seleccionar una
-  fuente activa con licencia que permita catalogo/seguimiento. Repetir la evaluacion de
-  disponibilidad, limites, IDs cruzados, aliases y atribucion antes de programar un
-  adaptador.
-- **Descartes actuales**: Jikan es no oficial; `anime-offline-database` quedo archivada
-  el 2026-07-04; AniList prohibe por defecto servicios competidores de tracking.
-- **Dependencias**: decision legal/de producto externa. Hasta entonces, Wikidata
-  multilingue es el camino soportado.
-- **Modelo sugerido**: Grande. No empezar la implementacion sin cerrar la fuente.
+- **Decision del owner (2026-08-29)**: Jikan (envoltorio no oficial de MyAnimeList)
+  como fuente primaria en vivo — trade-off consciente y aceptado para un uso
+  personal/no comercial, sin pedir permiso escrito a AniList por ahora.
+  `anime-offline-database` se suma como secundaria: aunque quedo archivada el
+  2026-07-04, su ultimo snapshot sigue siendo util como indice offline (mismo patron
+  que el dataset no comercial de IMDb en [F1]), no como fuente en vivo.
+- **Alcance ampliado respecto del original**: ya no es "elegir una fuente", es componer
+  dos con roles distintos. Antes de programar el adaptador hace falta una pasada de
+  diseño corta (mismo criterio que uso [Q3] para componer IMDb con el puente de
+  Wikidata) que defina: que resuelve cada una (Jikan = busqueda y datos en vivo;
+  `anime-offline-database` = cruce de IDs/aliases o respaldo si Jikan no responde), como
+  se etiqueta la procedencia de cada dato, y que pasa cuando difieren.
+- **Dependencias**: ninguna externa — la eleccion de fuente ya esta decidida. Wikidata
+  multilingue sigue siendo el camino soportado mientras esto no se implemente.
+- **Modelo sugerido**: Grande. Dos fuentes con roles distintos, no un adaptador simple.
 
 #### [F3] Evaluar TMDb como fuente estructurada opcional
 - **Alcance**: revisar licencia, atribucion, limites, uso de API key, campos disponibles
@@ -94,6 +106,22 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
   costos operativos; solo si se aprueba, crear una tarea separada de adaptador.
 - **Depende de**: —
 - **Modelo sugerido**: Grande. Requiere investigacion legal y criterio de producto.
+
+#### [F4] Permitir API keys opcionales por fuente
+- **Idea del owner (2026-08-29)**: seguir usando fuentes abiertas/sin key como default
+  (Wikipedia, Wikidata, FilmAffinity, IMDb via sugerencias, Jikan) tal como funcionan
+  hoy, pero dejar que quien lo desee sume sus propias API keys para fuentes que las
+  requieren (por ejemplo TMDb, si [F3] se aprueba). Nunca obligar a nadie a crear una
+  cuenta o pagar para usar Movie Inbox.
+- **Alcance a definir**: donde se guardan las keys (por instancia, por miembro), como
+  se habilita/deshabilita una fuente segun haya o no key configurada, que pasa con el
+  catalogo si se borra una key despues de enriquecer datos con ella, y como esto
+  interactua con `locked_fields`/procedencia. El propio owner senala que esto necesita
+  un analisis de diseño importante antes de poder asignarle un modelo de tamaño real.
+- **Depende de**: nada tecnicamente, pero es el prerrequisito real si [F3] aprueba
+  integrar TMDb (esa fuente no funciona sin key).
+- **Modelo sugerido**: sin definir todavia — pendiente de un analisis de diseño previo.
+  Prioridad baja, al final de la cola de este frente.
 
 ### Frente: Bibliotecas y curaduria
 
@@ -116,21 +144,20 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
 ### Frente: Privacidad e historial Git
 
-#### [P1] Decidir visibilidad opcional de archivos para miembros
-- **Alcance**: definir si el admin puede compartir existencia, nombre o ruta de archivos
-  y con que granularidad; hacer threat model antes de relajar la invariante actual.
-- **Criterio de cierre**: ADR de producto/privacidad. Si se rechaza, conservar la regla
-  dura; si se aprueba, crear contrato exacto para [P2].
-- **Depende de**: decision del owner.
-- **Modelo sugerido**: Grande. Puede exponer estructura del servidor.
-
-#### [P2] Implementar visibilidad de archivos aprobada
-- **Alcance**: aplicar exclusivamente el contrato de [P1] en servicio, API y UI, con
-  default privado y migracion segura.
-- **Criterio de cierre**: pruebas negativas por rol/campo, opt-in explicito y ninguna
-  ruta expuesta fuera del alcance aprobado.
-- **Depende de**: [P1] aprobada.
-- **Modelo sugerido**: Grande. Frontera critica de privacidad.
+#### [P2] Compartir disponibilidad fisica como coleccion de Club (contrato de [P1])
+- **Alcance**: el admin puede elegir compartir, como una coleccion de Club mas (mismo
+  mecanismo que ya usan las colecciones seguibles), los titulos que el escaneo local
+  marca `en_catalogo`. Nunca viaja ruta, nombre de archivo, nota ni ningun otro estado
+  operativo del escaneo — la coleccion solo expone lo que cualquier coleccion ya expone
+  hoy (identidad del titulo), con la disponibilidad fisica como señal derivada.
+- **Criterio de cierre**: opt-in explicito (por biblioteca o por instancia, a definir
+  en diseño), pruebas negativas confirmando que ruta/archivo/nota/estado operativo
+  nunca aparecen en el payload de Club aunque la coleccion este activa, y actualizar el
+  invariante de privacidad de `CLAUDE.md` para reflejar el alcance exacto aprobado —
+  recien al implementar esto, no antes.
+- **Depende de**: [P1], decision ya tomada (ver Hecho, 2026-08-29).
+- **Modelo sugerido**: Grande. Frontera critica de privacidad, aunque el contrato ya
+  esta acotado.
 
 ### Frente: Superficie publica y despliegue
 
@@ -491,6 +518,16 @@ pendientes reales, que se conservaron con `git stash` durante la resincronizacio
 - **Fuera de alcance, ejecutado aparte**: el archivo sigue en disco, sin tocar, fuera
   de Git — es dato personal real de Lucas.
 2026-08-26.
+
+#### [P1] Decidir visibilidad opcional de archivos para miembros
+Decision: la regla dura se mantiene para ruta, nombre de archivo, nota y estado
+operativo del escaneo — ninguno de los cuatro se expone jamas en una vista compartida,
+sin excepcion para el owner, exactamente como ya fija el invariante de `CLAUDE.md`. Se
+aprueba un unico carve-out acotado: el admin puede elegir compartir, como una coleccion
+de Club mas (mismo mecanismo que ya usan las colecciones seguibles), los titulos que el
+escaneo local marca `en_catalogo` — disponibilidad fisica derivada, nunca el archivo o
+la ruta que la origino. Contrato exacto para implementar, en [P2].
+2026-08-29.
 
 ### Frente: Enriquecimiento Wikidata
 
