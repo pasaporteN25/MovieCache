@@ -15,6 +15,7 @@ by `cli/database.py`/`cli/backup.py`.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,13 @@ _INDEX_FILENAME = "imdb-dataset.db"
 
 
 def main(argv: list[str] | None = None) -> int:
+    # title.akas holds titles in every script IMDb tracks (Cyrillic, CJK,
+    # Arabic, ...). A console still on a legacy codepage (cp1252 is the
+    # Windows default) raises UnicodeEncodeError on the first one it can't
+    # represent instead of just rendering it — reconfigure to UTF-8 so
+    # `lookup` can't crash partway through printing real results.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(
         description="Prototype: download and index IMDb's non-commercial bulk datasets locally."
     )

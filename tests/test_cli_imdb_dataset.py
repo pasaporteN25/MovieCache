@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -160,6 +161,31 @@ class RunLookupTests(unittest.TestCase):
                 exit_code = run_lookup(Path("/some/dir"), "tt9999999", None, None)
         self.assertEqual(exit_code, 1)
         self.assertIn("No matching title", buffer.getvalue())
+
+    def test_a_title_outside_the_consoles_codepage_does_not_crash_main(self) -> None:
+        # Found against real data: title.akas holds every script IMDb tracks,
+        # and a console still on a legacy codepage (cp1252 on Windows by
+        # default) raised UnicodeEncodeError partway through printing a real
+        # lookup result before main() reconfigured stdout to UTF-8.
+        result = TitleLookupResult(
+            tconst="tt0113277",
+            title_type="movie",
+            primary_title="Heat",
+            original_title="Heat",
+            start_year=1995,
+            end_year=None,
+            runtime_minutes=170,
+            genres="Action,Crime,Drama",
+            akas=(AkaEntry(title="ヒート", region="JP", language=None, is_original_title=False),),
+        )
+        legacy_stdout = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", errors="strict")
+        with patch("movie_inbox.cli.imdb_dataset.lookup_by_tconst", return_value=result):
+            with patch.object(sys, "stdout", legacy_stdout):
+                exit_code = main(["lookup", "--output-dir", ".", "--tconst", "tt0113277"])
+        self.assertEqual(exit_code, 0)
+        legacy_stdout.flush()
+        written = legacy_stdout.buffer.getvalue().decode("utf-8")
+        self.assertIn("ヒート", written)
 
 
 class MainDispatchTests(unittest.TestCase):

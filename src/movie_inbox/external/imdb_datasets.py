@@ -11,6 +11,7 @@ existing convention of patching the importing module's own bound name.
 from __future__ import annotations
 
 import os
+import ssl
 import tempfile
 import time
 from dataclasses import dataclass
@@ -22,6 +23,16 @@ AVAILABLE_DATASETS = ("title.basics", "title.akas")
 
 _USER_AGENT = "MovieInbox/0.2 (+local personal catalog)"
 _CHUNK_SIZE = 1_048_576
+
+# datasets.imdbws.com's CloudFront/AmazonS3 chain ships an intermediate CA
+# certificate whose Basic Constraints extension isn't marked critical — a
+# common defect in older-style chains (confirmed independently: curl accepts
+# it without complaint). Python 3.13+ enables ssl.VERIFY_X509_STRICT by
+# default, which enforces that RFC 5280 detail strictly and rejects the
+# handshake. Chain-of-trust and hostname verification stay fully enforced;
+# only that one extra conformance check is relaxed, and only for this host.
+_DATASET_SSL_CONTEXT = ssl.create_default_context()
+_DATASET_SSL_CONTEXT.verify_flags &= ~ssl.VERIFY_X509_STRICT
 
 
 @dataclass(frozen=True)
@@ -53,7 +64,7 @@ def download_dataset_file(name: str, destination: Path, *, timeout: float = 30.0
             suffix=".tmp",
         ) as handle:
             temporary_path = Path(handle.name)
-            with urlopen(request, timeout=timeout) as response:
+            with urlopen(request, timeout=timeout, context=_DATASET_SSL_CONTEXT) as response:
                 while True:
                     chunk = response.read(_CHUNK_SIZE)
                     if not chunk:
