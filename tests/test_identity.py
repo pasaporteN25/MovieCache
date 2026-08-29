@@ -234,7 +234,7 @@ class IdentityTests(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
-            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8])
+            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
@@ -274,6 +274,11 @@ class IdentityTests(unittest.TestCase):
                     );
                     INSERT INTO scanner_history(id, action, label, created_at)
                     VALUES ('history-1', 'link', 'Vincular', '2026-08-22T10:00:00Z');
+                    -- Minimal stand-in for the real v5 table this fixture
+                    -- otherwise skips (this test only exercises v8's
+                    -- scanner_history repair in isolation) -- v9's own
+                    -- migration ALTERs this table, so it must exist.
+                    CREATE TABLE library_scan_runs (id TEXT PRIMARY KEY);
                     """
                 )
                 connection.executemany(
@@ -297,7 +302,7 @@ class IdentityTests(unittest.TestCase):
                     "FROM scanner_history"
                 ).fetchone()
 
-            self.assertEqual(version, 8)
+            self.assertEqual(version, 9)
             self.assertTrue(
                 {"catalog_before_json", "catalog_after_json", "catalog_path"} <= columns
             )

@@ -6,7 +6,9 @@ import json
 import os
 import sqlite3
 import threading
+import uuid
 from contextlib import closing
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -90,10 +92,52 @@ class SqliteLibraryRepository:
                         "SELECT * FROM media_libraries WHERE id = ?",
                         (library_id,),
                     ).fetchone()
-                    return _library(row) if row else None
+                    if not row:
+                        return None
+                    return replace(
+                        _library(row),
+                        exclusion_patterns=_exclusion_patterns(connection, library_id),
+                    )
             except sqlite3.Error as error:
                 raise LibraryRepositoryError(
                     f"Cannot read managed library from: {self.path}"
+                ) from error
+
+    def replace_exclusion_rules(
+        self, library_id: str, patterns: list[str], created_at: int
+    ) -> tuple[str, ...]:
+        """[L1] tareas.md: the whole rule set is replaced atomically -- either
+        every pattern is stored, or (on an unexpected DB error) none of them
+        are; per-pattern validation happens before this is ever called."""
+        ordered = tuple(dict.fromkeys(patterns))
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    if not connection.execute(
+                        "SELECT 1 FROM media_libraries WHERE id = ?", (library_id,)
+                    ).fetchone():
+                        connection.rollback()
+                        raise LibraryNotFound("Managed library was not found")
+                    connection.execute(
+                        "DELETE FROM library_exclusion_rules WHERE library_id = ?",
+                        (library_id,),
+                    )
+                    connection.executemany(
+                        """INSERT INTO library_exclusion_rules(id, library_id, pattern, created_at)
+                        VALUES (?, ?, ?, ?)""",
+                        [
+                            (uuid.uuid4().hex, library_id, pattern, created_at)
+                            for pattern in ordered
+                        ],
+                    )
+                    connection.commit()
+                    return ordered
+            except LibraryNotFound:
+                raise
+            except sqlite3.Error as error:
+                raise LibraryRepositoryError(
+                    f"Cannot save exclusion rules in: {self.path}"
                 ) from error
 
     def update_library(self, library: ManagedLibrary) -> ManagedLibrary:
@@ -175,8 +219,9 @@ class SqliteLibraryRepository:
                     connection.execute(
                         """INSERT INTO library_scan_runs(
                             id, library_id, mode, trigger, status, created_at, started_at,
-                            finished_at, summary_json, errors_json, preview_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            finished_at, summary_json, errors_json, preview_json,
+                            newly_excluded_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             run.id,
                             run.library_id,
@@ -189,6 +234,7 @@ class SqliteLibraryRepository:
                             _json_dump(run.summary),
                             _json_dump(list(run.errors)),
                             _json_dump(list(run.preview)),
+                            _json_dump(list(run.newly_excluded)),
                         ),
                     )
                     connection.execute(
@@ -307,7 +353,8 @@ class SqliteLibraryRepository:
                             )
                     connection.execute(
                         """UPDATE library_scan_runs SET status = ?, started_at = ?, finished_at = ?,
-                            summary_json = ?, errors_json = ?, preview_json = ?
+                            summary_json = ?, errors_json = ?, preview_json = ?,
+                            newly_excluded_json = ?
                         WHERE id = ? AND status = 'running'""",
                         (
                             run.status,
@@ -316,6 +363,7 @@ class SqliteLibraryRepository:
                             _json_dump(run.summary),
                             _json_dump(list(run.errors)),
                             _json_dump(list(run.preview)),
+                            _json_dump(list(run.newly_excluded)),
                             run.id,
                         ),
                     )
@@ -642,6 +690,14 @@ class SqliteLibraryRepository:
         return connection
 
 
+def _exclusion_patterns(connection: sqlite3.Connection, library_id: str) -> tuple[str, ...]:
+    rows = connection.execute(
+        "SELECT pattern FROM library_exclusion_rules WHERE library_id = ? ORDER BY created_at",
+        (library_id,),
+    ).fetchall()
+    return tuple(str(row["pattern"]) for row in rows)
+
+
 def _library(row: sqlite3.Row) -> ManagedLibrary:
     return ManagedLibrary(
         id=str(row["id"]),
@@ -674,6 +730,9 @@ def _run(row: sqlite3.Row) -> LibraryScanRun:
         errors=tuple(str(value) for value in _json_list(row["errors_json"])),
         preview=tuple(
             value for value in _json_list(row["preview_json"]) if isinstance(value, dict)
+        ),
+        newly_excluded=tuple(
+            value for value in _json_list(row["newly_excluded_json"]) if isinstance(value, dict)
         ),
     )
 

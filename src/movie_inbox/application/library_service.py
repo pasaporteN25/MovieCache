@@ -21,6 +21,9 @@ from movie_inbox.application.library_repository import (
 )
 from movie_inbox.domain.catalog import external_urls, title_match_key, title_match_keys_for_item
 from movie_inbox.domain.libraries import (
+    MAX_EXCLUSION_RULES_PER_LIBRARY,
+    ExclusionPatternError,
+    ExclusionRulesInvalid,
     LibraryFile,
     LibraryScanRun,
     LibraryValidationError,
@@ -30,6 +33,8 @@ from movie_inbox.domain.libraries import (
     normalize_library_name,
     normalize_missing_ratio,
     normalize_schedule,
+    path_matches_excluded_pattern,
+    validate_exclusion_pattern,
     work_identity,
     work_identity_key,
 )
@@ -166,6 +171,24 @@ class ManagedLibraryService:
         )
         return self.repository.update_library(updated)
 
+    def set_exclusion_rules(self, library_id: str, patterns: list[str]) -> ManagedLibrary:
+        """[L1] tareas.md: validates every pattern before saving any of
+        them -- an invalid rule never partially applies."""
+        self._library(library_id)  # confirms the library exists, mirrors update_library
+        cleaned: list[str] = []
+        errors: list[ExclusionPatternError] = []
+        for value in patterns[:MAX_EXCLUSION_RULES_PER_LIBRARY]:
+            try:
+                cleaned.append(validate_exclusion_pattern(value))
+            except ExclusionPatternError as error:
+                errors.append(error)
+        if len(patterns) > MAX_EXCLUSION_RULES_PER_LIBRARY:
+            errors.append(ExclusionPatternError("", "too_many_rules"))
+        if errors:
+            raise ExclusionRulesInvalid(errors)
+        self.repository.replace_exclusion_rules(library_id, cleaned, self._now())
+        return self._library(library_id)
+
     def set_active(self, library_id: str, active: bool) -> ManagedLibrary:
         library = self._library(library_id)
         if library.status == "scanning":
@@ -238,8 +261,15 @@ class ManagedLibraryService:
         previous_by_path = {item.relative_path: _scanner_cache_row(item) for item in previous}
         try:
             root = self.validate_root(library.root_path)
-            scanned, errors = self.scanner(root, previous_by_path, scanned_at=started_at)
-            classified, summary, preview = self._classify_scan(library, run, scanned, previous)
+            scanned, errors = self.scanner(
+                root,
+                previous_by_path,
+                excluded_dirs=set(library.exclusion_patterns),
+                scanned_at=started_at,
+            )
+            classified, summary, preview, newly_excluded = self._classify_scan(
+                library, run, scanned, previous
+            )
             guard_error = _removal_guard(previous, scanned, library.max_missing_ratio)
             if guard_error:
                 errors.append(guard_error)
@@ -276,6 +306,7 @@ class ManagedLibraryService:
                 summary=summary,
                 errors=tuple(errors),
                 preview=tuple(preview),
+                newly_excluded=tuple(newly_excluded),
             )
             self.repository.complete_run(
                 completed_run,
@@ -553,7 +584,7 @@ class ManagedLibraryService:
         run: LibraryScanRun,
         scanned: list[dict[str, Any]],
         previous: list[LibraryFile],
-    ) -> tuple[list[LibraryFile], dict[str, int], list[dict[str, Any]]]:
+    ) -> tuple[list[LibraryFile], dict[str, int], list[dict[str, Any]], list[dict[str, Any]]]:
         match_index = _CatalogMatchIndex.build(self.catalog_universe())
         previous_by_path = {_relative_path_key(item.relative_path): item for item in previous}
         current_path_keys = {
@@ -649,10 +680,30 @@ class ManagedLibraryService:
             if classified_item is not None:
                 row["state"] = classified_item.state
                 row["candidate_count"] = len(classified_item.candidates)
-        counts["missing"] = len(
-            [item for item in previous if item.available and item.id not in claimed_ids]
-        )
-        return classified, counts, preview
+        missing_items = [item for item in previous if item.available and item.id not in claimed_ids]
+        # [L1] tareas.md: "missing" already conflated real deletions with an
+        # I/O hiccup or an unpaired fingerprint move -- now it can also mean
+        # "a rule the owner just added stopped this from being discovered."
+        # Split that case out explicitly instead of letting it look like the
+        # file vanished from disk, using only the library's own custom
+        # patterns (never DEFAULT_EXCLUDED_DIRS, which never changes, so a
+        # previously-tracked file could never have matched it).
+        newly_excluded_items = [
+            item
+            for item in missing_items
+            if path_matches_excluded_pattern(item.relative_path, library.exclusion_patterns)
+        ]
+        counts["missing"] = len(missing_items)
+        counts["newly_excluded"] = len(newly_excluded_items)
+        newly_excluded_preview = [
+            {
+                "relative_path": item.relative_path,
+                "title": item.detected_title,
+                "year": item.detected_year,
+            }
+            for item in newly_excluded_items[:PREVIEW_LIMIT]
+        ]
+        return classified, counts, preview, newly_excluded_preview
 
     @staticmethod
     def _classification(

@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from movie_inbox.domain.libraries import matches_excluded_pattern
 from movie_inbox.domain.titles import detect_media_part, strip_disc_part_marker
 
 DEFAULT_EXTENSIONS = {
@@ -81,7 +82,7 @@ def scan_media_files(
         safe_directories: list[str] = []
         for name in directories:
             child = current_path / name
-            if name.casefold() in excluded or _is_link(child):
+            if matches_excluded_pattern(name, excluded) or _is_link(child):
                 continue
             safe_directories.append(name)
         directories[:] = safe_directories

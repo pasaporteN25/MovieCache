@@ -88,6 +88,26 @@ class LibraryScannerTests(unittest.TestCase):
             self.assertEqual(errors, [])
             self.assertEqual([row["relative_path"] for row in rows], ["Feature.1999.mkv"])
 
+    def test_a_glob_style_exclusion_rule_is_matched_not_just_an_exact_name(self) -> None:
+        # [L1] tareas.md: per-library rules are patterns (fnmatch), not just
+        # the exact-name equality DEFAULT_EXCLUDED_DIRS already used.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for directory in ("Behind The Scenes", "BEHIND-the-scenes-extended"):
+                excluded = root / directory
+                excluded.mkdir()
+                (excluded / "clip.mp4").write_bytes(b"ignored")
+            (root / "Feature.1999.mkv").write_bytes(b"feature")
+
+            rows, errors = scan_media_files(
+                root,
+                excluded_dirs={"behind*"},
+                scanned_at=1_800_000_000,
+            )
+
+            self.assertEqual(errors, [])
+            self.assertEqual([row["relative_path"] for row in rows], ["Feature.1999.mkv"])
+
     def test_disc_markers_do_not_change_the_detected_work_title(self) -> None:
         first = parse_release_name("Once.Upon.a.Time.in.America.1984.CD1.mkv")
         second = parse_release_name("Once.Upon.a.Time.in.America.1984.disc-2.mkv")

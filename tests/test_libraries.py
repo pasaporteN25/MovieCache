@@ -18,7 +18,7 @@ from movie_inbox.application.library_service import (
     _CatalogMatchIndex,
 )
 from movie_inbox.domain.catalog import normalize_item
-from movie_inbox.domain.libraries import LibraryScanRun, ManagedLibrary
+from movie_inbox.domain.libraries import ExclusionRulesInvalid, LibraryScanRun, ManagedLibrary
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
@@ -134,6 +134,54 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertEqual(run.summary["matched"], 1)
         self.assertGreater(detail["verified_at"], 0)
         self.assertEqual(detail["counts"]["files"], 0)
+
+    def test_a_custom_exclusion_rule_is_respected_by_the_next_scan(self) -> None:
+        # [L1] tareas.md: rules are per-library, glob-style, applied on top
+        # of the safe defaults (extras/sample) that already existed.
+        (self.media / "Feature.1999.mkv").write_bytes(b"feature")
+        bonus = self.media / "Bonus"
+        bonus.mkdir()
+        (bonus / "clip.mp4").write_bytes(b"bonus")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+
+        updated = self.service.set_exclusion_rules(library.id, ["bonus*"])
+        run = self.execute(library.id, "dry_run")
+
+        self.assertEqual(updated.exclusion_patterns, ("bonus*",))
+        self.assertEqual(run.summary["discovered"], 1)  # only Feature.1999.mkv now
+
+    def test_a_new_rule_reports_previously_tracked_files_as_newly_excluded_not_missing(
+        self,
+    ) -> None:
+        (self.media / "Feature.1999.mkv").write_bytes(b"feature")
+        bonus = self.media / "Bonus"
+        bonus.mkdir()
+        (bonus / "clip.mp4").write_bytes(b"bonus")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+
+        self.service.set_exclusion_rules(library.id, ["bonus*"])
+        run = self.execute(library.id, "dry_run")
+
+        self.assertEqual(run.summary["newly_excluded"], 1)
+        self.assertEqual(len(run.newly_excluded), 1)
+        self.assertEqual(run.newly_excluded[0]["relative_path"], "Bonus/clip.mp4")
+
+    def test_an_invalid_pattern_is_rejected_and_nothing_is_saved(self) -> None:
+        library = self.create_library()
+
+        with self.assertRaises(ExclusionRulesInvalid) as raised:
+            self.service.set_exclusion_rules(library.id, ["ok-pattern", "*", "a/b"])
+
+        reasons = {error.pattern: error.reason for error in raised.exception.errors}
+        self.assertEqual(reasons["*"], "excludes_everything")
+        self.assertEqual(reasons["a/b"], "has_path_separator")
+        reloaded = self.service.repository.get_library(library.id)
+        assert reloaded is not None
+        self.assertEqual(reloaded.exclusion_patterns, ())
 
     def test_numeric_title_matches_an_existing_catalog_item(self) -> None:
         self.catalog_items = [
