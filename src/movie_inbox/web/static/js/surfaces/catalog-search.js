@@ -645,7 +645,14 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
             throw new Error(payload.reason || `HTTP ${response.status}`);
           }
           completed = true;
-          button.textContent = payload.reason === "duplicate" ? "Ya existe" : "Agregado";
+          if (payload.reason === "duplicate") {
+            button.textContent = "Ya existe";
+          } else if (payload.reason === "merged_into_existing") {
+            button.textContent = "Combinado";
+            fields.manualSearchStatus.textContent = `Se combinó con "${payload.item?.title || "la ficha existente"}", ya en tu colección.`;
+          } else {
+            button.textContent = "Agregado";
+          }
           await load();
           if (payload.background_enrichment === "scheduled") {
             window.setTimeout(() => load(), 12000);
