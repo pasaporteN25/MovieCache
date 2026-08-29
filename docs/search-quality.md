@@ -196,6 +196,60 @@ queda cubierto por pruebas unitarias directas contra el código real
 verificadas por ejecución, no solo revisadas — la brecha es puntual al
 corpus con datos en vivo, no a la cobertura de la lógica en sí.
 
+### Búsqueda por dirección como descubrimiento explícito ([Q4], 2026-08-29)
+
+`directors: list[str]` ya existía en el modelo (poblado desde Wikidata P57
+y FilmAffinity) pero `_search_values()` lo excluía deliberadamente del
+buscador principal. `"director:Jacopetti"` ahora se reconoce como su
+propio tipo de consulta — `parse_search_query()` hace un early-return con
+`director_query`/`director_query_key` seteados y título/año vacíos — en
+vez de leerse como una consulta de título vacía.
+
+**Hallazgo real durante el diseño, no asumido**: el primer diseño agregaba
+el nombre del director como un fallback más en la cadena de cada
+adaptador y daba por sentado que el resto del pipeline externo seguía
+funcionando. Verificado que no alcanza: `registry.py::_rank_batch`
+puntúa cada resultado con `external_result_score()`, que compara texto de
+consulta contra TÍTULO — un apellido de director no aparece en el título
+de una película por diseño, y el caso real ("Jacopetti" contra "Mondo
+Cane") confirma que el score cae muy por debajo del umbral de aceptación
+por el camino difuso normal. Sin arreglar esto, la búsqueda externa por
+director hubiera devuelto cero resultados siempre, en silencio.
+`external_result_score()` gana un branch explícito: en modo director,
+confía en el ranking propio de la fuente para cualquier candidato con
+título reconocible, en vez de re-puntuar localmente (no hay nada sensato
+que comparar). Localmente, `search_catalog_items()` delega a
+`_search_by_director()`, una función separada que nunca toca
+`_catalog_search_score`/`_search_values` — "nunca mezclarse con el score
+de título" se cumple por construcción, no por un flag dentro del scoring
+compartido. Ambos caminos reusan `text_match_score`/`EXTERNAL_RELEVANCE_
+THRESHOLD` ya existentes, sin umbrales nuevos inventados.
+
+**Seguridad, verificada por lectura directa**: `domain/matching.py` no
+tiene ninguna referencia a `director` — cero código que tocar. Confirmado
+en vivo (servidor real, catálogo sintético) que dos obras distintas del
+mismo director no producen match ni fusión automática, y que
+`rank_catalog_candidates()`/`_candidate_query()` nunca puede emitir
+`director:...` por sí solo, así que el flujo automático de Comparar jamás
+entra en modo-director.
+
+IMDb contribuye poco o nada para un nombre de director suelto — su
+endpoint de sugerencias descarta cualquier `qid` que no sea de
+película/serie (un nodo de persona queda afuera) y el puente de Wikidata
+exige un IMDb id con forma `tt...` (un nodo de persona no la tiene).
+Documentado como límite estructural aceptado, no perseguido con lógica
+nueva — confirmado además en vivo que Wikipedia sí aporta valor real: una
+búsqueda real de "director:Jacopetti" con fuentes externas activas
+encontró y etiquetó correctamente la biografía del propio director en
+Wikipedia.
+
+Toggle nuevo en Colección ("Buscar por dirección"), mismo patrón que el
+checkbox existente de fuentes externas — antepone `director:` al texto ya
+escrito, así que nadie necesita conocer la sintaxis para usarla; tipearla
+directamente también funciona. Verificado con un servidor real (no solo
+tests unitarios): catálogo local y Wikipedia en vivo, ambos etiquetando
+correctamente "coincide por dirección".
+
 ## Laboratorio de busqueda
 
 El primer incremento sera un `Search Lab` de desarrollo, no destructivo y disponible

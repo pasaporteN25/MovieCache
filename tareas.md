@@ -33,20 +33,6 @@ agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb
 Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
 consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
-#### [Q4] Agregar busqueda por direccion como descubrimiento explicito
-- **Alcance**: permitir buscar la filmografia local por una sintaxis/campo visible como
-  `director:Jacopetti` y evaluar la misma pista para fuentes externas. Una coincidencia
-  por direccion debe rotularse como descubrimiento y nunca mezclarse con el score de
-  titulo usado por Comparar, merge o Scanner.
-- **UX**: ofrecer una forma descubrible de activar/quitar el filtro y mostrar
-  "coincide por direccion"; el texto libre actual conserva precision por titulo.
-- **Criterio de cierre**: encontrar obras locales por director, combinar
-  titulo+director como pista externa sin degradar los negativos de [Q2], y garantizar
-  que compartir director no produzca una candidata segura ni una fusion automatica.
-- **Depende de**: [Q2], [Q3].
-- **Modelo sugerido**: Grande. Introduce un segundo contrato de busqueda, no otro peso
-  dentro del matching de identidad.
-
 #### [Q5] Definir autoridad y conflicto campo por campo
 - **Alcance**: crear una matriz versionada para titulo/aliases, ano/tipo, creditos,
   imagenes, fechas y descripcion. Manual y `locked_fields` ganan siempre; IMDb puede ser
@@ -397,6 +383,54 @@ reales resulto mas dificil de lo esperado (la busqueda de Wikipedia rara vez vue
 genuinamente vacia contra titulos reales conocidos) y se paro la exploracion en vivo
 antes de gastar mas cupo de API publica en algo no critico; la logica queda cubierta
 por pruebas unitarias directas contra codigo real, no por el corpus con datos en vivo.
+2026-08-29.
+
+#### [Q4] Agregar busqueda por direccion como descubrimiento explicito
+`directors: list[str]` ya existia en el modelo (poblado desde Wikidata P57 y
+FilmAffinity) pero `_search_values()` lo excluia deliberadamente del buscador
+principal. `"director:Jacopetti"` ahora se reconoce como su propio tipo de consulta:
+`parse_search_query()` hace un early-return con `director_query`/`director_query_key`
+seteados y titulo/año vacios, en vez de leerse como una consulta de titulo vacia.
+
+Hallazgo real durante el diseño, no asumido: el primer diseño agregaba el nombre del
+director como un fallback mas en la cadena de cada adaptador dando por sentado que el
+resto del pipeline externo seguia funcionando. Un agente Plan verifico que no
+alcanzaba: `registry.py::_rank_batch` puntua cada resultado con
+`external_result_score()`, que compara texto de consulta contra TITULO — un apellido
+de director no aparece en el titulo de una pelicula por diseño, y el caso real
+("Jacopetti" contra "Mondo Cane") confirmo que el score cae muy por debajo del umbral
+de aceptacion. Sin arreglar esto, la busqueda externa por director hubiera devuelto
+cero resultados siempre, en silencio. `external_result_score()` gano un branch
+explicito: en modo director, confia en el ranking propio de la fuente para cualquier
+candidato con titulo reconocible, en vez de re-puntuar localmente. Localmente,
+`search_catalog_items()` delega a `_search_by_director()`, una funcion separada que
+nunca toca `_catalog_search_score`/`_search_values` — "nunca mezclarse con el score de
+titulo" se cumple por construccion, no por un flag dentro del scoring compartido.
+Ambos caminos reusan `text_match_score`/`EXTERNAL_RELEVANCE_THRESHOLD` ya existentes.
+
+Seguridad verificada por lectura directa: `domain/matching.py` no tiene ninguna
+referencia a `director`. Confirmado en vivo (servidor real, catalogo sintetico) que
+dos obras distintas del mismo director no producen match ni fusion automatica, y que
+`rank_catalog_candidates()`/`_candidate_query()` nunca puede emitir `director:...` por
+si solo, asi que el flujo automatico de Comparar jamas entra en modo-director. IMDb
+contribuye poco o nada para un nombre de director suelto (su endpoint descarta nodos
+de persona, el puente de Wikidata exige un IMDb id con forma `tt...`) — documentado
+como limite estructural aceptado, no perseguido con logica nueva; Wikipedia si aporta
+valor real, confirmado en vivo encontrando y etiquetando la biografia del propio
+director.
+
+Toggle nuevo en Coleccion ("Buscar por direccion"), mismo patron que el checkbox
+existente de fuentes externas — antepone `director:` al texto ya escrito, asi que
+nadie necesita conocer la sintaxis para usarla. Verificado con 17 pruebas nuevas
+(parseo, scoring en modo director, `_search_by_director`, fallback en los 3
+adaptadores, seguridad de `decide_match`, etiquetado HTTP) mas un servidor real con
+catalogo sintetico probado a mano: busqueda local y Wikipedia en vivo, ambas
+etiquetando correctamente "coincide por direccion". Sin prueba de navegador
+permanente nueva — la verificacion manual (red real, ambos caminos) ya cubrio mas
+terreno que una mockeada tipica, y el cambio es un toggle mas una etiqueta, no una
+maquina de estados nueva como el trabajo de modo comparar/vincular de [Q1] que
+justifico cobertura Playwright nueva ahi. Suite completa, ambos gates de Search Lab,
+Ruff y mypy estricto en verde sin regresiones.
 2026-08-29.
 
 ### Frente: Tipado y capacidad de entrega

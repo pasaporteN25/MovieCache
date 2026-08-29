@@ -144,8 +144,12 @@ no inmoviliza el resto de la cola.
    CI con excepciones acotadas para callbacks dinamicos y fixtures Playwright.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
-`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7] y [Q3] tambien
-cerraron (ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [Q4].
+`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3] y [Q4]
+tambien cerraron (ver `tareas.md`). De los items restantes de la seccion 2 de abajo,
+[F1] y [Q5] quedan bloqueados por decisiones/resultados externos a esta cola; [L1] no
+tiene una dependencia pendiente ([T2], su unico bloqueo declarado, ya cerro) pese a
+estar listado despues en la secuencia — confirmar el estado de cada uno en `tareas.md`
+antes de tomar el siguiente item, no asumir por el orden de esta lista.
 
 ### 2. Calidad de datos y bibliotecas
 
@@ -165,7 +169,14 @@ cerraron (ver `tareas.md`); el siguiente item ejecutable de la hoja de ruta es [
    preferido de la instancia queda como constante fija (`("es", "en")`), decision
    explicita del owner — no existe infraestructura de settings en el proyecto y
    ningun criterio de cierre exigia que fuera editable. Detalle en `tareas.md`.
-5. [Q4] Busqueda por direccion como descubrimiento separado del matching de identidad.
+5. **Cerrado 2026-08-29.** [Q4] `"director:X"` se reconoce como su propio tipo de
+   consulta (`SearchIntent.director_query`), nunca una consulta de titulo vacia.
+   Localmente delega a `_search_by_director()`, separada por completo del scoring de
+   titulo; en fuentes externas, `external_result_score()` confia en el ranking propio
+   de la fuente para modo-director en vez de comparar contra texto de titulo (un
+   apellido no aparece en un titulo por diseño). `domain/matching.py` queda sin
+   ninguna referencia a `director` — verificado en vivo que compartir director no
+   produce match ni fusion automatica. Detalle en `tareas.md`.
 6. [F1] Prototipo local opcional con datasets oficiales de IMDb.
 7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente.
 8. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
