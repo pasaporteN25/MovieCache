@@ -33,19 +33,6 @@ agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb
 Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
 consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
-#### [Q6] Crear una ficha compuesta sin altas manuales duplicadas
-- **Alcance**: agrupar resultados externos solo mediante identidad fuerte y presentar
-  una candidata unificada con procedencia por campo. Agregar una vez debe crear o
-  enriquecer una unica ficha: por ejemplo, identidad/titulos estructurados desde IMDb y
-  sinopsis desde Wikipedia. Si las fuentes no pueden vincularse con seguridad,
-  permanecen separadas y se ofrece Comparar en lugar de combinarlas.
-- **Criterio de cierre**: al agregar `tt0180396` desde cualquiera de sus nombres, la
-  ficha conserva aliases espanol/original/ingles, links confirmados y la mejor
-  descripcion disponible sin pedir tres altas ni una fusion manual; el historial,
-  `locked_fields`, deshacer e idempotencia siguen protegidos.
-- **Depende de**: [Q3], [Q5].
-- **Modelo sugerido**: Grande. Une identidad, enrichment, procedencia, UX e historial.
-
 ### Frente: Fuentes externas y especializacion de anime
 
 #### [F2] Autoridad de anime sostenible
@@ -508,6 +495,59 @@ arriba. Fuera de alcance, explicito: decidir si una fila de una fuente correspon
 una ficha dada (eso ya lo gobierna `domain/matching.py` y el invariante de matching
 conservador de `CLAUDE.md`); escribir el codigo real que orqueste el orden de esta
 matriz (trabajo de quien integre esto al catalogo real, probablemente junto con [Q6]).
+2026-08-29.
+
+#### [Q6] Crear una ficha compuesta sin altas manuales duplicadas
+`CatalogService.append_item()` (`application/catalog_service.py`) solo evitaba
+duplicados con igualdad exacta de id/URL y una heuristica **lexica** de solapamiento
+de palabras del titulo (`possible_duplicate_candidates`) — un par entre idiomas sin
+ninguna palabra en comun (ej. "El Padrino" vs "The Godfather") no disparaba nada y
+creaba dos fichas sin vincular en silencio. El proyecto ya tenia el gate correcto para
+esto — `decide_match()` (`domain/matching.py`, cero falsos positivos conocidos, ya
+usado para auto-aceptar sin intervencion humana en Scanner y en las herramientas CLI
+batch) — pero nunca se llamaba desde `/api/add`; ahi solo rankeaba candidatas para un
+humano en "Comparar". `append_item` ahora corre `decide_match` contra los items
+existentes antes de caer en la heuristica lexica de siempre: si acepta exactamente
+uno, no crea una ficha nueva — la responde como `"strong_match"` y el router
+(`web/routers/catalog.py`) la combina en la ficha existente. Todo lo que
+`decide_match` no acepta sigue exactamente igual que antes (misma interjeccion
+Combinar/Agregar igual/Cancelar, o alta normal).
+
+Hallazgo real durante el diseño, verificado ejecutandolo en un REPL antes de escribir
+nada: el unico metodo existente para "item existente + resultado externo"
+(`CurationWorkflowService.merge()`) usa `apply_reviewed_merge()`
+(`domain/merge_review.py`) — una implementacion de merge separada y distinta de
+`merge_metadata_field()` (la que [Q5] ya probo). `_default_choice()` ahi decide "el
+lado que tiene valor gana" **antes** de mirar si el campo esta bloqueado: un campo
+`locked_fields` pero vacio en el lado sobreviviente queda con `default_choice="right"`,
+nunca pide una decision humana, y `apply_reviewed_merge(left, right, "left", {})`
+escribe el valor entrante encima de un campo bloqueado en silencio — reproducido tal
+cual con datos sinteticos reales. Esto ya afecta `auto_resolve_duplicates()` en
+produccion HOY (llama `merge(choices={})` sin ningun humano de por medio),
+completamente independiente de esta tarea — quedo anotado aparte para arreglar. Por
+eso mismo, el mecanismo nuevo de esta tarea (`CurationWorkflowService.auto_merge_on_add()`)
+compone directo `_capture` + `merge_into_existing` + `_commit_operation`, sin pasar
+nunca por `apply_reviewed_merge` — hereda historial y deshacer gratis, sin heredar ese
+bug. Si el catalogo cambio entre el chequeo y la confirmacion (`CurationConflict`), cae
+a un alta normal en vez de reintentar.
+
+Verificado contra datos reales, no solo tests sinteticos: servidor real con una ficha
+local "Heat" (1995, sin links), agregar el resultado de Wikipedia en español la
+combino en la misma ficha (via `exact_title_year`) trayendo sinopsis completa,
+reparto, generos, mas de 60 alias reales en todos los alfabetos y `wikidata_id` en una
+sola llamada; agregar despues el resultado de Wikipedia en ingles combino en la MISMA
+ficha otra vez (esta vez via `shared_wikidata_id`) sin tocar los campos ya llenos — dos
+altas reales, una sola ficha final, sin pedir fusion manual ninguna de las dos veces.
+Fuera de alcance, explicito y verificado: no todo par del mismo titulo entre fuentes se
+auto-combina, solo lo que `decide_match` ya acepta — FilmAffinity nunca resuelve
+`wikidata_id` (confirmado leyendo su parser), asi que un alta de "Calor" despues de
+"Heat" sigue la heuristica lexica de siempre, sin cambios; cerrar ese hueco de raiz
+pediria mejorar la resolucion de identidad cruzada entre fuentes, alcance mayor a esta
+tarea.
+455 pruebas (crecio desde 449 al empezar), mypy estricto, Ruff, `compileall` y
+`git diff --check` en verde en cada fase — una de mis propias pruebas nuevas hacia una
+llamada de red real de ~5s a Wikipedia hasta que la mockee igual que ya hacia la
+prueba vecina.
 2026-08-29.
 
 ### Frente: Tipado y capacidad de entrega
