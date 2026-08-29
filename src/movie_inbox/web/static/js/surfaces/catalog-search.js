@@ -78,6 +78,15 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         descriptionReturnFocus = value;
       }
 
+      // [Q4] tareas.md: "director:X" is the backend contract, but nobody
+      // needs to know that syntax to use it -- the discoverable toggle
+      // builds it from whatever the user already typed. Typing the prefix
+      // directly still works too (checked case-insensitively, never doubled).
+      export function effectiveSearchQuery(rawQuery) {
+        if (!fields.searchByDirector.checked || /^director:/i.test(rawQuery)) return rawQuery;
+        return `director:${rawQuery}`;
+      }
+
       export async function runSearch({ updateHistory = true } = {}) {
         const requestedQuery = fields.query.value.trim();
         fields.collectionUtilityMenu.open = false;
@@ -323,9 +332,10 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
               : `Buscando “${query}” en tu catálogo…`
             : comparisonSearchMessage()
         );
+        const effectiveQuery = effectiveSearchQuery(query);
         const tasks = [];
-        if (collectionSearchMode === "browse") tasks.push(loadLocalSearchResults(query, controller));
-        sources.forEach((name) => tasks.push(loadExternalSourceResults(query, name, controller)));
+        if (collectionSearchMode === "browse") tasks.push(loadLocalSearchResults(effectiveQuery, controller));
+        sources.forEach((name) => tasks.push(loadExternalSourceResults(effectiveQuery, name, controller)));
         try {
           await Promise.allSettled(tasks);
           if (!isCurrentSearch(controller)) return;
@@ -359,7 +369,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         renderManualResults();
         setSearchState("searching", `Reintentando ${EXTERNAL_SOURCE_LABELS[source][0]} para “${query}”…`);
         try {
-          await loadExternalSourceResults(query, source, controller);
+          await loadExternalSourceResults(effectiveSearchQuery(query), source, controller);
           if (!isCurrentSearch(controller)) return;
           updateExternalSearchSummary();
           setSearchState(

@@ -93,6 +93,7 @@ import { renderEditorialHome } from "./home.js";
           sort: fields.sort.value && fields.sort.value !== "original" ? fields.sort.value : "",
           duplicates: duplicatesOnly ? "1" : "",
           external: activeQuery && fields.externalSource.checked ? "1" : "",
+          director: activeQuery && fields.searchByDirector.checked ? "1" : "",
           mode: collectionSearchMode !== "browse" ? collectionSearchMode : "",
           link_id: collectionSearchMode === "link" ? selectedExistingIdForSearch || "" : ""
         };
@@ -123,6 +124,7 @@ import { renderEditorialHome } from "./home.js";
           : "original";
         duplicatesOnly = params.get("duplicates") === "1";
         fields.externalSource.checked = params.get("external") === "1";
+        fields.searchByDirector.checked = params.get("director") === "1";
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         syncCollectionFilterControls();

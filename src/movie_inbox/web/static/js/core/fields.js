@@ -13,6 +13,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
       export const fields = {
         query: document.querySelector("#query"),
         externalSource: document.querySelector("#externalSource"),
+        searchByDirector: document.querySelector("#searchByDirector"),
         searchButton: document.querySelector("#searchButton"),
         homeButton: document.querySelector("#homeButton"),
         catalogButton: document.querySelector("#catalogButton"),

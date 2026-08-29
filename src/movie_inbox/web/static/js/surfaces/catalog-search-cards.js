@@ -47,6 +47,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
               ${meta(result.source)}${meta(result.year)}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(result.url ? new URL(result.url).hostname.replace(/^www\./, "") : "")}${meta(similarity)}
             </div>
             <div class="card-badges">
+              ${result._search?.reason === "director_match" ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(result._search))}</span>` : ""}
               <span class="pill good">${escapeHtml(result.source || "externo")}</span>
               <span class="pill ${result.url ? "good" : "muted"}">${result.url ? "con referencia" : "sin referencia"}</span>
             </div>
@@ -88,6 +89,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
 
       export function searchReasonLabel(search = {}) {
         const labels = {
+          director_match: "coincide por dirección",
           shared_external_url: "mismo enlace",
           shared_wikidata_id: "mismo Wikidata",
           exact_title_year: "título y año exactos",
@@ -107,8 +109,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
           alternative_titles: "nombre alternativo",
           local_file: "archivo local",
           external_id: "identificador externo",
-          external_link: "enlace externo",
-          director: "dirección"
+          external_link: "enlace externo"
         };
         return fieldLabels[search.matched_field] || "coincidencia local";
       }
