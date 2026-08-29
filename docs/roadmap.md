@@ -144,12 +144,11 @@ no inmoviliza el resto de la cola.
    CI con excepciones acotadas para callbacks dinamicos y fixtures Playwright.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
-`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3] y [Q4]
-tambien cerraron (ver `tareas.md`). De los items restantes de la seccion 2 de abajo,
-[F1] y [Q5] quedan bloqueados por decisiones/resultados externos a esta cola; [L1] no
-tiene una dependencia pendiente ([T2], su unico bloqueo declarado, ya cerro) pese a
-estar listado despues en la secuencia — confirmar el estado de cada uno en `tareas.md`
-antes de tomar el siguiente item, no asumir por el orden de esta lista.
+`ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3], [Q4] y
+[L1] tambien cerraron (ver `tareas.md`). De los items restantes de la seccion 2 de
+abajo, [F1] y [Q5] quedan bloqueados por decisiones/resultados externos a esta cola —
+confirmar el estado de cada uno en `tareas.md` antes de tomar el siguiente item, no
+asumir por el orden de esta lista.
 
 ### 2. Calidad de datos y bibliotecas
 
@@ -180,7 +179,12 @@ antes de tomar el siguiente item, no asumir por el orden de esta lista.
 6. [F1] Prototipo local opcional con datasets oficiales de IMDb.
 7. [Q5] Autoridad y conflictos campo por campo, sin prioridad global de fuente.
 8. [Q6] Ficha externa compuesta sin altas ni fusiones manuales duplicadas.
-9. [L1] Exclusiones configurables por biblioteca.
+9. **Cerrado 2026-08-29.** [L1] Reglas de exclusion adicionales por biblioteca, encima
+   de los defaults seguros existentes (`extras`, `sample`, etc.): patrones tipo glob
+   validados en `domain/libraries.py` y persistidos por biblioteca, aplicados por
+   `scan_media_files()`. Un archivo previamente disponible que una regla nueva empieza
+   a excluir se distingue en el mismo dry run existente (`run.newly_excluded`) en vez
+   de confundirse en silencio con uno borrado del disco. Detalle en `tareas.md`.
 10. [F3] Evaluacion de TMDb; un adaptador solo nace si el ADR la aprueba.
 11. [F2] Fuente de anime sostenible, bloqueada hasta contar con permiso/licencia.
 12. [C1] Contrato para grupos de 3+ duplicados.

@@ -97,15 +97,6 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
 ### Frente: Bibliotecas y curaduria
 
-#### [L1] Reglas de exclusion configurables por biblioteca
-- **Alcance**: partir de los defaults seguros actuales (`extras`, `sample`, multipartes)
-  y definir reglas adicionales por biblioteca con preview antes de aplicar. Persistir
-  configuracion sin reinterpretar inventario historico silenciosamente.
-- **Criterio de cierre**: esquema y migracion, validacion de rutas/patrones, UI owner,
-  pruebas de preview/aplicacion y recuperacion ante una regla invalida.
-- **Depende de**: [T2] para que el nuevo contrato nazca tipado.
-- **Modelo sugerido**: Grande. Toca scanner, persistencia, seguridad y UI.
-
 #### [C1] Disenar el contrato para grupos de 3+ duplicados
 - **Alcance**: reemplazar la descomposicion C(n,2) por un caso de grupo sin implementar
   todavia el merge N-a-1. Definir identidad del caso, orden, conflictos, historial,
@@ -713,6 +704,77 @@ pedido puntual de esa sesion. Las 3 tareas son independientes entre si.
 - **Cierre**: patrones recursivos aplicados y el unico catalogo anidado que habia
   escapado dejo de estar trackeado sin abrirse ni borrarse del disco. La purga del
   historial sigue deliberadamente fuera de alcance. 2026-08-24, commit `ad53ec9`.
+
+---
+
+### Frente: Bibliotecas y curaduria
+
+#### [L1] Reglas de exclusion configurables por biblioteca
+`scan_media_files()` (`infrastructure/library_scanner.py`) ya aceptaba un parametro
+`excluded_dirs` ademas de los defaults seguros (`extras`/`sample`/etc.), pero
+`ManagedLibraryService.execute_run()` nunca se lo pasaba — el punto de extension existia
+sin nada conectado a una biblioteca real. Un agente Plan encontro una violacion de
+layering real en el primer diseño: la validacion de patrones y el predicado de
+coincidencia no podian vivir en `infrastructure/library_scanner.py` si
+`application/library_service.py` necesitaba reusarlos para calcular que inventario
+existente quedaria oculto por una regla nueva (`tests/test_layering.py` prohibe ese
+import por AST) — fueron a `domain/libraries.py`, junto a
+`normalize_library_name`/`normalize_missing_ratio` que ya vivian ahi.
+
+`domain/libraries.py` gano `validate_exclusion_pattern` (normaliza NFC, recorta,
+rechaza vacio/demasiado largo/con `/` o `\`/solo asteriscos), `matches_excluded_pattern`
+(NFC + casefold + `fnmatch.fnmatchcase`, nunca compila regex) y
+`path_matches_excluded_pattern` (solo componentes de directorio del path relativo,
+nunca el nombre de archivo) — mas `ManagedLibrary.exclusion_patterns` y
+`LibraryScanRun.newly_excluded`. `library_scanner.py` cambio una sola linea (coincidencia
+exacta por `matches_excluded_pattern`): como ningun nombre de `DEFAULT_EXCLUDED_DIRS`
+tiene caracteres especiales de fnmatch, es un superset estricto sin cambio de
+comportamiento para los defaults actuales.
+
+Persistencia nueva: tabla `library_exclusion_rules` (schema v9, mismo patron de script
+completo que v5, no el `ALTER TABLE` con branch propio de v8) con `ON DELETE CASCADE`
+contra `media_libraries`, mas `library_scan_runs.newly_excluded_json`.
+`replace_exclusion_rules()` (`library_repository.py`) reemplaza el conjunto completo de
+forma atomica (`BEGIN IMMEDIATE`) y recibe `created_at` del llamador en vez de leer el
+reloj el mismo, siguiendo la convencion ya existente en ese repositorio — encontrado por
+grep antes de correr nada: un `_utc_now()` que se asumio existente ahi en realidad solo
+existe en otros archivos.
+
+El hueco de producto real que cierra esta tarea, no un simple rename: un archivo que
+deja de aparecer por una regla nueva y uno borrado del disco producian exactamente el
+mismo `available = 0`, sin ninguna señal que los distinga. `_classify_scan()`
+(`library_service.py`) ahora separa, dentro de los items previamente disponibles no
+reclamados por la corrida, cuales coinciden con una regla de exclusion vigente
+(`path_matches_excluded_pattern`) — esos salen en un preview propio
+(`run.newly_excluded`, mismo `PREVIEW_LIMIT` que ya usa el preview de descubiertos) en
+vez de contarse en silencio como "missing" generico. Visible en el mismo dry run ya
+obligatorio antes de aplicar (`queue_scan` ya bloqueaba `apply` sin una prueba exitosa
+previa — reusado tal cual, sin una segunda pasada de seguridad nueva).
+
+Endpoint nuevo `POST /api/libraries/{id}/exclusion-rules`, con forma de error propia
+(`{"ok": false, "reason": "invalid_patterns", "errors": [{"pattern", "reason"}, ...]}`)
+en vez de la string unica de `error_response()` — `admin-libraries.js` no podia mostrar
+cual patron especifico fallo con el mecanismo existente. Frontend dentro del slot de
+"Opciones avanzadas" que ya existia: alta/baja de filas, guardado como reemplazo
+atomico del conjunto completo (nunca alta/baja individual contra el servidor), con
+`libraryExclusionRulesErrorMessage()` leyendo el array estructurado. Verificado en
+servidor real, no solo con pruebas unitarias: crear una biblioteca con una regla nueva
+a la vez que se crea (el id todavia no existe hasta que responde el POST principal);
+guardado persiste y una reapertura del dialogo la precarga; quitar la regla y
+re-escanear recupera el archivo; volver a agregarla muestra "1 archivo ya registrado
+quedo excluido por una regla" en vez de mezclarse con "missing"; un patron invalido
+(`"a/b"`) se rechaza con el motivo especifico sin cerrar el dialogo ni descartar el
+resto del formulario.
+
+398 pruebas (crecio desde 393 al empezar, en 2 fases con esa cobertura nueva), mypy
+estricto, Ruff (lint y formato), `compileall` y `git diff --check` en verde en cada
+fase. Fuera de alcance, explicito desde el diseño: reglas a nivel de archivo individual
+(solo carpetas, mismo alcance que los defaults ya tienen), alta/baja individual de
+reglas por endpoints separados, un endpoint de preview sincrono aparte del dry run
+existente, y una prueba de navegador Playwright nueva para este dialogo (no tenia
+cobertura de ese tipo antes tampoco; verificacion manual con servidor real, mismo
+criterio que [Q4]).
+2026-08-29.
 
 ---
 
