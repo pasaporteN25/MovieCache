@@ -526,6 +526,7 @@ class ManagedLibraryService:
             "created_at": library.created_at,
             "updated_at": library.updated_at,
             "counts": counts,
+            "exclusion_patterns": list(library.exclusion_patterns),
         }
 
     @staticmethod
@@ -542,6 +543,7 @@ class ManagedLibraryService:
             "summary": dict(run.summary),
             "errors": list(run.errors),
             "preview": [dict(value) for value in run.preview],
+            "newly_excluded": [dict(value) for value in run.newly_excluded],
         }
 
     @staticmethod

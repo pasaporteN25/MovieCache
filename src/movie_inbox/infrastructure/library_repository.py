@@ -78,7 +78,25 @@ class SqliteLibraryRepository:
                     rows = connection.execute(
                         "SELECT * FROM media_libraries ORDER BY name COLLATE NOCASE, created_at"
                     ).fetchall()
-                    return [_library(row) for row in rows]
+                    # One extra query for every library's rules (not one per
+                    # library) -- a personal self-hosted instance realistically
+                    # has a handful of libraries, so this stays two queries
+                    # total rather than true N+1.
+                    patterns_by_library: dict[str, list[str]] = {}
+                    for pattern_row in connection.execute(
+                        "SELECT library_id, pattern FROM library_exclusion_rules "
+                        "ORDER BY library_id, created_at"
+                    ):
+                        patterns_by_library.setdefault(str(pattern_row["library_id"]), []).append(
+                            str(pattern_row["pattern"])
+                        )
+                    return [
+                        replace(
+                            _library(row),
+                            exclusion_patterns=tuple(patterns_by_library.get(str(row["id"]), [])),
+                        )
+                        for row in rows
+                    ]
             except sqlite3.Error as error:
                 raise LibraryRepositoryError(
                     f"Cannot list managed libraries from: {self.path}"

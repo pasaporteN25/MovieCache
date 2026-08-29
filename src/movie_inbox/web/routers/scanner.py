@@ -18,7 +18,11 @@ from movie_inbox.application.library_repository import (
 from movie_inbox.application.library_service import LibraryPathError
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowError
-from movie_inbox.domain.libraries import LibraryValidationError, work_identity
+from movie_inbox.domain.libraries import (
+    ExclusionRulesInvalid,
+    LibraryValidationError,
+    work_identity,
+)
 from movie_inbox.web.catalog_api import (
     background_enrich_catalog_item,
     load_items,
@@ -193,6 +197,47 @@ def update_managed_library(
         return error_response("library_scan_busy", 409)
     except (ValueError, LibraryValidationError) as error:
         return error_response(str(error), 400)
+    except LibraryRepositoryError:
+        return error_response("library_store_unavailable", 503)
+
+
+@router.post("/api/libraries/{library_id}/exclusion-rules")
+def update_managed_library_exclusion_rules(
+    library_id: str,
+    request: Request,
+    body: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    # [L1] tareas.md: a dedicated response shape, not error_response() --
+    # that helper only ever carries one "reason" string, and the frontend
+    # collapses it to that, discarding anything else. Showing which
+    # pattern(s) failed and why needs its own "errors" list.
+    require_owner(request)
+    library_service = request.app.state.library_service
+    patterns = body.get("patterns")
+    if not isinstance(patterns, list) or not all(isinstance(value, str) for value in patterns):
+        return error_response("patterns_must_be_a_list_of_strings", 400)
+    try:
+        library = library_service.set_exclusion_rules(library_id, patterns)
+        return JSONResponse(
+            {
+                "ok": True,
+                "reason": "exclusion_rules_updated",
+                "library": library_service.library_payload(library),
+            }
+        )
+    except LibraryNotFound:
+        return error_response("library_not_found", 404)
+    except ExclusionRulesInvalid as error:
+        return JSONResponse(
+            {
+                "ok": False,
+                "reason": "invalid_patterns",
+                "errors": [
+                    {"pattern": item.pattern, "reason": item.reason} for item in error.errors
+                ],
+            },
+            status_code=400,
+        )
     except LibraryRepositoryError:
         return error_response("library_store_unavailable", 503)
 

@@ -1775,6 +1775,55 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertTrue(items.json()["items"][0]["_availability"]["server"])
         self.assertNotIn(str(self.media_path), items.text)
 
+    def test_owner_can_set_exclusion_rules_and_the_next_scan_respects_them(self) -> None:
+        (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
+        bonus_dir = self.media_path / "Bonus"
+        bonus_dir.mkdir()
+        (bonus_dir / "clip.mp4").write_bytes(b"bonus-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {"name": "Con reglas", "root_path": str(self.media_path), "schedule": "manual"}
+            ),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+
+        invalid = self.client.post(
+            f"/api/libraries/{library_id}/exclusion-rules",
+            content=json.dumps({"patterns": ["ok-pattern", "*"]}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(invalid.status_code, 400, invalid.content)
+        payload = invalid.json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["reason"], "invalid_patterns")
+        self.assertEqual(
+            {(entry["pattern"], entry["reason"]) for entry in payload["errors"]},
+            {("*", "excludes_everything")},
+        )
+
+        valid = self.client.post(
+            f"/api/libraries/{library_id}/exclusion-rules",
+            content=json.dumps({"patterns": ["bonus*"]}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(valid.status_code, 200, valid.content)
+        self.assertEqual(valid.json()["library"]["exclusion_patterns"], ["bonus*"])
+
+        tested = self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        run = self.client.get(
+            f"/api/library-runs/{tested.json()['run']['id']}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        ).json()["run"]
+
+        self.assertEqual(run["summary"]["discovered"], 1)  # only Heat.1995.1080p.mkv
+        self.assertEqual(run["summary"]["newly_excluded"], 0)  # Bonus was never applied/tracked
+
     def test_scheduled_scans_require_applied_inventory_and_manual_libraries_reject_activation(
         self,
     ) -> None:
