@@ -83,6 +83,7 @@ class ManagedLibrary:
     created_at: int = 0
     updated_at: int = 0
     exclusion_patterns: tuple[str, ...] = ()
+    share_availability_as_collection: bool = False
 
 
 @dataclass(frozen=True)

@@ -11,6 +11,12 @@ from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_service import CollectionService
 from movie_inbox.application.member_service import MemberService
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.collections import (
+    collection_item_from_availability_record,
+    normalize_club_collection_description,
+    normalize_club_collection_title,
+    normalize_collection_item,
+)
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
@@ -131,6 +137,77 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(result["summary"]["review"], 1)
         self.assertEqual(result["results"][0]["reason"], "possible_duplicate")
         self.assertEqual(self.catalog_repository.read(), [])
+
+
+class AvailabilityCollectionItemTests(unittest.TestCase):
+    """[P2]: building a collection item from a library-availability record."""
+
+    def _record(self, **overrides):
+        record = {
+            "work_key": "wikidata:Q12345",
+            "identity": {"title": "Heat", "year": "1995", "kind": "pelicula"},
+            "library_id": "lib-abc-123",
+            "library_name": "Blu-rays del living",
+            "file_count": 2,
+        }
+        record.update(overrides)
+        return record
+
+    def test_item_never_carries_the_library_id_or_name(self) -> None:
+        entry = collection_item_from_availability_record(self._record(), 0)
+
+        self.assertEqual(entry.id, "wikidata:Q12345")
+        self.assertNotIn("library_id", entry.item)
+        self.assertNotIn("library_name", entry.item)
+        self.assertNotIn("lib-abc-123", str(entry.item))
+        self.assertNotIn("Blu-rays del living", str(entry.item))
+        self.assertEqual(entry.item["title"], "Heat")
+        self.assertEqual(entry.item["file_count"], 2)
+
+    def test_a_personal_catalog_items_full_availability_no_longer_survives_normalization(
+        self,
+    ) -> None:
+        leaky = normalize_item(
+            {
+                "id": "x",
+                "title": "Heat",
+                "year": "1995",
+                "_availability": {
+                    "effective": True,
+                    "sources": [
+                        {
+                            "library_id": "lib-abc-123",
+                            "library_name": "Blu-rays del living",
+                            "file_count": 2,
+                        }
+                    ],
+                },
+            }
+        ).to_dict()
+
+        safe = normalize_collection_item(leaky)
+
+        self.assertNotIn("_availability", safe)
+        self.assertNotIn("lib-abc-123", str(safe))
+        self.assertNotIn("Blu-rays del living", str(safe))
+
+    def test_missing_work_key_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            collection_item_from_availability_record(self._record(work_key=""), 0)
+
+
+class ClubCollectionTitleTests(unittest.TestCase):
+    def test_title_must_be_between_two_and_120_characters(self) -> None:
+        self.assertEqual(normalize_club_collection_title("  Blu-rays  "), "Blu-rays")
+        with self.assertRaises(ValueError):
+            normalize_club_collection_title("a")
+        with self.assertRaises(ValueError):
+            normalize_club_collection_title("a" * 121)
+
+    def test_description_is_capped_at_2000_characters(self) -> None:
+        self.assertEqual(normalize_club_collection_description("  hola  "), "hola")
+        with self.assertRaises(ValueError):
+            normalize_club_collection_description("a" * 2001)
 
 
 if __name__ == "__main__":

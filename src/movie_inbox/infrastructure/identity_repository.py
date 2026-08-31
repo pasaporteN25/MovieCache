@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 9
+INSTANCE_SCHEMA_VERSION = 10
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -323,6 +323,13 @@ ON library_exclusion_rules(library_id);
 ALTER TABLE library_scan_runs ADD COLUMN newly_excluded_json TEXT NOT NULL DEFAULT '[]';
 """
 
+INSTANCE_SCHEMA_V10 = """
+ALTER TABLE media_libraries ADD COLUMN share_availability_as_collection
+    INTEGER NOT NULL DEFAULT 0 CHECK (share_availability_as_collection IN (0, 1));
+ALTER TABLE curated_collections ADD COLUMN derived_library_id
+    TEXT REFERENCES media_libraries(id) ON DELETE CASCADE;
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -332,6 +339,7 @@ INSTANCE_MIGRATIONS = {
     7: ("reversible scanner review history", INSTANCE_SCHEMA_V7),
     8: ("scanner history catalog snapshots", INSTANCE_SCHEMA_V8),
     9: ("per-library exclusion rules", INSTANCE_SCHEMA_V9),
+    10: ("shared library availability collections", INSTANCE_SCHEMA_V10),
 }
 
 
