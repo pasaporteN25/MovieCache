@@ -185,8 +185,11 @@ jobs:
           archive="$(find backups -maxdepth 1 -name '*.tar.gz' -print -quit)"
           test -n "$archive"
           test -f "$archive.sha256"
-          tar -tzf "$archive" | grep -q 'movie-inbox/.private-backup-smoke'
-          docker compose run --rm --no-deps movie-inbox-backup backup verify "/backups/$(basename "$archive")"
+          archive_name="$(basename "$archive")"
+          docker compose run --rm --no-deps --entrypoint python movie-inbox-backup \
+            -c 'import sys, tarfile; names = tarfile.open(sys.argv[1], "r:gz").getnames(); raise SystemExit(0 if "movie-inbox/.private-backup-smoke" in names else 1)' \
+            "/backups/$archive_name"
+          docker compose run --rm --no-deps movie-inbox-backup backup verify "/backups/$archive_name"
       - name: Show container logs on failure
         if: failure()
         run: docker compose logs --no-color

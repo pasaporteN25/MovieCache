@@ -113,6 +113,9 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn('test "$compose_started" = "true"', workflow)
         self.assertIn("docker compose restart movie-inbox", workflow)
         self.assertIn(".private-backup-smoke", workflow)
+        self.assertIn("--entrypoint python movie-inbox-backup", workflow)
+        self.assertIn('tarfile.open(sys.argv[1], "r:gz")', workflow)
+        self.assertNotIn('tar -tzf "$archive"', workflow)
         self.assertIn("ReadonlyRootfs", workflow)
         self.assertIn("test ! -w /imports", workflow)
 
