@@ -95,6 +95,27 @@
               <button id="addLibraryExclusionRule" class="quiet-action" type="button">Agregar regla</button>
               <p id="libraryExclusionRulesFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
             </div>
+            <div class="library-share-availability">
+              <label class="privacy-master-control">
+                <input id="libraryShareAvailability" name="share_availability_as_collection" type="checkbox">
+                <span>
+                  <strong>Compartir disponibilidad en el Club</strong>
+                  <small>Publica una colección de solo lectura con los títulos confirmados y disponibles de esta biblioteca.</small>
+                </span>
+              </label>
+              <p class="privacy-boundary">Rutas, archivos y nombres de archivo nunca se comparten — solo el título de la biblioteca, editable, y los títulos confirmados.</p>
+              <div id="libraryShareAvailabilityFields" class="library-share-availability-fields" hidden>
+                <label>
+                  <span>Título en el Club</span>
+                  <input id="libraryClubTitle" name="club_title" type="text" maxlength="120">
+                </label>
+                <label>
+                  <span>Descripción en el Club (opcional)</span>
+                  <textarea id="libraryClubDescription" name="club_description" maxlength="2000" rows="2"></textarea>
+                </label>
+              </div>
+              <p id="libraryShareAvailabilityFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
+            </div>
           </details>
           <p id="libraryDialogFeedback" class="admin-inline-feedback" role="alert" aria-live="polite" hidden></p>
         </div>

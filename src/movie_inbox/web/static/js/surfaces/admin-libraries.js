@@ -461,6 +461,10 @@ import { loadScannerQueue } from "./inbox-scanner.js";
         return errors.map((error) => `"${error.pattern}": ${reasons[error.reason] || "no es válido"}`).join(" · ");
       }
 
+      export function toggleLibraryShareAvailabilityFields() {
+        fields.libraryShareAvailabilityFields.hidden = !fields.libraryShareAvailability.checked;
+      }
+
       export function openLibraryDialog(library = null) {
         editingLibraryId = library?.id || "";
         browsedLibraryPath = "";
@@ -478,6 +482,11 @@ import { loadScannerQueue } from "./inbox-scanner.js";
         setLibraryPathFeedback("");
         fields.librarySchedule.value = library?.schedule || "manual";
         fields.libraryMissingRatio.value = Math.round(Number(library?.max_missing_ratio ?? 0.5) * 100);
+        fields.libraryShareAvailability.checked = Boolean(library?.share_availability_as_collection);
+        fields.libraryClubTitle.value = library?.club_title || library?.name || "";
+        fields.libraryClubDescription.value = library?.club_description || "";
+        toggleLibraryShareAvailabilityFields();
+        setInlineFeedback(fields.libraryShareAvailabilityFeedback, "");
         fields.libraryRootHint.textContent = library
           ? "Para cambiar la ruta, quitá el seguimiento y registrala nuevamente."
           : `Raíces habilitadas: ${scannerAllowedRoots.join(" · ")}`;
@@ -600,6 +609,46 @@ import { loadScannerQueue } from "./inbox-scanner.js";
         }
       }
 
+      async function saveLibraryShareSettings(libraryId) {
+        const enabled = fields.libraryShareAvailability.checked;
+        const body = { enabled };
+        if (enabled) {
+          // Title: omit rather than send "" when left blank -- the backend
+          // only overrides the title when the key is present, falling back
+          // to the library's own name otherwise. Sending an explicit ""
+          // would instead fail the 2-120 char validation meant for a
+          // deliberately typed short title.
+          const title = fields.libraryClubTitle.value.trim();
+          if (title) body.club_title = title;
+          // Description: always send, even blank -- unlike the title it has
+          // no minimum length, so this is the only way to clear one that was
+          // set previously.
+          body.club_description = fields.libraryClubDescription.value.trim();
+        }
+        try {
+          const response = await apiFetch(`/api/libraries/${encodeURIComponent(libraryId)}/share-availability`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            setInlineFeedback(fields.libraryShareAvailabilityFeedback, libraryErrorMessage(payload.reason), "error");
+            return false;
+          }
+          setInlineFeedback(
+            fields.libraryShareAvailabilityFeedback,
+            enabled && !payload.collection_synced
+              ? "Se guardó la preferencia; la colección se actualizará con el próximo recorrido."
+              : ""
+          );
+          return true;
+        } catch (error) {
+          setInlineFeedback(fields.libraryShareAvailabilityFeedback, libraryErrorMessage(error.message), "error");
+          return false;
+        }
+      }
+
       export async function saveManagedLibrary(event) {
         event.preventDefault();
         fields.submitLibrary.disabled = true;
@@ -625,6 +674,7 @@ import { loadScannerQueue } from "./inbox-scanner.js";
           const libraryId = payload.library?.id || editingLibraryId;
           selectedLibraryId = libraryId;
           if (!(await saveLibraryExclusionRules(libraryId))) return;
+          if (!(await saveLibraryShareSettings(libraryId))) return;
           closeLibraryDialog();
           setLibraryFeedback(`${name} quedó guardada. ${payload.reason === "library_created" ? "Ejecutá ahora el recorrido de prueba." : ""}`.trim());
           await loadLibraries();

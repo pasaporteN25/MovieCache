@@ -271,6 +271,48 @@ def update_managed_library_status(
         return error_response("library_store_unavailable", 503)
 
 
+@router.post("/api/libraries/{library_id}/share-availability")
+def update_managed_library_share_availability(
+    library_id: str,
+    request: Request,
+    body: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    # [P2] tareas.md: a dedicated endpoint, mirroring /status -- sharing is a
+    # separate opt-in concern from scheduled-scan automation, not another
+    # field folded into /update or /status.
+    require_owner(request)
+    library_service = request.app.state.library_service
+    if not isinstance(body.get("enabled"), bool):
+        return error_response("enabled_must_be_boolean", 400)
+    club_title = body.get("club_title")
+    club_description = body.get("club_description")
+    if club_title is not None and not isinstance(club_title, str):
+        return error_response("club_title_must_be_a_string", 400)
+    if club_description is not None and not isinstance(club_description, str):
+        return error_response("club_description_must_be_a_string", 400)
+    try:
+        library, synced = library_service.set_share_availability(
+            library_id,
+            body["enabled"],
+            club_title=club_title,
+            club_description=club_description,
+        )
+        return JSONResponse(
+            {
+                "ok": True,
+                "reason": "share_availability_updated",
+                "collection_synced": synced,
+                "library": library_service.library_payload(library),
+            }
+        )
+    except LibraryNotFound:
+        return error_response("library_not_found", 404)
+    except ValueError as error:
+        return error_response(str(error), 400)
+    except LibraryRepositoryError:
+        return error_response("library_store_unavailable", 503)
+
+
 @router.post("/api/libraries/{library_id}/delete")
 def delete_managed_library(
     library_id: str,

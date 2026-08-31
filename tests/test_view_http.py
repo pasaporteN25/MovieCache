@@ -1846,6 +1846,77 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertTrue(items.json()["items"][0]["_availability"]["server"])
         self.assertNotIn(str(self.media_path), items.text)
 
+    def test_sharing_a_librarys_availability_publishes_a_club_collection_without_leaking_paths(
+        self,
+    ) -> None:
+        (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
+        created = self.client.post(
+            "/api/libraries",
+            content=json.dumps(
+                {
+                    "name": "Blu-rays del living",
+                    "root_path": str(self.media_path),
+                    "schedule": "manual",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+        library_id = created.json()["library"]["id"]
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "dry_run"}),
+            headers=self.post_headers(),
+        )
+        self.client.post(
+            f"/api/libraries/{library_id}/runs",
+            content=json.dumps({"mode": "apply"}),
+            headers=self.post_headers(),
+        )
+
+        shared = self.client.post(
+            f"/api/libraries/{library_id}/share-availability",
+            content=json.dumps({"enabled": True}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(shared.status_code, 200, shared.content)
+        self.assertTrue(shared.json()["collection_synced"])
+        self.assertTrue(shared.json()["library"]["share_availability_as_collection"])
+        self.assertEqual(shared.json()["library"]["club_title"], "Blu-rays del living")
+
+        listed = self.client.get(
+            "/api/collections", headers={"X-Movie-Inbox-Token": self.config.api_token}
+        )
+        collection = next(
+            item for item in listed.json()["collections"] if item["title"] == "Blu-rays del living"
+        )
+        self.assertEqual(collection["source_kind"], "user")
+
+        detail = self.client.get(
+            f"/api/collections/{collection['id']}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(detail.status_code, 200, detail.content)
+        heat = next(item for item in detail.json()["items"] if item["title"] == "Heat")
+        self.assertEqual(heat["year"], "1995")
+        self.assertNotIn(library_id, detail.text)
+        self.assertNotIn(str(self.media_path), detail.text)
+        self.assertNotIn("Heat.1995.1080p.mkv", detail.text)
+        self.assertNotIn("library_id", detail.text)
+        self.assertNotIn("library_name", detail.text)
+
+        disabled = self.client.post(
+            f"/api/libraries/{library_id}/share-availability",
+            content=json.dumps({"enabled": False}),
+            headers=self.post_headers(),
+        )
+        self.assertEqual(disabled.status_code, 200, disabled.content)
+        after_disable = self.client.get(
+            f"/api/collections/{collection['id']}",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(after_disable.json()["visibility"], "private")
+        self.assertEqual(after_disable.json()["title"], "Blu-rays del living")
+
     def test_owner_can_set_exclusion_rules_and_the_next_scan_respects_them(self) -> None:
         (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")
         bonus_dir = self.media_path / "Bonus"

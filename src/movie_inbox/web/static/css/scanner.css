@@ -289,6 +289,8 @@
       .library-exclusion-rule-row { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) auto; }
       .library-exclusion-rule-row button,
       .library-exclusion-rules > .quiet-action { min-height: 34px; width: auto; }
+      .library-share-availability { display: grid; gap: 7px; margin-top: 13px; }
+      .library-share-availability-fields { display: grid; gap: 7px; }
 
       .scanner-workbench {
         border-block: 1px solid var(--line);
