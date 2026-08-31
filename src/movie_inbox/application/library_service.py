@@ -13,6 +13,10 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from movie_inbox.application.collection_repository import (
+    CollectionRepository,
+    CollectionRepositoryError,
+)
 from movie_inbox.application.library_repository import (
     LibraryNotFound,
     LibraryRepository,
@@ -20,6 +24,11 @@ from movie_inbox.application.library_repository import (
     LibraryRunBusy,
 )
 from movie_inbox.domain.catalog import external_urls, title_match_key, title_match_keys_for_item
+from movie_inbox.domain.collections import (
+    collection_item_from_availability_record,
+    normalize_club_collection_description,
+    normalize_club_collection_title,
+)
 from movie_inbox.domain.libraries import (
     MAX_EXCLUSION_RULES_PER_LIBRARY,
     ExclusionPatternError,
@@ -114,6 +123,7 @@ class ManagedLibraryService:
         catalog_universe: CatalogUniverseProvider,
         scanner: FilesystemScanner,
         clock: Callable[[], float] = time.time,
+        collection_repository: CollectionRepository | None = None,
     ) -> None:
         self.repository = repository
         self.allowed_roots = tuple(
@@ -121,6 +131,7 @@ class ManagedLibraryService:
         )
         self.catalog_universe = catalog_universe
         self.scanner = scanner
+        self.collection_repository = collection_repository
         self.clock = clock
 
     @property
@@ -210,6 +221,79 @@ class ManagedLibraryService:
             updated_at=now,
         )
         return self.repository.update_library(updated)
+
+    def sync_shared_collection(self, library_id: str) -> None:
+        """[P2]: regenerate the library's derived Club collection from its
+        current confirmed availability. A no-op unless sharing is on and a
+        collection repository was injected -- safe to call unconditionally
+        from anywhere (the post-scan hook, or right after enabling sharing)."""
+        if self.collection_repository is None:
+            return
+        library = self._library(library_id)
+        if not library.share_availability_as_collection:
+            return
+        records = [
+            record
+            for record in self.repository.availability_records()
+            if str(record.get("library_id") or "") == library_id
+        ]
+        items = [
+            collection_item_from_availability_record(record, position)
+            for position, record in enumerate(records)
+        ]
+        self.collection_repository.upsert_derived_collection(
+            library_id=library_id,
+            owner_user_id=library.created_by_user_id,
+            default_title=library.name,
+            items=items,
+        )
+
+    def set_share_availability(
+        self,
+        library_id: str,
+        enabled: bool,
+        *,
+        club_title: str | None = None,
+        club_description: str | None = None,
+    ) -> tuple[ManagedLibrary, bool]:
+        """Returns the updated library and whether the collection sync
+        actually happened (enabling always tries it immediately; a transient
+        failure there does not fail the whole request -- the flag is still
+        saved and the collection will catch up on the next scan)."""
+        library = self._library(library_id)
+        updated = self.repository.update_library(
+            replace(
+                library,
+                share_availability_as_collection=bool(enabled),
+                updated_at=self._now(),
+            )
+        )
+        if self.collection_repository is None:
+            return updated, False
+        if not enabled:
+            self.collection_repository.unpublish_derived_collection(library_id)
+            return updated, True
+        synced = True
+        try:
+            self.sync_shared_collection(library_id)
+        except CollectionRepositoryError:
+            synced = False
+        if synced and (club_title is not None or club_description is not None):
+            existing = self.collection_repository.get_by_derived_library_id(library_id)
+            title = (
+                normalize_club_collection_title(club_title)
+                if club_title is not None
+                else (existing.title if existing is not None else library.name)
+            )
+            description = (
+                normalize_club_collection_description(club_description)
+                if club_description is not None
+                else (existing.description if existing is not None else "")
+            )
+            self.collection_repository.set_derived_collection_details(
+                library_id, title=title, description=description
+            )
+        return updated, synced
 
     def delete_library(self, library_id: str) -> bool:
         return self.repository.delete_library(library_id)
@@ -315,6 +399,24 @@ class ManagedLibraryService:
                 commit_inventory=commit_inventory,
                 mark_missing=mark_missing,
             )
+            if self.collection_repository is not None:
+                # Broad on purpose, not CollectionRepositoryError: this call
+                # sits inside the same try block as complete_run() above, so
+                # ANY exception escaping here falls through to `except
+                # Exception` below, which calls _fail_run() -> complete_run()
+                # a second time using the pre-scan `library` snapshot. That
+                # second call's `library_scan_runs` UPDATE is guarded
+                # (`WHERE status = 'running'`) and becomes a no-op, but its
+                # `media_libraries` UPDATE is NOT guarded -- it would
+                # unconditionally revert verified_at/last_scan_at/status back
+                # to their stale pre-scan values, corrupting a scan that had
+                # already completed successfully. Mirrors
+                # ManagedLibraryScheduler._loop()'s own swallow-everything
+                # isolation for the same reason.
+                try:
+                    self.sync_shared_collection(completed_library.id)
+                except Exception:
+                    pass
         except Exception as error:
             self._fail_run(run, library, started_at, error)
 
@@ -512,6 +614,13 @@ class ManagedLibraryService:
     def library_payload(self, library: ManagedLibrary) -> dict[str, Any]:
         counts_method = getattr(self.repository, "counts", None)
         counts = counts_method(library.id) if callable(counts_method) else {}
+        club_title = ""
+        club_description = ""
+        if library.share_availability_as_collection and self.collection_repository is not None:
+            derived = self.collection_repository.get_by_derived_library_id(library.id)
+            if derived is not None:
+                club_title = derived.title
+                club_description = derived.description
         return {
             "id": library.id,
             "name": library.name,
@@ -527,6 +636,9 @@ class ManagedLibraryService:
             "updated_at": library.updated_at,
             "counts": counts,
             "exclusion_patterns": list(library.exclusion_patterns),
+            "share_availability_as_collection": library.share_availability_as_collection,
+            "club_title": club_title,
+            "club_description": club_description,
         }
 
     @staticmethod

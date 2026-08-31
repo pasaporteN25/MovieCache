@@ -20,6 +20,7 @@ from movie_inbox.application.library_service import (
 )
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.libraries import ExclusionRulesInvalid, LibraryScanRun, ManagedLibrary
+from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
@@ -51,6 +52,7 @@ class ManagedLibraryTests(unittest.TestCase):
             write_path=str(self.catalog),
         )
         self.repository = SqliteLibraryRepository(self.instance)
+        self.collection_repository = SqliteCollectionRepository(self.instance)
         self.now = 1_800_000_000
         self.service = ManagedLibraryService(
             self.repository,
@@ -58,6 +60,7 @@ class ManagedLibraryTests(unittest.TestCase):
             catalog_universe=lambda: list(self.catalog_items),
             scanner=scan_media_files,
             clock=lambda: self.now,
+            collection_repository=self.collection_repository,
         )
 
     def tearDown(self) -> None:
@@ -805,6 +808,127 @@ class ManagedLibraryTests(unittest.TestCase):
         assert reloaded is not None
         self.assertTrue(reloaded.share_availability_as_collection)
         self.assertEqual(reloaded.name, "Renombrada")
+
+    def _confirmed_library_with_one_file(self) -> ManagedLibrary:
+        # Not "Heat" -- self.catalog_items (setUp) already seeds a "Heat"
+        # catalog item, which would auto-match instead of landing in the
+        # review queue, exactly like the existing precedent test uses
+        # "Arrival" (unrelated to the fixture's own catalog universe).
+        (self.media / "Arrival.2016.1080p.mkv").write_bytes(b"arrival")
+        library = self.create_library()
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        queue = self.service.review_queue()
+        self.service.review_file(
+            queue[0]["id"],
+            {"action": "confirm", "title": "Arrival", "year": "2016", "kind": "pelicula"},
+        )
+        return library
+
+    def test_enabling_sharing_immediately_publishes_a_collection_from_the_last_scan(
+        self,
+    ) -> None:
+        library = self._confirmed_library_with_one_file()
+        self.assertIsNone(self.collection_repository.get_by_derived_library_id(library.id))
+
+        updated, synced = self.service.set_share_availability(library.id, True)
+
+        self.assertTrue(synced)
+        self.assertTrue(updated.share_availability_as_collection)
+        derived = self.collection_repository.get_by_derived_library_id(library.id)
+        assert derived is not None
+        self.assertEqual(derived.title, "Peliculas principales")
+        self.assertEqual(derived.visibility, "published")
+        self.assertEqual([entry.item["title"] for entry in derived.items], ["Arrival"])
+
+    def test_a_custom_club_title_and_description_are_saved_and_survive_a_resync(self) -> None:
+        library = self._confirmed_library_with_one_file()
+
+        self.service.set_share_availability(
+            library.id, True, club_title="Mi coleccion especial", club_description="Fisicas"
+        )
+        self.service.sync_shared_collection(library.id)
+
+        derived = self.collection_repository.get_by_derived_library_id(library.id)
+        assert derived is not None
+        self.assertEqual(derived.title, "Mi coleccion especial")
+        self.assertEqual(derived.description, "Fisicas")
+
+    def test_disabling_sharing_unpublishes_without_deleting(self) -> None:
+        library = self._confirmed_library_with_one_file()
+        self.service.set_share_availability(library.id, True)
+
+        updated, _ = self.service.set_share_availability(library.id, False)
+
+        self.assertFalse(updated.share_availability_as_collection)
+        derived = self.collection_repository.get_by_derived_library_id(library.id)
+        assert derived is not None
+        self.assertEqual(derived.visibility, "private")
+
+    def test_a_scheduled_scan_resyncs_an_already_shared_library(self) -> None:
+        library = self._confirmed_library_with_one_file()
+        self.service.set_share_availability(library.id, True)
+
+        (self.media / "Sicario.2015.1080p.mkv").write_bytes(b"sicario")
+        self.execute(library.id, "dry_run")
+        self.execute(library.id, "apply")
+        queue = self.service.review_queue()
+        self.service.review_file(
+            queue[0]["id"],
+            {"action": "confirm", "title": "Sicario", "year": "2015", "kind": "pelicula"},
+        )
+        self.execute(library.id, "apply")
+
+        derived = self.collection_repository.get_by_derived_library_id(library.id)
+        assert derived is not None
+        self.assertEqual({entry.item["title"] for entry in derived.items}, {"Arrival", "Sicario"})
+
+    def test_a_collection_sync_failure_does_not_corrupt_the_completed_runs_library_state(
+        self,
+    ) -> None:
+        """[P2]: the execute_run() hook must catch a broad Exception, not just
+        CollectionRepositoryError -- otherwise an unexpected failure (e.g. a
+        bad availability record) escapes to the method's own `except
+        Exception`, which calls _fail_run() -> complete_run() a SECOND time
+        using the pre-scan library snapshot, silently reverting
+        verified_at/last_scan_at/status even though the scan itself already
+        completed successfully. Reproduced and confirmed by reading
+        complete_run() directly before writing this test."""
+        library = self._confirmed_library_with_one_file()
+        self.service.set_share_availability(library.id, True)
+
+        def _broken_records() -> list[dict[str, Any]]:
+            raise ValueError("boom: not a CollectionRepositoryError")
+
+        self.repository.availability_records = _broken_records  # type: ignore[method-assign]
+        before = self.repository.get_library(library.id)
+        assert before is not None
+
+        run = self.service.queue_scan(library.id, "apply")
+        self.service.execute_run(run.id)
+
+        completed_run = self.repository.get_run(run.id)
+        assert completed_run is not None
+        self.assertEqual(completed_run.status, "completed")
+        after = self.repository.get_library(library.id)
+        assert after is not None
+        self.assertEqual(after.status, "ready")
+        self.assertGreaterEqual(after.verified_at, before.verified_at)
+        self.assertGreaterEqual(after.last_scan_at, before.verified_at)
+
+    def test_library_payload_exposes_the_share_settings(self) -> None:
+        library = self._confirmed_library_with_one_file()
+        self.service.set_share_availability(
+            library.id, True, club_title="Mi coleccion", club_description="Fisicas"
+        )
+
+        reloaded = self.repository.get_library(library.id)
+        assert reloaded is not None
+        payload = self.service.library_payload(reloaded)
+
+        self.assertTrue(payload["share_availability_as_collection"])
+        self.assertEqual(payload["club_title"], "Mi coleccion")
+        self.assertEqual(payload["club_description"], "Fisicas")
 
     def test_persistent_run_history_is_bounded_per_library(self) -> None:
         library = self.create_library()

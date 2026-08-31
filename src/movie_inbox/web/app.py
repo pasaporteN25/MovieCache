@@ -129,11 +129,17 @@ def create_app(config: ViewerConfig) -> FastAPI:
             universe.extend(rows)
         return universe
 
+    collection_repository = SqliteCollectionRepository(instance_db)
+    collection_repository.install_once(
+        AKIRA_KUROSAWA_SEED_KEY,
+        akira_kurosawa_collection(owner.id),
+    )
     library_service = ManagedLibraryService(
         library_repository,
         allowed_roots=config.library_allowed_roots,
         catalog_universe=catalog_universe,
         scanner=scan_media_files,
+        collection_repository=collection_repository,
     )
     availability_service = AvailabilityService(library_repository)
     scanner_workflow = ScannerWorkflowService(
@@ -149,11 +155,6 @@ def create_app(config: ViewerConfig) -> FastAPI:
             load_items(patterns),
             include_sources=False,
         ),
-    )
-    collection_repository = SqliteCollectionRepository(instance_db)
-    collection_repository.install_once(
-        AKIRA_KUROSAWA_SEED_KEY,
-        akira_kurosawa_collection(owner.id),
     )
     collection_service = CollectionService(collection_repository)
     home_service = EditorialHomeService()
