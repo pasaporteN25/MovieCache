@@ -38,8 +38,9 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 La epica [F2] se divide en tres entregas moderadas: contrato de composicion [F2.1]
 (cerrado), fuente en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
 en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
-queda aislada en [F5]. La numeracion decimal expresa partes de una epica, no una fase
-adicional del roadmap.
+queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
+ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
+de una epica, no una fase adicional del roadmap.
 
 #### [F2.3] Construir indice offline de anime y fallback
 - **Alcance**: comando explicito `sync/stats/lookup` para el ultimo snapshot de
@@ -57,22 +58,6 @@ adicional del roadmap.
   falta descargarlo.
 - **Depende de**: [F2.1]; la activacion en producto depende de [F2.2].
 - **Modelo sugerido**: Grande. Indice local, licencia y resiliencia entre dos fuentes.
-
-#### [F4] Permitir API keys opcionales por fuente
-- **Idea del owner (2026-08-29)**: seguir usando fuentes abiertas/sin key como default
-  (Wikipedia, Wikidata, FilmAffinity e IMDb via sugerencias; Jikan se suma al cerrar
-  [F2.2]) y dejar que quien lo desee aporte sus propias API keys para fuentes que las
-  requieren (TMDb, aprobado condicionalmente en [F3]). Nunca obligar a nadie a crear
-  una cuenta o pagar para usar Movie Inbox.
-- **Alcance a definir**: donde se guardan las keys (por instancia, por miembro), como
-  se habilita/deshabilita una fuente segun haya o no key configurada, que pasa con el
-  catalogo si se borra una key despues de enriquecer datos con ella, y como esto
-  interactua con `locked_fields`/procedencia. El propio owner senala que esto necesita
-  un analisis de diseño importante antes de poder asignarle un modelo de tamaño real.
-- **Depende de**: nada tecnicamente, pero es el prerrequisito real si [F3] aprueba
-  integrar TMDb (esa fuente no funciona sin key).
-- **Modelo sugerido**: sin definir todavia — pendiente de un analisis de diseño previo.
-  Prioridad baja, al final de la cola de este frente.
 
 #### [F5] Integrar TMDb como fuente estructurada opt-in
 - **Decision de [F3]**: integrar, pero nunca como requisito ni fuente activa por
@@ -344,6 +329,48 @@ grabadas sin secretos.
 actuales ni a [F2]; complementa campos con la politica fill-only de [Q5]. Esta decision
 cierra [F3] y separa correctamente investigacion de implementacion.
 2026-08-31.
+
+#### [F4.1] Definir alcance, activacion y ciclo de vida de credenciales externas
+La credencial de una fuente pertenece a la **instancia**, no a cada miembro: el owner
+acepta los terminos y administra cuota, atribucion y retirada para todos los catalogos
+servidos por ese proceso. La configuracion base sigue usando solo fuentes sin secreto;
+una fuente con key se registra unicamente cuando su credencial valida esta presente.
+Esto evita cuentas obligatorias y garantiza que una instalacion sin TMDb mantenga el
+comportamiento actual.
+
+Los secretos viven solo en archivos del servidor y en memoria del proceso. No se
+aceptan como valor literal de CLI, variable con el token, formulario web, SQLite,
+catalogo, export, fixture o log. La variable de entorno opcional contiene solamente la
+ruta al archivo. El estado observable se reduce a `configured`/`not configured`, nunca
+devuelve parte de la key.
+
+Quitar la credencial desactiva las llamadas en el siguiente arranque, pero no borra
+silenciosamente metadata ya incorporada. [F5] debe marcar toda contribucion persistida
+con procedencia `tmdb` y proveer una retirada explicita y auditable. Esa operacion no
+puede tocar valores manuales, campos bloqueados ni datos que otra fuente tambien
+respalde; desactivar y purgar son decisiones distintas. Con esto quedan resueltas las
+decisiones que bloqueaban la implementacion y [F5] puede recibir la credencial por
+inyeccion sin conocer archivos ni variables de entorno.
+2026-08-31, commit `96f07fb`.
+
+#### [F4.2] Implementar ingreso seguro y opt-in de TMDb por instancia
+`ExternalSourceCredentials` mantiene el API Read Access Token fuera del `repr` y de la
+igualdad de `ViewerConfig`. `movie-inbox serve` acepta
+`--tmdb-read-access-token-file` o la ruta
+`MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE`, limita el archivo a 16 KiB y rechaza vacios,
+multilinea o whitespace. El arranque muestra solo si la credencial esta preparada y
+aclara que el adaptador pertenece a [F5]; sin archivo queda vacia y no se hace ninguna
+llamada.
+
+Docker conserva `compose.yaml` sin TMDb y agrega el overlay explicito
+`compose.tmdb.example.yaml`, que monta el archivo como secret de solo lectura. `.env`
+guarda solo su ruta y la guia documenta activacion/desactivacion. Cobertura de regresion:
+token con newline final, ausencia, vacio, multilinea, tamaño excesivo, `repr` y salida
+sin filtraciones, mas contrato del overlay. Verificado junto al gate completo: 494
+pruebas unitarias, Ruff, formato, mypy estricto, `compileall` y `git diff --check`.
+Docker Compose no estaba instalado en el host de trabajo, por lo que el `config` real
+del overlay queda como smoke de [F5]/CI antes de usar una credencial voluntaria.
+2026-08-31, commit `96f07fb`.
 
 #### [Q1] Mantener el contexto al refinar una busqueda de Comparar
 `runSearch()` ahora ramifica por `collectionSearchMode` antes de resetear nada: en
