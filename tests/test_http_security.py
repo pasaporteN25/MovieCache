@@ -6,6 +6,7 @@ from email.message import Message
 from unittest.mock import patch
 from urllib.error import HTTPError
 
+from movie_inbox.web.config import DEFAULT_IMAGE_ALLOWED_HOSTS
 from movie_inbox.web.security import (
     InvalidPublicOrigin,
     LoginAttemptLimiter,
@@ -75,6 +76,22 @@ class HttpSecurityTests(unittest.TestCase):
             ),
             "https://upload.wikimedia.org/poster.jpg",
         )
+
+    def test_default_image_allowlist_accepts_jikan_cdn_but_not_lookalikes(self) -> None:
+        self.assertEqual(
+            validate_public_http_url(
+                "https://cdn.myanimelist.net/images/anime/1/2.jpg",
+                resolver_for("8.8.8.8"),
+                DEFAULT_IMAGE_ALLOWED_HOSTS,
+            ),
+            "https://cdn.myanimelist.net/images/anime/1/2.jpg",
+        )
+        with self.assertRaisesRegex(UnsafeRemoteUrl, "host is not allowed"):
+            validate_public_http_url(
+                "https://cdn.myanimelist.net.attacker.example/poster.jpg",
+                resolver_for("8.8.8.8"),
+                DEFAULT_IMAGE_ALLOWED_HOSTS,
+            )
 
     def test_private_and_nonstandard_destinations_are_blocked(self) -> None:
         for address in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "::1"):

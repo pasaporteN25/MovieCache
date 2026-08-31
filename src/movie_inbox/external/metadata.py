@@ -1,4 +1,4 @@
-"""Metadata orchestration across Wikipedia, IMDb and generic HTML pages."""
+"""Metadata orchestration across the supported external sources."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from movie_inbox.domain.titles import (
 )
 from movie_inbox.external.filmaffinity import fetch_filmaffinity_metadata
 from movie_inbox.external.imdb import fetch_wikipedia_by_imdb_id, imdb_id_from_text
+from movie_inbox.external.jikan import fetch_jikan_metadata
 from movie_inbox.external.wikidata import fetch_wikidata_metadata
 from movie_inbox.external.wikipedia import (
     fetch_wikipedia_by_title,
@@ -59,6 +60,9 @@ class MetadataParser(HTMLParser):
 
 
 def fetch_metadata(url: str) -> dict[str, Any]:
+    if external_source_name(url) == "jikan":
+        return fetch_jikan_metadata(url)
+
     wikipedia_metadata = fetch_wikipedia_metadata(url)
     if wikipedia_metadata:
         return wikipedia_metadata

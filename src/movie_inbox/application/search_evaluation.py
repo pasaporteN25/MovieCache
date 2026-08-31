@@ -422,7 +422,13 @@ def _result_key(row: Mapping[str, Any]) -> str:
     item_id = str(row.get("id") or "").strip()
     if item_id:
         return item_id
-    for field in ("url", "wikipedia_url", "imdb_url", "filmaffinity_url"):
+    for field in (
+        "url",
+        "wikipedia_url",
+        "imdb_url",
+        "filmaffinity_url",
+        "myanimelist_url",
+    ):
         url = canonical_url(str(row.get(field) or ""))
         if url:
             return url

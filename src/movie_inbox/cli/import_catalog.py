@@ -245,12 +245,15 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
     wikipedia_url = str(row.get("wikipedia_url") or "")
     imdb_url = str(row.get("imdb_url") or "")
     filmaffinity_url = str(row.get("filmaffinity_url") or "")
+    myanimelist_url = str(row.get("myanimelist_url") or "")
     if link_field == "wikipedia_url":
         wikipedia_url = wikipedia_url or url
     elif link_field == "imdb_url":
         imdb_url = imdb_url or url
     elif link_field == "filmaffinity_url":
         filmaffinity_url = filmaffinity_url or url
+    elif link_field == "myanimelist_url":
+        myanimelist_url = myanimelist_url or url
     return normalize_item(
         CatalogItem(
             id=str(row.get("id") or stable_id(url or local_path or local_name or title)),
@@ -272,8 +275,10 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
             wikipedia_url=wikipedia_url,
             imdb_url=imdb_url,
             filmaffinity_url=filmaffinity_url,
+            myanimelist_url=myanimelist_url,
             wikipedia_title=str(row.get("wikipedia_title") or ""),
             wikidata_id=str(row.get("wikidata_id") or ""),
+            mal_id=str(row.get("mal_id") or ""),
             duration_minutes=normalize_optional_positive_int(
                 row.get("duration_minutes") or row.get("duration")
             ),

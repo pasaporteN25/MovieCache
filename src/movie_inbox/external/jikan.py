@@ -1,25 +1,18 @@
-"""Jikan search parsing for the live-anime source designed in tareas.md [F2].
-
-The adapter deliberately stays out of the default registry until [F2.2] adds
-``mal_id``/``myanimelist_url`` to the canonical catalog schema.  Registering it
-earlier would make search appear to work while silently discarding its identity
-when a result is persisted.
-"""
+"""Jikan search and metadata parsing for the live-anime source."""
 
 from __future__ import annotations
 
 import re
 from collections.abc import Mapping
 from typing import Any
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode
 
-from movie_inbox.domain.catalog import merge_lists
+from movie_inbox.domain.catalog import merge_lists, myanimelist_anime_id
 from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.domain.search import parse_search_query
 from movie_inbox.external.common import clean_text, fetch_json, object_dict, object_list
 
 JIKAN_API_BASE_URL = "https://api.jikan.moe/v4"
-_MAL_ANIME_PATH = re.compile(r"^/anime/(\d+)(?:/|$)", flags=re.IGNORECASE)
 
 
 class JikanAdapter:
@@ -104,15 +97,7 @@ def fetch_jikan_metadata(url: str) -> dict[str, Any]:
 
 
 def jikan_anime_id(value: str) -> str:
-    try:
-        parsed = urlparse(value)
-    except ValueError:
-        return ""
-    hostname = (parsed.hostname or "").casefold().removeprefix("www.")
-    if hostname != "myanimelist.net":
-        return ""
-    match = _MAL_ANIME_PATH.match(parsed.path)
-    return _positive_id(match.group(1)) if match else ""
+    return myanimelist_anime_id(value)
 
 
 def _positive_id(value: Any) -> str:

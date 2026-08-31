@@ -33,6 +33,7 @@ METADATA_FIELDS = (
     "page_image",
     "backdrop_image",
     "tmdb_id",
+    "mal_id",
     "wikipedia_extract",
 )
 
@@ -156,3 +157,12 @@ def normalize_optional_positive_int(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return normalized if normalized > 0 else None
+
+
+def normalize_external_positive_id(value: Any) -> str:
+    """Canonical string form for numeric IDs owned by an external source."""
+    try:
+        normalized = int(str(value or "").strip())
+    except (TypeError, ValueError):
+        return ""
+    return str(normalized) if normalized > 0 else ""

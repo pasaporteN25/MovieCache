@@ -352,6 +352,7 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "wikipedia_url": str(result.get("wikipedia_url") or ""),
         "imdb_url": str(result.get("imdb_url") or ""),
         "filmaffinity_url": str(result.get("filmaffinity_url") or ""),
+        "myanimelist_url": str(result.get("myanimelist_url") or ""),
     }
     if link_field:
         source_links[link_field] = source_links.get(link_field) or url
@@ -390,6 +391,7 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "page_image": str(result.get("page_image") or ""),
         "backdrop_image": str(result.get("backdrop_image") or ""),
         "tmdb_id": str(result.get("tmdb_id") or ""),
+        "mal_id": str(result.get("mal_id") or ""),
         "wikipedia_extract": str(result.get("wikipedia_extract") or ""),
         "en_catalogo": False,
         "local_files": [],

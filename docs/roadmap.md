@@ -129,7 +129,7 @@ el ciclo Docker completo con estado persistente y backup privado.
 
 - Buscar el catalogo personal en el servidor, incluyendo titulos originales,
   espanoles, ingleses, aliases, nombres de archivo e identificadores externos.
-- Separar visualmente los resultados locales, Wikipedia, IMDb y FilmAffinity, con
+- Separar visualmente los resultados locales, Wikipedia, IMDb, FilmAffinity y Jikan, con
   carga progresiva por fuente.
 - Usar el mismo ranking al buscar, comparar y agregar para detectar duplicados antes
   de escribir.

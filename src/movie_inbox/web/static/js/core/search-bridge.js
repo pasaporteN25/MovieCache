@@ -21,7 +21,7 @@ import { renderCatalogMergeResults, runSearch, searchManual, setActiveQuery, set
         fields.catalogMergeTitle.textContent = "Entrada seleccionada";
         fields.catalogMergeStatus.textContent = "Elegí un resultado externo y tocá Comparar para revisar diferencias.";
         renderCatalogMergeResults();
-        await searchManual("all", "Buscando coincidencias en Wikipedia, IMDb y FilmAffinity...");
+        await searchManual("all", "Buscando coincidencias en Wikipedia, IMDb, FilmAffinity y Jikan...");
         fields.query.scrollIntoView({ behavior: "smooth", block: "center" });
       }
 
@@ -30,4 +30,3 @@ import { renderCatalogMergeResults, runSearch, searchManual, setActiveQuery, set
         await runSearch({ updateHistory: false });
         fields.query.scrollIntoView({ behavior: "smooth", block: "center" });
       }
-

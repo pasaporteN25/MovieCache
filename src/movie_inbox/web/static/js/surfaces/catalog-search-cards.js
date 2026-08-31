@@ -92,6 +92,8 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
           director_match: "coincide por dirección",
           shared_external_url: "mismo enlace",
           shared_wikidata_id: "mismo Wikidata",
+          shared_mal_id: "mismo MyAnimeList ID",
+          mal_id_conflict: "MyAnimeList ID distinto",
           exact_title_year: "título y año exactos",
           exact_title_missing_year: "título exacto; falta año",
           exact_title_year_mismatch: "título exacto; año distinto",

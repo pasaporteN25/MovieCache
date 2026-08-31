@@ -13,6 +13,7 @@ DEFAULT_IMAGE_ALLOWED_HOSTS = (
     "ia.media-imdb.com",
     "images.filmaffinity.com",
     "pics.filmaffinity.com",
+    "cdn.myanimelist.net",
 )
 
 

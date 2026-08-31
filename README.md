@@ -47,7 +47,7 @@ Nucleo actual:
 - `src/movie_inbox/domain/`: modelos, normalizacion, matching y reglas de merge.
 - `src/movie_inbox/application/`: casos de uso compartidos por el visor, importadores y scanner.
 - `src/movie_inbox/infrastructure/`: esquemas, repositorios JSON/SQLite y exportacion.
-- `src/movie_inbox/external/`: clientes separados para Wikipedia, Wikidata, IMDb y FilmAffinity.
+- `src/movie_inbox/external/`: clientes separados para Wikipedia, Wikidata, IMDb, FilmAffinity y Jikan.
 - `src/movie_inbox/web/`: aplicacion FastAPI, servidor Uvicorn, proxy seguro de imagenes y assets estaticos.
 - `catalog.schema.json`: contrato JSON versionado del catalogo.
 - `PRODUCT.md` y `DESIGN.md`: contratos de producto, terminologia y lenguaje visual del visor.
@@ -502,8 +502,8 @@ catalogo personal completo por titulo principal, original, espanol, ingles, alia
 nombres de archivo, IDs y links, ignorando tildes y tolerando una errata en
 palabras largas. Descripcion, reparto, genero, tags, direccion y guion no forman parte
 del buscador para que una coincidencia incidental de esos campos no se confunda con una
-coincidencia de titulo; siguen visibles en la ficha. `Buscar tambien en fuentes externas` agrega Wikipedia, IMDb y
-FilmAffinity solamente despues de la accion explicita. La consulta, el orden y las
+coincidencia de titulo; siguen visibles en la ficha. `Buscar tambien en fuentes externas` agrega Wikipedia, IMDb,
+FilmAffinity y Jikan solamente despues de la accion explicita. La consulta, el orden y las
 facetas de estado, disponibilidad, tipo, fuente, director, genero, decada, rango de
 anos y memoria personal quedan representados en la URL para que Atras y Adelante
 restauren la estanteria correcta. Distintas facetas se combinan con `AND`; varios
@@ -518,7 +518,7 @@ los IDs de IMDb y las consultas `titulo + ano` se interpretan antes de buscar, y
 fuente ordena sus alternativas por coincidencia de titulo y ano. Wikipedia prioriza la
 coincidencia exacta dentro de la consulta amplia y usa la resolucion directa como
 respaldo; si falla un idioma conserva los resultados del otro. Los resultados aparecen en estanterias separadas de Wikipedia,
-IMDb y FilmAffinity apenas responde cada fuente, con seis opciones iniciales, carga
+IMDb, FilmAffinity y Jikan apenas responde cada fuente, con seis opciones iniciales, carga
 adicional y reintento independiente cuando una consulta falla o supera 10 segundos. `External DBs`
 muestra estado, latencia, cantidad de resultados y errores, ademas de hits, misses y
 entradas del cache. Wikipedia devuelve primero datos livianos y completa la metadata de
@@ -549,7 +549,7 @@ Antes de agregar, el visor revisa si ya existe una entrada con titulo normalizad
 
 Cuando el detector automatico no encuentra el duplicado, en un resultado externo podes usar `Comparar`: el visor busca la entrada existente y abre la misma mesa de comparacion usada por la Bandeja. Cada diferencia permite conservar A, usar B o combinar listas; archivos locales y disponibilidad se preservan, mientras que conflictos de estado, fecha, puntaje, review o notas exigen una eleccion explicita.
 
-Cada tarjeta tiene `Buscar link`. Ese boton usa automaticamente el titulo/año de esa entrada, busca en Wikipedia, IMDb y FilmAffinity, y deja lista la comparacion contra esa misma entrada.
+Cada tarjeta tiene `Buscar link`. Ese boton usa automaticamente el titulo/año de esa entrada, busca en Wikipedia, IMDb, FilmAffinity y Jikan, y deja lista la comparacion contra esa misma entrada.
 
 El panel lateral tiene accion `Eliminar`. Antes de borrar, el navegador pide confirmacion porque se modifica directamente el catalogo elegido.
 
@@ -567,7 +567,7 @@ El panel lateral permite cambiar manualmente `en_catalogo` con `Marcar catalogo`
 
 El panel lateral permite editar el tipo con un selector: `pelicula`, `serie`, `anime` o `documental`. Las entradas nuevas se crean como `pelicula` por defecto.
 
-Al combinar un resultado externo se guarda el link especifico de la fuente (`wikipedia_url`, `imdb_url` o `filmaffinity_url`) sin perder el link principal que ya tuviera la entrada.
+Al combinar un resultado externo se guarda el link especifico de la fuente (`wikipedia_url`, `imdb_url`, `filmaffinity_url` o `myanimelist_url`) sin perder el link principal que ya tuviera la entrada.
 
 La navegacion principal incluye una `Bandeja` para trabajar sin mezclar ese proceso con la exploracion, con tres modos. `Curaduria` reune pendientes, posibles duplicados y entradas `Sin referencia` externa; tambien conserva una cola separada de casos pospuestos. Las decisiones `Posponer`, `No son duplicados`, `No requiere referencia` y los merges revisados quedan en `Actividad`, desde donde pueden deshacerse. `Inventario` (el scanner administrado por la instancia, marcado `Admin` porque no modifica tu catalogo personal) organiza su cola por causa y confianza en vez de una lista plana: `Falta identidad`, `Conflicto de año/tipo`, `Probable ficha existente` o `Sin señales`. Cuando no encuentra una candidata segura lo dice explicitamente (`No encontramos una coincidencia segura`, no una ausencia comprobada) y ofrece buscar en tu catalogo antes de dar de alta una ficha nueva; cada candidata muestra ademas su procedencia (`En tu catalogo` / `Catalogo compartido`). `Importaciones` conserva borradores temporales y muestra la clasificacion antes de cualquier escritura.
 
@@ -575,7 +575,7 @@ Una franja de alcance persistente acompaña toda la decision en Curaduria e Inve
 
 El historial conserva hasta 50 operaciones y puede funcionar como `Persistente` o `Solo esta sesion`. El modo persistente usa un unico archivo lateral `.<catalogo>.curation-history.json`, separado del esquema portable y de las exportaciones. `Limpiar historial` elimina esos snapshots con confirmacion y no modifica el catalogo. Si una obra fue editada despues de una operacion, Deshacer se bloquea para no sobrescribir el cambio posterior.
 
-La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por ver y cuantas tienen links o portada. Tambien expone el catalogo editable, los archivos cargados y el estado de Wikipedia, IMDb y FilmAffinity. Los accesos de depuracion abren directamente la cola correspondiente de la Bandeja.
+La vista `Administrar` muestra cuantas entradas estan vistas, cuantas quedan por ver y cuantas tienen links o portada. Tambien expone el catalogo editable, los archivos cargados y el estado de Wikipedia, IMDb, FilmAffinity y Jikan. Los accesos de depuracion abren directamente la cola correspondiente de la Bandeja.
 
 `Random` abre una ficha al azar sin modificar el JSON. Su casilla permite limitar la eleccion a obras disponibles en catalogo. Dentro de `Coleccion`, `Mezclar vista` cambia solamente el orden visual de los resultados actuales y `Restablecer orden` recupera el orden elegido.
 
@@ -591,7 +591,7 @@ movie-inbox cache prune --dir .catalog-cache/images --max-total-mb 512
 movie-inbox cache clear --dir .catalog-cache/images
 ```
 
-Se puede desactivar todo el cache con `--no-image-cache`, desactivar solamente la precarga con `--image-cache-warm-mode off`, ajustar su ritmo con `--image-cache-warm-interval-seconds`, cambiar la carpeta con `--image-cache-dir`, limitar cada imagen con `--image-cache-max-mb` o el total con `--image-cache-total-mb`. El proxy acepta JPEG, PNG, WebP, GIF y AVIF provenientes de los hosts conocidos de Wikimedia, IMDb y FilmAffinity. Un proveedor adicional debe habilitarse de forma explicita repitiendo `--image-host nombre.example`.
+Se puede desactivar todo el cache con `--no-image-cache`, desactivar solamente la precarga con `--image-cache-warm-mode off`, ajustar su ritmo con `--image-cache-warm-interval-seconds`, cambiar la carpeta con `--image-cache-dir`, limitar cada imagen con `--image-cache-max-mb` o el total con `--image-cache-total-mb`. El proxy acepta JPEG, PNG, WebP, GIF y AVIF provenientes de los hosts conocidos de Wikimedia, IMDb, FilmAffinity y el CDN de MyAnimeList. Un proveedor adicional debe habilitarse de forma explicita repitiendo `--image-host nombre.example`.
 
 Para intentar completar links automaticamente desde la terminal:
 
@@ -599,13 +599,13 @@ Para intentar completar links automaticamente desde la terminal:
 movie-inbox match catalogv2.json --json catalogv3_links.json --report external-links-report.json --limit 100
 ```
 
-El comando busca en Wikipedia, IMDb y FilmAffinity para entradas sin link, combina automaticamente solo matches de alta confianza y deja en el reporte los casos dudosos para revisar en el visualizador.
+El comando busca en Wikipedia, IMDb, FilmAffinity y Jikan para entradas sin link, combina automaticamente solo matches de alta confianza y deja en el reporte los casos dudosos para revisar en el visualizador.
 
 Un titulo exacto sin ano, con ano distinto o con tipo incompatible nunca se combina automaticamente. Esos candidatos aparecen en `needs_review` con score, motivo y evidencia para decidirlos desde el visor.
 
 ## Esquema versionado y migracion
 
-Las escrituras nuevas usan `schema_version: 7` y guardan las entradas dentro de `items`.
+Las escrituras nuevas usan `schema_version: 8` y guardan las entradas dentro de `items`.
 Los catalogos legacy y las versiones 1 a 6 pasan por migraciones explicitas antes de
 usarse. Una version futura, una raiz mal formada o una fila invalida se rechazan y nunca
 se interpretan como catalogo vacio ni se reescriben silenciosamente. Cada obra puede

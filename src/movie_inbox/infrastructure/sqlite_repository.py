@@ -556,6 +556,7 @@ class SqliteCatalogRepository:
             "wikipedia_url": "",
             "imdb_url": "",
             "filmaffinity_url": "",
+            "myanimelist_url": "",
             "wikipedia_title": "",
             "wikidata_id": "",
             "countries": [],
@@ -569,6 +570,7 @@ class SqliteCatalogRepository:
             "page_image": row["page_image"],
             "backdrop_image": row["backdrop_image"],
             "tmdb_id": row["tmdb_id"],
+            "mal_id": "",
             "wikipedia_extract": row["wikipedia_extract"],
             "en_catalogo": bool(row["en_catalogo"]),
             "local_files": self._local_files(connection, item_id),
@@ -716,6 +718,9 @@ class SqliteCatalogRepository:
                 item["imdb_url"] = row["url"]
             elif source == "filmaffinity":
                 item["filmaffinity_url"] = row["url"]
+            elif source == "jikan":
+                item["myanimelist_url"] = row["url"]
+                item["mal_id"] = row["external_id"]
             elif source == "wikidata":
                 item["wikidata_id"] = row["external_id"]
 
@@ -879,7 +884,9 @@ class SqliteCatalogRepository:
             "wikipedia_title",
             "imdb_url",
             "filmaffinity_url",
+            "myanimelist_url",
             "wikidata_id",
+            "mal_id",
         )
         if previous is None or any(
             previous.get(field) != item.get(field) for field in external_fields
@@ -945,6 +952,12 @@ class SqliteCatalogRepository:
                 "filmaffinity",
                 _external_id(item.get("filmaffinity_url", ""), r"film(\d+)"),
                 item.get("filmaffinity_url", ""),
+                "",
+            ),
+            (
+                "jikan",
+                item.get("mal_id", ""),
+                item.get("myanimelist_url", ""),
                 "",
             ),
             ("wikidata", item.get("wikidata_id", ""), "", ""),

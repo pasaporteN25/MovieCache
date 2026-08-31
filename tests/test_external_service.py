@@ -226,6 +226,31 @@ class ExternalCatalogServiceTests(unittest.TestCase):
         self.assertEqual(result["title"], "The Fly")
         self.assertEqual(result["english_title"], "The Fly")
 
+    def test_enrich_preserves_jikan_identity(self) -> None:
+        gateway = FakeGateway()
+        service = ExternalCatalogService(
+            gateway,
+            lambda _: {
+                "title": "Kimi no Na wa.",
+                "mal_id": "32281",
+                "myanimelist_url": "https://myanimelist.net/anime/32281",
+                "genres": ["Drama"],
+            },
+        )
+
+        result = service.enrich(
+            {
+                "title": "Your Name",
+                "source": "jikan",
+                "url": "https://myanimelist.net/anime/32281",
+            }
+        )
+
+        self.assertEqual(result["mal_id"], "32281")
+        self.assertEqual(result["myanimelist_url"], "https://myanimelist.net/anime/32281")
+        self.assertEqual(result["alternative_titles"], ["Your Name"])
+        self.assertEqual(result["genres"], ["Drama"])
+
 
 if __name__ == "__main__":
     unittest.main()

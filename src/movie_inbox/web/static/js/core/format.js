@@ -76,6 +76,7 @@
         wikipedia: "Wikipedia",
         imdb: "IMDb",
         filmaffinity: "FilmAffinity",
+        jikan: "Jikan / MyAnimeList",
         wikidata: "Wikidata",
         local_files: "Archivo local",
         txt: "Importación de texto",
@@ -148,9 +149,11 @@
         return hasHost(item?.url, "wikipedia.org")
           || hasHost(item?.url, "imdb.com")
           || hasHost(item?.url, "filmaffinity.com")
+          || hasHost(item?.url, "myanimelist.net")
           || hasHost(item?.wikipedia_url, "wikipedia.org")
           || hasHost(item?.imdb_url, "imdb.com")
-          || hasHost(item?.filmaffinity_url, "filmaffinity.com");
+          || hasHost(item?.filmaffinity_url, "filmaffinity.com")
+          || hasHost(item?.myanimelist_url, "myanimelist.net");
       }
 
       export function normalizeRating(value) {
@@ -186,4 +189,3 @@
       export function escapeAttr(value) {
         return escapeHtml(value).replace(/`/g, "&#096;");
       }
-

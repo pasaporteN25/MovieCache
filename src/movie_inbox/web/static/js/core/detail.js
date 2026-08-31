@@ -476,6 +476,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           item.wikipedia_url ? `<a href="${escapeAttr(item.wikipedia_url)}" target="_blank" rel="noreferrer">Wikipedia</a>` : "",
           item.imdb_url ? `<a href="${escapeAttr(item.imdb_url)}" target="_blank" rel="noreferrer">IMDb</a>` : "",
           item.filmaffinity_url ? `<a href="${escapeAttr(item.filmaffinity_url)}" target="_blank" rel="noreferrer">FilmAffinity</a>` : "",
+          item.myanimelist_url ? `<a href="${escapeAttr(item.myanimelist_url)}" target="_blank" rel="noreferrer">MyAnimeList</a>` : "",
           item.wikidata_id ? `<a href="https://www.wikidata.org/wiki/${escapeAttr(item.wikidata_id)}" target="_blank" rel="noreferrer">Wikidata</a>` : ""
         ].filter(Boolean).join("");
         return links || `<span class="status-line">Sin referencias asociadas.</span>`;
@@ -496,6 +497,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           ["Guionistas", "writers", "text"],
           ["Reparto", "cast", "text"],
           ["TMDB ID", "tmdb_id", "text"],
+          ["MyAnimeList ID", "mal_id", "text"],
           ["Imagen landscape", "backdrop_image", "text"]
         ];
         return `<div class="metadata-editor" data-detail-form="metadata" data-id="${escapeAttr(item.id)}">
@@ -803,4 +805,3 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         if (fields.detailDrawer.open) closeDetail({ restoreFocus: false, updateHistory: false, skipGuard: true });
         await findLinkForItem(item);
       }
-

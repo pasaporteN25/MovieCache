@@ -215,7 +215,7 @@ import { openCollection, setSelectedCollectionId } from "./club.js";
           const title = item.title || entry.label || "Entrada sin título";
           const original = item.original_title && item.original_title !== title ? item.original_title : "";
           const data = [item.year, importKindLabel(item.kind), item.source].filter(Boolean).join(" · ") || "Sin datos adicionales";
-          const link = importUrlLabel(item.url || item.wikipedia_url || item.imdb_url || item.filmaffinity_url);
+          const link = importUrlLabel(item.url || item.wikipedia_url || item.imdb_url || item.filmaffinity_url || item.myanimelist_url);
           const candidate = entry.candidates?.[0];
           const detail = candidate
             ? `Posible: ${candidate.title || candidate.id || "obra existente"}${candidate.year ? ` (${candidate.year})` : ""}`
@@ -665,4 +665,3 @@ import { openCollection, setSelectedCollectionId } from "./club.js";
           return "";
         }
       }
-

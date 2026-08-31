@@ -9,6 +9,7 @@ from movie_inbox.external.jikan import (
     jikan_anime_id,
     jikan_anime_result,
 )
+from movie_inbox.web.catalog_api import item_from_search_result
 
 
 def _anime_payload() -> dict[str, object]:
@@ -136,6 +137,18 @@ class JikanAdapterTests(unittest.TestCase):
     def test_invalid_metadata_url_never_calls_jikan(self, fetch_json) -> None:
         self.assertEqual(fetch_jikan_metadata("https://example.com/anime/32281"), {})
         fetch_json.assert_not_called()
+
+    def test_search_result_keeps_mal_identity_when_materialized_for_the_catalog(self) -> None:
+        result = jikan_anime_result(_anime_payload())
+
+        self.assertIsNotNone(result)
+        assert result is not None
+        item = item_from_search_result(result)
+
+        self.assertEqual(item["source"], "jikan")
+        self.assertEqual(item["myanimelist_url"], "https://myanimelist.net/anime/32281")
+        self.assertEqual(item["mal_id"], "32281")
+        self.assertEqual(item["metadata_sources"]["mal_id"]["source"], "jikan")
 
 
 if __name__ == "__main__":

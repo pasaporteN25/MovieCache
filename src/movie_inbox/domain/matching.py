@@ -12,6 +12,7 @@ from movie_inbox.domain.catalog import (
     title_match_keys_for_item,
     title_similarity,
 )
+from movie_inbox.domain.metadata import normalize_external_positive_id
 from movie_inbox.domain.normalization import normalize_kind
 from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
@@ -46,6 +47,18 @@ def decide_match(
     incoming_wikidata = str(incoming.get("wikidata_id") or "").strip().upper()
     if existing_wikidata and existing_wikidata == incoming_wikidata:
         return MatchDecision(True, "shared_wikidata_id", 1.0, {"wikidata_id": existing_wikidata})
+
+    existing_mal_id = normalize_external_positive_id(existing.get("mal_id"))
+    incoming_mal_id = normalize_external_positive_id(incoming.get("mal_id"))
+    if existing_mal_id and incoming_mal_id:
+        if existing_mal_id == incoming_mal_id:
+            return MatchDecision(True, "shared_mal_id", 1.0, {"mal_id": existing_mal_id})
+        return MatchDecision(
+            False,
+            "mal_id_conflict",
+            1.0,
+            {"existing_mal_id": existing_mal_id, "incoming_mal_id": incoming_mal_id},
+        )
 
     existing_titles = title_match_keys_for_item(dict(existing))
     incoming_titles = title_match_keys_for_item(dict(incoming))

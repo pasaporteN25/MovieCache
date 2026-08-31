@@ -135,6 +135,7 @@ class CatalogItem(ModelMapping):
     wikipedia_url: str = ""
     imdb_url: str = ""
     filmaffinity_url: str = ""
+    myanimelist_url: str = ""
     wikipedia_title: str = ""
     wikidata_id: str = ""
     duration_minutes: int | None = None
@@ -149,6 +150,7 @@ class CatalogItem(ModelMapping):
     page_image: str = ""
     backdrop_image: str = ""
     tmdb_id: str = ""
+    mal_id: str = ""
     wikipedia_extract: str = ""
     en_catalogo: bool = False
     local_files: list[LocalFile] = field(default_factory=list)
@@ -223,6 +225,7 @@ class ExternalSearchResult(TypedDict, total=False):
     wikipedia_url: str
     imdb_url: str
     filmaffinity_url: str
+    myanimelist_url: str
     wikipedia_title: str
     wikidata_id: str
     duration_minutes: int | None
@@ -237,6 +240,7 @@ class ExternalSearchResult(TypedDict, total=False):
     page_image: str
     backdrop_image: str
     tmdb_id: str
+    mal_id: str
     wikipedia_extract: str
 
 

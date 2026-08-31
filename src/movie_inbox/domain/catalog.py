@@ -19,6 +19,7 @@ from movie_inbox.domain.curation import (
 from movie_inbox.domain.metadata import (
     METADATA_FIELDS,
     merge_local_files,
+    normalize_external_positive_id,
     normalize_local_files,
     normalize_locked_fields,
     normalize_metadata_sources,
@@ -35,11 +36,20 @@ from movie_inbox.domain.normalization import (
 from movie_inbox.domain.releases import merge_release_dates, normalize_release_dates
 from movie_inbox.domain.titles import infer_kind_from_text, looks_like_external_id
 
-KNOWN_LINK_HOSTS = {
+EXTERNAL_LINK_HOSTS = {
     "wikipedia": "wikipedia.org",
     "imdb": "imdb.com",
     "filmaffinity": "filmaffinity.com",
+    "jikan": "myanimelist.net",
 }
+COVERAGE_LINK_SOURCES = ("wikipedia", "imdb", "filmaffinity")
+SOURCE_URL_FIELDS = {
+    "wikipedia": "wikipedia_url",
+    "imdb": "imdb_url",
+    "filmaffinity": "filmaffinity_url",
+    "jikan": "myanimelist_url",
+}
+_MYANIMELIST_ANIME_PATH = re.compile(r"^/anime/(\d+)(?:/|$)", flags=re.IGNORECASE)
 LIST_FIELDS = {
     "alternative_titles",
     "countries",
@@ -98,6 +108,15 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         "watched_at": item.get("watched_at") or item.get("watchedAt"),
     }
     item.update(alias_values)
+    explicit_mal_id = normalize_external_positive_id(item.get("mal_id"))
+    mal_url = str(item.get("myanimelist_url") or "")
+    if not mal_url and external_source_name(str(item.get("url") or "")) == "jikan":
+        mal_url = str(item.get("url") or "")
+    mal_id = explicit_mal_id or myanimelist_anime_id(mal_url)
+    item["mal_id"] = mal_id
+    item["myanimelist_url"] = f"https://myanimelist.net/anime/{mal_id}" if mal_id else ""
+    if mal_id and str(item.get("source") or "") == "jikan":
+        item["url"] = item["myanimelist_url"]
     string_fields = {
         "id",
         "url",
@@ -111,11 +130,13 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         "wikipedia_url",
         "imdb_url",
         "filmaffinity_url",
+        "myanimelist_url",
         "wikipedia_title",
         "wikidata_id",
         "page_image",
         "backdrop_image",
         "tmdb_id",
+        "mal_id",
         "wikipedia_extract",
         "local_name",
         "local_path",
@@ -282,7 +303,7 @@ def external_source_name(url: str) -> str:
         hostname = _normalized_hostname(parsed).removeprefix("www.")
     except (UnicodeError, ValueError):
         return ""
-    for source, expected_host in KNOWN_LINK_HOSTS.items():
+    for source, expected_host in EXTERNAL_LINK_HOSTS.items():
         if hostname == expected_host or hostname.endswith(f".{expected_host}"):
             return source
     return ""
@@ -297,20 +318,24 @@ def _normalized_hostname(parsed: Any) -> str:
 
 def source_url_field(source: str, url: str = "") -> str:
     source_name = str(source or "").strip().lower()
-    if source_name not in KNOWN_LINK_HOSTS:
+    if source_name not in EXTERNAL_LINK_HOSTS:
         source_name = external_source_name(url)
-    if source_name:
-        return f"{source_name}_url"
-    return ""
+    return SOURCE_URL_FIELDS.get(source_name, "")
+
+
+def myanimelist_anime_id(url: str) -> str:
+    canonical = canonical_url(url)
+    if not canonical or external_source_name(canonical) != "jikan":
+        return ""
+    match = _MYANIMELIST_ANIME_PATH.match(urlparse(canonical).path)
+    return normalize_external_positive_id(match.group(1)) if match else ""
 
 
 def external_urls(item: Mapping[str, Any]) -> set[str]:
-    urls = {
-        trusted_external_url(str(item.get("url") or "")),
-        trusted_external_url(str(item.get("wikipedia_url") or "")),
-        trusted_external_url(str(item.get("imdb_url") or "")),
-        trusted_external_url(str(item.get("filmaffinity_url") or "")),
-    }
+    urls = {trusted_external_url(str(item.get("url") or ""))}
+    urls.update(
+        trusted_external_url(str(item.get(field) or "")) for field in SOURCE_URL_FIELDS.values()
+    )
     return {url for url in urls if url}
 
 
@@ -319,10 +344,14 @@ def has_external_link(item: Mapping[str, Any]) -> bool:
 
 
 def linked_sources(item: Mapping[str, Any]) -> set[str]:
-    """Which of the named sources (not the generic `url` field) have a trusted link."""
+    """Which legacy coverage sources have a named link, excluding generic ``url``.
+
+    This metric intentionally remains capped at the historical three-source
+    coverage target. ``has_external_link`` and ``external_urls`` include Jikan.
+    """
     return {
         source
-        for source in KNOWN_LINK_HOSTS
+        for source in COVERAGE_LINK_SOURCES
         if trusted_external_url(str(item.get(source_url_field(source)) or ""))
     }
 
@@ -447,7 +476,9 @@ def possible_duplicate_candidates(
                 "wikipedia_url": existing.get("wikipedia_url", ""),
                 "imdb_url": existing.get("imdb_url", ""),
                 "filmaffinity_url": existing.get("filmaffinity_url", ""),
+                "myanimelist_url": existing.get("myanimelist_url", ""),
                 "wikidata_id": existing.get("wikidata_id", ""),
+                "mal_id": existing.get("mal_id", ""),
                 "en_catalogo": existing.get("en_catalogo", False),
                 "reason": reason,
                 "score": round(similarity, 3),
@@ -593,6 +624,7 @@ def metadata_origin(item: Mapping[str, Any]) -> tuple[str, str]:
         "wikipedia": str(item.get("wikipedia_url") or ""),
         "imdb": str(item.get("imdb_url") or ""),
         "filmaffinity": str(item.get("filmaffinity_url") or ""),
+        "jikan": str(item.get("myanimelist_url") or ""),
     }
     if source in source_urls:
         return source, source_urls[source] or url
@@ -698,7 +730,7 @@ def merge_into_existing(
         )
         if incoming_source_field and incoming_url:
             existing[incoming_source_field] = existing.get(incoming_source_field) or incoming_url
-        for field in ("wikipedia_url", "imdb_url", "filmaffinity_url"):
+        for field in SOURCE_URL_FIELDS.values():
             existing[field] = existing.get(field) or incoming.get(field, "")
         if not existing.get("wikipedia_url") and is_wikipedia_item(incoming):
             existing["wikipedia_url"] = incoming_url

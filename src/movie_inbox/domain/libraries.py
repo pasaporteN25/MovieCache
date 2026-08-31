@@ -216,7 +216,9 @@ def work_identity(item: Mapping[str, Any]) -> dict[str, Any]:
         "wikipedia_url": canonical_url(str(item.get("wikipedia_url") or "")),
         "imdb_url": canonical_url(str(item.get("imdb_url") or "")),
         "filmaffinity_url": canonical_url(str(item.get("filmaffinity_url") or "")),
+        "myanimelist_url": canonical_url(str(item.get("myanimelist_url") or "")),
         "wikidata_id": str(item.get("wikidata_id") or "").strip().upper(),
+        "mal_id": str(item.get("mal_id") or "").strip(),
     }
     return {key: value for key, value in identity.items() if value not in ("", [])}
 
@@ -229,6 +231,9 @@ def work_identity_key(item: Mapping[str, Any]) -> str:
     wikidata = str(item.get("wikidata_id") or "").strip().upper()
     if wikidata:
         return f"wikidata:{wikidata}"
+    mal_id = str(item.get("mal_id") or "").strip()
+    if mal_id:
+        return f"mal:{mal_id}"
     urls = sorted(external_urls(item))
     if urls:
         return f"url:{urls[0]}"
@@ -244,6 +249,10 @@ def identity_matches_item(identity: Mapping[str, Any], item: Mapping[str, Any]) 
     right_wikidata = str(item.get("wikidata_id") or "").strip().upper()
     if left_wikidata and left_wikidata == right_wikidata:
         return True
+    left_mal_id = str(identity.get("mal_id") or "").strip()
+    right_mal_id = str(item.get("mal_id") or "").strip()
+    if left_mal_id and right_mal_id:
+        return left_mal_id == right_mal_id
     if external_urls(identity) & external_urls(item):
         return True
     left_titles = set(title_match_keys_for_item(identity))

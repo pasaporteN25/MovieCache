@@ -473,7 +473,8 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
           .filter(Boolean)
           .map((title) => `title:${title}|${year}|${kind}`);
         if (candidate.wikidata_id) keys.push(`wikidata:${String(candidate.wikidata_id).toUpperCase()}`);
-        [candidate.url, candidate.wikipedia_url, candidate.imdb_url, candidate.filmaffinity_url]
+        if (candidate.mal_id) keys.push(`mal:${String(candidate.mal_id)}`);
+        [candidate.url, candidate.wikipedia_url, candidate.imdb_url, candidate.filmaffinity_url, candidate.myanimelist_url]
           .filter(Boolean)
           .forEach((url) => keys.push(`url:${url}`));
         return [...new Set(keys)];
@@ -568,12 +569,14 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         const sources = [
           ["Wikipedia", candidate.wikipedia_url, "wikipedia.org"],
           ["IMDb", candidate.imdb_url, "imdb.com"],
-          ["FilmAffinity", candidate.filmaffinity_url, "filmaffinity.com"]
+          ["FilmAffinity", candidate.filmaffinity_url, "filmaffinity.com"],
+          ["MyAnimeList", candidate.myanimelist_url, "myanimelist.net"]
         ];
         if (candidate.url) {
           if (hasHost(candidate.url, "wikipedia.org")) sources.push(["Wikipedia", candidate.url, "wikipedia.org"]);
           else if (hasHost(candidate.url, "imdb.com")) sources.push(["IMDb", candidate.url, "imdb.com"]);
           else if (hasHost(candidate.url, "filmaffinity.com")) sources.push(["FilmAffinity", candidate.url, "filmaffinity.com"]);
+          else if (hasHost(candidate.url, "myanimelist.net")) sources.push(["MyAnimeList", candidate.url, "myanimelist.net"]);
         }
         if (/^Q[0-9]+$/i.test(String(candidate.wikidata_id || ""))) {
           sources.push(["Wikidata", `https://www.wikidata.org/wiki/${candidate.wikidata_id}`, "wikidata.org"]);
@@ -598,6 +601,8 @@ import { formatImportBytes, importKindLabel } from "./inbox-imports.js";
         return {
           shared_external_url: "Misma fuente externa",
           shared_wikidata_id: "Mismo ID de Wikidata",
+          shared_mal_id: "Mismo ID de MyAnimeList",
+          mal_id_conflict: "ID de MyAnimeList diferente",
           exact_title_year: "Título y año exactos",
           exact_title_missing_year: "Título exacto; falta año",
           exact_title_year_mismatch: "Título exacto; año diferente",

@@ -5,7 +5,9 @@ import unittest
 from movie_inbox.domain.catalog import (
     external_link_coverage,
     external_source_name,
+    has_external_link,
     linked_sources,
+    normalize_item,
     possible_duplicate_candidates,
     title_match_key,
     trusted_external_url,
@@ -84,12 +86,48 @@ class MatchingTests(unittest.TestCase):
         self.assertTrue(decision.accepted)
         self.assertEqual(decision.reason, "shared_external_url")
 
+    def test_shared_mal_id_is_strong_evidence_and_a_conflict_blocks_title_merge(self) -> None:
+        shared = decide_match(
+            {"title": "Unknown", "mal_id": "32281"},
+            {"title": "Your Name", "mal_id": 32281},
+        )
+        conflict = decide_match(
+            {"title": "Fruits Basket", "year": "2001", "kind": "anime", "mal_id": "120"},
+            {"title": "Fruits Basket", "year": "2001", "kind": "anime", "mal_id": "999"},
+        )
+
+        self.assertTrue(shared.accepted)
+        self.assertEqual(shared.reason, "shared_mal_id")
+        self.assertFalse(conflict.accepted)
+        self.assertEqual(conflict.reason, "mal_id_conflict")
+
     def test_trusted_hosts_are_compared_by_hostname(self) -> None:
         self.assertEqual(external_source_name("https://www.imdb.com/title/tt0113277/"), "imdb")
         self.assertEqual(external_source_name("https://imdb.com.example.org/title/tt0113277/"), "")
         self.assertEqual(trusted_external_url("https://imdb.com.example.org/title/tt0113277/"), "")
         self.assertEqual(external_source_name("https://user@imdb.com/title/tt0113277/"), "")
         self.assertEqual(external_source_name("https://imdb.com:8443/title/tt0113277/"), "")
+        self.assertEqual(
+            external_source_name("https://myanimelist.net/anime/32281/Kimi_no_Na_wa"), "jikan"
+        )
+        self.assertEqual(external_source_name("https://myanimelist.net.example/anime/32281"), "")
+
+    def test_mal_identity_is_canonicalized_without_changing_three_source_coverage(self) -> None:
+        item = normalize_item(
+            {
+                "title": "Kimi no Na wa.",
+                "source": "jikan",
+                "url": "https://myanimelist.net/anime/32281/Kimi_no_Na_wa",
+            }
+        )
+
+        self.assertEqual(item.mal_id, "32281")
+        self.assertEqual(item.myanimelist_url, "https://myanimelist.net/anime/32281")
+        self.assertEqual(item.url, item.myanimelist_url)
+        self.assertTrue(has_external_link(item))
+        self.assertEqual(linked_sources(item), set())
+        self.assertEqual(external_link_coverage(item), 0)
+        self.assertEqual(work_identity_key(item), "mal:32281")
 
     def test_a_stricter_strategy_can_require_review_where_the_baseline_would_not(self) -> None:
         existing = {"title": "Heat", "year": ""}

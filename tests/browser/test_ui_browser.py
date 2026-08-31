@@ -579,6 +579,63 @@ class BrowserInterfaceTests(unittest.TestCase):
         merge_section_class = page.locator("#catalogMergeSection").get_attribute("class") or ""
         self.assertIn("active", merge_section_class)
 
+    def test_catalog_can_search_and_add_a_jikan_result(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+        submitted: list[dict[str, Any]] = []
+
+        def handle_search(route) -> None:
+            url = route.request.url
+            body: dict[str, Any]
+            if "external=true" not in url:
+                body = {"catalog": {"results": []}}
+            elif "source=jikan" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Kimi no Na wa.",
+                            "english_title": "Your Name.",
+                            "year": "2016",
+                            "kind": "anime",
+                            "source": "jikan",
+                            "url": "https://myanimelist.net/anime/32281",
+                            "myanimelist_url": "https://myanimelist.net/anime/32281",
+                            "mal_id": "32281",
+                        }
+                    ]
+                }
+            else:
+                body = {"results": []}
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+        def handle_add(route) -> None:
+            submitted.append(route.request.post_data_json)
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"ok": True, "reason": "added"}),
+            )
+
+        page.route("**/api/search?*", handle_search)
+        page.route("**/api/add", handle_add)
+        page.locator("#catalogButton").click()
+        page.locator("#externalSource").check()
+        page.locator("#query").fill("Your Name")
+        page.locator("#searchButton").click()
+
+        jikan_group = page.locator('[data-source-group="jikan"]')
+        jikan_group.get_by_role("heading", name="Kimi no Na wa.", exact=True).wait_for()
+        jikan_group.get_by_role("button", name="Agregar").click()
+        page.wait_for_function(
+            "[...document.querySelectorAll('[data-source-group=\"jikan\"] button')]"
+            ".some((button) => button.textContent === 'Agregado')"
+        )
+
+        self.assertEqual(len(submitted), 1)
+        self.assertEqual(submitted[0]["source"], "jikan")
+        self.assertEqual(submitted[0]["mal_id"], "32281")
+        self.assertEqual(submitted[0]["myanimelist_url"], "https://myanimelist.net/anime/32281")
+
     def test_catalog_link_mode_refine_keeps_local_item_and_searches_external_only(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)

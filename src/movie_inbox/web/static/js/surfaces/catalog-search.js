@@ -41,12 +41,13 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
 
       export const SEARCH_TIMEOUT_MS = 10000;
 
-      export const EXTERNAL_SEARCH_SOURCES = ["wikipedia", "imdb", "filmaffinity"];
+      export const EXTERNAL_SEARCH_SOURCES = ["wikipedia", "imdb", "filmaffinity", "jikan"];
 
       export const EXTERNAL_SOURCE_LABELS = {
         wikipedia: ["Wikipedia", "Artículos y datos enciclopédicos"],
         imdb: ["IMDb", "Títulos internacionales y reparto"],
-        filmaffinity: ["FilmAffinity", "Referencias en español"]
+        filmaffinity: ["FilmAffinity", "Referencias en español"],
+        jikan: ["Jikan", "Anime y títulos de MyAnimeList"]
       };
       externalSourceSearchStates = emptyExternalSourceSearchStates();
 
@@ -624,7 +625,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         try {
           if (targetId) {
             if (!isExternalResult(manualResults[index])) {
-              reportExternalResultProblem("Ese resultado no tiene un enlace reconocido. Elegí una opción de Wikipedia, IMDb o FilmAffinity.");
+              reportExternalResultProblem("Ese resultado no tiene un enlace reconocido. Elegí una opción de Wikipedia, IMDb, FilmAffinity o Jikan.");
               return;
             }
             await mergeSearchResult(index, targetId);
@@ -706,10 +707,13 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         return result?.source === "wikipedia"
           || result?.source === "imdb"
           || result?.source === "filmaffinity"
+          || result?.source === "jikan"
           || hasHost(result?.url, "wikipedia.org")
           || hasHost(result?.url, "imdb.com")
           || hasHost(result?.url, "filmaffinity.com")
+          || hasHost(result?.url, "myanimelist.net")
           || hasHost(result?.wikipedia_url, "wikipedia.org")
           || hasHost(result?.imdb_url, "imdb.com")
-          || hasHost(result?.filmaffinity_url, "filmaffinity.com");
+          || hasHost(result?.filmaffinity_url, "filmaffinity.com")
+          || hasHost(result?.myanimelist_url, "myanimelist.net");
       }

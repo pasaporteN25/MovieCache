@@ -199,7 +199,8 @@ import { renderEditorialHome } from "./home.js";
           local_files: "Archivos locales",
           wikipedia: "Wikipedia",
           imdb: "IMDb",
-          filmaffinity: "FilmAffinity"
+          filmaffinity: "FilmAffinity",
+          jikan: "Jikan / MyAnimeList"
         };
         return labels[normalized] || String(value || label);
       }
@@ -223,6 +224,7 @@ import { renderEditorialHome } from "./home.js";
             ${externalDatabaseItem("Wikipedia", "wikipedia")}
             ${externalDatabaseItem("IMDb", "imdb")}
             ${externalDatabaseItem("FilmAffinity", "filmaffinity")}
+            ${externalDatabaseItem("Jikan", "jikan")}
             ${externalCacheItem()}
           </div>
         `;
@@ -806,4 +808,3 @@ import { renderEditorialHome } from "./home.js";
           else setSearchState("error", "No pudimos guardar la disponibilidad. Reintentá.");
         }
       }
-

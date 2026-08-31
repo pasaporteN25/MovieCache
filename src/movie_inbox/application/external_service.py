@@ -57,7 +57,10 @@ class ExternalCatalogService:
         result_url = str(enriched.get("url") or "")
         detected_source = external_source_name(result_url)
         source = str(enriched.get("source") or detected_source)
-        if source not in {"wikipedia", "imdb", "filmaffinity"} or source != detected_source:
+        if (
+            source not in {"wikipedia", "imdb", "filmaffinity", "jikan"}
+            or source != detected_source
+        ):
             return cast(ExternalSearchResult, enriched)
         cache_key = canonical_url(result_url) or result_url
         metadata, _ = self.gateway.selected_metadata(
@@ -78,6 +81,7 @@ class ExternalCatalogService:
             "page_image",
             "backdrop_image",
             "tmdb_id",
+            "mal_id",
             "wikipedia_extract",
         ):
             if metadata.get(field):
@@ -113,7 +117,7 @@ class ExternalCatalogService:
             enriched["release_dates"] = merge_release_dates(
                 enriched.get("release_dates"), release_dates
             )
-        for field in ("wikipedia_url", "imdb_url", "filmaffinity_url"):
+        for field in ("wikipedia_url", "imdb_url", "filmaffinity_url", "myanimelist_url"):
             if metadata.get(field):
                 enriched[field] = str(metadata[field])
         metadata_url = str(metadata.get("url") or "")
@@ -124,6 +128,8 @@ class ExternalCatalogService:
             enriched["imdb_url"] = result_url
         elif source == "filmaffinity":
             enriched["filmaffinity_url"] = result_url
+        elif source == "jikan":
+            enriched["myanimelist_url"] = result_url
         enriched["alternative_titles"] = _alternative_titles(enriched, preserved_titles)
         return cast(ExternalSearchResult, enriched)
 

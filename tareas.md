@@ -197,27 +197,33 @@ adicional del roadmap.
   `/anime` y detalle bajo demanda, y sumar una estanteria Jikan distinguible en la UI.
   No consultar detalle ni staff para cada candidato: busqueda liviana primero; al elegir
   uno, detalle y staff dentro de un presupuesto acotado.
-- **Avance 2026-08-31**: `external/jikan.py` contiene el adaptador de busqueda y parser
-  de detalle aislados, todavia sin registrarlos. Valida filas no confiables, conserva
-  identidad MAL, deduplica titulos/sinonimos, normaliza fecha/generos/productores y
-  excluye deliberadamente score, ranking y duracion por episodio. Siete pruebas sin
-  red cubren mapeo, Unicode, año alternativo, URL hostil, seleccion bajo demanda y la
-  prohibicion de convertir `director:X` en una consulta de titulo.
-- **Por que aun no esta activo**: el modelo actual solo reconoce Wikipedia, IMDb y
-  FilmAffinity como links persistentes. Registrar Jikan ahora mostraria resultados
-  que perderian `mal_id`/`myanimelist_url` al guardarse y caerian falsamente en
-  Curaduria como “sin link”. El siguiente corte es migrar esa identidad de punta a
-  punta; recien despues se registra el adaptador y se toca la UI.
+- **Avance 2026-08-31**: Jikan ya esta registrado como cuarta fuente en vivo. La
+  busqueda sigue siendo liviana y el detalle se consulta solo al seleccionar una fila.
+  `mal_id` y `myanimelist_url` son identidad canonica de punta a punta: modelo,
+  esquema JSON v8, tabla generica `external_ids` de SQLite, import/export, privacidad,
+  busqueda local, comparador, Curaduria y materializacion web. Un ID compartido acepta
+  la identidad y dos IDs distintos bloquean el match por titulo/año. La UI agrega una
+  estanteria Jikan con los mismos estados independientes de carga/error/reintento, link
+  MyAnimeList en la ficha, editor de ID y host de portadas limitado exactamente a
+  `cdn.myanimelist.net`.
+- **Contrato ya probado**: el parser valida filas no confiables, conserva Unicode,
+  deduplica titulos/sinonimos, normaliza fecha/generos/productores y excluye score,
+  ranking y duracion por episodio. Hay cobertura sin red para URL hostil, seleccion
+  bajo demanda, migracion JSON, ida y vuelta SQLite, importacion, identidad fuerte y
+  conflicto. Una prueba de navegador busca, selecciona y envia una ficha Jikan sin
+  perder su ID MAL.
 - **Reglas heredadas de [F2.1]**: `kind=anime`; nunca copiar `score` a `rating`; Jikan
   llena campos vacios pero no pisa ediciones manuales/bloqueadas; `mal_id` compartido
   puede ser evidencia fuerte, uno divergente nunca se resuelve por titulo solamente.
   Respetar `429`/`Retry-After`, timeout y cooldown por fuente; no ocultar una caida como
   una busqueda vacia.
-- **Criterio de cierre restante**: contrato HTTP/health/cache, migraciones redondas
-  JSON↔SQLite y prueba de navegador de buscar/seleccionar/agregar. Smoke live no
+- **Criterio de cierre restante**: respetar `429`/`Retry-After` y abrir un cooldown
+  visible por fuente, incorporar staff/direccion solo en el detalle elegido con un
+  presupuesto acotado, y mostrar la atribucion/no-afiliacion acordada. Completar esos
+  caminos con respuestas grabadas para 429/5xx/timeout y health/cache. Smoke live no
   obligatorio y fuera del gate.
-- **Verificacion del corte**: 484 tests, Ruff, formato, mypy estricto, `compileall` y
-  `git diff --check` en verde.
+- **Verificacion del corte**: 490 tests unitarios y 16 de navegador, Ruff, formato,
+  mypy estricto, `compileall`, detector Impeccable y `git diff --check` en verde.
 - **Depende de**: [F2.1] (cerrado).
 - **Modelo sugerido**: Grande. Cruza identidad, persistencia, red y frontend.
 
@@ -238,7 +244,7 @@ asi:
    indice secundario local: aporta aliases e IDs cruzados, y puede responder con su
    propia procedencia cuando Jikan esta caido, limitado o no encuentra nada. Una fila
    offline nunca se rotula `jikan`.
-2. **Identidad**. [F2.2] agregara dos campos canonicos: `mal_id` y
+2. **Identidad**. [F2.2] agrego dos campos canonicos: `mal_id` y
    `myanimelist_url`. Un `mal_id` compartido es evidencia fuerte de identidad; dos IDs
    MAL distintos son un conflicto y nunca se fusionan automaticamente solo por titulo
    y año. Direccion/staff sigue siendo descubrimiento, no identidad, igual que [Q4].
@@ -273,8 +279,9 @@ y [ultimo release](https://github.com/manami-project/anime-offline-database/rele
 El ultimo snapshot declara 41.537 entradas y 65% revisadas; el repo fue archivado el
 2026-07-04, por eso es respaldo finito y no autoridad viva. Una consulta live de
 control a Jikan devolvio `504` porque no pudo conectar con MyAnimeList: evidencia
-concreta de que [F2.3] no es optimizacion prematura. Cierre de diseño, sin tocar aun
-modelo, red ni UI; esas responsabilidades quedan separadas en [F2.2]/[F2.3].
+concreta de que [F2.3] no es optimizacion prematura. Este item cierra el diseño; la
+identidad, red y UI ya comenzaron a materializarse en [F2.2], mientras que el indice
+offline sigue separado en [F2.3].
 2026-08-31.
 
 #### [F3.1] Evaluar terminos y costo operativo de TMDb

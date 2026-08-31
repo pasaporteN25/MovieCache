@@ -17,6 +17,7 @@ from movie_inbox.external.base import SourceAdapter
 from movie_inbox.external.common import clean_text, dedupe_results, utc_now
 from movie_inbox.external.filmaffinity import FilmAffinityAdapter
 from movie_inbox.external.imdb import ImdbAdapter
+from movie_inbox.external.jikan import JikanAdapter
 from movie_inbox.external.wikipedia import WikipediaAdapter
 
 SEARCH_CACHE_TTL_SECONDS = 15 * 60
@@ -26,7 +27,12 @@ SEARCH_CACHE_MAX_ENTRIES = 128
 
 class ExternalSourceService:
     def __init__(self, adapters: list[SourceAdapter] | None = None) -> None:
-        selected = adapters or [WikipediaAdapter(), ImdbAdapter(), FilmAffinityAdapter()]
+        selected = adapters or [
+            WikipediaAdapter(),
+            ImdbAdapter(),
+            FilmAffinityAdapter(),
+            JikanAdapter(),
+        ]
         self.adapters = {adapter.name: adapter for adapter in selected}
         self._search_cache: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
         self._metadata_cache: dict[str, tuple[float, dict[str, Any]]] = {}

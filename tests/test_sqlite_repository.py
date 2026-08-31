@@ -17,6 +17,7 @@ from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
+from movie_inbox.infrastructure.schema import SCHEMA_VERSION
 from movie_inbox.infrastructure.sqlite_repository import SCHEMA_V1, SqliteCatalogRepository
 
 
@@ -59,6 +60,8 @@ def sample_item(item_id: str = "heat-1995") -> CatalogItem:
             "page_image": "https://images.example/poster.jpg",
             "backdrop_image": "https://images.example/backdrop.jpg",
             "tmdb_id": "949",
+            "myanimelist_url": "https://myanimelist.net/anime/32281",
+            "mal_id": "32281",
             "en_catalogo": True,
             "local_files": [
                 {
@@ -152,6 +155,8 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.composers, ["Elliot Goldenthal"])
             self.assertEqual(loaded.backdrop_image, "https://images.example/backdrop.jpg")
             self.assertEqual(loaded.tmdb_id, "949")
+            self.assertEqual(loaded.myanimelist_url, "https://myanimelist.net/anime/32281")
+            self.assertEqual(loaded.mal_id, "32281")
             self.assertEqual(loaded.release_dates[0]["date"], "1995-12-15")
             self.assertEqual(loaded.link_curation_status, "resolved")
             self.assertEqual(
@@ -181,6 +186,13 @@ class SqliteRepositoryTests(unittest.TestCase):
                 <= tables
             )
             self.assertEqual(repository.database_version(), 5)
+
+            with closing(sqlite3.connect(path)) as connection:
+                mal_row = connection.execute(
+                    "SELECT external_id, url FROM external_ids WHERE item_id = ? AND source = ?",
+                    ("heat-1995", "jikan"),
+                ).fetchone()
+            self.assertEqual(mal_row, ("32281", "https://myanimelist.net/anime/32281"))
 
     def test_catalog_service_mutates_sqlite_transactionally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -531,7 +543,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 self.assertEqual(import_json(source, database), 0)
                 self.assertEqual(export_json(database, exported), 0)
             payload = json.loads(exported.read_text(encoding="utf-8"))
-            self.assertEqual(payload["schema_version"], 7)
+            self.assertEqual(payload["schema_version"], SCHEMA_VERSION)
             self.assertEqual(payload["items"][0]["id"], "heat-1995")
 
     def test_json_import_reads_source_without_creating_a_sidecar_lock(self) -> None:

@@ -55,7 +55,7 @@ class PackageLayoutTests(unittest.TestCase):
 
     def test_external_clients_are_registered_independently(self) -> None:
         service = ExternalSourceService()
-        self.assertEqual(set(service.adapters), {"wikipedia", "imdb", "filmaffinity"})
+        self.assertEqual(set(service.adapters), {"wikipedia", "imdb", "filmaffinity", "jikan"})
 
     def test_packaged_frontend_assets_are_loadable(self) -> None:
         # Movie Inbox v0.4.0 splits app.js/style.css/index.html into per-surface files
