@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-14T01:48:24.2745428-03:00",
+  "generatedAt": "2026-08-31T17:27:24.5521637-03:00",
   "title": "Design System: Movie Inbox",
   "extensions": {
     "colorMeta": {
@@ -105,6 +105,102 @@
         "displayName": "Quiet Control",
         "canonical": "oklch(28.4% 0.055 275.1)",
         "tonalRamp": ["oklch(15% 0.055 275.1)", "oklch(27% 0.055 275.1)", "oklch(39% 0.055 275.1)", "oklch(51% 0.055 275.1)", "oklch(63% 0.055 275.1)", "oklch(75% 0.055 275.1)", "oklch(87% 0.055 275.1)", "oklch(95% 0.055 275.1)"]
+      },
+      "text-pink": {
+        "role": "signal-text",
+        "displayName": "Text Pink",
+        "canonical": "oklch(75.2% 0.179 349.7)",
+        "tonalRamp": ["oklch(15% 0.179 349.7)", "oklch(27% 0.179 349.7)", "oklch(39% 0.179 349.7)", "oklch(51% 0.179 349.7)", "oklch(63% 0.179 349.7)", "oklch(75% 0.179 349.7)", "oklch(87% 0.179 349.7)", "oklch(95% 0.179 349.7)"]
+      },
+      "text-cyan-soft": {
+        "role": "confirmation-text",
+        "displayName": "Text Cyan Soft",
+        "canonical": "oklch(92.4% 0.089 201.9)",
+        "tonalRamp": ["oklch(15% 0.089 201.9)", "oklch(27% 0.089 201.9)", "oklch(39% 0.089 201.9)", "oklch(51% 0.089 201.9)", "oklch(63% 0.089 201.9)", "oklch(75% 0.089 201.9)", "oklch(87% 0.089 201.9)", "oklch(95% 0.089 201.9)"]
+      },
+      "text-gold-soft": {
+        "role": "value-text",
+        "displayName": "Text Gold Soft",
+        "canonical": "oklch(91.8% 0.086 84.2)",
+        "tonalRamp": ["oklch(15% 0.086 84.2)", "oklch(27% 0.086 84.2)", "oklch(39% 0.086 84.2)", "oklch(51% 0.086 84.2)", "oklch(63% 0.086 84.2)", "oklch(75% 0.086 84.2)", "oklch(87% 0.086 84.2)", "oklch(95% 0.086 84.2)"]
+      },
+      "text-danger-soft": {
+        "role": "error-text",
+        "displayName": "Text Danger Soft",
+        "canonical": "oklch(82.8% 0.098 9.9)",
+        "tonalRamp": ["oklch(15% 0.098 9.9)", "oklch(27% 0.098 9.9)", "oklch(39% 0.098 9.9)", "oklch(51% 0.098 9.9)", "oklch(63% 0.098 9.9)", "oklch(75% 0.098 9.9)", "oklch(87% 0.098 9.9)", "oklch(95% 0.098 9.9)"]
+      },
+      "poster-red-mid": {
+        "role": "poster-fallback",
+        "displayName": "Poster Red Mid",
+        "canonical": "oklch(41.7% 0.145 331.5)",
+        "tonalRamp": ["oklch(15% 0.145 331.5)", "oklch(27% 0.145 331.5)", "oklch(39% 0.145 331.5)", "oklch(51% 0.145 331.5)", "oklch(63% 0.145 331.5)", "oklch(75% 0.145 331.5)", "oklch(87% 0.145 331.5)", "oklch(95% 0.145 331.5)"]
+      },
+      "poster-teal-mid": {
+        "role": "poster-fallback",
+        "displayName": "Poster Teal Mid",
+        "canonical": "oklch(46.5% 0.085 228.8)",
+        "tonalRamp": ["oklch(15% 0.085 228.8)", "oklch(27% 0.085 228.8)", "oklch(39% 0.085 228.8)", "oklch(51% 0.085 228.8)", "oklch(63% 0.085 228.8)", "oklch(75% 0.085 228.8)", "oklch(87% 0.085 228.8)", "oklch(95% 0.085 228.8)"]
+      },
+      "poster-gold-mid": {
+        "role": "poster-fallback",
+        "displayName": "Poster Gold Mid",
+        "canonical": "oklch(51% 0.157 345.8)",
+        "tonalRamp": ["oklch(15% 0.157 345.8)", "oklch(27% 0.157 345.8)", "oklch(39% 0.157 345.8)", "oklch(51% 0.157 345.8)", "oklch(63% 0.157 345.8)", "oklch(75% 0.157 345.8)", "oklch(87% 0.157 345.8)", "oklch(95% 0.157 345.8)"]
+      },
+      "poster-violet-mid": {
+        "role": "poster-fallback",
+        "displayName": "Poster Violet Mid",
+        "canonical": "oklch(35% 0.106 282.3)",
+        "tonalRamp": ["oklch(15% 0.106 282.3)", "oklch(27% 0.106 282.3)", "oklch(39% 0.106 282.3)", "oklch(51% 0.106 282.3)", "oklch(63% 0.106 282.3)", "oklch(75% 0.106 282.3)", "oklch(87% 0.106 282.3)", "oklch(95% 0.106 282.3)"]
+      },
+      "poster-deep": {
+        "role": "poster-fallback-base",
+        "displayName": "Poster Deep",
+        "canonical": "oklch(16.3% 0.036 276.6)",
+        "tonalRamp": ["oklch(15% 0.036 276.6)", "oklch(27% 0.036 276.6)", "oklch(39% 0.036 276.6)", "oklch(51% 0.036 276.6)", "oklch(63% 0.036 276.6)", "oklch(75% 0.036 276.6)", "oklch(87% 0.036 276.6)", "oklch(95% 0.036 276.6)"]
+      },
+      "chip-tint-red": {
+        "role": "chip-ink",
+        "displayName": "Chip Tint Red",
+        "canonical": "oklch(85.9% 0.093 347.4)",
+        "tonalRamp": ["oklch(15% 0.093 347.4)", "oklch(27% 0.093 347.4)", "oklch(39% 0.093 347.4)", "oklch(51% 0.093 347.4)", "oklch(63% 0.093 347.4)", "oklch(75% 0.093 347.4)", "oklch(87% 0.093 347.4)", "oklch(95% 0.093 347.4)"]
+      },
+      "chip-tint-teal": {
+        "role": "chip-ink",
+        "displayName": "Chip Tint Teal",
+        "canonical": "oklch(93.4% 0.08 200.7)",
+        "tonalRamp": ["oklch(15% 0.08 200.7)", "oklch(27% 0.08 200.7)", "oklch(39% 0.08 200.7)", "oklch(51% 0.08 200.7)", "oklch(63% 0.08 200.7)", "oklch(75% 0.08 200.7)", "oklch(87% 0.08 200.7)", "oklch(95% 0.08 200.7)"]
+      },
+      "chip-tint-gold": {
+        "role": "chip-ink",
+        "displayName": "Chip Tint Gold",
+        "canonical": "oklch(96.8% 0.04 89.7)",
+        "tonalRamp": ["oklch(15% 0.04 89.7)", "oklch(27% 0.04 89.7)", "oklch(39% 0.04 89.7)", "oklch(51% 0.04 89.7)", "oklch(63% 0.04 89.7)", "oklch(75% 0.04 89.7)", "oklch(87% 0.04 89.7)", "oklch(95% 0.04 89.7)"]
+      },
+      "chip-tint-violet": {
+        "role": "chip-ink",
+        "displayName": "Chip Tint Violet",
+        "canonical": "oklch(90.3% 0.05 290.3)",
+        "tonalRamp": ["oklch(15% 0.05 290.3)", "oklch(27% 0.05 290.3)", "oklch(39% 0.05 290.3)", "oklch(51% 0.05 290.3)", "oklch(63% 0.05 290.3)", "oklch(75% 0.05 290.3)", "oklch(87% 0.05 290.3)", "oklch(95% 0.05 290.3)"]
+      },
+      "danger": {
+        "role": "destructive-signal",
+        "displayName": "Danger",
+        "canonical": "oklch(70.8% 0.186 15.4)",
+        "tonalRamp": ["oklch(15% 0.186 15.4)", "oklch(27% 0.186 15.4)", "oklch(39% 0.186 15.4)", "oklch(51% 0.186 15.4)", "oklch(63% 0.186 15.4)", "oklch(75% 0.186 15.4)", "oklch(87% 0.186 15.4)", "oklch(95% 0.186 15.4)"]
+      },
+      "danger-border": {
+        "role": "destructive-border",
+        "displayName": "Danger Border",
+        "canonical": "oklch(57.4% 0.13 27.7)",
+        "tonalRamp": ["oklch(15% 0.13 27.7)", "oklch(27% 0.13 27.7)", "oklch(39% 0.13 27.7)", "oklch(51% 0.13 27.7)", "oklch(63% 0.13 27.7)", "oklch(75% 0.13 27.7)", "oklch(87% 0.13 27.7)", "oklch(95% 0.13 27.7)"]
+      },
+      "danger-ink": {
+        "role": "destructive-ink",
+        "displayName": "Danger Ink",
+        "canonical": "oklch(44.5% 0.13 27.8)",
+        "tonalRamp": ["oklch(15% 0.13 27.8)", "oklch(27% 0.13 27.8)", "oklch(39% 0.13 27.8)", "oklch(51% 0.13 27.8)", "oklch(63% 0.13 27.8)", "oklch(75% 0.13 27.8)", "oklch(87% 0.13 27.8)", "oklch(95% 0.13 27.8)"]
       }
     },
     "typographyMeta": {
@@ -143,6 +239,14 @@
       "label": {
         "displayName": "Signal Label",
         "purpose": "Metadata, estados, kickers y microcopy tecnico."
+      },
+      "stat": {
+        "displayName": "Stat",
+        "purpose": "Metricas compactas, contadores y cifras de resumen."
+      },
+      "compact": {
+        "displayName": "Compact Body",
+        "purpose": "Lectura operativa densa cuando el cuerpo base necesita ahorrar espacio."
       }
     },
     "shadows": [
@@ -233,7 +337,7 @@
       "refersTo": "button-quiet",
       "description": "Salida, limpieza o accion secundaria sin competir con la principal.",
       "html": "<button class=\"ds-btn-quiet\" type=\"button\">SALIR</button>",
-      "css": ".ds-btn-quiet { background: var(--quiet-control, #222745); border: 1px solid var(--control-border, #454c78); border-radius: 3px; color: var(--ink, #f5f3ff); cursor: pointer; font: 700 16px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 14px; transition: filter 180ms ease; } .ds-btn-quiet:hover { filter: brightness(.96); } .ds-btn-quiet:active { filter: brightness(.88); } .ds-btn-quiet:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+      "css": ".ds-btn-quiet { background: var(--surface-quiet, #222745); border: 1px solid var(--control-border, #6f78b5); border-radius: 3px; color: var(--ink, #f5f3ff); cursor: pointer; font: 700 16px/1.2 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 14px; transition: filter 180ms ease; } .ds-btn-quiet:hover { filter: brightness(.96); } .ds-btn-quiet:active { filter: brightness(.88); } .ds-btn-quiet:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
     },
     {
       "name": "Search Input",
@@ -241,7 +345,7 @@
       "refersTo": "input-search",
       "description": "Campo profundo y sobrio para iniciar la busqueda principal.",
       "html": "<label class=\"ds-search\"><span>BUSCAR PELICULAS</span><input type=\"search\" placeholder=\"Buscar una pelicula...\"></label>",
-      "css": ".ds-search { color: var(--muted, #a7aac7); display: grid; font: 800 10px/1.2 \"Courier New\", monospace; gap: 6px; letter-spacing: .12em; text-transform: uppercase; } .ds-search input { background: var(--control-background, #0c1025); border: 1px solid var(--control-border, #454c78); border-radius: 3px; color: var(--ink, #f5f3ff); font: 400 16px/1.5 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 10px; } .ds-search input::placeholder { color: var(--muted, #a7aac7); } .ds-search input:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
+      "css": ".ds-search { color: var(--muted, #a7aac7); display: grid; font: 800 10px/1.2 \"Courier New\", monospace; gap: 6px; letter-spacing: .12em; text-transform: uppercase; } .ds-search input { background: var(--surface-control, #0c1025); border: 1px solid var(--control-border, #6f78b5); border-radius: 3px; color: var(--ink, #f5f3ff); font: 400 16px/1.5 \"Space Grotesk\", \"Trebuchet MS\", sans-serif; min-height: 38px; padding: 8px 10px; } .ds-search input::placeholder { color: var(--text-placeholder, #9297b8); } .ds-search input:focus-visible { outline: 3px solid var(--teal, #22d8e5); outline-offset: 2px; }"
     },
     {
       "name": "Primary Navigation",
