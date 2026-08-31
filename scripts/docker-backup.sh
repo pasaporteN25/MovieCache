@@ -32,7 +32,7 @@ resolve_backup_host_path() {
     }
     $1 == "target:" {
       target = $2
-      gsub(/^\"|\"$/, "", target)
+      gsub(/^"|"$/, "", target)
       if (target == "/backups") {
         print source
         exit
@@ -64,14 +64,23 @@ prepare_backup_destination() {
     echo "Could not create backup destination: $backup_host_path" >&2
     exit 1
   fi
-  if [[ ! -d "$backup_host_path" || ! -w "$backup_host_path" ]]; then
-    echo "Backup destination is not a writable directory: $backup_host_path" >&2
+  if [[ ! -d "$backup_host_path" ]]; then
+    echo "Backup destination is not a directory: $backup_host_path" >&2
     exit 1
   fi
   echo "Backup destination: $backup_host_path"
 }
 
+verify_backup_destination() {
+  if ! docker compose run --rm --no-deps --entrypoint sh "$BACKUP_SERVICE" \
+    -c 'test -d /backups && test -w /backups'; then
+    echo "Backup destination is not writable by the $BACKUP_SERVICE container." >&2
+    exit 1
+  fi
+}
+
 prepare_backup_destination
+verify_backup_destination
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
