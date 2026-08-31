@@ -31,7 +31,12 @@ En Linux/CI: `bash scripts/check.sh`. CI (`.github/workflows/tests.yml`) corre `
    review, reparto, género o tags nunca deciden identidad. Gate de v0.3.0: cero falsos
    positivos conocidos en auto-match.
 4. **Privacidad** — vistas compartidas (`Club`) nunca exponen rutas, archivos locales,
-   notas ni estado operativo. Sin excepción para el owner.
+   notas ni estado operativo. Sin excepción para el owner. **Excepción explícita y
+   acotada ([P2])**: si el admin activa "compartir disponibilidad" para una biblioteca
+   puntual (opt-in por biblioteca, nunca automático), el título de la colección de Club
+   resultante puede mostrar — y por defecto arranca con — el nombre que el admin le
+   puso a esa biblioteca. Nunca la ruta, los archivos ni ningún otro dato operativo; el
+   admin puede cambiar ese título antes o después de publicarlo.
 5. **Correcciones manuales y `locked_fields`** sobreviven a cualquier enriquecimiento.
 6. **JSON portable** — `catalog.schema.json` es un contrato versionado. SQLite es la
    fuente de verdad; JSON es importación/exportación/backup.

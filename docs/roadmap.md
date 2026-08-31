@@ -145,7 +145,7 @@ no inmoviliza el resto de la cola.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
 `ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3], [Q4],
-[L1], [F1], [Q5], [Q6] y [C1] tambien cerraron (ver `tareas.md`). [F2] ya tiene decision
+[L1], [F1], [Q5], [Q6], [C1] y [P2] tambien cerraron (ver `tareas.md`). [F2] ya tiene decision
 del owner tomada (2026-08-29) y queda lista para una pasada de diseño — confirmar el
 estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 
@@ -240,8 +240,12 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 - **Resuelta 2026-08-26.** [S1]/[S2]: Lucas eligio purgar. El catalogo personal
   anidado quedo inalcanzable en rama y tags de `origin/master` (128 commits y 5 tags
   reescritos con backup previo); ver `tareas.md`.
-- **Resuelta 2026-08-29.** [P1]: ruta, archivo, nota y estado operativo del escaneo
-  siguen sin exponerse nunca en una vista compartida — la regla dura no cambia. Unico
-  carve-out aprobado: el admin puede compartir la disponibilidad fisica (`en_catalogo`)
-  como una coleccion de Club mas. Contrato exacto para implementar, en [P2] de
-  `tareas.md`.
+- **Resuelta 2026-08-29, implementada 2026-08-31.** [P1]/[P2]: ruta, archivo, nota y
+  estado operativo del escaneo siguen sin exponerse nunca en una vista compartida — la
+  regla dura no cambia. Unico carve-out aprobado, ya implementado: el admin puede
+  activar "compartir disponibilidad" por biblioteca, publicando una coleccion de Club
+  de solo lectura con los titulos confirmados — nunca ruta ni archivo, el titulo de la
+  biblioteca es lo unico nuevo que se expone, opt-in y editable. Verificado en vivo
+  contra un servidor real que el payload de `/api/collections` no contiene
+  `library_id`/`library_name`/ruta/nombre de archivo en ningun lugar. Detalle completo
+  en `tareas.md`.

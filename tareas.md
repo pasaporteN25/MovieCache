@@ -100,23 +100,6 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 - **Depende de**: [C1] (cerrado).
 - **Modelo sugerido**: Grande. Cambio transversal y sensible a perdida de datos.
 
-### Frente: Privacidad e historial Git
-
-#### [P2] Compartir disponibilidad fisica como coleccion de Club (contrato de [P1])
-- **Alcance**: el admin puede elegir compartir, como una coleccion de Club mas (mismo
-  mecanismo que ya usan las colecciones seguibles), los titulos que el escaneo local
-  marca `en_catalogo`. Nunca viaja ruta, nombre de archivo, nota ni ningun otro estado
-  operativo del escaneo — la coleccion solo expone lo que cualquier coleccion ya expone
-  hoy (identidad del titulo), con la disponibilidad fisica como señal derivada.
-- **Criterio de cierre**: opt-in explicito (por biblioteca o por instancia, a definir
-  en diseño), pruebas negativas confirmando que ruta/archivo/nota/estado operativo
-  nunca aparecen en el payload de Club aunque la coleccion este activa, y actualizar el
-  invariante de privacidad de `CLAUDE.md` para reflejar el alcance exacto aprobado —
-  recien al implementar esto, no antes.
-- **Depende de**: [P1], decision ya tomada (ver Hecho, 2026-08-29).
-- **Modelo sugerido**: Grande. Frontera critica de privacidad, aunque el contrato ya
-  esta acotado.
-
 ### Frente: Superficie publica y despliegue
 
 #### [W1] Definir contrato de presentacion publica
@@ -631,6 +614,93 @@ de Club mas (mismo mecanismo que ya usan las colecciones seguibles), los titulos
 escaneo local marca `en_catalogo` — disponibilidad fisica derivada, nunca el archivo o
 la ruta que la origino. Contrato exacto para implementar, en [P2].
 2026-08-29.
+
+#### [P2] Compartir disponibilidad fisica como coleccion de Club (contrato de [P1])
+El admin puede activar, por biblioteca, "compartir disponibilidad" — publica una
+coleccion de Club de solo lectura con los titulos confirmados y disponibles de esa
+biblioteca, regenerada automaticamente en cada recorrido aplicado. El diseño original
+(basado en `AvailabilityService.decorate_items()`, ya usado para decorar el catalogo
+personal) se abandono por completo: reproduje yo mismo, con datos sinteticos, que
+dejaba pasar `_availability.sources` (con `library_id`/`library_name`) intacto a traves
+del allowlist de nivel superior de `normalize_collection_item()`, y que copiar un item
+compartido al catalogo personal dejaba un `_availability` obsoleto y contradictorio.
+
+El diseño final evita esa superficie de fuga por construccion en vez de filtrarla
+despues: `LibraryRepository.availability_records()` (ya existente, usado hoy solo por
+`AvailabilityService`) ya devuelve exactamente lo seguro —
+`work_identity(item)` (`domain/libraries.py`, docstring propio: "catalog-independent
+evidence that can be shared safely") como `identity`, con `library_id`/`library_name`
+como claves **hermanas**, nunca mezcladas adentro. `collection_item_from_availability_record()`
+(`domain/collections.py`) arma el item de coleccion solo a partir de `identity` +
+`work_key` (id estable entre recorridos), sin tocar jamas `library_id`/`library_name`.
+De paso cerre una fuga latente e independiente: `COLLECTION_ITEM_FIELDS` heredaba
+`_availability` de `SHARED_CATALOG_FIELDS` (pensado para un llamador distinto y ya
+seguro que reconstruye un sub-dict limpio) — cualquier item de catalogo personal con
+`_availability` poblado habria pasado ese bloque intacto por cualquier otro camino que
+use `normalize_collection_item()`. Ahora excluido explicitamente.
+
+`curated_collections` gana `derived_library_id` (columna nueva anulable, FK a
+`media_libraries` con `ON DELETE CASCADE` — confirmado en vivo que borrar la biblioteca
+borra en cascada la coleccion derivada y los seguidores de otros usuarios, comportamiento
+correcto y ahora cubierto por un test dedicado). `source_kind` sigue siendo `'user'`
+para estas: cambiar el CHECK constraint existente habria pedido el "recrear tabla" de
+12 pasos que SQLite exige y que este repositorio nunca uso en 9 migraciones — confirmado
+en vivo que `ALTER TABLE ... DROP CONSTRAINT` ni siquiera es sintaxis valida. Insertar
+`""` (el default del dataclase) en esa columna FK anulable tampoco es lo mismo que
+`NULL` — confirmado en vivo que SQLite valida `""` como un valor real y lo rechaza —
+asi que todo punto de escritura convierte `"" → None` explicitamente.
+
+Dos bugs reales, no hipoteticos, encontrados durante la implementacion (no en el
+diseño) y arreglados antes de escribir un solo test que los cubriera:
+1. `library_repository.py::_library(row)` es un constructor explicito campo por campo,
+   sin comodin. Sin mapear la columna nueva, toda lectura de una biblioteca volvia con
+   el default del dataclase (`False`) sin importar lo que dijera la base — y como
+   `update_library()`/`set_active()` cargan-y-reconstruyen via `dataclasses.replace()`,
+   **cualquier edicion no relacionada (renombrar, tocar el horario) reiniciaba en
+   silencio el flag de compartir a apagado**. Reproducido y arreglado antes de escribir
+   el test que lo prueba.
+2. El gancho nuevo en `execute_run()` (justo despues de que `complete_run()` termina
+   bien, todavia dentro del mismo `try`) tenia que capturar `Exception` ancho, no
+   `CollectionRepositoryError` como en el borrador original. Traze que el `except
+   Exception` de mas afuera de `execute_run()` llama `_fail_run()` → `complete_run()`
+   una segunda vez con la foto vieja (pre-recorrido) de la biblioteca — el `UPDATE
+   library_scan_runs` tiene guarda (`WHERE status='running'`, no-op en la segunda
+   llamada) pero el `UPDATE media_libraries` que sigue no tiene ninguna, y pisaria sin
+   condicion `verified_at`/`last_scan_at`/`status` con los valores viejos, revirtiendo
+   un recorrido que ya habia terminado bien. Un test nuevo fuerza una excepcion que NO
+   es `CollectionRepositoryError` durante el sync y confirma que el estado de la
+   biblioteca sobrevive intacto.
+
+Frontend: los 3 controles (activar/desactivar, titulo, descripcion opcional) viven
+juntos dentro de "Opciones avanzadas" — mismo `<details>` que ya aloja las reglas de
+exclusion de [L1] — con un unico guardado (`saveLibraryShareSettings`, mismo patron
+secuencial que `saveLibraryExclusionRules`). El borrador original separaba un checkbox
+en la tarjeta (guardado al toque) de los campos de texto en el dialogo (guardados recien
+al enviar) — dos mecanismos de guardado independientes para el mismo estado, con una
+ventana real donde uno pisaba al otro; se unifico antes de implementar. Deliberadamente
+no anidado en `libraryAutomationControl()`, que se esconde entero para bibliotecas con
+`schedule === "manual"` (el caso mas comun de uso personal) porque solo controla la
+automatizacion del recorrido, sin relacion con compartir disponibilidad.
+
+Verificado en vivo contra un servidor real, no solo con pruebas unitarias: biblioteca
+creada, recorrido de prueba + aplicado, archivo confirmado via la cola del escaner,
+"compartir disponibilidad" activado con el campo de titulo en blanco (confirma que cae
+al nombre de la biblioteca) — la respuesta real de `/api/collections` contenia
+unicamente `title`/`year`/`kind`/`file_count` del item, cero `library_id`, cero
+`library_name`, cero ruta, cero nombre de archivo, en ningun lugar del payload.
+Desactivar despublica (`visibility: "private"`) sin borrar la coleccion ni sus
+seguidores.
+
+Suite completa (477 pruebas, crecio desde 463 al empezar) + mypy estricto + Ruff +
+`compileall` + `git diff --check` en verde en cada una de las 4 fases (esquema+dominio,
+repositorio, aplicacion, web+frontend). `CLAUDE.md` invariante #4 actualizado con la
+excepcion exacta y acotada que aprobo el owner. Fuera de alcance, explicito: editar
+titulo/descripcion de cualquier OTRA coleccion (builtin/import) — esta tarea construyo
+la primera capacidad de edicion de colecciones del proyecto, deliberadamente acotada a
+colecciones derivadas de una biblioteca; exponer `derived_library_id` en cualquier
+respuesta HTTP (queda interno); el bug ya reportado aparte de `apply_reviewed_merge`
+(no relacionado).
+2026-08-31.
 
 ### Frente: Enriquecimiento Wikidata
 
