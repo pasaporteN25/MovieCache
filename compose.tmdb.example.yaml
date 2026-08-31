@@ -1,0 +1,10 @@
+services:
+  movie-inbox:
+    environment:
+      MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE: /run/secrets/tmdb_read_access_token
+    secrets:
+      - tmdb_read_access_token
+
+secrets:
+  tmdb_read_access_token:
+    file: ${MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE:?Set the host path to the TMDb token file}

@@ -60,6 +60,33 @@ sudo chmod 600 secrets/owner-password.txt
 
 No se debe guardar la contrasena real dentro de `.env` ni de `compose.yaml`.
 
+## Fuente TMDb opcional
+
+TMDb no forma parte de la configuracion base y una instancia sin token conserva las
+fuentes abiertas actuales. Para preparar el opt-in, crear un archivo que contenga solo
+el **API Read Access Token** de TMDb, sin comillas ni espacios:
+
+```powershell
+Set-Content -NoNewline .\secrets\tmdb-read-access-token.txt "TOKEN_REAL"
+```
+
+Luego descomentar y ajustar en `.env` solamente la ruta al archivo — nunca el token —
+y levantar Compose con el overlay explicito:
+
+```dotenv
+MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE=./secrets/tmdb-read-access-token.txt
+```
+
+```powershell
+docker compose -f compose.yaml -f compose.tmdb.example.yaml up -d
+```
+
+El archivo se monta como secret de solo lectura; el token no viaja al navegador, no se
+imprime y no se guarda en SQLite ni en los catalogos. Quitar el overlay y recrear el
+contenedor desactiva TMDb. Los datos que TMDb aporte en [F5] conservaran procedencia y
+no se borraran silenciosamente al desactivar la fuente: la retirada sera una operacion
+explicita para no destruir correcciones o campos bloqueados del usuario.
+
 ## Cache progresivo de portadas
 
 El volumen `movie-inbox-data` conserva `/var/lib/movie-inbox/image-cache` al reiniciar o

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import secrets
 import webbrowser
 from pathlib import Path
@@ -21,6 +22,7 @@ from movie_inbox.web.config import (
     DEFAULT_IMAGE_ALLOWED_HOSTS,
     DEFAULT_IMAGE_CACHE_WARM_INTERVAL_SECONDS,
     DEFAULT_SESSION_TTL_SECONDS,
+    ExternalSourceCredentials,
     ViewerConfig,
 )
 from movie_inbox.web.security import InvalidPublicOrigin, normalize_public_origin
@@ -73,6 +75,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--owner-password-file",
         type=Path,
         help="Read the first owner password from a file instead of prompting.",
+    )
+    parser.add_argument(
+        "--tmdb-read-access-token-file",
+        type=Path,
+        default=(
+            Path(os.environ["MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE"])
+            if os.environ.get("MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE")
+            else None
+        ),
+        help=(
+            "Read a TMDb API Read Access Token from a server-side file. "
+            "Omit it to keep TMDb disabled."
+        ),
     )
     parser.add_argument(
         "--session-days",
@@ -162,6 +177,15 @@ def main(argv: list[str] | None = None) -> int:
     if not 1 <= args.session_days <= 365:
         parser.error("--session-days must be between 1 and 365")
     try:
+        external_credentials = ExternalSourceCredentials(
+            tmdb_read_access_token=external_api_token(
+                args.tmdb_read_access_token_file,
+                source_label="TMDb",
+            )
+        )
+    except ValueError as error:
+        parser.error(str(error))
+    try:
         public_origin = normalize_public_origin(args.public_origin)
     except InvalidPublicOrigin as error:
         parser.error(str(error))
@@ -196,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
         image_cache_warm_interval_seconds=args.image_cache_warm_interval_seconds,
         image_allowed_hosts=tuple(dict.fromkeys([*DEFAULT_IMAGE_ALLOWED_HOSTS, *args.image_host])),
         library_allowed_roots=tuple(str(path.resolve()) for path in args.library_root),
+        external_credentials=external_credentials,
     )
     identity_repository = SqliteIdentityRepository(instance_db)
     identity_repository.initialize()
@@ -244,6 +269,11 @@ def main(argv: list[str] | None = None) -> int:
         if config.library_allowed_roots
         else "Managed scanner: disabled (no --library-root)"
     )
+    print(
+        "TMDb credentials: configured (adapter pending F5)"
+        if config.external_credentials.tmdb_configured
+        else "TMDb credentials: not configured"
+    )
     print(f"Open {url}")
     print("Press Ctrl+C to stop.")
 
@@ -279,6 +309,24 @@ def owner_password(password_file: Path | None) -> str:
     if first != second:
         raise ValueError("Owner passwords do not match")
     return first
+
+
+def external_api_token(token_file: Path | None, *, source_label: str) -> str:
+    """Read one opaque API token without ever accepting it as a CLI value."""
+
+    if token_file is None:
+        return ""
+    try:
+        if token_file.stat().st_size > 16 * 1024:
+            raise ValueError(f"{source_label} token file is too large")
+        token = token_file.read_text(encoding="utf-8").rstrip("\r\n")
+    except OSError as error:
+        raise ValueError(f"Cannot read {source_label} token file: {token_file}") from error
+    if not token:
+        raise ValueError(f"{source_label} token file is empty")
+    if any(character.isspace() for character in token):
+        raise ValueError(f"{source_label} token file must contain one token without whitespace")
+    return token
 
 
 if __name__ == "__main__":

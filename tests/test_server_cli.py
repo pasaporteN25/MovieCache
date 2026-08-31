@@ -10,6 +10,7 @@ from unittest.mock import patch
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.web import server
+from movie_inbox.web.config import ExternalSourceCredentials
 
 
 class ServerCliTests(unittest.TestCase):
@@ -71,6 +72,55 @@ class ServerCliTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(raised.exception.code, 2)
+
+    def test_tmdb_token_file_opts_instance_in_without_printing_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog = Path(temporary) / "catalog.json"
+            token_file = Path(temporary) / "tmdb-token.txt"
+            token = "eyJ-secret-read-access-token"
+            token_file.write_text(f"{token}\n", encoding="utf-8")
+            JsonCatalogRepository(catalog, normalize_item).write([])
+            stdout = StringIO()
+
+            with (
+                patch("movie_inbox.web.server.uvicorn.run") as run,
+                patch("movie_inbox.web.server.owner_password", return_value="a-long-password"),
+                redirect_stdout(stdout),
+            ):
+                result = server.main(
+                    [
+                        str(catalog),
+                        "--tmdb-read-access-token-file",
+                        str(token_file),
+                        "--no-open",
+                    ]
+                )
+
+            self.assertEqual(result, 0)
+            config = run.call_args.args[0].state.viewer_config
+            self.assertTrue(config.external_credentials.tmdb_configured)
+            self.assertEqual(config.external_credentials.tmdb_read_access_token, token)
+            self.assertIn("TMDb credentials: configured (adapter pending F5)", stdout.getvalue())
+            self.assertNotIn(token, stdout.getvalue())
+            self.assertNotIn(token, repr(config))
+            self.assertNotIn(token, repr(config.external_credentials))
+
+    def test_tmdb_stays_disabled_without_token_file(self) -> None:
+        credentials = ExternalSourceCredentials()
+
+        self.assertFalse(credentials.tmdb_configured)
+        self.assertEqual(credentials.tmdb_read_access_token, "")
+
+    def test_external_api_token_rejects_empty_multiline_and_oversized_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            token_file = Path(temporary) / "tmdb-token.txt"
+            invalid_contents = ("\n", "first\nsecond", "x" * (16 * 1024 + 1))
+
+            for content in invalid_contents:
+                with self.subTest(size=len(content)):
+                    token_file.write_text(content, encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        server.external_api_token(token_file, source_label="TMDb")
 
 
 if __name__ == "__main__":

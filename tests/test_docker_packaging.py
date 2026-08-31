@@ -76,6 +76,17 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("MOVIE_INBOX_BACKUP_RETENTION_DAYS=14", environment)
         self.assertNotIn("MOVIE_INBOX_OWNER_PASSWORD=", environment)
 
+    def test_tmdb_compose_overlay_is_opt_in_and_file_backed(self) -> None:
+        base_compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+        overlay = (ROOT / "compose.tmdb.example.yaml").read_text(encoding="utf-8")
+        environment = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+        self.assertNotIn("tmdb_read_access_token", base_compose)
+        self.assertIn("/run/secrets/tmdb_read_access_token", overlay)
+        self.assertIn("MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE", overlay)
+        self.assertIn("# MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE=", environment)
+        self.assertNotIn("MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN=", environment)
+
     def test_scheduled_backup_stops_restarts_and_health_checks_the_service(self) -> None:
         script = (ROOT / "scripts" / "docker-backup.sh").read_text(encoding="utf-8")
         service = (ROOT / "deploy" / "movie-inbox-backup.service.example").read_text(

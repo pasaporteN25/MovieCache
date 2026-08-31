@@ -531,6 +531,14 @@ Al comparar un resultado externo, el servidor enriquece primero esa opcion y apl
 mismo ranking sobre todo el catalogo, por lo que aliases o nombres locales que no
 coinciden con la consulta inicial siguen pudiendo aparecer antes de crear un duplicado.
 
+TMDb es una integracion distinta de IMDb y permanece desactivada por defecto. La
+configuracion opt-in acepta un API Read Access Token unicamente desde un archivo del
+servidor mediante `--tmdb-read-access-token-file` o
+`MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE`; nunca acepta el secreto como argumento
+literal, dato del navegador o campo del catalogo. Este corte prepara la activacion
+segura; el adaptador que hara consultas y aprovechara los IDs cruzados pertenece a
+[F5]. En Docker se usa el overlay y el procedimiento de [docs/docker.md](docs/docker.md).
+
 ```powershell
 movie-inbox serve catalog_wiki_v5.json --write-json catalog_wiki_v5.json
 ```
