@@ -79,21 +79,25 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
 ### Frente: Bibliotecas y curaduria
 
-#### [C1] Disenar el contrato para grupos de 3+ duplicados
-- **Alcance**: reemplazar la descomposicion C(n,2) por un caso de grupo sin implementar
-  todavia el merge N-a-1. Definir identidad del caso, orden, conflictos, historial,
-  deshacer y comportamiento si el grupo cambia durante la revision.
-- **Criterio de cierre**: ADR y fixtures sinteticas de 3 y 4 entradas que permitan
-  implementar sin decisiones pendientes.
-- **Depende de**: [T2].
-- **Modelo sugerido**: Grande. Es una decision de producto y consistencia de datos.
-
 #### [C2] Implementar resolucion N-a-1 de duplicados
-- **Alcance**: cola, detalle, comparador, auto-resolucion segura, historial y deshacer
-  para el contrato aprobado en [C1]. Mantener cero merges automaticos con conflictos.
+- **Alcance**: contrato de caso-grupo ya definido y verificado en [C1] (Hecho,
+  `case: {id, type, status, reason, evidence, members: [...]}`, identidad =
+  componente conexa de `_duplicate_refs`/`_duplicate_deferred_refs`, no union-find
+  crudo ni lista estatica de pares). Falta implementarlo de verdad en
+  `curation_service.py`/`curation_workflow.py`, mas cola, detalle, comparador,
+  auto-resolucion segura, historial y deshacer para 3+ items. Mantener cero merges
+  automaticos con conflictos — [C1] documento con una tabla trazada que
+  `auto_resolve_duplicates()` hoy no cumple esto para grupos de 3+ (un conflicto real
+  puede quedar tapado por ruido de referencias obsoletas del mismo lote).
+- **Decision pendiente que [C1] dejo explicitamente para aca**: si encadenar fusiones
+  de a pares para resolver un grupo de N, evaluar la conexion con la tarea de fondo
+  `task_47d7cd43` (bug de `apply_reviewed_merge`/`_default_choice` que puede pisar un
+  campo bloqueado vacio) antes de heredarla varias veces por grupo.
+- **Tambien pendiente**: actualizar `inbox-curation.js`/`merge.js`, que hoy asumen
+  literalmente 2 items (`primary`/`secondary`, "Entrada A"/"Entrada B").
 - **Criterio de cierre**: pruebas de dominio, servicio, HTTP y navegador para 3+ items,
   incluidos cambios concurrentes y rollback.
-- **Depende de**: [C1].
+- **Depende de**: [C1] (cerrado).
 - **Modelo sugerido**: Grande. Cambio transversal y sensible a perdida de datos.
 
 ### Frente: Privacidad e historial Git
@@ -911,6 +915,113 @@ existente, y una prueba de navegador Playwright nueva para este dialogo (no teni
 cobertura de ese tipo antes tampoco; verificacion manual con servidor real, mismo
 criterio que [Q4]).
 2026-08-29.
+
+#### [C1] Disenar el contrato para grupos de 3+ duplicados
+Hoy `build_curation_payload`/`_duplicate_cases` (`application/curation_service.py:20-76`)
+descompone cualquier grupo de duplicados que ya arma `annotate_duplicate_items`
+(union-find real y transitivo sobre claves `url:`/`title-year:`,
+`domain/catalog.py:493-575`) en C(n,2) casos independientes por par. Un trio identico
+sin ningun dato produce hoy 3 casos `duplicate` (`counts.duplicates: 3`), verificado
+ejecutandolo, en vez de mostrarle al humano una sola decision.
+
+No es solo una molestia de UX. `CurationWorkflowService.auto_resolve_duplicates()`
+(`application/curation_workflow.py:191-229`) consume esa misma lista estatica de pares
+y la procesa en orden con `merge(choices={})`. Traze un grupo real de 4 (dos sin dato,
+`rating=9` y `rating=4` en los otros dos) par por par: heat-a+heat-b y heat-a+heat-c
+fusionan sin problema (heat-a termina con `rating=9`); heat-a+heat-d es un conflicto
+real (`MergeReviewError: Missing decision for protected field: rating`, 9 contra 4);
+los 3 pares restantes (heat-b+heat-c, heat-b+heat-d, heat-c+heat-d) fallan con
+`CurationItemNotFound` porque heat-b y heat-c ya no existen — se fusionaron en pasos
+anteriores del mismo lote. Resultado: `{"resolved": 2, "needs_review": 4}`, pero de
+esos 4 "needs_review" **solo 1 es un conflicto real**; los otros 3 son ruido de
+referencias obsoletas. Para un grupo totalmente limpio de N la formula deterministica
+(verificada ejecutando el codigo real para N=3 y N=4) es `resolved = N-1`,
+`needs_review = C(N,2)-(N-1)` — coincide con el test ya existente
+`test_auto_resolve_merges_an_identical_trio_down_to_one_survivor` (N=3:
+`resolved=2, needs_review=1`) y con el nuevo `test_auto_resolve_on_a_quartet_with_
+one_conflict_leaves_mostly_stale_reference_noise` (N=4 con un conflicto real:
+`resolved=2, needs_review=4`, con la tabla completa arriba). Cuanto mas grande el
+grupo, mas ruido fantasma tapa el conflicto real — y en un grupo de 3+, un campo con
+valores distintos puede terminar descartado por orden de procesamiento sin que ningun
+humano lo vea, en tension directa con "coincidencia dudosa = revision humana" de
+`CLAUDE.md`. Ya afecta produccion hoy; esta tarea documenta el problema con precision,
+no lo corrige (eso es [C2]).
+
+**Contrato nuevo**: un caso `duplicate` deja de representar un par y pasa a representar
+una **componente conexa** del grafo de aristas `pending`/`deferred` que ya calcula
+`annotate_duplicate_items` en cada item (`_duplicate_refs`/`_duplicate_deferred_refs`) —
+no el grupo crudo de union-find (nunca se achica) ni una lista estatica de pares.
+Forma: `{id, type: "duplicate", status, reason, evidence, members: [...]}`, con
+`members` (2+) reemplazando `primary`/`secondary`. Verificado con un prototipo Python
+descartable (no comiteado; usa sin modificarlas las funciones reales
+`curation_item_reference`, `_duplicate_evidence`, `_item_summary`, `_case_digest`) en 5
+escenarios: (1) trio limpio sin decisiones, hoy 3 casos por par → nuevo 1 caso de 3
+miembros; (2) grupo de 4 con 1 conflicto real pero sin decisiones aun (vista de cola,
+no de auto-resolve) → sigue siendo 1 caso de 4 miembros, sigue pidiendo revision humana
+porque nada se fusiono todavia; (3) cortar solo la arista A-B de un trio (una decision
+`not_duplicate`) → sigue siendo 1 caso de 3 miembros, A y B quedan unidos igual via C
+transitivamente — confirmado tambien con codigo real, no solo el prototipo, en
+`tests/test_curation.py::test_not_duplicate_on_one_edge_of_a_trio_still_leaves_a_
+connected_path`; (4) cortar las 2 aristas que tocan A → recien ahi A queda aislado y
+B-C forma su propio caso de 2; (5) grupo entre archivos (mismo id crudo, `_source_file`
+distinto) ya funciona hoy sin cambios a nivel de pares — confirmado con codigo real en
+`tests/test_curation.py::test_cross_file_group_with_colliding_ids_is_disambiguated_by_
+source_file` (3 casos por par con `ref` compuesto correctamente disambiguado hoy;
+bajo el contrato nuevo colapsan a 1 caso de 3 miembros). `load_items()` ya aplana todos
+los catalogos antes de anotar duplicados, asi que un grupo entre archivos ya es el caso
+normal, no una excepcion a disenar aparte.
+
+Las 2 decisiones que quedaban abiertas, resueltas aca y no delegadas a [C2]:
+**evidencia** de un caso-grupo = union deduplicada (orden de primera aparicion) de
+`_duplicate_evidence(a, b)` para cada arista que sigue conectando directamente a dos
+miembros — un grupo de 2 da la misma lista de hoy, uno heterogeneo muestra todas las
+razones en vez de una elegida al azar; **orden de la cola** (`_case_sort_key`, hoy lee
+`case["primary"]["title"]`) = titulo (casefold) mas chico alfabeticamente entre todos
+los miembros, generalizacion directa sin criterio nuevo.
+
+**Correccion de encuadre**: `_case_digest(*values)` ya es variadico y ya se llama hoy
+con un par pre-ordenado alfabeticamente — ya es insensible al orden, hoy, para 2
+elementos, sin cambios de codigo. El id de un caso-grupo
+(`_case_digest(*sorted(member_refs))`) extiende ese mismo patron a N, no inventa nada.
+Esto es distinto de `merge_review_id` (`domain/merge_review.py:154-161`), que serializa
+`[snapshot(left), snapshot(right)]` como arreglo — `sort_keys` ordena las claves
+*dentro* de cada snapshot pero no el orden del arreglo, asi que
+`merge_review_id(left, right) != merge_review_id(right, left)` en general (verificado:
+dos hashes distintos con los mismos snapshots invertidos). Un borrador anterior de este
+diseño asumia que un futuro "id de revision de grupo" generalizaria `merge_review_id`
+— es incorrecto decirlo asi: ese hash es de **contenido** (concurrencia optimista
+dentro de `merge()`, que esta tarea no toca), el id del caso-grupo es de **identidad**
+(que referencias componen el caso). Si [C2] necesita un chequeo de staleness N-a-1, es
+una decision propia de [C2], no algo que este diseño resuelva de antemano.
+
+**Conexion con la tarea de fondo `task_47d7cd43`** (bug de
+`apply_reviewed_merge`/`_default_choice` en `domain/merge_review.py`, encontrado
+durante [Q6]: un campo bloqueado pero vacio puede quedar pisado porque el chequeo de
+"que lado tiene valor" corre antes que el de `protected`/`locked_fields`):
+`auto_resolve_duplicates` ya pasa por ese mismo camino hoy. Si [C2] resuelve un grupo
+de N encadenando fusiones de a pares (una de las formas de implementacion que este
+diseño deja abiertas), ese bug se dispara potencialmente varias veces por grupo — se
+nombra aca explicitamente para que [C2] decida con conocimiento: esperar el arreglo, o
+asegurarse de que su propio mecanismo de eleccion de campo para N vias no herede el
+mismo orden de chequeos, igual que [Q6] evito este camino componiendo
+`merge_into_existing` directo en vez de reusar `apply_reviewed_merge`.
+
+**Cambio de contrato visible**: `counts.duplicates` pasa de contar pares a contar
+grupos — con los mismos datos, un trio hoy reporta 3 y con el contrato nuevo reporta 1.
+No es una regresion ni perdida de datos, es la consecuencia directa de no mostrar la
+misma decision tres veces; vale una linea en el CHANGELOG cuando [C2] lo implemente.
+
+Cumple el criterio de cierre con ADR y fixtures, no una implementacion — mismo alcance
+que [Q5], sin formato de ADR separado en este repo (ver precedente citado ahi): cero
+cambios a `curation_service.py`/`curation_workflow.py`/al frontend. 3 tests nuevos
+sobre codigo ya existente sin ningun prototipo comiteado: el de la tabla de 4 items
+arriba (`tests/test_curation_workflow.py`) y los 2 de conectividad/cross-file citados
+arriba (`tests/test_curation.py`). El caso de trio limpio N=3 no se reimplementa, ya
+esta cubierto por el test existente citado arriba. Fuera de alcance, explicito: la
+implementacion real del contrato de grupo, el arreglo de `auto_resolve_duplicates` o de
+`task_47d7cd43`, y el frontend (`inbox-curation.js`/`merge.js`) que hoy asume
+literalmente 2 items ("Entrada A"/"Entrada B") — todo eso es [C2].
+2026-08-30.
 
 ---
 

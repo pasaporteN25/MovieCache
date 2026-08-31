@@ -123,6 +123,79 @@ class CurationTests(unittest.TestCase):
             self.assertEqual(payload["counts"]["duplicates"], 0)
             self.assertNotIn("duplicate", {case["type"] for case in payload["cases"]})
 
+    def test_not_duplicate_on_one_edge_of_a_trio_still_leaves_a_connected_path(self) -> None:
+        """[C1] characterization: marking one pair of a 3-way duplicate group as
+        `not_duplicate` does not remove either item from the queue, because the third
+        item still links them transitively. Both surviving pairs (a-c, b-c) stay as
+        separate cases today; isolating a member fully would require cutting both of
+        its edges, not just one."""
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = JsonCatalogRepository(Path(temporary) / "catalog.json", normalize_item)
+            repository.write(
+                [
+                    normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-c", "title": "Heat", "year": "1995"}),
+                ]
+            )
+            service = CatalogService(repository)
+            updated, reason = service.update_duplicate_curation(
+                "heat-a",
+                "heat-b::catalog.json",
+                "not_duplicate",
+            )
+
+            self.assertTrue(updated)
+            self.assertEqual(reason, "updated")
+            payload = build_curation_payload(curation_rows(repository.read()))
+            duplicate_cases = [case for case in payload["cases"] if case["type"] == "duplicate"]
+            self.assertEqual(payload["counts"]["duplicates"], 2)
+            pairs = {
+                frozenset({case["primary"]["id"], case["secondary"]["id"]})
+                for case in duplicate_cases
+            }
+            self.assertEqual(
+                pairs,
+                {frozenset({"heat-a", "heat-c"}), frozenset({"heat-b", "heat-c"})},
+            )
+
+    def test_cross_file_group_with_colliding_ids_is_disambiguated_by_source_file(self) -> None:
+        """[C1] characterization: two catalog files can legitimately reuse the same
+        item id. `annotate_duplicate_items`/`curation_item_reference` already
+        disambiguate by `_source_file`, so a 3-way duplicate group spanning two files
+        (one id collision plus a third, distinct id) already produces the correct
+        pairwise cases today -- no code change needed for cross-file groups."""
+        items = [
+            *curation_rows(
+                [normalize_item({"id": "same-id", "title": "Heat", "year": "1995"})],
+                source_file="catalog-a.json",
+            ),
+            *curation_rows(
+                [
+                    normalize_item({"id": "same-id", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "other", "title": "Heat", "year": "1995"}),
+                ],
+                source_file="catalog-b.json",
+            ),
+        ]
+
+        payload = build_curation_payload(items)
+
+        duplicate_cases = [case for case in payload["cases"] if case["type"] == "duplicate"]
+        self.assertEqual(payload["counts"]["duplicates"], 3)
+        refs = {
+            frozenset({case["primary"]["ref"], case["secondary"]["ref"]})
+            for case in duplicate_cases
+        }
+        self.assertEqual(
+            refs,
+            {
+                frozenset({"same-id::catalog-a.json", "same-id::catalog-b.json"}),
+                frozenset({"same-id::catalog-a.json", "other::catalog-b.json"}),
+                frozenset({"same-id::catalog-b.json", "other::catalog-b.json"}),
+            },
+        )
+
     def test_deferred_cases_can_return_to_pending(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = JsonCatalogRepository(Path(temporary) / "catalog.json", normalize_item)

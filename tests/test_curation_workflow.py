@@ -386,6 +386,39 @@ class CurationWorkflowTests(unittest.TestCase):
             self.assertEqual(history["count"], 2)
             self.assertTrue(all(op["action"] == "merge" for op in history["operations"]))
 
+    def test_auto_resolve_on_a_quartet_with_one_conflict_leaves_mostly_stale_reference_noise(
+        self,
+    ) -> None:
+        """[C1] characterization: a static C(N,2) pair list processed in order means a
+        single real conflict (heat-a vs heat-d, rating 9 vs 4) produces only 1 genuine
+        `needs_review`, but the other 3 pairs involving already-merged heat-b/heat-c
+        raise `CurationItemNotFound` and get counted as `needs_review` too -- inflating
+        the count with stale-reference noise rather than real conflicts. See [C1] in
+        tareas.md for the full per-pair trace."""
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-c", "title": "Heat", "year": "1995", "rating": 9}),
+                    normalize_item({"id": "heat-d", "title": "Heat", "year": "1995", "rating": 4}),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            items = [item.to_dict() for item in repository.read()]
+            for item in items:
+                item["_source_file"] = str(catalog_path)
+
+            result = workflow.auto_resolve_duplicates(
+                items, history_mode="persistent", session_id="session-a"
+            )
+
+            self.assertEqual(result, {"resolved": 2, "needs_review": 4})
+            survivors = {item.id: item.rating for item in repository.read()}
+            self.assertEqual(survivors, {"heat-a": 9, "heat-d": 4})
+
     def test_auto_resolve_leaves_a_genuine_personal_conflict_for_manual_review(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             catalog_path = Path(temporary) / "catalog.json"

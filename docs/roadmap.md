@@ -145,8 +145,8 @@ no inmoviliza el resto de la cola.
 
 El baseline diagnostico inicial de 174 errores fuera de `domain` quedo cerrado sin
 `ignore_errors` ni overrides sobre codigo de producto. [Q1], [Q2], [Q7], [Q3], [Q4],
-[L1], [F1], [Q5] y [Q6] tambien cerraron (ver `tareas.md`). [F2] ya tiene decision del
-owner tomada (2026-08-29) y queda lista para una pasada de diseño — confirmar el
+[L1], [F1], [Q5], [Q6] y [C1] tambien cerraron (ver `tareas.md`). [F2] ya tiene decision
+del owner tomada (2026-08-29) y queda lista para una pasada de diseño — confirmar el
 estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 
 ### 2. Calidad de datos y bibliotecas
@@ -205,8 +205,16 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 11. **Decision tomada 2026-08-29.** [F2] Jikan como fuente de anime primaria,
     `anime-offline-database` como secundaria/offline. Falta una pasada de diseño corta
     (como componen las dos) antes de programar el adaptador.
-12. [C1] Contrato para grupos de 3+ duplicados.
-13. [C2] Resolucion N-a-1 segun ese contrato.
+12. **Cerrado 2026-08-30.** [C1] Contrato para grupos de 3+ duplicados: un caso deja de
+    representar un par y pasa a representar la componente conexa de
+    `_duplicate_refs`/`_duplicate_deferred_refs` (`members: [...]`, no
+    `primary`/`secondary`). De paso documento con una tabla trazada que
+    `auto_resolve_duplicates()` hoy infla `needs_review` con ruido de referencias
+    obsoletas del mismo lote (solo 1 de 4 "needs_review" era un conflicto real en el
+    grupo de prueba) — ADR y fixtures de caracterizacion, sin tocar produccion; mismo
+    alcance que [Q5]. Detalle en `tareas.md`.
+13. [C2] Resolucion N-a-1 segun el contrato ya cerrado en [C1] — listo para tomar
+    tamaño y programarse.
 14. [F4] API keys opcionales por fuente (ej. TMDb), sin dejar de ser abierto por
     default. Prioridad baja a pedido del owner — necesita su propio analisis de diseño
     antes de poder tomar tamaño.
