@@ -17,9 +17,11 @@ from movie_inbox.domain.collections import (
     normalize_club_collection_title,
     normalize_collection_item,
 )
+from movie_inbox.domain.libraries import ManagedLibrary
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
+from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
 from movie_inbox.infrastructure.starter_collections import (
     AKIRA_KUROSAWA_SEED_KEY,
@@ -137,6 +139,155 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(result["summary"]["review"], 1)
         self.assertEqual(result["results"][0]["reason"], "possible_duplicate")
         self.assertEqual(self.catalog_repository.read(), [])
+
+
+class DerivedLibraryCollectionTests(unittest.TestCase):
+    """[P2]: the repository-level lifecycle of a library-derived collection."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.catalog_path = self.root / "owner.json"
+        JsonCatalogRepository(self.catalog_path, normalize_item).write([])
+        self.instance = self.root / "instance.db"
+        self.identity_repository = SqliteIdentityRepository(self.instance)
+        self.owner, _ = AuthService(self.identity_repository).bootstrap_owner(
+            "owner",
+            "a-long-owner-password",
+            catalog_name="Owner catalog",
+            source_paths=[str(self.catalog_path)],
+            write_path=str(self.catalog_path),
+        )
+        self.library_repository = SqliteLibraryRepository(self.instance)
+        self.library_repository.create_library(
+            ManagedLibrary(
+                id="lib-1",
+                name="Blu-rays del living",
+                root_path=str(self.root),
+                created_by_user_id=self.owner.id,
+                created_at=1_800_000_000,
+                updated_at=1_800_000_000,
+            )
+        )
+        self.repository = SqliteCollectionRepository(self.instance)
+        self.seed = akira_kurosawa_collection(self.owner.id)
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def _item(self, work_key: str, title: str):
+        record = {
+            "work_key": work_key,
+            "identity": {"title": title, "year": "1995"},
+            "library_id": "lib-1",
+            "library_name": "Blu-rays del living",
+            "file_count": 2,
+        }
+        return collection_item_from_availability_record(record, 0)
+
+    def test_a_regular_collections_default_derived_library_id_does_not_break_its_insert(
+        self,
+    ) -> None:
+        """The "" -> None conversion for the new nullable FK column must not
+        regress collection creation for every existing caller (builtin seed,
+        imports), which never set derived_library_id and rely on its "" default."""
+        self.assertTrue(self.repository.install_once(AKIRA_KUROSAWA_SEED_KEY, self.seed))
+
+    def test_upsert_creates_a_published_collection_seeded_from_the_library_name(self) -> None:
+        created = self.repository.upsert_derived_collection(
+            library_id="lib-1",
+            owner_user_id=self.owner.id,
+            default_title="Blu-rays del living",
+            items=[self._item("wikidata:Q1", "Heat")],
+        )
+
+        self.assertEqual(created.title, "Blu-rays del living")
+        self.assertEqual(created.visibility, "published")
+        self.assertEqual(created.source_kind, "user")
+        self.assertEqual(created.derived_library_id, "lib-1")
+        self.assertEqual(len(created.items), 1)
+
+    def test_resyncing_preserves_an_admin_edited_title_and_replaces_the_items(self) -> None:
+        created = self.repository.upsert_derived_collection(
+            library_id="lib-1",
+            owner_user_id=self.owner.id,
+            default_title="Blu-rays del living",
+            items=[self._item("wikidata:Q1", "Heat")],
+        )
+        self.repository.set_derived_collection_details(
+            "lib-1", title="Mi coleccion especial", description="Peliculas fisicas"
+        )
+
+        resynced = self.repository.upsert_derived_collection(
+            library_id="lib-1",
+            owner_user_id=self.owner.id,
+            default_title="Blu-rays del living",
+            items=[self._item("wikidata:Q2", "Sicario")],
+        )
+
+        self.assertEqual(resynced.id, created.id)
+        self.assertEqual(resynced.title, "Mi coleccion especial")
+        self.assertEqual(resynced.description, "Peliculas fisicas")
+        self.assertEqual([entry.item["title"] for entry in resynced.items], ["Sicario"])
+
+    def test_unpublish_hides_without_deleting_and_preserves_followers(self) -> None:
+        created = self.repository.upsert_derived_collection(
+            library_id="lib-1",
+            owner_user_id=self.owner.id,
+            default_title="Blu-rays del living",
+            items=[self._item("wikidata:Q1", "Heat")],
+        )
+        members = MemberService(
+            self.identity_repository,
+            SqlitePersonalCatalogProvisioner(self.root / "member-catalogs"),
+        )
+        member = members.create_member(
+            self.owner, "maria", temporary_password="a-temporary-password"
+        ).member.user
+        self.repository.set_following(member.id, created.id, True)
+
+        self.repository.unpublish_derived_collection("lib-1")
+
+        unpublished = self.repository.get_by_derived_library_id("lib-1")
+        assert unpublished is not None
+        self.assertEqual(unpublished.visibility, "private")
+        self.assertEqual(unpublished.title, "Blu-rays del living")
+        with closing(sqlite3.connect(self.instance)) as connection:
+            follow_count = connection.execute(
+                "SELECT COUNT(*) FROM collection_follows WHERE collection_id = ?",
+                (created.id,),
+            ).fetchone()[0]
+        self.assertEqual(follow_count, 1)
+
+    def test_unknown_library_has_no_derived_collection(self) -> None:
+        self.assertIsNone(self.repository.get_by_derived_library_id("lib-does-not-exist"))
+
+    def test_deleting_the_library_cascades_to_its_derived_collection_and_followers(self) -> None:
+        created = self.repository.upsert_derived_collection(
+            library_id="lib-1",
+            owner_user_id=self.owner.id,
+            default_title="Blu-rays del living",
+            items=[self._item("wikidata:Q1", "Heat")],
+        )
+        members = MemberService(
+            self.identity_repository,
+            SqlitePersonalCatalogProvisioner(self.root / "member-catalogs"),
+        )
+        member = members.create_member(
+            self.owner, "maria", temporary_password="a-temporary-password"
+        ).member.user
+        self.repository.set_following(member.id, created.id, True)
+
+        self.library_repository.delete_library("lib-1")
+
+        self.assertIsNone(self.repository.get_by_derived_library_id("lib-1"))
+        self.assertIsNone(self.repository.get_accessible(self.owner.id, created.id))
+        with closing(sqlite3.connect(self.instance)) as connection:
+            remaining = connection.execute(
+                "SELECT COUNT(*) FROM collection_follows WHERE collection_id = ?",
+                (created.id,),
+            ).fetchone()[0]
+        self.assertEqual(remaining, 0)
 
 
 class AvailabilityCollectionItemTests(unittest.TestCase):

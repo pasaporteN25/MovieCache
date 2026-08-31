@@ -175,7 +175,7 @@ class SqliteLibraryRepository:
                         """UPDATE media_libraries SET
                             name = ?, root_path = ?, root_key = ?, schedule = ?, active = ?,
                             status = ?, max_missing_ratio = ?, verified_at = ?, last_scan_at = ?,
-                            next_scan_at = ?, updated_at = ?
+                            next_scan_at = ?, updated_at = ?, share_availability_as_collection = ?
                         WHERE id = ?""",
                         (
                             library.name,
@@ -189,6 +189,7 @@ class SqliteLibraryRepository:
                             library.last_scan_at,
                             library.next_scan_at,
                             library.updated_at,
+                            int(library.share_availability_as_collection),
                             library.id,
                         ),
                     )
@@ -731,6 +732,7 @@ def _library(row: sqlite3.Row) -> ManagedLibrary:
         next_scan_at=int(row["next_scan_at"]),
         created_at=int(row["created_at"]),
         updated_at=int(row["updated_at"]),
+        share_availability_as_collection=bool(row["share_availability_as_collection"]),
     )
 
 

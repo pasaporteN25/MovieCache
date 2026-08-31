@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
+import unicodedata
+import uuid
 from contextlib import closing
+from datetime import UTC, datetime
 from pathlib import Path
 
 from movie_inbox.application.collection_repository import CollectionRepositoryError
@@ -172,6 +176,133 @@ class SqliteCollectionRepository:
                     f"Cannot update collection follow in: {self.path}"
                 ) from error
 
+    def get_by_derived_library_id(self, library_id: str) -> CuratedCollection | None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    row = connection.execute(
+                        """SELECT c.*, u.username AS owner_username, 0 AS followed
+                        FROM curated_collections c
+                        LEFT JOIN users u ON u.id = c.owner_user_id
+                        WHERE c.derived_library_id = ?""",
+                        (library_id,),
+                    ).fetchone()
+                    return self._collection(connection, row) if row else None
+            except sqlite3.Error as error:
+                raise CollectionRepositoryError(
+                    f"Cannot read derived collection from: {self.path}"
+                ) from error
+
+    def upsert_derived_collection(
+        self,
+        *,
+        library_id: str,
+        owner_user_id: str,
+        default_title: str,
+        items: list[CollectionItem],
+    ) -> CuratedCollection:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    existing = connection.execute(
+                        "SELECT id FROM curated_collections WHERE derived_library_id = ?",
+                        (library_id,),
+                    ).fetchone()
+                    now = _utc_now()
+                    if existing is None:
+                        collection = CuratedCollection(
+                            id=f"library-{uuid.uuid4().hex}",
+                            slug=f"{_slug(default_title)}-{library_id[:8]}",
+                            title=default_title,
+                            description="",
+                            owner_user_id=owner_user_id,
+                            visibility="published",
+                            source_kind="user",
+                            built_in=False,
+                            version=1,
+                            created_at=now,
+                            updated_at=now,
+                            derived_library_id=library_id,
+                        )
+                        self._insert_collection(connection, collection)
+                        collection_id = collection.id
+                    else:
+                        collection_id = str(existing["id"])
+                        connection.execute(
+                            "UPDATE curated_collections SET updated_at = ?, "
+                            "version = version + 1 WHERE id = ?",
+                            (now, collection_id),
+                        )
+                    connection.execute(
+                        "DELETE FROM curated_collection_items WHERE collection_id = ?",
+                        (collection_id,),
+                    )
+                    for entry in items:
+                        connection.execute(
+                            """INSERT INTO curated_collection_items(
+                                collection_id, item_id, position, payload_json
+                            ) VALUES (?, ?, ?, ?)""",
+                            (
+                                collection_id,
+                                entry.id,
+                                entry.position,
+                                _json_dump(normalize_collection_item(entry.item)),
+                            ),
+                        )
+                    row = connection.execute(
+                        """SELECT c.*, u.username AS owner_username, 0 AS followed
+                        FROM curated_collections c
+                        LEFT JOIN users u ON u.id = c.owner_user_id
+                        WHERE c.id = ?""",
+                        (collection_id,),
+                    ).fetchone()
+                    collection = self._collection(connection, row)
+                    connection.commit()
+                    return collection
+            except sqlite3.Error as error:
+                raise CollectionRepositoryError(
+                    f"Cannot sync derived collection in: {self.path}"
+                ) from error
+
+    def set_derived_collection_details(
+        self,
+        library_id: str,
+        *,
+        title: str,
+        description: str,
+    ) -> None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    connection.execute(
+                        """UPDATE curated_collections SET title = ?, description = ?,
+                        updated_at = ? WHERE derived_library_id = ?""",
+                        (title, description, _utc_now(), library_id),
+                    )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise CollectionRepositoryError(
+                    f"Cannot update derived collection details in: {self.path}"
+                ) from error
+
+    def unpublish_derived_collection(self, library_id: str) -> None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    connection.execute(
+                        """UPDATE curated_collections SET visibility = 'private',
+                        updated_at = ? WHERE derived_library_id = ?""",
+                        (_utc_now(), library_id),
+                    )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise CollectionRepositoryError(
+                    f"Cannot unpublish derived collection in: {self.path}"
+                ) from error
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=self.busy_timeout, isolation_level=None)
         connection.row_factory = sqlite3.Row
@@ -181,12 +312,18 @@ class SqliteCollectionRepository:
 
     @staticmethod
     def _insert_collection(connection: sqlite3.Connection, collection: CuratedCollection) -> None:
+        # "" (the CuratedCollection.derived_library_id default) is a real value
+        # a nullable FK column checks against media_libraries.id, not the same
+        # as NULL -- verified directly: SQLite rejects '' with an IntegrityError
+        # while NULL correctly skips FK enforcement. Every existing caller
+        # (builtin seed, imports) uses the "" default, so this conversion is
+        # required for them to keep working once the column exists.
         connection.execute(
             """INSERT INTO curated_collections(
                 id, slug, title, description, owner_user_id, visibility,
                 source_kind, source_url, source_label, built_in, version,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                created_at, updated_at, derived_library_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 collection.id,
                 collection.slug,
@@ -201,6 +338,7 @@ class SqliteCollectionRepository:
                 collection.version,
                 collection.created_at,
                 collection.updated_at,
+                collection.derived_library_id or None,
             ),
         )
         for entry in collection.items:
@@ -248,7 +386,18 @@ class SqliteCollectionRepository:
             owner_username=str(row["owner_username"] or ""),
             followed=bool(row["followed"]),
             items=items,
+            derived_library_id=str(row["derived_library_id"] or ""),
         )
+
+
+def _slug(value: str) -> str:
+    text = unicodedata.normalize("NFKD", value.casefold())
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")[:72] or "coleccion"
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 def _json_dump(value: object) -> str:

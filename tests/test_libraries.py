@@ -5,6 +5,7 @@ import tempfile
 import threading
 import unittest
 from contextlib import closing
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -784,6 +785,26 @@ class ManagedLibraryTests(unittest.TestCase):
         self.assertFalse(updated.active)
         self.assertEqual(updated.status, "ready")
         self.assertEqual(updated.next_scan_at, 0)
+
+    def test_an_unrelated_edit_does_not_silently_reset_share_availability(self) -> None:
+        """[P2]: _library(row) must map share_availability_as_collection, or
+        every load falls back to the dataclass default (False) regardless of
+        what is actually stored -- and since update_library()/set_active()
+        build their new state from a freshly-loaded library via
+        dataclasses.replace(), that would silently reset the flag to False on
+        every unrelated edit."""
+        library = self.create_library()
+        self.repository.update_library(replace(library, share_availability_as_collection=True))
+
+        sharing_enabled = self.repository.get_library(library.id)
+        assert sharing_enabled is not None
+        renamed = self.repository.update_library(replace(sharing_enabled, name="Renombrada"))
+
+        self.assertTrue(renamed.share_availability_as_collection)
+        reloaded = self.repository.get_library(library.id)
+        assert reloaded is not None
+        self.assertTrue(reloaded.share_availability_as_collection)
+        self.assertEqual(reloaded.name, "Renombrada")
 
     def test_persistent_run_history_is_bounded_per_library(self) -> None:
         library = self.create_library()
