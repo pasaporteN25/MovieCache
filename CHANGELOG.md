@@ -4,6 +4,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+## [0.6.0] - 2026-08-31
+
 ### Agregado
 
 - La hoja de ruta convierte las direcciones pendientes en un backlog ordenado con
@@ -18,6 +20,42 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   compositores. Los cinco campos forman parte del modelo portable, conservan
   procedencia y bloqueos, migran el JSON a schema v7 y hacen round-trip en
   SQLite v5, importaciones y exportaciones.
+- Search Lab incorpora un corpus de respuestas externas grabadas y un gate reproducible
+  por fuente e idioma. Distingue si una obra nunca fue devuelta o si Movie Inbox la
+  descarto, sin consultar la red ni usar catalogos personales en CI.
+- La consulta explicita `director:Nombre` y su control visible permiten descubrir la
+  filmografia local y consultar fuentes externas. La coincidencia queda rotulada como
+  direccion y nunca se usa como prueba de identidad, auto-match o merge.
+- `movie-inbox imdb-dataset sync/stats/lookup` descarga de forma opt-in los datasets
+  oficiales no comerciales `title.basics` y `title.akas`, construye un SQLite separado
+  y ofrece consultas de solo lectura con atribucion. No toca el catalogo ni se activa
+  al instalar o arrancar el servidor.
+- Cada biblioteca puede sumar reglas de exclusion tipo glob sobre los defaults seguros,
+  previsualizar el efecto y distinguir archivos recien excluidos de archivos ausentes.
+- El admin puede publicar la disponibilidad confirmada de una biblioteca como coleccion
+  de Club, editar titulo y descripcion y retirarla sin borrar seguidores. La coleccion
+  comparte obras, nunca rutas, nombres de archivo ni estado operativo.
+- Al agregar desde otra fuente, una identidad fuerte puede enriquecer la ficha existente
+  en vez de crear un duplicado. La operacion conserva datos personales, queda en
+  Actividad y puede deshacerse; las coincidencias ambiguas siguen requiriendo revision.
+- Una matriz de autoridad por familia de campo documenta el orden de relleno entre
+  fuentes. Ninguna fuente pisa un valor ya cargado y `locked_fields` mantiene prioridad.
+- El contrato para grupos de tres o mas duplicados y sus casos de caracterizacion dejan
+  preparada la implementacion N-a-1 sin ocultar los limites actuales del flujo por pares.
+
+### Cambiado
+
+- El planificador externo reintenta Wikipedia y FilmAffinity con un numero acotado de
+  aliases confirmados; IMDb tambien puede reconstruir una candidata por ID cuando su
+  endpoint de sugerencias vuelve vacio.
+- Los anos ambiguos dentro del titulo conservan una lectura literal segura: `Verano
+  1993` puede recuperar `Estiu 1993`, mientras `(2017)` sigue funcionando como ano de
+  estreno y los remakes no ganan evidencia automatica incorrecta.
+- La busqueda conserva alfabetos no latinos, reutiliza lecturas de catalogo sin cambios
+  y prefiltra catalogos grandes. El benchmark sintetico de 10.000 obras redujo una
+  consulta exacta de aproximadamente 1,43 s a 0,17 s.
+- El catalogo personal que habia quedado en el historial publico fue purgado de ramas y
+  tags remotos sin leerlo ni borrar la copia local ignorada.
 
 ### Corregido
 
@@ -31,9 +69,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Una ficha `anime` y un resultado externo `película`/`serie` con el mismo
   título y año vuelven a aparecer al comparar como revisión de formato, sin
   convertirse en combinación automática.
-- La búsqueda local reutiliza lecturas de catálogo sin cambios y prefiltra por
-  términos distintivos en catálogos grandes. En el benchmark sintético de
-  10.000 obras, una consulta exacta baja de aproximadamente 1,43 s a 0,17 s.
+- Refinar el texto durante `Comparar` o al buscar una referencia conserva la ficha y el
+  modo originales incluso con cero resultados, reintentos y navegacion atras.
+- El backup de Docker valida permisos con el usuario real del contenedor de mantenimiento
+  en vez de exigir que el runner de CI pueda escribir el directorio `root:root`; el
+  parser de `docker compose config` deja de emitir advertencias por escapes de `awk` y
+  el gate inspecciona el archivo privado desde el propio contenedor de mantenimiento.
 
 ## [0.5.0] - 2026-08-24
 

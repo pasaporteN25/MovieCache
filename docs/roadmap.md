@@ -105,6 +105,26 @@ todavia:
   2026-08-01. Sacarlo de la historia requiere reescribir commits y probablemente un
   force-push — decision de Lucas, no delegable a una tarea de `tareas.md`.
 
+### v0.6.0: descubrimiento multilingue y operacion familiar — publicado 2026-08-31
+
+Cierra el primer tramo de la secuencia priorizada abierta despues de v0.5.0. La
+busqueda puede diagnosticar recuperacion por idioma y fuente sin red, reintenta con
+aliases confirmados, conserva titulos con anos ambiguos y ofrece un modo explicito de
+descubrimiento por director sin convertirlo en evidencia de identidad. El indice local
+oficial de IMDb queda disponible como prototipo opt-in y separado del catalogo real.
+
+En la operacion familiar, las bibliotecas aceptan exclusiones propias y pueden publicar
+su disponibilidad verificada como una coleccion de Club sin exponer rutas ni archivos.
+Agregar desde otra fuente puede enriquecer una identidad fuerte existente con historial
+y deshacer, y la matriz de autoridad deja explicito que ningun proveedor pisa datos ya
+cargados o bloqueados. El contrato para duplicados N-a-1 queda caracterizado, pero su
+implementacion visual sigue fuera del alcance de esta version.
+
+Gate local de salida cumplido el 2026-08-31: 477 pruebas unitarias y 15 pruebas de
+navegador, mas Ruff, formato, mypy estricto, compileall, los dos gates de Search Lab y
+`git diff --check`. El pipeline remoto valida ademas Linux, Windows 3.14, wheel limpio y
+el ciclo Docker completo con estado persistente y backup privado.
+
 ## Implementado en el incremento de descubrimiento y scanner
 
 - Buscar el catalogo personal en el servidor, incluyendo titulos originales,

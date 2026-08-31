@@ -4,7 +4,7 @@ Gestor self-hosted para organizar obras, disponibilidad fisica y memoria persona
 
 ## Estado del proyecto
 
-La version estable actual es **v0.5.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+La version estable actual es **v0.6.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
 
 v0.3.0 cerro el gate de calidad de busqueda (cero falsos positivos conocidos en
 auto-match y merge, con `movie-inbox search-lab run --enforce` como gate real en CI).
@@ -19,8 +19,14 @@ v0.5.0 completa ese cierre: Scanner incorpora actividad y deshacer, Curaduria su
 busqueda y navegacion por teclado, los duplicados quedan diferenciados aun en empates
 extremos y la busqueda externa reconoce titulos multilingues verificados contra el
 mismo identificador de IMDb. El acceso conserva el carnet de videoclub con una
-secuencia de credenciales mas clara y adaptable. Detalle completo de las versiones en
-[CHANGELOG.md](CHANGELOG.md).
+secuencia de credenciales mas clara y adaptable.
+
+v0.6.0 profundiza descubrimiento y operacion familiar: diagnostica regresiones
+multilingues sin red, conserva consultas ambiguas como `Verano 1993`, permite buscar
+por direccion sin usarla como prueba de identidad y suma un prototipo opt-in del indice
+oficial no comercial de IMDb. Las bibliotecas aceptan exclusiones propias y el admin
+puede publicar su disponibilidad como una coleccion de Club sin exponer rutas ni
+archivos. Detalle completo de las versiones en [CHANGELOG.md](CHANGELOG.md).
 
 El paquete instalable y la interfaz web son el camino recomendado. Los lanzadores de
 compatibilidad con v0.1 (`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`,
@@ -85,6 +91,8 @@ movie-inbox cache info --dir .catalog-cache/images
 movie-inbox backup create data --output-dir backups --retention-days 14
 movie-inbox backup verify backups/movie-inbox-instance-20260811-033000Z.tar.gz
 movie-inbox search-lab run --json reports/search-baseline.json --html reports/search-baseline.html
+movie-inbox search-lab external-diagnostics --enforce
+movie-inbox imdb-dataset stats --output-dir data/imdb
 ```
 
 En Windows, si la carpeta `Scripts` de Python no esta en `PATH`, usa la forma equivalente:
@@ -131,6 +139,26 @@ columnas contra la baseline productiva, sin cambiar el comportamiento real de bu
 ```powershell
 movie-inbox search-lab compare --candidate estrategia-candidata.json --html reports/compare.html
 ```
+
+### Indice local opt-in de IMDb
+
+`imdb-dataset` es un prototipo separado del catalogo real. Descarga exclusivamente
+`title.basics` y `title.akas` desde los datasets oficiales no comerciales de IMDb,
+construye un SQLite local y permite medirlo o consultarlo sin escribir fichas ni
+participar de merges:
+
+```powershell
+movie-inbox imdb-dataset sync --output-dir data/imdb --report reports/imdb-sync.json
+movie-inbox imdb-dataset stats --output-dir data/imdb
+movie-inbox imdb-dataset lookup --output-dir data/imdb --title "Heat" --year 1995
+movie-inbox imdb-dataset lookup --output-dir data/imdb --tconst tt0113277
+```
+
+No se descarga durante la instalacion ni al iniciar el servidor. La medicion de
+referencia del 2026-08-29 descargo aproximadamente 704 MB y produjo un indice de
+aproximadamente 8,1 GB en 24 minutos; reservar espacio y ejecutarlo como una tarea de
+mantenimiento. Su uso queda sujeto a las condiciones personales/no comerciales y a la
+atribucion que imprime el propio comando.
 
 ### Primer acceso
 
