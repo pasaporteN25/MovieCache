@@ -35,38 +35,35 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
 ### Frente: Fuentes externas y especializacion de anime
 
-#### [F2] Autoridad de anime sostenible
-- **Decision del owner (2026-08-29)**: Jikan (envoltorio no oficial de MyAnimeList)
-  como fuente primaria en vivo — trade-off consciente y aceptado para un uso
-  personal/no comercial, sin pedir permiso escrito a AniList por ahora.
-  `anime-offline-database` se suma como secundaria: aunque quedo archivada el
-  2026-07-04, su ultimo snapshot sigue siendo util como indice offline (mismo patron
-  que el dataset no comercial de IMDb en [F1]), no como fuente en vivo.
-- **Alcance ampliado respecto del original**: ya no es "elegir una fuente", es componer
-  dos con roles distintos. Antes de programar el adaptador hace falta una pasada de
-  diseño corta (mismo criterio que uso [Q3] para componer IMDb con el puente de
-  Wikidata) que defina: que resuelve cada una (Jikan = busqueda y datos en vivo;
-  `anime-offline-database` = cruce de IDs/aliases o respaldo si Jikan no responde), como
-  se etiqueta la procedencia de cada dato, y que pasa cuando difieren.
-- **Dependencias**: ninguna externa — la eleccion de fuente ya esta decidida. Wikidata
-  multilingue sigue siendo el camino soportado mientras esto no se implemente.
-- **Modelo sugerido**: Grande. Dos fuentes con roles distintos, no un adaptador simple.
+La epica [F2] se divide en tres entregas moderadas: contrato de composicion [F2.1]
+(cerrado), fuente en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
+en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
+queda aislada en [F5]. La numeracion decimal expresa partes de una epica, no una fase
+adicional del roadmap.
 
-#### [F3] Evaluar TMDb como fuente estructurada opcional
-- **Alcance**: revisar licencia, atribucion, limites, uso de API key, campos disponibles
-  e IDs cruzados. Comparar completitud y conflictos contra las fuentes actuales sobre
-  el corpus sintetico, sin enviar catalogos personales.
-- **Criterio de cierre**: ADR con decision integrar/no integrar, matriz de campos y
-  costos operativos; solo si se aprueba, crear una tarea separada de adaptador.
-- **Depende de**: —
-- **Modelo sugerido**: Grande. Requiere investigacion legal y criterio de producto.
+#### [F2.3] Construir indice offline de anime y fallback
+- **Alcance**: comando explicito `sync/stats/lookup` para el ultimo snapshot de
+  `anime-offline-database`, en SQLite separado y reconstruible; indexar `mal_id`, IDs
+  cruzados, titulo y sinonimos. No descargar ni distribuir el snapshot por defecto.
+  Usarlo para completar aliases/IDs y como resultado secundario etiquetado cuando
+  Jikan falla, limita o no encuentra nada; nunca presentar una fila offline como si
+  viniera de Jikan.
+- **Licencia/operacion**: conservar snapshot e indice fuera del catalogo, mostrar
+  atribucion ODbL/DbCL al usar datos y documentar version/fecha del snapshot. El ultimo
+  release conocido (2026-27, 2026-07-04) es finito: no prometer actualidad en vivo.
+- **Criterio de cierre**: build atomico, version de esquema, busqueda multilingue y
+  composicion determinista probadas sin red; casos de Jikan ok/vacio/429/5xx/timeout;
+  estadisticas de tamaño y tiempo con el snapshot real, previa autorizacion si hace
+  falta descargarlo.
+- **Depende de**: [F2.1]; la activacion en producto depende de [F2.2].
+- **Modelo sugerido**: Grande. Indice local, licencia y resiliencia entre dos fuentes.
 
 #### [F4] Permitir API keys opcionales por fuente
 - **Idea del owner (2026-08-29)**: seguir usando fuentes abiertas/sin key como default
-  (Wikipedia, Wikidata, FilmAffinity, IMDb via sugerencias, Jikan) tal como funcionan
-  hoy, pero dejar que quien lo desee sume sus propias API keys para fuentes que las
-  requieren (por ejemplo TMDb, si [F3] se aprueba). Nunca obligar a nadie a crear una
-  cuenta o pagar para usar Movie Inbox.
+  (Wikipedia, Wikidata, FilmAffinity e IMDb via sugerencias; Jikan se suma al cerrar
+  [F2.2]) y dejar que quien lo desee aporte sus propias API keys para fuentes que las
+  requieren (TMDb, aprobado condicionalmente en [F3]). Nunca obligar a nadie a crear
+  una cuenta o pagar para usar Movie Inbox.
 - **Alcance a definir**: donde se guardan las keys (por instancia, por miembro), como
   se habilita/deshabilita una fuente segun haya o no key configurada, que pasa con el
   catalogo si se borra una key despues de enriquecer datos con ella, y como esto
@@ -76,6 +73,26 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
   integrar TMDb (esa fuente no funciona sin key).
 - **Modelo sugerido**: sin definir todavia — pendiente de un analisis de diseño previo.
   Prioridad baja, al final de la cola de este frente.
+
+#### [F5] Integrar TMDb como fuente estructurada opt-in
+- **Decision de [F3]**: integrar, pero nunca como requisito ni fuente activa por
+  defecto. La instancia sin key conserva exactamente las fuentes actuales. Con key,
+  TMDb complementa identidad, titulos/traducciones, imagenes, datos estructurados y
+  creditos; Wikipedia conserva prioridad para descripciones e IMDb para los datos que
+  [Q5] ya le asigna.
+- **Alcance**: adaptador movie/TV con busqueda y detalle bajo demanda, IDs externos,
+  traducciones, creditos e imagenes. Usar el menor numero de requests posible y no
+  copiar `vote_average` a `rating`. Toda contribucion persistida lleva procedencia
+  `tmdb`, para poder auditarla y purgarla si se retira la key o terminan los terminos.
+- **Cumplimiento**: key por instancia via [F4], atribucion y logo exigidos en la UI,
+  aviso de no-endorsement, cache muy por debajo de seis meses, `429`/backoff y una
+  operacion documentada para dejar de usar y retirar contenido TMDb.
+- **Criterio de cierre**: respuestas grabadas sin secretos y pruebas sobre `Addio Zio
+  Tom`, `Fanny & Alexander`, `Verano 1993 (2017)` y un homonimo movie/TV; validar con
+  una key voluntaria que busqueda original/traducida/alternativa y los IDs cruzados se
+  comportan como documenta la API. Sin key, cero llamadas y cero degradacion.
+- **Depende de**: [F4].
+- **Modelo sugerido**: Grande. Adaptador, secretos, cumplimiento, persistencia y UI.
 
 ### Frente: Bibliotecas y curaduria
 
@@ -172,11 +189,154 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
 ## En curso
 
-*(vacío)*
+### Frente: Fuentes externas y especializacion de anime
+
+#### [F2.2] Integrar Jikan como fuente de anime en vivo
+- **Alcance**: incorporar `mal_id` y `myanimelist_url` como identidad persistente
+  (modelo, JSON, SQLite, import/export, privacidad y comparador), implementar busqueda
+  `/anime` y detalle bajo demanda, y sumar una estanteria Jikan distinguible en la UI.
+  No consultar detalle ni staff para cada candidato: busqueda liviana primero; al elegir
+  uno, detalle y staff dentro de un presupuesto acotado.
+- **Avance 2026-08-31**: `external/jikan.py` contiene el adaptador de busqueda y parser
+  de detalle aislados, todavia sin registrarlos. Valida filas no confiables, conserva
+  identidad MAL, deduplica titulos/sinonimos, normaliza fecha/generos/productores y
+  excluye deliberadamente score, ranking y duracion por episodio. Siete pruebas sin
+  red cubren mapeo, Unicode, año alternativo, URL hostil, seleccion bajo demanda y la
+  prohibicion de convertir `director:X` en una consulta de titulo.
+- **Por que aun no esta activo**: el modelo actual solo reconoce Wikipedia, IMDb y
+  FilmAffinity como links persistentes. Registrar Jikan ahora mostraria resultados
+  que perderian `mal_id`/`myanimelist_url` al guardarse y caerian falsamente en
+  Curaduria como “sin link”. El siguiente corte es migrar esa identidad de punta a
+  punta; recien despues se registra el adaptador y se toca la UI.
+- **Reglas heredadas de [F2.1]**: `kind=anime`; nunca copiar `score` a `rating`; Jikan
+  llena campos vacios pero no pisa ediciones manuales/bloqueadas; `mal_id` compartido
+  puede ser evidencia fuerte, uno divergente nunca se resuelve por titulo solamente.
+  Respetar `429`/`Retry-After`, timeout y cooldown por fuente; no ocultar una caida como
+  una busqueda vacia.
+- **Criterio de cierre restante**: contrato HTTP/health/cache, migraciones redondas
+  JSON↔SQLite y prueba de navegador de buscar/seleccionar/agregar. Smoke live no
+  obligatorio y fuera del gate.
+- **Verificacion del corte**: 484 tests, Ruff, formato, mypy estricto, `compileall` y
+  `git diff --check` en verde.
+- **Depende de**: [F2.1] (cerrado).
+- **Modelo sugerido**: Grande. Cruza identidad, persistencia, red y frontend.
 
 ## Hecho
 
 ### Frente: Busqueda, comparacion y composicion de fuentes
+
+#### [F2.1] Definir composicion, identidad y autoridad para anime
+La decision del owner del 2026-08-29 se conserva: Jikan es la opcion primaria aceptada
+para uso personal/no comercial, sin pedir permiso escrito a AniList por ahora, y
+`anime-offline-database` es secundaria. La epica no era una sola tarea: faltaba el
+contrato que evita mezclar dos bases con edades y semanticas distintas. Queda cerrado
+asi:
+
+1. **Roles**. Jikan es la fuente primaria de busqueda y metadata en vivo. Se consulta
+   `/anime` para candidatos y solo despues de una seleccion se habilitan detalle y
+   staff; no se multiplica el costo por cada tarjeta. `anime-offline-database` es un
+   indice secundario local: aporta aliases e IDs cruzados, y puede responder con su
+   propia procedencia cuando Jikan esta caido, limitado o no encuentra nada. Una fila
+   offline nunca se rotula `jikan`.
+2. **Identidad**. [F2.2] agregara dos campos canonicos: `mal_id` y
+   `myanimelist_url`. Un `mal_id` compartido es evidencia fuerte de identidad; dos IDs
+   MAL distintos son un conflicto y nunca se fusionan automaticamente solo por titulo
+   y año. Direccion/staff sigue siendo descubrimiento, no identidad, igual que [Q4].
+3. **Mapeo Jikan**. `title`/`title_japanese`/`title_english`, `titles` y `synonyms`
+   alimentan titulo, original, ingles y aliases; no se inventa un titulo español si la
+   respuesta no lo declara. `year` o `aired.from`, `synopsis`, imagen, generos y
+   productores llenan sus equivalentes; `kind` es `anime`. `score`, `rank`,
+   popularidad, episodios y duracion por episodio no se copian a `rating` ni a
+   `duration_minutes`: esos campos locales tienen otra semantica. Staff puede aportar
+   direccion solo en el detalle elegido.
+4. **Autoridad/conflictos**. Se conserva la decision de [Q5]: autoridad significa
+   orden de relleno, no sobreescritura. Manual/`locked_fields` gana siempre; Jikan
+   llena vacios; el snapshot offline solo completa vacios, une aliases/IDs compatibles
+   y nunca pisa a Jikan. Cada campo guarda la fuente y URL reales en
+   `metadata_sources`. Un conflicto de identidad queda para Comparar/Curaduria.
+5. **Resiliencia**. `429` respeta `Retry-After`; timeout/5xx abren cooldown visible en
+   health y habilitan fallback si existe indice. Una respuesta vacia exitosa se
+   distingue de un error: el indice puede buscar aliases, pero no cambia el estado de
+   Jikan. Sin indice configurado, la app se degrada a las fuentes actuales.
+6. **Licencia/atribucion**. Jikan se declara no oficial, no afiliado a MyAnimeList y
+   responsabiliza al consumidor por respetar sus terminos; no se usaran rutas
+   autenticadas. `anime-offline-database` esta bajo ODbL 1.0/DbCL 1.0: snapshot e
+   indice quedan separados, reconstruibles y no empaquetados; la UI/CLI muestra
+   atribucion al presentar sus datos. Esto es una restriccion de producto, no una
+   opinion legal sobre usos futuros.
+
+Fuentes verificadas el 2026-08-31: [README oficial de Jikan](https://github.com/jikan-me/jikan-rest/blob/master/README.MD),
+[OpenAPI v4](https://raw.githubusercontent.com/jikan-me/jikan-rest/master/storage/api-docs/api-docs.json),
+[README del snapshot](https://github.com/manami-project/anime-offline-database),
+[licencia](https://github.com/manami-project/anime-offline-database/blob/master/LICENSE)
+y [ultimo release](https://github.com/manami-project/anime-offline-database/releases/tag/2026-27).
+El ultimo snapshot declara 41.537 entradas y 65% revisadas; el repo fue archivado el
+2026-07-04, por eso es respaldo finito y no autoridad viva. Una consulta live de
+control a Jikan devolvio `504` porque no pudo conectar con MyAnimeList: evidencia
+concreta de que [F2.3] no es optimizacion prematura. Cierre de diseño, sin tocar aun
+modelo, red ni UI; esas responsabilidades quedan separadas en [F2.2]/[F2.3].
+2026-08-31.
+
+#### [F3.1] Evaluar terminos y costo operativo de TMDb
+TMDb es viable para esta app personal solo como fuente opcional. Requiere token/API
+key; el uso no comercial puede usar la API sujeto a sus terminos, mientras que el
+comercial necesita acuerdo escrito separado. La UI que consuma datos debe mostrar el
+logo y el aviso prominente exigido: “This product uses TMDB and the TMDB APIs but is
+not endorsed, certified, or otherwise approved by TMDB.” Los datos cacheados no
+pueden conservarse mas de seis meses y, al terminar el uso, hay que dejar de llamar y
+retirar el contenido sujeto a esos terminos. El cache de busqueda actual (15 minutos)
+entra holgadamente, pero una ficha
+persistida exige procedencia y una via de purga; no alcanza con llamarla “cache”.
+
+El limite legacy de 40 requests cada 10 segundos ya no es el contrato; la
+documentacion publica describe un techo aproximado de 40 requests por segundo que
+puede cambiar, exige respetar `429` y recomienda backoff. El costo funcional se acota
+con busqueda liviana y detalle bajo demanda, usando `append_to_response` cuando
+corresponda. Una key nunca viaja al navegador, logs, export ni respuestas grabadas.
+
+Fuentes oficiales verificadas el 2026-08-31: [terminos de API](https://www.themoviedb.org/api-terms-of-use),
+[autenticacion](https://developer.themoviedb.org/v4/docs/authentication-application) y
+[rate limiting](https://developer.themoviedb.org/docs/rate-limiting). Decision:
+**apto con condiciones**, nunca default; [F4] debe resolver secretos/activacion antes
+de implementar [F5]. Investigacion de terminos, no asesoramiento legal.
+2026-08-31.
+
+#### [F3.2] Comparar campos y decidir la integracion de TMDb
+La evaluacion se hizo contra el contrato sintetico del proyecto, sin catalogos
+personales ni una key prestada. La matriz resultante es:
+
+| Familia | Aporte TMDb | Autoridad/transformacion acordada |
+| --- | --- | --- |
+| Identidad | `id`, IMDb y Wikidata externos | `tmdb_id` propio; IDs cruzados validan, uno divergente bloquea auto-merge |
+| Titulos | original, localizado, traducciones y alternativos | une aliases; IMDb/Wikipedia conservan el orden de [Q5]; nunca traduce texto libre |
+| Descripcion | `overview` localizado | Wikipedia primero; TMDb solo llena vacio antes del snippet IMDb/FilmAffinity |
+| Estructurados | fecha, runtime, generos, pais e idioma original | normalizar vocabularios; llena vacios, no pisa manual ni `locked_fields` |
+| Creditos | cast y crew con roles | mapear roles conocidos; personas nunca son evidencia de identidad |
+| Imagenes | poster y backdrop por idioma/tamaño | candidato principal para `backdrop_image`; conservar URL/procedencia TMDb |
+| Puntaje publico | `vote_average`/conteo | fuera de alcance: nunca se copia al `rating` personal |
+
+La API documenta busqueda por titulos originales, traducidos y alternativos; detalle
+localizable, traducciones, creditos e IDs externos cubren huecos reales de las fuentes
+actuales. Referencias: [busqueda de peliculas](https://developer.themoviedb.org/reference/search-movie),
+[idiomas](https://developer.themoviedb.org/docs/languages),
+[detalle](https://developer.themoviedb.org/reference/movie-details),
+[traducciones](https://developer.themoviedb.org/reference/movie-translations),
+[creditos](https://developer.themoviedb.org/reference/movie-credits) e
+[IDs externos](https://developer.themoviedb.org/reference/movie-external-ids).
+
+Corpus de aceptacion transferido a [F5]: `Addio Zio Tom` prueba original/aliases e ID
+IMDb; `Fanny & Alexander`, equivalencia de `&`/`and`; `Verano 1993 (2017)`, que el año
+interno del titulo no desplace al año de estreno; y un homonimo movie/TV, que el tipo
+no se pierda. [Q2]-[Q3] ya resolvieron localmente las dos primeras formas de variacion
+y [Q4] la ambiguedad del año; TMDb debe recibir titulo/año/idioma estructurados y no
+reimplementar ese parser. No se hizo una llamada live porque toda llamada exige key:
+la comprobacion empirica queda como criterio de [F5], despues de [F4], con respuestas
+grabadas sin secretos.
+
+**ADR**: integrar TMDb de forma opt-in mediante [F5]. No reemplaza a las tres fuentes
+actuales ni a [F2]; complementa campos con la politica fill-only de [Q5]. Esta decision
+cierra [F3] y separa correctamente investigacion de implementacion.
+2026-08-31.
 
 #### [Q1] Mantener el contexto al refinar una busqueda de Comparar
 `runSearch()` ahora ramifica por `collectionSearchMode` antes de resetear nada: en
