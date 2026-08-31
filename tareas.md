@@ -40,7 +40,8 @@ La epica [F2] se divide en tres entregas moderadas: contrato de composicion [F2.
 en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
 queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
 ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
-de una epica, no una fase adicional del roadmap.
+de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
+consulta [F5.1] (cerrado), identidad/retirada [F5.2] y cumplimiento/UX [F5.3].
 
 #### [F2.3] Construir indice offline de anime y fallback
 - **Alcance**: comando explicito `sync/stats/lookup` para el ultimo snapshot de
@@ -59,25 +60,30 @@ de una epica, no una fase adicional del roadmap.
 - **Depende de**: [F2.1]; la activacion en producto depende de [F2.2].
 - **Modelo sugerido**: Grande. Indice local, licencia y resiliencia entre dos fuentes.
 
-#### [F5] Integrar TMDb como fuente estructurada opt-in
-- **Decision de [F3]**: integrar, pero nunca como requisito ni fuente activa por
-  defecto. La instancia sin key conserva exactamente las fuentes actuales. Con key,
-  TMDb complementa identidad, titulos/traducciones, imagenes, datos estructurados y
-  creditos; Wikipedia conserva prioridad para descripciones e IMDb para los datos que
-  [Q5] ya le asigna.
-- **Alcance**: adaptador movie/TV con busqueda y detalle bajo demanda, IDs externos,
-  traducciones, creditos e imagenes. Usar el menor numero de requests posible y no
-  copiar `vote_average` a `rating`. Toda contribucion persistida lleva procedencia
-  `tmdb`, para poder auditarla y purgarla si se retira la key o terminan los terminos.
-- **Cumplimiento**: key por instancia via [F4], atribucion y logo exigidos en la UI,
-  aviso de no-endorsement, cache muy por debajo de seis meses, `429`/backoff y una
-  operacion documentada para dejar de usar y retirar contenido TMDb.
-- **Criterio de cierre**: respuestas grabadas sin secretos y pruebas sobre `Addio Zio
-  Tom`, `Fanny & Alexander`, `Verano 1993 (2017)` y un homonimo movie/TV; validar con
-  una key voluntaria que busqueda original/traducida/alternativa y los IDs cruzados se
-  comportan como documenta la API. Sin key, cero llamadas y cero degradacion.
-- **Depende de**: [F4].
-- **Modelo sugerido**: Grande. Adaptador, secretos, cumplimiento, persistencia y UI.
+#### [F5.2] Integrar identidad, procedencia y retirada de datos TMDb
+- **Alcance**: persistir `tmdb_id` como identidad fuerte de movie/TV; un ID compartido
+  valida y dos IDs distintos bloquean auto-merge. Incorporar IDs externos, traducciones,
+  creditos, imagenes y datos estructurados bajo la politica fill-only de [Q5]. Cada
+  campo aportado conserva procedencia `tmdb`; nunca copiar `vote_average` a `rating`.
+- **Retirada**: implementar preview y purga explicita/auditable de contribuciones TMDb
+  al retirar la key o terminar los terminos. Nunca borrar ediciones manuales, campos
+  bloqueados ni valores respaldados tambien por otra fuente.
+- **Criterio de cierre**: pruebas JSON/SQLite/import-export, matching y conflictos de
+  identidad, merge con `locked_fields`, preview, purga y rollback.
+- **Depende de**: [F5.1].
+- **Modelo sugerido**: Grande. Identidad y operacion potencialmente destructiva.
+
+#### [F5.3] Exponer TMDb con cumplimiento, resiliencia y validacion real
+- **Alcance**: mostrar la estanteria y health de TMDb solo cuando este configurado;
+  atribucion/logo y aviso de no-endorsement exigidos, imagenes permitidas y estado
+  comprensible para el owner. Respetar `429`/`Retry-After`, backoff/cooldown y mantener
+  el cache muy por debajo de seis meses.
+- **Validacion**: respuestas grabadas sin secretos y smoke voluntario con key sobre
+  `Addio Zio Tom`, `Fanny & Alexander`, `Verano 1993 (2017)` y un homonimo movie/TV;
+  comprobar titulos originales/traducidos/alternativos e IDs cruzados. Sin key, cero
+  llamadas, cero estanteria fantasma y cero degradacion.
+- **Depende de**: [F5.1] y [F5.2].
+- **Modelo sugerido**: Grande. Frontend, terminos, rate limit y evidencia live.
 
 ### Frente: Bibliotecas y curaduria
 
@@ -369,8 +375,43 @@ token con newline final, ausencia, vacio, multilinea, tamaño excesivo, `repr` y
 sin filtraciones, mas contrato del overlay. Verificado junto al gate completo: 494
 pruebas unitarias, Ruff, formato, mypy estricto, `compileall` y `git diff --check`.
 Docker Compose no estaba instalado en el host de trabajo, por lo que el `config` real
-del overlay queda como smoke de [F5]/CI antes de usar una credencial voluntaria.
+del overlay queda como smoke de [F5.3]/CI antes de usar una credencial voluntaria.
 2026-08-31, commit `96f07fb`.
+
+#### [F5.1] Implementar el nucleo opt-in de TMDb
+El gateway se configura al crear la app: sin API Read Access Token conserva exactamente
+Wikipedia, IMDb, FilmAffinity y Jikan; con token agrega `TmdbAdapter` y su entrada de
+health. El secreto queda en memoria del servidor, fuera del `repr`, y se envia solamente
+como `Authorization: Bearer`; nunca forma parte de URL, respuesta, cache key o log.
+
+La busqueda usa una sola llamada `/search/multi`, filtra personas y mantiene movie/TV
+como `pelicula`/`serie`. Un `tt...` usa `/find?external_source=imdb_id` y conserva el
+vinculo IMDb como evidencia para que el ranking no descarte una respuesta sin titulo
+parecido al identificador. Una URL TMDb directa se valida por esquema, host exacto y
+ruta `/movie|tv/{id}`. El detalle se pide solo al seleccionar y agrupa en una llamada
+`append_to_response`: traducciones, titulos alternativos, creditos, IDs externos,
+fechas e imagenes. Mapea `tmdb_id`, IMDb/Wikidata, runtime solo de peliculas, pais,
+idioma original, generos, direccion, guion, produccion, musica, reparto, poster y
+backdrop; ignora deliberadamente `vote_average`/popularidad y nunca toca `rating`.
+
+El corpus sin red cubre `Addio Zio Tom`, `Fanny & Alexander`, `Verano 1993`, `Verano
+1993 (2017)`, un homonimo movie/TV, busqueda por IMDb ID y detalle de ambos tipos. En el
+camino se corrigio el parser compartido: `Verano 1993 (2017)` dejaba el titulo espurio
+`Verano 1993 ()`; ahora conserva `Verano 1993` y separa `2017` para el ranking. El host
+publico TMDb y `image.tmdb.org` quedaron en sus allowlists; la materializacion inicial
+ya conserva procedencia `tmdb`, mientras las reglas fuertes de conflicto/purga siguen
+aisladas en [F5.2].
+
+Contrato contrastado el 2026-08-31 con documentacion oficial:
+[autenticacion](https://developer.themoviedb.org/docs/authentication-application),
+[multi search](https://developer.themoviedb.org/reference/search-multi),
+[find](https://developer.themoviedb.org/docs/finding-data),
+[detalle de peliculas](https://developer.themoviedb.org/reference/movie-details) y
+[detalle de series](https://developer.themoviedb.org/reference/tv-series-details).
+No hubo key ni llamada live: capturas reales, atribucion visual, `429` y smoke del
+corpus pertenecen expresamente a [F5.3]. Verificado con 506 pruebas unitarias, Ruff,
+formato, mypy estricto, `compileall` y `git diff --check`.
+2026-08-31, commit `cbc5dc7`.
 
 #### [Q1] Mantener el contexto al refinar una busqueda de Comparar
 `runSearch()` ahora ramifica por `collectionSearchMode` antes de resetear nada: en
