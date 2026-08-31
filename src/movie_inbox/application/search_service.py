@@ -173,6 +173,8 @@ def group_external_results(results: Sequence[Mapping[str, Any]]) -> dict[str, li
         "wikipedia": [],
         "imdb": [],
         "filmaffinity": [],
+        "jikan": [],
+        "tmdb": [],
     }
     for result in results:
         source = str(result.get("source") or "").casefold()

@@ -7,9 +7,24 @@ from typing import Any
 from movie_inbox.application.external_service import ExternalCatalogService
 from movie_inbox.domain.models import ExternalSearchResult
 from movie_inbox.external.metadata import fetch_metadata, fetch_metadata_by_title
-from movie_inbox.external.registry import EXTERNAL_SOURCES
+from movie_inbox.external.registry import ExternalSourceService, default_source_adapters
 
+EXTERNAL_SOURCES = ExternalSourceService()
 EXTERNAL_CATALOG = ExternalCatalogService(EXTERNAL_SOURCES, fetch_metadata)
+
+
+def configure_external_catalog(tmdb_read_access_token: str = "") -> None:
+    """Configure the process-wide gateway once for this single-worker app."""
+
+    global EXTERNAL_CATALOG, EXTERNAL_SOURCES
+    EXTERNAL_SOURCES = ExternalSourceService(default_source_adapters(tmdb_read_access_token))
+    EXTERNAL_CATALOG = ExternalCatalogService(
+        EXTERNAL_SOURCES,
+        lambda url: fetch_metadata(
+            url,
+            tmdb_read_access_token=tmdb_read_access_token,
+        ),
+    )
 
 
 def search_external_sources(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from collections.abc import Mapping
 
 from movie_inbox.external import common as external_common
 from movie_inbox.external import filmaffinity as external_filmaffinity
@@ -152,7 +153,12 @@ class RecordLiveResponsesTests(unittest.TestCase):
         # Stand in for "the real network" with our own stub, patched before
         # record_live_responses() captures its reference to the current
         # fetch_text -- this test never touches the actual network.
-        def fake_fetch_text(url: str, accept: str = "", timeout: float = 0) -> str:
+        def fake_fetch_text(
+            url: str,
+            accept: str = "",
+            timeout: float = 0,
+            headers: Mapping[str, str] | None = None,
+        ) -> str:
             return json.dumps(IMDB_SUGGESTION_BODY)
 
         external_common.fetch_text = fake_fetch_text

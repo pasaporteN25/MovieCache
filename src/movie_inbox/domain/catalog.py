@@ -41,6 +41,7 @@ EXTERNAL_LINK_HOSTS = {
     "imdb": "imdb.com",
     "filmaffinity": "filmaffinity.com",
     "jikan": "myanimelist.net",
+    "tmdb": "themoviedb.org",
 }
 COVERAGE_LINK_SOURCES = ("wikipedia", "imdb", "filmaffinity")
 SOURCE_URL_FIELDS = {

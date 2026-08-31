@@ -21,6 +21,7 @@ from movie_inbox.domain.titles import (
 from movie_inbox.external.filmaffinity import fetch_filmaffinity_metadata
 from movie_inbox.external.imdb import fetch_wikipedia_by_imdb_id, imdb_id_from_text
 from movie_inbox.external.jikan import fetch_jikan_metadata
+from movie_inbox.external.tmdb import fetch_tmdb_metadata
 from movie_inbox.external.wikidata import fetch_wikidata_metadata
 from movie_inbox.external.wikipedia import (
     fetch_wikipedia_by_title,
@@ -59,8 +60,11 @@ class MetadataParser(HTMLParser):
         return clean_title(" ".join(self.title_parts))
 
 
-def fetch_metadata(url: str) -> dict[str, Any]:
-    if external_source_name(url) == "jikan":
+def fetch_metadata(url: str, *, tmdb_read_access_token: str = "") -> dict[str, Any]:
+    detected_source = external_source_name(url)
+    if detected_source == "tmdb":
+        return fetch_tmdb_metadata(url, tmdb_read_access_token)
+    if detected_source == "jikan":
         return fetch_jikan_metadata(url)
 
     wikipedia_metadata = fetch_wikipedia_metadata(url)
@@ -74,7 +78,7 @@ def fetch_metadata(url: str) -> dict[str, Any]:
             wikidata_metadata["imdb_url"] = f"https://www.imdb.com/title/{imdb_id}/"
             return wikidata_metadata
 
-    if external_source_name(url) == "filmaffinity":
+    if detected_source == "filmaffinity":
         filmaffinity_metadata = fetch_filmaffinity_metadata(url)
         if filmaffinity_metadata:
             return filmaffinity_metadata

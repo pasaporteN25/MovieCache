@@ -5,14 +5,22 @@ from __future__ import annotations
 import html
 import json
 import re
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-def fetch_json(url: str, timeout: float = 8) -> dict[str, Any]:
-    raw = json.loads(fetch_text(url, accept="application/json", timeout=timeout) or "{}")
+def fetch_json(
+    url: str,
+    timeout: float = 8,
+    headers: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    fetch_options: dict[str, Any] = {"accept": "application/json", "timeout": timeout}
+    if headers is not None:
+        fetch_options["headers"] = headers
+    raw = json.loads(fetch_text(url, **fetch_options) or "{}")
     return raw if isinstance(raw, dict) else {}
 
 
@@ -27,13 +35,16 @@ def fetch_text(
     url: str,
     accept: str = "text/html,application/xhtml+xml",
     timeout: float = 8,
+    headers: Mapping[str, str] | None = None,
 ) -> str:
+    request_headers = {
+        "User-Agent": "MovieInbox/0.2 (+local personal catalog)",
+        "Accept": accept,
+    }
+    request_headers.update(headers or {})
     request = Request(
         url,
-        headers={
-            "User-Agent": "MovieInbox/0.2 (+local personal catalog)",
-            "Accept": accept,
-        },
+        headers=request_headers,
     )
     with urlopen(request, timeout=timeout) as response:
         charset = response.headers.get_content_charset() or "utf-8"

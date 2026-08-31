@@ -14,6 +14,7 @@ DEFAULT_IMAGE_ALLOWED_HOSTS = (
     "images.filmaffinity.com",
     "pics.filmaffinity.com",
     "cdn.myanimelist.net",
+    "image.tmdb.org",
 )
 
 

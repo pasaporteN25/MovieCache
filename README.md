@@ -535,9 +535,13 @@ TMDb es una integracion distinta de IMDb y permanece desactivada por defecto. La
 configuracion opt-in acepta un API Read Access Token unicamente desde un archivo del
 servidor mediante `--tmdb-read-access-token-file` o
 `MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE`; nunca acepta el secreto como argumento
-literal, dato del navegador o campo del catalogo. Este corte prepara la activacion
-segura; el adaptador que hara consultas y aprovechara los IDs cruzados pertenece a
-[F5]. En Docker se usa el overlay y el procedimiento de [docs/docker.md](docs/docker.md).
+literal, dato del navegador o campo del catalogo. Con token, el nucleo [F5.1] registra
+un adaptador server-side: una busqueda multi separa peliculas/series, un ID IMDb usa
+`/find` y el detalle seleccionado agrupa traducciones, aliases, creditos, IDs externos
+e imagenes en una sola respuesta ampliada. Sin token, TMDb no aparece en el registry ni
+en health y no recibe llamadas. La estanteria, atribucion y operacion de retirada siguen
+en [F5.2]-[F5.3]. En Docker se usa el overlay y el procedimiento de
+[docs/docker.md](docs/docker.md).
 
 ```powershell
 movie-inbox serve catalog_wiki_v5.json --write-json catalog_wiki_v5.json

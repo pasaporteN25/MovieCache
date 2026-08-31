@@ -160,6 +160,11 @@ def external_result_score(
     result_url = canonical_url(str(result.get("url") or ""))
     if intent.canonical_url and result_url == intent.canonical_url:
         return 140.0
+    if intent.external_id and any(
+        intent.external_id in str(result.get(field) or "").casefold()
+        for field in ("url", "imdb_url", "wikidata_id", "tmdb_id", "mal_id")
+    ):
+        return 140.0
 
     title_query = intent.title_key or search_key(intent.external_id) or intent.key
     score = _score_title_and_year(title_query, intent.year, result, strategy)
@@ -224,6 +229,7 @@ def _split_disambiguating_year(title: str) -> tuple[str, str, bool]:
         return "", title, False
     year = candidate.group(1)
     split_title = title[: candidate.start()] + title[candidate.end() :]
+    split_title = re.sub(r"\(\s*\)", " ", split_title)
     return year, split_title, len(matches) == 1
 
 

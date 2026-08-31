@@ -83,7 +83,7 @@ docker compose -f compose.yaml -f compose.tmdb.example.yaml up -d
 
 El archivo se monta como secret de solo lectura; el token no viaja al navegador, no se
 imprime y no se guarda en SQLite ni en los catalogos. Quitar el overlay y recrear el
-contenedor desactiva TMDb. Los datos que TMDb aporte en [F5] conservaran procedencia y
+contenedor desactiva TMDb. Los datos que TMDb aporte desde [F5.2] conservaran procedencia y
 no se borraran silenciosamente al desactivar la fuente: la retirada sera una operacion
 explicita para no destruir correcciones o campos bloqueados del usuario.
 

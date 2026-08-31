@@ -58,7 +58,7 @@ class ExternalCatalogService:
         detected_source = external_source_name(result_url)
         source = str(enriched.get("source") or detected_source)
         if (
-            source not in {"wikipedia", "imdb", "filmaffinity", "jikan"}
+            source not in {"wikipedia", "imdb", "filmaffinity", "jikan", "tmdb"}
             or source != detected_source
         ):
             return cast(ExternalSearchResult, enriched)

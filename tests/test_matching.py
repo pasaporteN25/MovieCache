@@ -111,6 +111,8 @@ class MatchingTests(unittest.TestCase):
             external_source_name("https://myanimelist.net/anime/32281/Kimi_no_Na_wa"), "jikan"
         )
         self.assertEqual(external_source_name("https://myanimelist.net.example/anime/32281"), "")
+        self.assertEqual(external_source_name("https://www.themoviedb.org/movie/48691"), "tmdb")
+        self.assertEqual(external_source_name("https://themoviedb.org.example/movie/48691"), "")
 
     def test_mal_identity_is_canonicalized_without_changing_three_source_coverage(self) -> None:
         item = normalize_item(

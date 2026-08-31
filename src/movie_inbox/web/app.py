@@ -36,6 +36,7 @@ from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.curation_history import MemoryCurationHistoryRepository
+from movie_inbox.infrastructure.external_catalog import configure_external_catalog
 from movie_inbox.infrastructure.home_snapshot_repository import SqliteHomeSnapshotRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import parse_import_content
@@ -92,6 +93,7 @@ STATIC_CACHE_CONTROL = "public, max-age=3600, must-revalidate"
 def create_app(config: ViewerConfig) -> FastAPI:
     if not config.instance_db:
         raise RuntimeError("ViewerConfig.instance_db is required")
+    configure_external_catalog(config.external_credentials.tmdb_read_access_token)
     instance_db = Path(config.instance_db)
     identity_repository = SqliteIdentityRepository(instance_db)
     identity_repository.initialize()

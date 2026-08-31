@@ -67,7 +67,7 @@ class ParseSearchQueryYearTests(unittest.TestCase):
     def test_a_parenthesized_year_disambiguates_a_year_shaped_title_token(self) -> None:
         intent = parse_search_query("Verano 1993 (2017)")
 
-        self.assertIn("1993", intent.title)
+        self.assertEqual(intent.title, "Verano 1993")
         self.assertEqual(intent.year, "2017")
         # Two year-shaped tokens: the last one is unambiguously the
         # disambiguator, so there's nothing for an alternate reading to add.
@@ -75,6 +75,14 @@ class ParseSearchQueryYearTests(unittest.TestCase):
 
 
 class ExternalResultScoreStrategyTests(unittest.TestCase):
+    def test_an_external_id_match_is_admitted_without_title_text(self) -> None:
+        result = {
+            "title": "Adiós, tío Tom",
+            "imdb_url": "https://www.imdb.com/title/tt0180396/",
+        }
+
+        self.assertEqual(external_result_score("tt0180396", result), 140.0)
+
     def test_a_lighter_year_mismatch_penalty_keeps_a_wrong_year_result_above_the_floor(
         self,
     ) -> None:
