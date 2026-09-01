@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:movie-inbox:schema:public-presentation:1",
+  "title": "Movie Inbox public presentation v1",
+  "description": "Closed, deliberately minimal payload for an opt-in public availability presentation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "presentation", "items"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "description"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["position", "title", "kind"],
+        "properties": {
+          "position": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "original_title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "year": {
+            "type": "integer",
+            "minimum": 1800,
+            "maximum": 3000
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "genres": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          }
+        }
+      }
+    }
+  }
+}

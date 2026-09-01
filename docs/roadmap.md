@@ -241,7 +241,9 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 
 ### 3. Superficie publica y operacion
 
-1. [W1] Contrato y threat model de presentacion publica opt-in.
+1. **Cerrado 2026-09-01.** [W1] fijo el contrato y threat model de presentacion
+   publica opt-in: una capacidad opaca de solo lectura, snapshot minimo, sin cache de
+   contenido y separada de Club/sesiones privadas. Ver ADR-0001 y esquema v1.
 2. [W2] Landing publica aislada de sesiones y endpoints privados.
 3. [D1] HTTPS guiado mediante reverse proxy soportado.
 4. [W3] Diseno de paquetes/sincronizacion entre homeservers sin servicio central

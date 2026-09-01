@@ -20,6 +20,22 @@ explicita diga lo contrario. Una tarea bloqueada por una decision externa no det
 cola: se documenta aca y se toma la siguiente accionable. Los conteos de errores son una
 foto diagnostica, no un criterio estable entre versiones de herramientas.
 
+## Resumen operativo
+
+| Orden | Tarea | Resultado esperado | Dependencia |
+| --- | --- | --- | --- |
+| 1 | [W2] | Landing publica opt-in aislada | W1 cerrado |
+| 2 | [D1] | Guia HTTPS/reverse proxy segura | — |
+| 3 | [W3] | Diseno de paquetes entre homeservers | W1 + contrato portable |
+| 4 | [A1] | API versionada para dispositivos | D1 |
+| 5 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
+| 6 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+
+- **En curso:** ninguna tarea.
+- **Cerrado recientemente:** [C2] y [W1]. El detalle verificable permanece en `Hecho`.
+- **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
+  pruebas y commits sin mezclarlo con la cola.
+
 ### Frente: Busqueda, comparacion y composicion de fuentes
 
 Diagnostico del 2026-08-26: la busqueda local principal usa titulos, aliases, IDs y
@@ -46,20 +62,12 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 
 ### Frente: Superficie publica y despliegue
 
-#### [W1] Definir contrato de presentacion publica
-- **Alcance**: decidir landing estatica o endpoint de solo lectura, campos permitidos,
-  cache, revocacion, rate limit y aislamiento respecto de sesiones/CSRF privados.
-- **Criterio de cierre**: ADR, esquema versionado y threat model; ningun catalogo se
-  publica por defecto.
-- **Depende de**: [T4].
-- **Modelo sugerido**: Grande. Define una nueva frontera de confianza.
-
 #### [W2] Implementar landing publica opt-in
 - **Alcance**: construir la presentacion aprobada en [W1] sin reutilizar endpoints ni
   tokens privados; controles owner para activar, previsualizar y revocar.
 - **Criterio de cierre**: pruebas de aislamiento/autorizacion/cache y aceptacion visual
   responsive; instancia nueva permanece privada.
-- **Depende de**: [W1].
+- **Depende de**: [W1.1], [W1.2], [W1.3].
 - **Modelo sugerido**: Grande. Backend, seguridad y frontend publico.
 
 #### [D1] Documentar HTTPS guiado para homeservers
@@ -75,7 +83,7 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
   conflictos, revocacion y privacidad. No asumir un servicio central.
 - **Criterio de cierre**: ADR y prototipo descartable sin red publica involuntaria;
   implementacion productiva queda como tarea posterior.
-- **Depende de**: [W1] y contrato portable estable.
+- **Depende de**: [W1.1], [W1.2], [W1.3] y contrato portable estable.
 - **Modelo sugerido**: Grande. Distribucion, conflictos y modelo de amenazas.
 
 ### Frente: Clientes, integraciones y nuevos medios
@@ -119,6 +127,41 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 Sin tareas activas.
 
 ## Hecho
+
+### Frente: Superficie publica y despliegue
+
+#### [W1.1] Delimitar la presentacion publica y su privacidad
+**Cerrado 2026-09-01.** El ADR-0001 decide que la primera superficie publica no es
+Club ni un catalogo personal: es una presentacion de disponibilidad activada por un
+owner, construida desde un snapshot curado y sin publicacion implicita de cuentas,
+bibliotecas o colecciones. La URL lleva una capacidad URL-safe aleatoria de 256 bits de
+la que el servidor conserva solo el hash; no hay slugs, listado, busqueda ni OpenAPI
+publica. El contrato excluye explicitamente identidad de miembro, IDs, rutas, archivos,
+inventario, estado/review/nota personales, decisiones, procedencia, imagenes y enlaces
+externos. El snapshot se refresca solo por accion del owner, por lo que un cambio de
+Club, scanner o catalogo no ensancha la exposicion por arrastre.
+
+#### [W1.2] Versionar payload y operacion segura
+**Cerrado 2026-09-01.** `docs/public-presentation-v1.schema.json` define la allowlist
+cerrada (`additionalProperties: false`): encabezado editorial y hasta 200 obras con
+titulo, titulo original, ano, tipo, generos y duracion. El transporte sera
+`/p/{capacidad}` mas `/public/v1/presentations/{capacidad}`, con `schema_version: 1`;
+un cambio incompatible abre v2. La respuesta de contenido usa `Cache-Control: no-store`
+para que revocar sea efectivo en la siguiente consulta, sin CORS ni cookies; solo assets
+sin datos del owner podran ser inmutables. El limite fijado es rafaga de 20 y 60
+lecturas/minuto por capacidad+IP, con `429`/`Retry-After`; los IDs invalidos, revocados
+o inexistentes responden el mismo `404` generico.
+
+#### [W1.3] Aislar sesiones y documentar amenazas
+**Cerrado 2026-09-01.** El ADR exige router y servicio propios, exclusivamente
+`GET`/`HEAD`, sin importaciones de `/api/*`, `SessionCatalog`, `PrivacyService` o
+`CollectionService`, sin leer ni emitir cookies y sin escrituras. Las acciones del owner
+siguen privadas y protegidas por CSRF; preview tampoco usa una capacidad. El modelo de
+amenazas cubre enumeracion, fuga de campos, CSRF/sesion, revocacion, abuso, tracking,
+cache y XSS, con verificaciones concretas para [W2]. La configuracion soportada para
+Internet separa host publico y privado; [D1] proveera la receta HTTPS. El tablero y la
+hoja de ruta reflejan que [W2]/[W3] dependen de estas tres partes. No se modifico el
+comportamiento de la instancia: hoy continua completamente privada por defecto.
 
 ### Frente: Busqueda, comparacion y composicion de fuentes
 
