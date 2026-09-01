@@ -197,10 +197,11 @@ import { renderEditorialHome } from "./home.js";
           anime: "Anime",
           documental: "Documental",
           local_files: "Archivos locales",
-          wikipedia: "Wikipedia",
-          imdb: "IMDb",
-          filmaffinity: "FilmAffinity",
-          jikan: "Jikan / MyAnimeList"
+            wikipedia: "Wikipedia",
+            imdb: "IMDb",
+            filmaffinity: "FilmAffinity",
+            jikan: "Jikan / MyAnimeList",
+            anime_offline_database: "Anime DB offline"
         };
         return labels[normalized] || String(value || label);
       }
@@ -225,6 +226,7 @@ import { renderEditorialHome } from "./home.js";
             ${externalDatabaseItem("IMDb", "imdb")}
             ${externalDatabaseItem("FilmAffinity", "filmaffinity")}
             ${externalDatabaseItem("Jikan", "jikan")}
+            ${externalOfflineDatabaseItem()}
             ${externalCacheItem()}
           </div>
         `;
@@ -276,7 +278,7 @@ import { renderEditorialHome } from "./home.js";
         const consumed = externalSourcesLastUsed.includes(source);
         const attempted = externalSourcesAttempted.includes(source);
         const searchState = externalSourceSearchStates[source]?.status || "idle";
-        const stateLabels = { ready: "lista", ok: "disponible", empty: "sin resultados", error: "error" };
+        const stateLabels = { ready: "lista", ok: "disponible", empty: "sin resultados", error: "error", cooldown: "pausa temporal" };
         const state = stateLabels[health.status] || (fields.externalSource.checked ? "lista" : "apagada");
         const request = searchState === "loading"
           ? "consultando"
@@ -285,8 +287,26 @@ import { renderEditorialHome } from "./home.js";
             : attempted ? (consumed ? `${health.result_count || 0} resultados` : "sin resultados") : "sin consultar";
         const latency = health.latency_ms ? `${health.latency_ms} ms` : "";
         const error = health.error ? ` | ${health.error}` : "";
-        const status = [state, request, latency].filter(Boolean).join(" | ") + error;
+        const cooldown = Number(health.retry_after_seconds || 0)
+          ? `reintento en ${formatSourceDelay(health.retry_after_seconds)}`
+          : "";
+        const status = [state, request, latency, cooldown].filter(Boolean).join(" | ") + error;
         return `<div class="db-item"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(status)}</span></div>`;
+      }
+
+      export function externalOfflineDatabaseItem() {
+        const health = externalHealth?.sources?.anime_offline_database;
+        if (!health) return "";
+        const labels = { ready: "lista", ok: "disponible", empty: "sin coincidencias", error: "error" };
+        const state = labels[health.status] || health.status || "lista";
+        const snapshot = health.snapshot_date ? `snapshot ${health.snapshot_date}` : "snapshot local";
+        const count = health.last_attempt_at ? `${Number(health.result_count || 0)} resultados` : "sin consultar";
+        return `<div class="db-item"><strong>Anime DB offline</strong><span>${escapeHtml([state, snapshot, count].join(" | "))}</span></div>`;
+      }
+
+      export function formatSourceDelay(seconds) {
+        const value = Math.max(1, Number(seconds || 0));
+        return value < 60 ? `${Math.ceil(value)} s` : `${Math.ceil(value / 60)} min`;
       }
 
       export function externalCacheItem() {

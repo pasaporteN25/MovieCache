@@ -170,8 +170,15 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         return Object.fromEntries(EXTERNAL_SEARCH_SOURCES.map((source) => [source, {
           status: "idle",
           count: 0,
-          error: ""
+          error: "",
+          retryAfterSeconds: 0,
+          fallbackReason: ""
         }]));
+      }
+
+      export function resultShelfSource(result) {
+        if (result?._search_shelf) return result._search_shelf;
+        return result?.source === "anime_offline_database" ? "jikan" : result?.source || "";
       }
 
       export function requestedExternalSources(source, includeExternal) {
@@ -195,11 +202,16 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
 
       export function mergeExternalHealth(payload, source) {
         const incoming = payload?.external || {};
+        const sourceHealth = incoming.sources?.[source] ? { [source]: incoming.sources[source] } : {};
+        const offlineHealth = source === "jikan" && incoming.sources?.anime_offline_database
+          ? { anime_offline_database: incoming.sources.anime_offline_database }
+          : {};
         externalHealth = {
           ...externalHealth,
           sources: {
             ...(externalHealth?.sources || {}),
-            ...(incoming.sources?.[source] ? { [source]: incoming.sources[source] } : {})
+            ...sourceHealth,
+            ...offlineHealth
           },
           cache: incoming.cache || externalHealth?.cache || {}
         };
@@ -208,20 +220,22 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export function replaceExternalSourceResults(source, results) {
         const rows = (Array.isArray(results) ? results : []).map((result) => ({
           ...result,
-          source: result.source || source
+          source: result.source || source,
+          _search_shelf: result._search_shelf || source
         }));
         manualResults = manualResults
-          .filter((result) => result.source !== source)
+          .filter((result) => resultShelfSource(result) !== source)
           .concat(rows);
         manualSourceVisibleCounts[source] = SEARCH_PAGE_SIZE;
-        externalSourcesLastUsed = [...new Set(manualResults.map((result) => result.source || "").filter(Boolean))];
+        externalSourcesLastUsed = [...new Set(manualResults.map(resultShelfSource).filter(Boolean))];
         return rows;
       }
 
       export function updateExternalSearchSummary() {
         const states = externalSourcesAttempted.map((source) => externalSourceSearchStates[source] || {});
         const loading = states.filter((state) => state.status === "loading").length;
-        const failed = states.filter((state) => ["error", "timeout"].includes(state.status)).length;
+        const failed = states.filter((state) => ["error", "timeout", "cooldown"].includes(state.status)).length;
+        const fallbacks = states.filter((state) => state.status === "fallback").length;
         const completed = states.length - loading;
         const count = manualResults.length;
         if (!states.length) {
@@ -229,7 +243,12 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         } else if (loading) {
           fields.manualSearchStatus.textContent = `${completed}/${states.length} fuentes listas · ${count} ${count === 1 ? "resultado" : "resultados"}`;
         } else if (count) {
-          fields.manualSearchStatus.textContent = `${count} ${count === 1 ? "resultado" : "resultados"}${failed ? ` · ${failed} ${failed === 1 ? "fuente incompleta" : "fuentes incompletas"}` : ""}`;
+          const degraded = failed
+            ? ` · ${failed} ${failed === 1 ? "fuente incompleta" : "fuentes incompletas"}`
+            : fallbacks
+              ? ` · ${fallbacks} ${fallbacks === 1 ? "fuente con respaldo local" : "fuentes con respaldo local"}`
+              : "";
+          fields.manualSearchStatus.textContent = `${count} ${count === 1 ? "resultado" : "resultados"}${degraded}`;
         } else if (failed) {
           fields.manualSearchStatus.textContent = "No pudimos completar las fuentes externas. Podés reintentarlas por separado.";
         } else {
@@ -279,11 +298,29 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           mergeExternalHealth(payload, source);
           const rows = replaceExternalSourceResults(source, payload.results || []);
           const health = payload.external?.sources?.[source] || {};
-          externalSourceSearchStates[source] = rows.length
-            ? { status: "ready", count: rows.length, error: "" }
-            : health.status === "error"
-              ? { status: "error", count: 0, error: health.error || "source_error" }
-              : { status: "empty", count: 0, error: "" };
+          const offlineRows = rows.filter((row) => row.source === "anime_offline_database");
+          if (offlineRows.length) {
+            externalSourceSearchStates[source] = {
+              status: "fallback",
+              count: offlineRows.length,
+              error: health.error || "",
+              retryAfterSeconds: Number(health.retry_after_seconds || 0),
+              fallbackReason: offlineRows[0].fallback_reason || "unavailable"
+            };
+          } else if (rows.length) {
+            externalSourceSearchStates[source] = { status: "ready", count: rows.length, error: "" };
+          } else if (health.status === "cooldown") {
+            externalSourceSearchStates[source] = {
+              status: "cooldown",
+              count: 0,
+              error: health.error || "source_cooldown",
+              retryAfterSeconds: Number(health.retry_after_seconds || 0)
+            };
+          } else if (health.status === "error") {
+            externalSourceSearchStates[source] = { status: "error", count: 0, error: health.error || "source_error" };
+          } else {
+            externalSourceSearchStates[source] = { status: "empty", count: 0, error: "" };
+          }
         } catch (error) {
           if (!isCurrentSearch(controller)) return;
           replaceExternalSourceResults(source, []);
@@ -510,7 +547,8 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export function renderManualResults() {
         const grouped = Object.fromEntries(EXTERNAL_SEARCH_SOURCES.map((source) => [source, []]));
         manualResults.forEach((result, index) => {
-          if (grouped[result.source]) grouped[result.source].push({ result, index });
+          const shelf = resultShelfSource(result);
+          if (grouped[shelf]) grouped[shelf].push({ result, index });
         });
         fields.manualSearchResults.innerHTML = Object.entries(EXTERNAL_SOURCE_LABELS).map(([source, labels]) => {
           const rows = grouped[source];
@@ -525,11 +563,36 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
               <div><strong>${escapeHtml(labels[0])}</strong><span>${escapeHtml(labels[1])}</span></div>
               <span>${externalSourceStateLabel(state, rows.length)}</span>
             </header>
+            ${externalSourceNotice(source, state)}
             ${rows.length
               ? `<div class="search-source-track">${visible.map(({ result, index }) => searchResult(result, index)).join("")}</div>${more}`
               : externalSourceFeedback(source, state)}
+            ${externalSourceAttribution(source, rows)}
           </section>`;
         }).join("");
+      }
+
+      export function externalSourceNotice(source, state) {
+        if (source !== "jikan" || state.status !== "fallback") return "";
+        const reasons = {
+          empty: "Jikan no encontró coincidencias",
+          rate_limited: "Jikan alcanzó su límite temporal",
+          timeout: "Jikan superó el tiempo de espera",
+          upstream_error: "Jikan está temporalmente inestable",
+          unavailable: "Jikan no está disponible"
+        };
+        const reason = reasons[state.fallbackReason] || reasons.unavailable;
+        return `<p class="source-provenance is-fallback" role="status"><strong>Respaldo local.</strong> ${escapeHtml(reason)}; mostramos coincidencias del snapshot offline, con su procedencia original.</p>`;
+      }
+
+      export function externalSourceAttribution(source, rows) {
+        if (source !== "jikan") return "";
+        const hasOffline = rows.some(({ result }) => result.source === "anime_offline_database");
+        const offlineConfigured = Boolean(externalHealth?.sources?.anime_offline_database);
+        return `<div class="source-attribution">
+          <span><a href="https://jikan.moe/" target="_blank" rel="noreferrer">Jikan</a> es una API no oficial y no está afiliada a MyAnimeList.</span>
+          ${hasOffline || offlineConfigured ? `<span>El respaldo usa <a href="https://github.com/manami-project/anime-offline-database" target="_blank" rel="noreferrer">anime-offline-database</a> bajo ODbL/DbCL; snapshot finito, no datos en vivo.</span>` : ""}
+        </div>`;
       }
 
       export function renderCatalogMergeResults() {

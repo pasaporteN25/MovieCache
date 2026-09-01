@@ -93,6 +93,7 @@ movie-inbox backup verify backups/movie-inbox-instance-20260811-033000Z.tar.gz
 movie-inbox search-lab run --json reports/search-baseline.json --html reports/search-baseline.html
 movie-inbox search-lab external-diagnostics --enforce
 movie-inbox imdb-dataset stats --output-dir data/imdb
+movie-inbox anime-dataset stats --output-dir data/anime
 ```
 
 En Windows, si la carpeta `Scripts` de Python no esta en `PATH`, usa la forma equivalente:
@@ -159,6 +160,35 @@ referencia del 2026-08-29 descargo aproximadamente 704 MB y produjo un indice de
 aproximadamente 8,1 GB en 24 minutos; reservar espacio y ejecutarlo como una tarea de
 mantenimiento. Su uso queda sujeto a las condiciones personales/no comerciales y a la
 atribucion que imprime el propio comando.
+
+### Respaldo local opt-in para anime
+
+`anime-dataset` construye un SQLite separado y descartable a partir de un snapshot
+local de `anime-offline-database`. Movie Inbox no descarga ni empaqueta el snapshot:
+el owner elige el archivo `.jsonl` o `.json`, y el comando conserva en el indice su
+fecha, licencia y SHA-256.
+
+```powershell
+movie-inbox anime-dataset sync `
+  --snapshot downloads/anime-offline-database.jsonl `
+  --output-dir data/anime `
+  --report reports/anime-sync.json
+movie-inbox anime-dataset stats --output-dir data/anime
+movie-inbox anime-dataset lookup --output-dir data/anime --title "El cuaderno de la muerte"
+movie-inbox anime-dataset lookup --output-dir data/anime --external-id anilist:1535
+```
+
+El servidor permanece igual si no se configura el indice. Para activarlo como
+respaldo secundario de Jikan:
+
+```powershell
+movie-inbox serve catalog.json --anime-offline-index data/anime/anime-offline.db
+```
+
+Jikan conserva prioridad. El indice solo suma aliases e IDs compatibles a una
+coincidencia viva o presenta resultados propios —rotulados `Anime DB offline`— cuando
+Jikan falla, entra en cooldown o responde sin coincidencias. Sus resultados muestran
+la atribucion ODbL/DbCL y la fecha del snapshot; nunca se presentan como datos en vivo.
 
 ### Primer acceso
 
@@ -519,7 +549,10 @@ fuente ordena sus alternativas por coincidencia de titulo y ano. Wikipedia prior
 coincidencia exacta dentro de la consulta amplia y usa la resolucion directa como
 respaldo; si falla un idioma conserva los resultados del otro. Los resultados aparecen en estanterias separadas de Wikipedia,
 IMDb, FilmAffinity y Jikan apenas responde cada fuente, con seis opciones iniciales, carga
-adicional y reintento independiente cuando una consulta falla o supera 10 segundos. `External DBs`
+adicional y reintento independiente cuando una consulta falla o supera 10 segundos.
+Jikan respeta `Retry-After`; los limites, timeouts y errores 5xx abren una pausa visible.
+Si se configuro el indice offline, la misma estanteria distingue su respaldo local y
+mantiene la procedencia y atribucion del snapshot. `External DBs`
 muestra estado, latencia, cantidad de resultados y errores, ademas de hits, misses y
 entradas del cache. Wikipedia devuelve primero datos livianos y completa la metadata de
 la entrada elegida recien al agregarla o combinarla.

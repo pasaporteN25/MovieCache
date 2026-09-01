@@ -23,7 +23,11 @@ from movie_inbox.application.curation_workflow import CurationWorkflowService
 from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain import catalog as domain
-from movie_inbox.domain.metadata import METADATA_FIELDS, normalize_optional_positive_int
+from movie_inbox.domain.metadata import (
+    METADATA_FIELDS,
+    normalize_metadata_sources,
+    normalize_optional_positive_int,
+)
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.normalization import normalize_kind, normalize_rating
 from movie_inbox.infrastructure.curation_history import (
@@ -404,8 +408,9 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "locked_fields": [],
         "added_at": datetime.now(UTC).isoformat(),
     }
+    provided_sources = normalize_metadata_sources(result.get("metadata_sources"))
     item["metadata_sources"] = {
-        field: metadata_source_record(source, url, inferred=False)
+        field: provided_sources.get(field, metadata_source_record(source, url, inferred=False))
         for field in METADATA_FIELDS
         if item.get(field) not in (None, "", [], {})
     }

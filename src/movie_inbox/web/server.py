@@ -90,6 +90,19 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--anime-offline-index",
+        type=Path,
+        default=(
+            Path(os.environ["MOVIE_INBOX_ANIME_OFFLINE_INDEX"])
+            if os.environ.get("MOVIE_INBOX_ANIME_OFFLINE_INDEX")
+            else None
+        ),
+        help=(
+            "Use a local anime-offline.db as a fallback for Jikan. "
+            "Build it explicitly with `movie-inbox anime-dataset sync`."
+        ),
+    )
+    parser.add_argument(
         "--session-days",
         type=int,
         default=DEFAULT_SESSION_TTL_SECONDS // (24 * 60 * 60),
@@ -220,6 +233,9 @@ def main(argv: list[str] | None = None) -> int:
         image_cache_warm_interval_seconds=args.image_cache_warm_interval_seconds,
         image_allowed_hosts=tuple(dict.fromkeys([*DEFAULT_IMAGE_ALLOWED_HOSTS, *args.image_host])),
         library_allowed_roots=tuple(str(path.resolve()) for path in args.library_root),
+        anime_offline_index=str(args.anime_offline_index.resolve())
+        if args.anime_offline_index
+        else "",
         external_credentials=external_credentials,
     )
     identity_repository = SqliteIdentityRepository(instance_db)
@@ -273,6 +289,11 @@ def main(argv: list[str] | None = None) -> int:
         "TMDb credentials: configured (adapter pending F5)"
         if config.external_credentials.tmdb_configured
         else "TMDb credentials: not configured"
+    )
+    print(
+        f"Anime offline fallback: {config.anime_offline_index}"
+        if config.anime_offline_index
+        else "Anime offline fallback: not configured"
     )
     print(f"Open {url}")
     print("Press Ctrl+C to stop.")

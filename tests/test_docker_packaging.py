@@ -87,6 +87,19 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("# MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE=", environment)
         self.assertNotIn("MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN=", environment)
 
+    def test_anime_offline_overlay_is_opt_in_and_read_only(self) -> None:
+        base_compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+        overlay = (ROOT / "compose.anime-offline.example.yaml").read_text(encoding="utf-8")
+        environment = (ROOT / ".env.example").read_text(encoding="utf-8")
+
+        self.assertNotIn("MOVIE_INBOX_ANIME_OFFLINE_INDEX", base_compose)
+        self.assertIn("MOVIE_INBOX_ANIME_OFFLINE_INDEX: /anime-index/anime-offline.db", overlay)
+        self.assertIn("MOVIE_INBOX_ANIME_INDEX_DIR", overlay)
+        self.assertIn("target: /anime-index", overlay)
+        self.assertIn("read_only: true", overlay)
+        self.assertIn("create_host_path: false", overlay)
+        self.assertIn("# MOVIE_INBOX_ANIME_INDEX_DIR=", environment)
+
     def test_scheduled_backup_stops_restarts_and_health_checks_the_service(self) -> None:
         script = (ROOT / "scripts" / "docker-backup.sh").read_text(encoding="utf-8")
         service = (ROOT / "deploy" / "movie-inbox-backup.service.example").read_text(

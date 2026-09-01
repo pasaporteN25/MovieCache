@@ -51,6 +51,7 @@ class ViewerConfig:
     image_allowed_hosts: tuple[str, ...] = DEFAULT_IMAGE_ALLOWED_HOSTS
     library_allowed_roots: tuple[str, ...] = ()
     library_scheduler_poll_seconds: float = 15.0
+    anime_offline_index: str = ""
     external_credentials: ExternalSourceCredentials = field(
         default_factory=ExternalSourceCredentials,
         repr=False,

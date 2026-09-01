@@ -93,7 +93,10 @@ STATIC_CACHE_CONTROL = "public, max-age=3600, must-revalidate"
 def create_app(config: ViewerConfig) -> FastAPI:
     if not config.instance_db:
         raise RuntimeError("ViewerConfig.instance_db is required")
-    configure_external_catalog(config.external_credentials.tmdb_read_access_token)
+    configure_external_catalog(
+        config.external_credentials.tmdb_read_access_token,
+        config.anime_offline_index,
+    )
     instance_db = Path(config.instance_db)
     identity_repository = SqliteIdentityRepository(instance_db)
     identity_repository.initialize()

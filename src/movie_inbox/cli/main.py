@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from movie_inbox.cli import (
     account,
+    anime_dataset,
     backup,
     cache,
     database,
@@ -23,6 +24,10 @@ from movie_inbox.web import server
 Command = Callable[[list[str] | None], int]
 COMMANDS: dict[str, tuple[Command, str]] = {
     "account": (account.main, "Bootstrap the local owner account."),
+    "anime-dataset": (
+        anime_dataset.main,
+        "Build and query an opt-in anime-offline-database index.",
+    ),
     "import": (import_catalog.main, "Import or merge TXT, JSON and CSV catalogs."),
     "scan": (scan_library.main, "Scan a local video library incrementally."),
     "serve": (server.main, "Open the local catalog viewer."),

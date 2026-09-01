@@ -260,6 +260,29 @@
         align-items: center;
         justify-content: space-between;
       }
+      .source-provenance {
+        background: rgba(var(--gold-rgb), 0.08);
+        border: 1px solid rgba(var(--gold-rgb), 0.4);
+        color: var(--text-gold-soft);
+        font-size: var(--text-meta);
+        line-height: 1.45;
+        margin: 0;
+        max-width: 75ch;
+        overflow-wrap: anywhere;
+        padding: 8px 10px;
+      }
+      .source-provenance strong { color: var(--gold); }
+      .source-attribution {
+        border-top: 1px dashed rgba(var(--control-border-rgb), 0.52);
+        color: var(--muted);
+        display: grid;
+        font-size: var(--text-caption);
+        gap: 3px;
+        line-height: 1.45;
+        max-width: 75ch;
+        padding-top: 8px;
+      }
+      .source-attribution a { color: var(--text-cyan-soft); }
       .source-search-spinner {
         border: 2px solid var(--control-border);
         border-right-color: var(--teal);

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import unittest
 from collections.abc import Callable
+from email.message import Message
 from typing import Any
+from urllib.error import HTTPError
 
 from movie_inbox.application.external_service import ExternalCatalogService
 from movie_inbox.external.registry import ExternalSourceService
@@ -56,7 +58,7 @@ class FlakyAdapter:
     def search(self, query: str) -> list[dict[str, Any]]:
         self.calls += 1
         if self.calls == 1:
-            raise TimeoutError("temporary lookup failure")
+            raise RuntimeError("temporary lookup failure")
         return [{"title": query, "source": self.name, "url": "https://en.wikipedia.org/wiki/Heat"}]
 
 
@@ -79,6 +81,19 @@ class RelevanceAdapter:
                 "url": "https://example.test/2",
             },
         ]
+
+
+class RecordedFailureAdapter:
+    name = "jikan"
+    label = "Jikan / MyAnimeList"
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        self.calls = 0
+
+    def search(self, query: str) -> list[dict[str, Any]]:
+        self.calls += 1
+        raise self.error
 
 
 class ExternalCatalogServiceTests(unittest.TestCase):
@@ -104,6 +119,51 @@ class ExternalCatalogServiceTests(unittest.TestCase):
         self.assertEqual(first, [])
         self.assertEqual(second[0]["title"], "Heat")
         self.assertEqual(adapter.calls, 2)
+
+    def test_recorded_429_opens_a_source_cooldown_and_respects_retry_after(self) -> None:
+        headers = Message()
+        headers["Retry-After"] = "120"
+        adapter = RecordedFailureAdapter(
+            HTTPError("https://api.jikan.moe/v4/anime", 429, "rate limited", headers, None)
+        )
+        service = ExternalSourceService([adapter])
+
+        first, first_state = service.search("Your Name", "jikan")
+        second, second_state = service.search("Your Name", "jikan")
+
+        self.assertEqual(first, [])
+        self.assertEqual(second, [])
+        self.assertEqual(adapter.calls, 1)
+        self.assertEqual(first_state["sources"]["jikan"]["status"], "cooldown")
+        self.assertEqual(first_state["sources"]["jikan"]["error_code"], "rate_limited")
+        self.assertGreaterEqual(first_state["sources"]["jikan"]["retry_after_seconds"], 119)
+        self.assertGreaterEqual(second_state["sources"]["jikan"]["retry_after_seconds"], 119)
+
+    def test_recorded_timeout_and_5xx_have_distinct_visible_cooldowns(self) -> None:
+        cases = (
+            (TimeoutError("timed out"), "timeout"),
+            (
+                HTTPError(
+                    "https://api.jikan.moe/v4/anime",
+                    503,
+                    "unavailable",
+                    Message(),
+                    None,
+                ),
+                "upstream_error",
+            ),
+        )
+        for error, expected_code in cases:
+            with self.subTest(expected_code=expected_code):
+                service = ExternalSourceService([RecordedFailureAdapter(error)])
+
+                results, state = service.search("Your Name", "jikan")
+
+                self.assertEqual(results, [])
+                health = state["sources"]["jikan"]
+                self.assertEqual(health["status"], "cooldown")
+                self.assertEqual(health["error_code"], expected_code)
+                self.assertGreater(health["retry_after_seconds"], 0)
 
     def test_external_results_are_ranked_by_title_and_year(self) -> None:
         service = ExternalSourceService([RelevanceAdapter()])

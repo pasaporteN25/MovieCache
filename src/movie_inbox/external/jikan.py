@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 
 from movie_inbox.domain.catalog import merge_lists, myanimelist_anime_id
@@ -13,6 +14,7 @@ from movie_inbox.domain.search import parse_search_query
 from movie_inbox.external.common import clean_text, fetch_json, object_dict, object_list
 
 JIKAN_API_BASE_URL = "https://api.jikan.moe/v4"
+JIKAN_DETAIL_REQUEST_BUDGET = 2
 
 
 class JikanAdapter:
@@ -87,13 +89,41 @@ def jikan_anime_result(value: Any) -> dict[str, Any] | None:
 
 
 def fetch_jikan_metadata(url: str) -> dict[str, Any]:
-    """Load the full object for a selected MAL anime URL, never for a result shelf."""
+    """Load full metadata and staff for one selected result within a two-call budget."""
     mal_id = jikan_anime_id(url)
     if not mal_id:
         return {}
     raw = fetch_json(f"{JIKAN_API_BASE_URL}/anime/{mal_id}/full")
     parsed = jikan_anime_result(raw.get("data"))
-    return parsed or {}
+    if parsed is None:
+        return {}
+    try:
+        staff = fetch_json(f"{JIKAN_API_BASE_URL}/anime/{mal_id}/staff")
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError):
+        staff = {}
+    directors = jikan_staff_directors(staff.get("data"))
+    if directors:
+        parsed["directors"] = directors
+    return parsed
+
+
+def jikan_staff_directors(value: Any) -> list[str]:
+    """Extract credited directors without treating staff as identity evidence."""
+    directors: list[str] = []
+    for raw_row in object_list(value):
+        if not isinstance(raw_row, Mapping):
+            continue
+        positions = {
+            clean_text(str(position or "")).casefold()
+            for position in object_list(raw_row.get("positions"))
+        }
+        if "director" not in positions:
+            continue
+        person = object_dict(raw_row.get("person"))
+        name = clean_text(str(person.get("name") or ""))
+        if name:
+            directors.append(name)
+    return merge_lists([], directors)
 
 
 def jikan_anime_id(value: str) -> str:
@@ -166,8 +196,10 @@ def _release_dates(row: Mapping[str, Any], url: str) -> list[dict[str, Any]]:
 
 __all__ = [
     "JIKAN_API_BASE_URL",
+    "JIKAN_DETAIL_REQUEST_BUDGET",
     "JikanAdapter",
     "fetch_jikan_metadata",
     "jikan_anime_id",
     "jikan_anime_result",
+    "jikan_staff_directors",
 ]

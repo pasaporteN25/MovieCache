@@ -69,17 +69,22 @@ catalogo tambien queda en cache por firma de archivo; cualquier cambio de tamano
 fecha de modificacion invalida la copia. El corpus suma titulo japones nativo y la
 taxonomia anime/formato y mantiene el gate en verde con 28 casos.
 
-### Decision sobre nuevas fuentes
+### Decision sobre fuentes de anime
 
 - AniList ofrece la mejor API en tiempo real para titulos, sinonimos y relaciones,
   pero sus [terminos](https://docs.anilist.co/guide/terms-of-use) prohiben usarla en
   servicios competidores de listas o seguimiento sin una autorizacion expresa.
-- Jikan es un intermediario no oficial sobre MyAnimeList y no ofrece un contrato de
-  datos mas firme que la fuente original.
+- Jikan es la fuente primaria opt-in para busqueda de anime en vivo. Es una API no
+  oficial, sin afiliacion con MyAnimeList; la busqueda usa `/anime` y el detalle/staff
+  se consulta solo para la candidata elegida, con un maximo de dos llamadas.
 - `anime-offline-database` tiene licencia ODbL/DbCL y buenos cruces, pero su repositorio
-  fue archivado el 2026-07-04; no es una dependencia sostenible para datos nuevos.
-- Hasta contar con permiso o una fuente mantenida con licencia compatible, se mejora
-  Wikidata —ya integrado y trazable— en vez de agregar una cuarta estanteria fragil.
+  fue archivado el 2026-07-04; por eso funciona unicamente como snapshot local finito,
+  reconstruible y aportado por el owner, nunca como autoridad de datos nuevos.
+- El indice offline completa aliases e IDs compatibles sin pisar a Jikan. Si Jikan
+  responde vacio, `429`, timeout o 5xx, puede aportar resultados secundarios con
+  fuente `anime_offline_database`, fecha de snapshot y atribucion visibles.
+- Sin indice configurado no hay acceso al filesystem ni una estanteria fantasma: la
+  busqueda se degrada exactamente al conjunto de fuentes en vivo.
 
 IMDb tampoco se puede priorizar globalmente con el camino actual: la seleccion de un
 resultado de IMDb obtiene la ficha completa mediante Wikidata/Wikipedia; no extrae la

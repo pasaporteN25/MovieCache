@@ -77,6 +77,7 @@
         imdb: "IMDb",
         filmaffinity: "FilmAffinity",
         jikan: "Jikan / MyAnimeList",
+        anime_offline_database: "Anime DB offline",
         wikidata: "Wikidata",
         local_files: "Archivo local",
         txt: "Importación de texto",

@@ -126,12 +126,43 @@ class JikanAdapterTests(unittest.TestCase):
 
     @patch("movie_inbox.external.jikan.fetch_json")
     def test_full_metadata_is_loaded_only_for_a_selected_mal_url(self, fetch_json) -> None:
-        fetch_json.return_value = {"data": _anime_payload()}
+        fetch_json.side_effect = [
+            {"data": _anime_payload()},
+            {
+                "data": [
+                    {
+                        "person": {"mal_id": 1117, "name": "Makoto Shinkai"},
+                        "positions": ["Director", "Storyboard"],
+                    },
+                    {
+                        "person": {"mal_id": 999, "name": "Other Person"},
+                        "positions": ["Producer"],
+                    },
+                ]
+            },
+        ]
 
         metadata = fetch_jikan_metadata("https://myanimelist.net/anime/32281/Kimi_no_Na_wa")
 
         self.assertEqual(metadata["mal_id"], "32281")
-        fetch_json.assert_called_once_with("https://api.jikan.moe/v4/anime/32281/full")
+        self.assertEqual(metadata["directors"], ["Makoto Shinkai"])
+        self.assertEqual(
+            [call.args[0] for call in fetch_json.call_args_list],
+            [
+                "https://api.jikan.moe/v4/anime/32281/full",
+                "https://api.jikan.moe/v4/anime/32281/staff",
+            ],
+        )
+
+    @patch("movie_inbox.external.jikan.fetch_json")
+    def test_staff_failure_keeps_the_selected_full_metadata(self, fetch_json) -> None:
+        fetch_json.side_effect = [{"data": _anime_payload()}, TimeoutError("staff timeout")]
+
+        metadata = fetch_jikan_metadata("https://myanimelist.net/anime/32281")
+
+        self.assertEqual(metadata["mal_id"], "32281")
+        self.assertNotIn("directors", metadata)
+        self.assertEqual(fetch_json.call_count, 2)
 
     @patch("movie_inbox.external.jikan.fetch_json")
     def test_invalid_metadata_url_never_calls_jikan(self, fetch_json) -> None:

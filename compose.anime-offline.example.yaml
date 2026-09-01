@@ -1,0 +1,11 @@
+services:
+  movie-inbox:
+    environment:
+      MOVIE_INBOX_ANIME_OFFLINE_INDEX: /anime-index/anime-offline.db
+    volumes:
+      - type: bind
+        source: ${MOVIE_INBOX_ANIME_INDEX_DIR:?Set the host directory containing anime-offline.db}
+        target: /anime-index
+        read_only: true
+        bind:
+          create_host_path: false

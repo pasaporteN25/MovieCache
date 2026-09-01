@@ -4,6 +4,19 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Agregado
+
+- Jikan incorpora direccion desde staff solamente al elegir una candidata, con un
+  presupuesto maximo de dos llamadas, atribucion visible y cooldown por fuente para
+  `429`/`Retry-After`, timeouts y errores 5xx.
+- `movie-inbox anime-dataset sync/stats/lookup` construye de forma opt-in un indice
+  SQLite atomico desde un snapshot local de `anime-offline-database`, conserva fecha,
+  licencia y hash, y consulta títulos multilingues, MAL e IDs cruzados sin tocar el
+  catalogo.
+- Un indice configurado completa aliases e IDs de resultados Jikan y funciona como
+  respaldo rotulado cuando la fuente viva falla o vuelve vacia. Sin indice, no agrega
+  accesos al filesystem ni cambia el comportamiento de la instancia.
+
 ## [0.6.0] - 2026-08-31
 
 ### Agregado

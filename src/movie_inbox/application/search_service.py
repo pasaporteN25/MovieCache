@@ -178,8 +178,9 @@ def group_external_results(results: Sequence[Mapping[str, Any]]) -> dict[str, li
     }
     for result in results:
         source = str(result.get("source") or "").casefold()
-        if source in groups:
-            groups[source].append(dict(result))
+        shelf = str(result.get("_search_shelf") or source).casefold()
+        if shelf in groups:
+            groups[shelf].append(dict(result))
     return groups
 
 

@@ -32,6 +32,7 @@ class PackageLayoutTests(unittest.TestCase):
             set(COMMANDS),
             {
                 "account",
+                "anime-dataset",
                 "backup",
                 "cache",
                 "db",

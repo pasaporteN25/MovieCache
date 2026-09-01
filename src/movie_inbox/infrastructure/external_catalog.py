@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from movie_inbox.application.external_service import ExternalCatalogService
 from movie_inbox.domain.models import ExternalSearchResult
+from movie_inbox.external.anime_offline import AnimeOfflineAdapter
 from movie_inbox.external.metadata import fetch_metadata, fetch_metadata_by_title
 from movie_inbox.external.registry import ExternalSourceService, default_source_adapters
 
@@ -13,11 +15,22 @@ EXTERNAL_SOURCES = ExternalSourceService()
 EXTERNAL_CATALOG = ExternalCatalogService(EXTERNAL_SOURCES, fetch_metadata)
 
 
-def configure_external_catalog(tmdb_read_access_token: str = "") -> None:
+def configure_external_catalog(
+    tmdb_read_access_token: str = "",
+    anime_offline_index_path: str = "",
+) -> None:
     """Configure the process-wide gateway once for this single-worker app."""
 
     global EXTERNAL_CATALOG, EXTERNAL_SOURCES
-    EXTERNAL_SOURCES = ExternalSourceService(default_source_adapters(tmdb_read_access_token))
+    fallback_adapters = (
+        {"jikan": AnimeOfflineAdapter(Path(anime_offline_index_path))}
+        if anime_offline_index_path
+        else {}
+    )
+    EXTERNAL_SOURCES = ExternalSourceService(
+        default_source_adapters(tmdb_read_access_token),
+        fallback_adapters=fallback_adapters,
+    )
     EXTERNAL_CATALOG = ExternalCatalogService(
         EXTERNAL_SOURCES,
         lambda url: fetch_metadata(

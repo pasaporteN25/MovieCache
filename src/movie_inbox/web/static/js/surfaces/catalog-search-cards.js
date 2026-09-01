@@ -1,6 +1,6 @@
 import { cachedImageSrc } from "../core/card.js";
 import { fields } from "../core/fields.js";
-import { asList, displayTitle, escapeAttr, escapeHtml, firstListValue, hasExternalLink, isInCatalog, localFiles, meta, normalizeText, titleSizeClass, titleSubtitle } from "../core/format.js";
+import { asList, displayTitle, escapeAttr, escapeHtml, firstListValue, hasExternalLink, isInCatalog, localFiles, meta, normalizeText, sourceLabel, titleSizeClass, titleSubtitle } from "../core/format.js";
 import { items, selectedExistingIdForSearch } from "../core/state.js";
 import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, manualResults, selectedManualIndex } from "./catalog-search.js";
 
@@ -44,11 +44,11 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
             <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
             <div class="meta">
-              ${meta(result.source)}${meta(result.year)}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(result.url ? new URL(result.url).hostname.replace(/^www\./, "") : "")}${meta(similarity)}
+              ${meta(sourceLabel(result.source))}${meta(result.year)}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(result.url ? new URL(result.url).hostname.replace(/^www\./, "") : "")}${meta(similarity)}
             </div>
             <div class="card-badges">
               ${result._search?.reason === "director_match" ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(result._search))}</span>` : ""}
-              <span class="pill good">${escapeHtml(result.source || "externo")}</span>
+              <span class="pill good">${escapeHtml(sourceLabel(result.source))}</span>
               <span class="pill ${result.url ? "good" : "muted"}">${result.url ? "con referencia" : "sin referencia"}</span>
             </div>
             ${searchDescription(description, "manual", index)}
@@ -172,6 +172,8 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
       export function externalSourceStateLabel(state, count) {
         if (state.status === "loading") return "Consultando…";
         if (state.status === "timeout") return "Tiempo agotado";
+        if (state.status === "cooldown") return "En pausa temporal";
+        if (state.status === "fallback") return `${count} · respaldo local`;
         if (state.status === "error") return "No disponible";
         if (state.status === "canceled") return "Cancelada";
         if (state.status === "idle") return "Sin consultar";
@@ -186,13 +188,15 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
             <span>Consultando ${escapeHtml(label)}…</span>
           </div>`;
         }
-        if (["error", "timeout"].includes(state.status)) {
+        if (["error", "timeout", "cooldown"].includes(state.status)) {
           const message = state.status === "timeout"
             ? `${label} tardó más de ${SEARCH_TIMEOUT_MS / 1000} segundos.`
-            : `${label} no respondió correctamente.`;
+            : state.status === "cooldown"
+              ? `${label} está en pausa temporal${state.retryAfterSeconds ? ` por ${formatRetryDelay(state.retryAfterSeconds)}` : ""}.`
+              : `${label} no respondió correctamente.`;
           return `<div class="search-source-feedback is-error" role="status">
             <span>${escapeHtml(message)}</span>
-            <button class="quiet-action source-retry" type="button" data-click="retry-external-source" data-source="${source}" ${externalSearchController ? "disabled" : ""}>Reintentar</button>
+            <button class="quiet-action source-retry" type="button" data-click="retry-external-source" data-source="${source}" ${externalSearchController ? "disabled" : ""}>${state.status === "cooldown" ? "Comprobar de nuevo" : "Reintentar"}</button>
           </div>`;
         }
         if (state.status === "canceled") {
@@ -202,6 +206,12 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
           return `<p class="search-source-empty">Esta fuente no fue consultada.</p>`;
         }
         return `<p class="search-source-empty">Sin coincidencias en esta fuente.</p>`;
+      }
+
+      export function formatRetryDelay(seconds) {
+        const value = Math.max(1, Number(seconds || 0));
+        if (value < 60) return `${Math.ceil(value)} s`;
+        return `${Math.ceil(value / 60)} min`;
       }
 
       export function showDuplicateChoice(index, candidates) {

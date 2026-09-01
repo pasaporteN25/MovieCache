@@ -625,6 +625,7 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         jikan_group = page.locator('[data-source-group="jikan"]')
         jikan_group.get_by_role("heading", name="Kimi no Na wa.", exact=True).wait_for()
+        self.assertIn("no está afiliada a MyAnimeList", jikan_group.inner_text())
         jikan_group.get_by_role("button", name="Agregar").click()
         page.wait_for_function(
             "[...document.querySelectorAll('[data-source-group=\"jikan\"] button')]"
@@ -635,6 +636,61 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(submitted[0]["source"], "jikan")
         self.assertEqual(submitted[0]["mal_id"], "32281")
         self.assertEqual(submitted[0]["myanimelist_url"], "https://myanimelist.net/anime/32281")
+
+    def test_jikan_cooldown_shows_labeled_offline_fallback_and_attribution(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        def handle_search(route) -> None:
+            url = route.request.url
+            body: dict[str, Any] = {"results": []}
+            if "source=jikan" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Death Note",
+                            "year": "2006",
+                            "kind": "anime",
+                            "source": "anime_offline_database",
+                            "_search_shelf": "jikan",
+                            "fallback_reason": "rate_limited",
+                            "offline": True,
+                            "url": "https://myanimelist.net/anime/1535",
+                            "myanimelist_url": "https://myanimelist.net/anime/1535",
+                            "mal_id": "1535",
+                            "snapshot_date": "2026-07-04",
+                        }
+                    ],
+                    "external": {
+                        "sources": {
+                            "jikan": {
+                                "status": "cooldown",
+                                "error": "HTTP Error 429",
+                                "retry_after_seconds": 90,
+                            },
+                            "anime_offline_database": {
+                                "status": "ok",
+                                "snapshot_date": "2026-07-04",
+                                "result_count": 1,
+                            },
+                        }
+                    },
+                }
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+        page.route("**/api/search?*", handle_search)
+        page.locator("#catalogButton").click()
+        page.locator("#externalSource").check()
+        page.locator("#query").fill("Death Note")
+        page.locator("#searchButton").click()
+
+        jikan_group = page.locator('[data-source-group="jikan"]')
+        jikan_group.get_by_role("heading", name="Death Note", exact=True).wait_for()
+        text = jikan_group.inner_text()
+        self.assertIn("Respaldo local", text)
+        self.assertIn("Anime DB offline", text)
+        self.assertIn("ODbL/DbCL", text)
+        self.assertIn("Jikan alcanzó su límite temporal", text)
 
     def test_catalog_link_mode_refine_keeps_local_item_and_searches_external_only(self) -> None:
         page = self.page

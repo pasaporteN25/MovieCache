@@ -14,6 +14,13 @@ from movie_inbox.web.config import ExternalSourceCredentials
 
 
 class ServerCliTests(unittest.TestCase):
+    def test_anime_offline_index_can_be_configured_explicitly(self) -> None:
+        parsed = server.build_parser().parse_args(
+            ["catalog.json", "--anime-offline-index", "indexes/anime-offline.db"]
+        )
+
+        self.assertEqual(parsed.anime_offline_index, Path("indexes/anime-offline.db"))
+
     def test_serve_starts_uvicorn_with_one_loopback_worker(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             catalog = Path(temporary) / "catalog.json"

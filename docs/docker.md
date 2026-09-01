@@ -87,6 +87,38 @@ contenedor desactiva TMDb. Los datos que TMDb aporte desde [F5.2] conservaran pr
 no se borraran silenciosamente al desactivar la fuente: la retirada sera una operacion
 explicita para no destruir correcciones o campos bloqueados del usuario.
 
+## Respaldo offline de anime opcional
+
+El snapshot no forma parte de la imagen y Movie Inbox no lo descarga. El owner puede
+obtener manualmente `anime-offline-database.jsonl` desde el release elegido y construir
+un indice separado en el host:
+
+```powershell
+New-Item -ItemType Directory -Force .\anime-index
+movie-inbox anime-dataset sync `
+  --snapshot .\downloads\anime-offline-database.jsonl `
+  --output-dir .\anime-index
+```
+
+Configurar solamente el directorio que contiene `anime-offline.db`:
+
+```dotenv
+MOVIE_INBOX_ANIME_INDEX_DIR=./anime-index
+```
+
+Luego levantar el overlay explicito:
+
+```powershell
+docker compose -f compose.yaml -f compose.anime-offline.example.yaml up -d
+```
+
+El directorio se monta en solo lectura y fuera del volumen del catalogo. Al quitar el
+overlay, la instancia vuelve a consultar solo fuentes en vivo; ninguna ficha se borra.
+El admin muestra fecha y estado del snapshot. Los resultados de respaldo se rotulan
+`Anime DB offline` y conservan la atribucion ODbL/DbCL. Para actualizarlo, ejecutar de
+nuevo `anime-dataset sync`: el reemplazo del SQLite es atomico y el snapshot original
+permanece fuera de la aplicacion.
+
 ## Cache progresivo de portadas
 
 El volumen `movie-inbox-data` conserva `/var/lib/movie-inbox/image-cache` al reiniciar o
