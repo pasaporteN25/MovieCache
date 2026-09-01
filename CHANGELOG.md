@@ -16,6 +16,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Un indice configurado completa aliases e IDs de resultados Jikan y funciona como
   respaldo rotulado cuando la fuente viva falla o vuelve vacia. Sin indice, no agrega
   accesos al filesystem ni cambia el comportamiento de la instancia.
+- `tmdb_id`/`tmdb_url` quedan como identidad fuerte de movie/TV: un ID compartido con el
+  mismo tipo de medio auto-matchea, un ID o tipo de medio en conflicto bloquea el merge
+  automatico. El owner puede previsualizar y purgar de forma auditable toda contribucion
+  TMDb persistida (respetando ediciones manuales, `locked_fields` y valores respaldados
+  tambien por otra fuente) con historial y deshacer.
 
 ## [0.6.0] - 2026-08-31
 

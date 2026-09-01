@@ -43,19 +43,6 @@ ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa p
 de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
 consulta [F5.1] (cerrado), identidad/retirada [F5.2] y cumplimiento/UX [F5.3].
 
-#### [F5.2] Integrar identidad, procedencia y retirada de datos TMDb
-- **Alcance**: persistir `tmdb_id` como identidad fuerte de movie/TV; un ID compartido
-  valida y dos IDs distintos bloquean auto-merge. Incorporar IDs externos, traducciones,
-  creditos, imagenes y datos estructurados bajo la politica fill-only de [Q5]. Cada
-  campo aportado conserva procedencia `tmdb`; nunca copiar `vote_average` a `rating`.
-- **Retirada**: implementar preview y purga explicita/auditable de contribuciones TMDb
-  al retirar la key o terminar los terminos. Nunca borrar ediciones manuales, campos
-  bloqueados ni valores respaldados tambien por otra fuente.
-- **Criterio de cierre**: pruebas JSON/SQLite/import-export, matching y conflictos de
-  identidad, merge con `locked_fields`, preview, purga y rollback.
-- **Depende de**: [F5.1].
-- **Modelo sugerido**: Grande. Identidad y operacion potencialmente destructiva.
-
 #### [F5.3] Exponer TMDb con cumplimiento, resiliencia y validacion real
 - **Alcance**: mostrar la estanteria y health de TMDb solo cuando este configurado;
   atribucion/logo y aviso de no-endorsement exigidos, imagenes permitidas y estado
@@ -403,6 +390,38 @@ No hubo key ni llamada live: capturas reales, atribucion visual, `429` y smoke d
 corpus pertenecen expresamente a [F5.3]. Verificado con 506 pruebas unitarias, Ruff,
 formato, mypy estricto, `compileall` y `git diff --check`.
 2026-08-31, commit `cbc5dc7`.
+
+#### [F5.2] Integrar identidad, procedencia y retirada de datos TMDb
+`tmdb_id`/`tmdb_url` quedan como identidad fuerte de movie/TV en `decide_match`: un ID
+compartido con el mismo tipo de medio (movie/tv, inferido de la URL o de `kind`) auto
+matchea con confianza 1.0; un ID compartido con tipo distinto o dos IDs TMDb distintos
+bloquean el merge automatico, igual que ya hacia `mal_id` para anime. `domain/models.py`
+y `infrastructure/schema.py` suman `tmdb_url` como campo portable; el schema JSON sube a
+v9 con migracion v8→v9 y SQLite/import-export hacen round-trip completo.
+
+`domain/external_retirement.py` implementa `retire_tmdb_metadata()`: recorre
+`METADATA_FIELDS` y solo vacia un campo cuando TMDb es su unico contribuyente
+registrado; procedencia compuesta conserva el valor y solo saca `tmdb` de la etiqueta;
+`locked_fields` gana siempre. `release_dates` tiene procedencia por fila, asi que sus
+filas TMDb se pueden quitar sin tocar fechas de otra fuente. Si la referencia principal
+(`url`/`source`) era TMDb, cae al primer enlace restante entre Wikipedia/IMDb/
+FilmAffinity/Jikan o queda `local_files`/`retired`.
+
+`application/external_retirement.py` (`TmdbRetirementService`) expone preview
+(`preview_id` determinístico por hash del estado "antes"), purga con confirmacion
+explicita que rechaza un preview desactualizado o un catalogo de solo lectura, historial
+persistente y undo que restaura el estado exacto previo — con rollback si falla el
+registro de historial o la escritura de deshacer. `web/routers/integrations.py` expone
+las cuatro operaciones solo al owner bajo `/api/integrations/tmdb/retirement/*`.
+
+**Criterio de cierre**: `tests/test_external_retirement.py` cubre preview/purga/
+historial/undo sobre catalogo JSON y SQLite, catalogo de solo lectura y preview
+desactualizado bloqueando la purga, rollback ante fallo de historial, conservacion de
+campos manuales/bloqueados/compartidos y round-trip CSV con procedencia e identidad
+TMDb intactas; `tests/test_matching.py` y `tests/test_metadata_authority.py` cubren
+conflicto/coincidencia de `tmdb_id` y tipo de medio. Verificado con 533 pruebas
+unitarias, Ruff, formato, mypy estricto, `compileall` y `git diff --check`.
+2026-09-01, commit `0bc436c`.
 
 #### [Q1] Mantener el contexto al refinar una busqueda de Comparar
 `runSearch()` ahora ramifica por `collectionSearchMode` antes de resetear nada: en
