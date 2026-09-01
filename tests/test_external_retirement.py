@@ -109,15 +109,21 @@ class TmdbRetirementServiceTests(unittest.TestCase):
             root = Path(temporary)
             json_path = root / "owner.json"
             sqlite_path = root / "member.db"
+            # TmdbRetirementService round-trips catalog paths through
+            # Path.resolve() (its "before"/"after" states carry a resolved
+            # source_file), so the lookup here has to key on the resolved
+            # path too -- an unresolved key can silently diverge from what
+            # the service passes back on platforms where resolve() changes
+            # the path (e.g. a Windows temp-dir junction).
             repositories = {
-                path: open_catalog_repository(path, normalize_item)
+                path.resolve(): open_catalog_repository(path, normalize_item)
                 for path in (json_path, sqlite_path)
             }
-            repositories[json_path].write([tmdb_item("owner-item")])
-            repositories[sqlite_path].write([tmdb_item("member-item")])
+            repositories[json_path.resolve()].write([tmdb_item("owner-item")])
+            repositories[sqlite_path.resolve()].write([tmdb_item("member-item")])
             history = MemoryCurationHistoryRepository()
             service = TmdbRetirementService(
-                lambda path: repositories[path],
+                lambda path: repositories[path.resolve()],
                 history,
                 lambda: [
                     RetirementCatalog("owner", json_path, True),
@@ -130,15 +136,15 @@ class TmdbRetirementServiceTests(unittest.TestCase):
 
             self.assertTrue(preview["can_purge"])
             self.assertEqual(preview["affected_items"], 2)
-            self.assertEqual(repositories[json_path].read()[0].tmdb_id, "")
-            self.assertEqual(repositories[sqlite_path].read()[0].tmdb_id, "")
+            self.assertEqual(repositories[json_path.resolve()].read()[0].tmdb_id, "")
+            self.assertEqual(repositories[sqlite_path.resolve()].read()[0].tmdb_id, "")
             self.assertEqual(service.history()["count"], 1)
 
             operation = service.undo(result["operation"]["id"])
 
             self.assertEqual(operation["status"], "undone")
-            self.assertEqual(repositories[json_path].read()[0].tmdb_id, "48691")
-            self.assertEqual(repositories[sqlite_path].read()[0].tmdb_id, "48691")
+            self.assertEqual(repositories[json_path.resolve()].read()[0].tmdb_id, "48691")
+            self.assertEqual(repositories[sqlite_path.resolve()].read()[0].tmdb_id, "48691")
 
     def test_stale_preview_and_read_only_catalog_block_purge(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
