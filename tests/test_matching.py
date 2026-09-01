@@ -101,6 +101,62 @@ class MatchingTests(unittest.TestCase):
         self.assertFalse(conflict.accepted)
         self.assertEqual(conflict.reason, "mal_id_conflict")
 
+    def test_tmdb_id_is_strong_and_conflicts_override_titles_and_other_links(self) -> None:
+        shared = decide_match(
+            {"title": "Unknown", "kind": "pelicula", "tmdb_id": "48691"},
+            {"title": "Addio zio Tom", "kind": "pelicula", "tmdb_id": 48691},
+        )
+        conflict = decide_match(
+            {
+                "title": "Heat",
+                "year": "1995",
+                "kind": "pelicula",
+                "tmdb_id": "949",
+                "imdb_url": "https://www.imdb.com/title/tt0113277/",
+            },
+            {
+                "title": "Heat",
+                "year": "1995",
+                "kind": "pelicula",
+                "tmdb_id": "950",
+                "imdb_url": "https://www.imdb.com/title/tt0113277/",
+            },
+        )
+
+        self.assertTrue(shared.accepted)
+        self.assertEqual(shared.reason, "shared_tmdb_id")
+        self.assertFalse(conflict.accepted)
+        self.assertEqual(conflict.reason, "tmdb_id_conflict")
+
+    def test_same_tmdb_number_cannot_merge_movie_and_tv(self) -> None:
+        decision = decide_match(
+            {
+                "title": "Homónimo",
+                "kind": "pelicula",
+                "tmdb_id": "42",
+                "tmdb_url": "https://www.themoviedb.org/movie/42",
+            },
+            {
+                "title": "Homónimo",
+                "kind": "serie",
+                "tmdb_id": "42",
+                "tmdb_url": "https://www.themoviedb.org/tv/42",
+            },
+        )
+
+        self.assertFalse(decision.accepted)
+        self.assertEqual(decision.reason, "tmdb_media_type_conflict")
+        self.assertEqual(
+            work_identity_key(
+                {
+                    "kind": "pelicula",
+                    "tmdb_id": "42",
+                    "tmdb_url": "https://www.themoviedb.org/movie/42",
+                }
+            ),
+            "tmdb:movie:42",
+        )
+
     def test_trusted_hosts_are_compared_by_hostname(self) -> None:
         self.assertEqual(external_source_name("https://www.imdb.com/title/tt0113277/"), "imdb")
         self.assertEqual(external_source_name("https://imdb.com.example.org/title/tt0113277/"), "")

@@ -64,6 +64,20 @@ class ImportParserTests(unittest.TestCase):
         self.assertNotIn("path", item)
         self.assertNotIn("_source_file", item)
 
+    def test_csv_import_keeps_tmdb_movie_identity(self) -> None:
+        parsed = parse_import_content(
+            "tmdb.csv",
+            "csv",
+            "title,kind,tmdb_id,tmdb_url\nAddio zio Tom,pelicula,48691,"
+            "https://www.themoviedb.org/movie/48691\n",
+        )
+
+        item = parsed.items[0].item
+        assert item is not None
+        self.assertEqual(item["tmdb_id"], "48691")
+        self.assertEqual(item["tmdb_url"], "https://www.themoviedb.org/movie/48691")
+        self.assertEqual(item["kind"], "pelicula")
+
     def test_binary_and_duplicate_json_keys_are_rejected(self) -> None:
         with self.assertRaises(ImportParseError):
             parse_import_content("bad.txt", "txt", "Heat\x00Ikiru")

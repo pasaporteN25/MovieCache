@@ -15,9 +15,11 @@ from movie_inbox.domain.catalog import (
     canonical_url,
     external_urls,
     normalize_tags,
+    themoviedb_media_reference,
     title_match_keys_for_item,
 )
 from movie_inbox.domain.matching import explicit_kind
+from movie_inbox.domain.metadata import normalize_external_positive_id
 
 LIBRARY_SCHEDULES = {"manual", "hourly", "daily"}
 LIBRARY_STATUSES = {
@@ -217,7 +219,9 @@ def work_identity(item: Mapping[str, Any]) -> dict[str, Any]:
         "imdb_url": canonical_url(str(item.get("imdb_url") or "")),
         "filmaffinity_url": canonical_url(str(item.get("filmaffinity_url") or "")),
         "myanimelist_url": canonical_url(str(item.get("myanimelist_url") or "")),
+        "tmdb_url": canonical_url(str(item.get("tmdb_url") or "")),
         "wikidata_id": str(item.get("wikidata_id") or "").strip().upper(),
+        "tmdb_id": normalize_external_positive_id(item.get("tmdb_id")),
         "mal_id": str(item.get("mal_id") or "").strip(),
     }
     return {key: value for key, value in identity.items() if value not in ("", [])}
@@ -228,6 +232,10 @@ def detected_work_identity(title: str, year: str, kind: str) -> dict[str, Any]:
 
 
 def work_identity_key(item: Mapping[str, Any]) -> str:
+    tmdb_id = normalize_external_positive_id(item.get("tmdb_id"))
+    if tmdb_id:
+        media_type = _tmdb_media_type(item)
+        return f"tmdb:{media_type or 'unknown'}:{tmdb_id}"
     wikidata = str(item.get("wikidata_id") or "").strip().upper()
     if wikidata:
         return f"wikidata:{wikidata}"
@@ -245,6 +253,14 @@ def work_identity_key(item: Mapping[str, Any]) -> str:
 
 
 def identity_matches_item(identity: Mapping[str, Any], item: Mapping[str, Any]) -> bool:
+    left_tmdb_id = normalize_external_positive_id(identity.get("tmdb_id"))
+    right_tmdb_id = normalize_external_positive_id(item.get("tmdb_id"))
+    if left_tmdb_id and right_tmdb_id:
+        if left_tmdb_id != right_tmdb_id:
+            return False
+        left_type = _tmdb_media_type(identity)
+        right_type = _tmdb_media_type(item)
+        return not left_type or not right_type or left_type == right_type
     left_wikidata = str(identity.get("wikidata_id") or "").strip().upper()
     right_wikidata = str(item.get("wikidata_id") or "").strip().upper()
     if left_wikidata and left_wikidata == right_wikidata:
@@ -268,3 +284,16 @@ def identity_matches_item(identity: Mapping[str, Any], item: Mapping[str, Any]) 
         and left_year == right_year
         and (not left_kind or not right_kind or left_kind == right_kind)
     )
+
+
+def _tmdb_media_type(item: Mapping[str, Any]) -> str:
+    for url_field in ("tmdb_url", "url"):
+        reference = themoviedb_media_reference(str(item.get(url_field) or ""))
+        if reference is not None:
+            return reference[0]
+    kind = explicit_kind(item)
+    if kind == "serie":
+        return "tv"
+    if kind in {"pelicula", "documental"}:
+        return "movie"
+    return ""

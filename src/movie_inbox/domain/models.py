@@ -136,6 +136,7 @@ class CatalogItem(ModelMapping):
     imdb_url: str = ""
     filmaffinity_url: str = ""
     myanimelist_url: str = ""
+    tmdb_url: str = ""
     wikipedia_title: str = ""
     wikidata_id: str = ""
     duration_minutes: int | None = None
@@ -226,6 +227,7 @@ class ExternalSearchResult(TypedDict, total=False):
     imdb_url: str
     filmaffinity_url: str
     myanimelist_url: str
+    tmdb_url: str
     wikipedia_title: str
     wikidata_id: str
     duration_minutes: int | None

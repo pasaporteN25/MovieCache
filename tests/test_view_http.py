@@ -513,6 +513,89 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="loginForm"', login.content)
         self.assertIn(b"/static/login.js", login.content)
 
+    def test_owner_can_preview_purge_audit_and_undo_tmdb_metadata(self) -> None:
+        tmdb_url = "https://www.themoviedb.org/movie/48691"
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "addio",
+                        "source": "tmdb",
+                        "url": tmdb_url,
+                        "tmdb_url": tmdb_url,
+                        "tmdb_id": "48691",
+                        "title": "Adiós, tío Tom",
+                        "kind": "pelicula",
+                        "directors": ["Gualtiero Jacopetti"],
+                        "status": "watched",
+                        "rating": 8,
+                        "review": "Personal",
+                        "metadata_sources": {
+                            field: {
+                                "source": "tmdb",
+                                "url": tmdb_url,
+                                "updated_at": "2026-08-31T00:00:00Z",
+                                "inferred": False,
+                            }
+                            for field in (
+                                "title",
+                                "kind",
+                                "directors",
+                                "tmdb_id",
+                                "tmdb_url",
+                            )
+                        },
+                    }
+                )
+            ]
+        )
+        token_header = {"X-Movie-Inbox-Token": self.config.api_token}
+
+        preview = self.client.get(
+            "/api/integrations/tmdb/retirement/preview",
+            headers=token_header,
+        )
+        unconfirmed = self.client.post(
+            "/api/integrations/tmdb/retirement/purge",
+            content=json.dumps({"preview_id": preview.json()["preview_id"]}),
+            headers=self.post_headers(),
+        )
+        purged = self.client.post(
+            "/api/integrations/tmdb/retirement/purge",
+            content=json.dumps({"preview_id": preview.json()["preview_id"], "confirmed": True}),
+            headers=self.post_headers(),
+        )
+
+        self.assertEqual(preview.status_code, 200, preview.content)
+        self.assertEqual(preview.json()["affected_items"], 1)
+        self.assertTrue(preview.json()["can_purge"])
+        self.assertEqual(unconfirmed.status_code, 400, unconfirmed.content)
+        self.assertEqual(purged.status_code, 200, purged.content)
+        retired = JsonCatalogRepository(self.catalog_path, normalize_item).get("addio")
+        assert retired is not None
+        self.assertEqual(retired.tmdb_id, "")
+        self.assertEqual(retired.directors, [])
+        self.assertEqual(retired.rating, 8)
+        self.assertEqual(retired.review, "Personal")
+
+        history = self.client.get(
+            "/api/integrations/tmdb/retirement/history",
+            headers=token_header,
+        )
+        undo = self.client.post(
+            "/api/integrations/tmdb/retirement/undo",
+            content=json.dumps({"operation_id": purged.json()["operation"]["id"]}),
+            headers=self.post_headers(),
+        )
+
+        self.assertEqual(history.status_code, 200, history.content)
+        self.assertEqual(history.json()["count"], 1)
+        self.assertEqual(undo.status_code, 200, undo.content)
+        restored = JsonCatalogRepository(self.catalog_path, normalize_item).get("addio")
+        assert restored is not None
+        self.assertEqual(restored.tmdb_id, "48691")
+        self.assertEqual(restored.review, "Personal")
+
     def test_member_must_change_password_and_catalog_is_isolated_by_session(self) -> None:
         created = self.client.post(
             "/api/members",
@@ -616,10 +699,15 @@ class ViewerHttpTests(unittest.TestCase):
                 "/api/scanner/queue",
                 headers={"X-Movie-Inbox-Token": self.config.api_token},
             )
+            forbidden_tmdb_retirement = member_client.get(
+                "/api/integrations/tmdb/retirement/preview",
+                headers={"X-Movie-Inbox-Token": self.config.api_token},
+            )
             self.assertEqual(updated.status_code, 200, updated.content)
             self.assertEqual(forbidden_members.status_code, 403)
             self.assertEqual(forbidden_libraries.status_code, 403)
             self.assertEqual(forbidden_scanner_queue.status_code, 403)
+            self.assertEqual(forbidden_tmdb_retirement.status_code, 403)
 
         owner_item = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
         member_item = member_repository.get("heat")

@@ -19,7 +19,7 @@ from movie_inbox.infrastructure.schema import (
 
 
 class SchemaAndRepositoryTests(unittest.TestCase):
-    def test_legacy_list_is_migrated_to_v8_shape(self) -> None:
+    def test_legacy_list_is_migrated_to_v9_shape(self) -> None:
         rows = extract_catalog_items([{"title": "Heat", "year": "1995", "en_catalogo": "si"}])
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["kind"], "pelicula")
@@ -37,10 +37,11 @@ class SchemaAndRepositoryTests(unittest.TestCase):
         self.assertEqual(rows[0]["composers"], [])
         self.assertEqual(rows[0]["myanimelist_url"], "")
         self.assertEqual(rows[0]["mal_id"], "")
+        self.assertEqual(rows[0]["tmdb_url"], "")
 
     def test_future_and_malformed_catalogs_are_rejected(self) -> None:
         with self.assertRaises(UnsupportedCatalogVersion):
-            extract_catalog_items({"schema_version": 9, "items": []})
+            extract_catalog_items({"schema_version": 10, "items": []})
         with self.assertRaises(CatalogSchemaError):
             extract_catalog_items({"schema_version": 8, "items": "not-an-array"})
         with self.assertRaises(CatalogSchemaError):
@@ -84,9 +85,9 @@ class SchemaAndRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded[0].title, "Heat")
             self.assertEqual(loaded[0].duration_minutes, 172)
             self.assertEqual(loaded[0].countries, ["Estados Unidos"])
-            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 8)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 9)
 
-            path.write_text('{"schema_version": 9, "items": []}', encoding="utf-8")
+            path.write_text('{"schema_version": 10, "items": []}', encoding="utf-8")
             with self.assertRaises(CatalogFormatError):
                 repository.read()
 
@@ -137,6 +138,14 @@ class SchemaAndRepositoryTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["myanimelist_url"], "")
         self.assertEqual(rows[0]["mal_id"], "")
+
+    def test_v8_catalog_is_migrated_with_empty_tmdb_url(self) -> None:
+        item = normalize_item({"id": "heat", "title": "Heat", "kind": "pelicula"}).to_dict()
+        item.pop("tmdb_url")
+
+        rows = extract_catalog_items({"schema_version": 8, "items": [item]})
+
+        self.assertEqual(rows[0]["tmdb_url"], "")
 
     def test_normalization_repairs_identifier_titles_and_detects_series(self) -> None:
         item = normalize_item(

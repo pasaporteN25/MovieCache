@@ -357,6 +357,7 @@ def item_from_search_result(result: dict[str, Any]) -> dict[str, Any]:
         "imdb_url": str(result.get("imdb_url") or ""),
         "filmaffinity_url": str(result.get("filmaffinity_url") or ""),
         "myanimelist_url": str(result.get("myanimelist_url") or ""),
+        "tmdb_url": str(result.get("tmdb_url") or ""),
     }
     if link_field:
         source_links[link_field] = source_links.get(link_field) or url

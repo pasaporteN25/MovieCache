@@ -428,6 +428,7 @@ def _result_key(row: Mapping[str, Any]) -> str:
         "imdb_url",
         "filmaffinity_url",
         "myanimelist_url",
+        "tmdb_url",
     ):
         url = canonical_url(str(row.get(field) or ""))
         if url:

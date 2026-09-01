@@ -38,7 +38,7 @@ from movie_inbox.domain.releases import (
     normalize_release_dates,
 )
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 BACKUP_LIMIT = 1
 CATALOG_FIELDS = [
     "id",
@@ -60,6 +60,7 @@ CATALOG_FIELDS = [
     "imdb_url",
     "filmaffinity_url",
     "myanimelist_url",
+    "tmdb_url",
     "wikipedia_title",
     "wikidata_id",
     "duration_minutes",
@@ -217,6 +218,7 @@ def migrate_catalog_document(raw: Any) -> dict[str, Any]:
         5: v5_to_v6,
         6: v6_to_v7,
         7: v7_to_v8,
+        8: v8_to_v9,
     }
     while document["schema_version"] < SCHEMA_VERSION:
         migration = migrations.get(document["schema_version"])
@@ -330,6 +332,15 @@ def v7_to_v8(document: dict[str, Any]) -> dict[str, Any]:
         item["mal_id"] = str(item.get("mal_id") or "")
         rows.append(item)
     return {"schema_version": 8, "items": rows}
+
+
+def v8_to_v9(document: dict[str, Any]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for row in copy_item_rows(document.get("items"), "v8"):
+        item = normalize_legacy_item(row)
+        item["tmdb_url"] = str(item.get("tmdb_url") or "")
+        rows.append(item)
+    return {"schema_version": 9, "items": rows}
 
 
 def validate_catalog_document(document: Mapping[str, Any]) -> None:

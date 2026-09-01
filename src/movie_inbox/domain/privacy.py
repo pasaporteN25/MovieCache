@@ -25,6 +25,7 @@ SHARED_CATALOG_FIELDS = {
     "imdb_url",
     "filmaffinity_url",
     "myanimelist_url",
+    "tmdb_url",
     "wikipedia_title",
     "wikidata_id",
     "duration_minutes",

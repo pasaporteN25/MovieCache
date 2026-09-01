@@ -52,12 +52,27 @@ class ListFieldTests(unittest.TestCase):
         )
 
     def test_two_sources_disagreeing_on_a_list_field_end_up_unioned_not_replaced(self) -> None:
-        existing = normalize_item({"id": "x", "directors": ["Michael Mann"]}).to_dict()
+        existing = normalize_item(
+            {"id": "x", "source": "imdb", "directors": ["Michael Mann"]}
+        ).to_dict()
         incoming = normalize_item(
             {"source": "filmaffinity", "directors": ["Michael Mann", "Someone Else"]}
         ).to_dict()
         merge_metadata_field(existing, incoming, "directors")
         self.assertEqual(existing["directors"], ["Michael Mann", "Someone Else"])
+        self.assertEqual(
+            existing["metadata_sources"]["directors"]["source"],
+            "imdb+filmaffinity",
+        )
+
+    def test_tmdb_list_completion_records_both_contributors_for_safe_retirement(self) -> None:
+        existing = normalize_item({"id": "x", "source": "imdb", "genres": ["Drama"]}).to_dict()
+        incoming = normalize_item({"source": "tmdb", "genres": ["Drama", "History"]}).to_dict()
+
+        merge_metadata_field(existing, incoming, "genres")
+
+        self.assertEqual(existing["genres"], ["Drama", "History"])
+        self.assertEqual(existing["metadata_sources"]["genres"]["source"], "imdb+tmdb")
 
     def test_imdb_datasets_comma_joined_genres_string_unions_with_zero_new_code(self) -> None:
         existing = normalize_item({"id": "x", "genres": ["Drama"]}).to_dict()

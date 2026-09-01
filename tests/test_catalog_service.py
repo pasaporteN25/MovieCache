@@ -144,6 +144,39 @@ class AppendItemStrongMatchTests(unittest.TestCase):
             self.assertEqual(reason, "added")
             self.assertEqual(len(repository.read()), 2)
 
+    def test_conflicting_tmdb_ids_never_trigger_the_title_year_auto_merge(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            service, repository = self.service(catalog_path)
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat-tmdb",
+                            "title": "Heat",
+                            "year": "1995",
+                            "kind": "pelicula",
+                            "tmdb_id": "949",
+                        }
+                    )
+                ]
+            )
+
+            added, reason, extra = service.append_item(
+                {
+                    "id": "heat-wrong-tmdb",
+                    "title": "Heat",
+                    "year": "1995",
+                    "kind": "pelicula",
+                    "tmdb_id": "950",
+                }
+            )
+
+            self.assertFalse(added)
+            self.assertEqual(reason, "possible_duplicate")
+            self.assertEqual(extra["candidates"][0]["id"], "heat-tmdb")
+            self.assertEqual(len(repository.read()), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

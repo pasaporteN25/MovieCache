@@ -117,7 +117,13 @@ class ExternalCatalogService:
             enriched["release_dates"] = merge_release_dates(
                 enriched.get("release_dates"), release_dates
             )
-        for field in ("wikipedia_url", "imdb_url", "filmaffinity_url", "myanimelist_url"):
+        for field in (
+            "wikipedia_url",
+            "imdb_url",
+            "filmaffinity_url",
+            "myanimelist_url",
+            "tmdb_url",
+        ):
             if metadata.get(field):
                 enriched[field] = str(metadata[field])
         metadata_url = str(metadata.get("url") or "")
@@ -130,6 +136,8 @@ class ExternalCatalogService:
             enriched["filmaffinity_url"] = result_url
         elif source == "jikan":
             enriched["myanimelist_url"] = result_url
+        elif source == "tmdb":
+            enriched["tmdb_url"] = result_url
         enriched["alternative_titles"] = _alternative_titles(enriched, preserved_titles)
         return cast(ExternalSearchResult, enriched)
 

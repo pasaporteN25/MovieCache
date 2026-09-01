@@ -170,6 +170,7 @@ def tmdb_search_result(
         "kind": "pelicula" if media_type == "movie" else "serie",
         "year": release_date[:4] if re.match(r"^\d{4}", release_date) else "",
         "url": public_url,
+        "tmdb_url": public_url,
         "tmdb_id": tmdb_id,
         "description": clean_text(str(row.get("overview") or "")),
         "page_image": _image_url(row.get("poster_path"), "w500"),

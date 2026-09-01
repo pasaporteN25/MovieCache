@@ -61,6 +61,7 @@ MERGE_FIELDS = (
     MergeField("imdb_url", "IMDb", "sources"),
     MergeField("filmaffinity_url", "FilmAffinity", "sources"),
     MergeField("myanimelist_url", "MyAnimeList", "sources"),
+    MergeField("tmdb_url", "TMDb", "sources"),
     MergeField("wikipedia_title", "Titulo de Wikipedia", "sources"),
     MergeField("wikidata_id", "Wikidata", "sources"),
     MergeField("tmdb_id", "TMDB", "sources"),

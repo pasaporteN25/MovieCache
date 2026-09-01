@@ -9,6 +9,7 @@ from typing import Any, TypedDict
 
 from movie_inbox.domain.catalog import (
     external_urls,
+    themoviedb_media_reference,
     title_match_keys_for_item,
     title_similarity,
 )
@@ -39,6 +40,51 @@ def decide_match(
     incoming: Mapping[str, Any],
     strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> MatchDecision:
+    existing_tmdb_id = normalize_external_positive_id(existing.get("tmdb_id"))
+    incoming_tmdb_id = normalize_external_positive_id(incoming.get("tmdb_id"))
+    if existing_tmdb_id and incoming_tmdb_id:
+        if existing_tmdb_id != incoming_tmdb_id:
+            return MatchDecision(
+                False,
+                "tmdb_id_conflict",
+                1.0,
+                {
+                    "existing_tmdb_id": existing_tmdb_id,
+                    "incoming_tmdb_id": incoming_tmdb_id,
+                },
+            )
+        existing_tmdb_type = _tmdb_media_type(existing)
+        incoming_tmdb_type = _tmdb_media_type(incoming)
+        if existing_tmdb_type and incoming_tmdb_type and existing_tmdb_type != incoming_tmdb_type:
+            return MatchDecision(
+                False,
+                "tmdb_media_type_conflict",
+                1.0,
+                {
+                    "tmdb_id": existing_tmdb_id,
+                    "existing_media_type": existing_tmdb_type,
+                    "incoming_media_type": incoming_tmdb_type,
+                },
+            )
+
+    existing_mal_id = normalize_external_positive_id(existing.get("mal_id"))
+    incoming_mal_id = normalize_external_positive_id(incoming.get("mal_id"))
+    if existing_mal_id and incoming_mal_id and existing_mal_id != incoming_mal_id:
+        return MatchDecision(
+            False,
+            "mal_id_conflict",
+            1.0,
+            {"existing_mal_id": existing_mal_id, "incoming_mal_id": incoming_mal_id},
+        )
+
+    if existing_tmdb_id and existing_tmdb_id == incoming_tmdb_id:
+        return MatchDecision(
+            True,
+            "shared_tmdb_id",
+            1.0,
+            {"tmdb_id": existing_tmdb_id, "media_type": _tmdb_media_type(existing)},
+        )
+
     shared_urls = sorted(external_urls(dict(existing)) & external_urls(dict(incoming)))
     if shared_urls:
         return MatchDecision(True, "shared_external_url", 1.0, {"urls": shared_urls})
@@ -48,17 +94,8 @@ def decide_match(
     if existing_wikidata and existing_wikidata == incoming_wikidata:
         return MatchDecision(True, "shared_wikidata_id", 1.0, {"wikidata_id": existing_wikidata})
 
-    existing_mal_id = normalize_external_positive_id(existing.get("mal_id"))
-    incoming_mal_id = normalize_external_positive_id(incoming.get("mal_id"))
     if existing_mal_id and incoming_mal_id:
-        if existing_mal_id == incoming_mal_id:
-            return MatchDecision(True, "shared_mal_id", 1.0, {"mal_id": existing_mal_id})
-        return MatchDecision(
-            False,
-            "mal_id_conflict",
-            1.0,
-            {"existing_mal_id": existing_mal_id, "incoming_mal_id": incoming_mal_id},
-        )
+        return MatchDecision(True, "shared_mal_id", 1.0, {"mal_id": existing_mal_id})
 
     existing_titles = title_match_keys_for_item(dict(existing))
     incoming_titles = title_match_keys_for_item(dict(incoming))
@@ -168,3 +205,16 @@ def explicit_kind(item: Mapping[str, Any]) -> str:
 
 def _anime_release_taxonomy_mismatch(left: str, right: str) -> bool:
     return {left, right} in ({"anime", "pelicula"}, {"anime", "serie"})
+
+
+def _tmdb_media_type(item: Mapping[str, Any]) -> str:
+    for field in ("tmdb_url", "url"):
+        reference = themoviedb_media_reference(str(item.get(field) or ""))
+        if reference is not None:
+            return reference[0]
+    kind = explicit_kind(item)
+    if kind == "serie":
+        return "tv"
+    if kind in {"pelicula", "documental"}:
+        return "movie"
+    return ""

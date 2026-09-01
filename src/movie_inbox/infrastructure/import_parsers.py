@@ -81,6 +81,8 @@ CSV_ALIASES = {
     "imdb_url": {"imdb_url", "imdb"},
     "filmaffinity_url": {"filmaffinity_url", "filmaffinity"},
     "myanimelist_url": {"myanimelist_url", "myanimelist", "mal_url"},
+    "tmdb_url": {"tmdb_url", "tmdb", "themoviedb_url"},
+    "tmdb_id": {"tmdb_id", "themoviedb_id"},
     "mal_id": {"mal_id", "myanimelist_id"},
     "countries": {"countries", "country", "paises", "pais"},
     "original_languages": {
@@ -297,7 +299,15 @@ def _csv_mapping(headers: list[str], requested: Mapping[str, str]) -> dict[str, 
             raise ImportParseError("CSV column mapping is invalid")
         mapping[field] = header
     if "title" not in mapping and not (
-        {"url", "wikipedia_url", "imdb_url", "filmaffinity_url", "myanimelist_url"} & set(mapping)
+        {
+            "url",
+            "wikipedia_url",
+            "imdb_url",
+            "filmaffinity_url",
+            "myanimelist_url",
+            "tmdb_url",
+        }
+        & set(mapping)
     ):
         raise ImportParseError("CSV import needs a title or URL column")
     return mapping
@@ -345,6 +355,7 @@ def _normalize_import_item(raw: Mapping[str, Any]) -> dict[str, Any]:
         str(item.get("imdb_url") or item.get("imdb") or ""),
         str(item.get("filmaffinity_url") or item.get("filmaffinity") or ""),
         str(item.get("myanimelist_url") or item.get("myanimelist") or ""),
+        str(item.get("tmdb_url") or item.get("tmdb") or ""),
     ]
     primary_url = next(
         (canonical_url(value) for value in candidate_urls if canonical_url(value)), ""
@@ -358,7 +369,13 @@ def _normalize_import_item(raw: Mapping[str, Any]) -> dict[str, Any]:
         link_field = source_url_field(source, primary_url)
         if link_field:
             item[link_field] = trusted_external_url(primary_url)
-    for field in ("wikipedia_url", "imdb_url", "filmaffinity_url", "myanimelist_url"):
+    for field in (
+        "wikipedia_url",
+        "imdb_url",
+        "filmaffinity_url",
+        "myanimelist_url",
+        "tmdb_url",
+    ):
         value = str(item.get(field) or "")
         if value:
             trusted = trusted_external_url(value)

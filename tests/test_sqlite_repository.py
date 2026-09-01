@@ -60,6 +60,7 @@ def sample_item(item_id: str = "heat-1995") -> CatalogItem:
             "page_image": "https://images.example/poster.jpg",
             "backdrop_image": "https://images.example/backdrop.jpg",
             "tmdb_id": "949",
+            "tmdb_url": "https://www.themoviedb.org/movie/949",
             "myanimelist_url": "https://myanimelist.net/anime/32281",
             "mal_id": "32281",
             "en_catalogo": True,
@@ -155,6 +156,7 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.composers, ["Elliot Goldenthal"])
             self.assertEqual(loaded.backdrop_image, "https://images.example/backdrop.jpg")
             self.assertEqual(loaded.tmdb_id, "949")
+            self.assertEqual(loaded.tmdb_url, "https://www.themoviedb.org/movie/949")
             self.assertEqual(loaded.myanimelist_url, "https://myanimelist.net/anime/32281")
             self.assertEqual(loaded.mal_id, "32281")
             self.assertEqual(loaded.release_dates[0]["date"], "1995-12-15")

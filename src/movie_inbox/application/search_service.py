@@ -342,6 +342,7 @@ def _search_values(item: Mapping[str, Any]) -> list[tuple[str, str, float]]:
         ("external_link", item.get("imdb_url"), 0.92),
         ("external_link", item.get("filmaffinity_url"), 0.92),
         ("external_link", item.get("myanimelist_url"), 0.92),
+        ("external_link", item.get("tmdb_url"), 0.92),
         # Secondary metadata (director/genre/writer/cast/tags/description/notes/review)
         # is deliberately excluded: docs/search-quality.md's "Catálogo" and
         # "Comparar/merge" contracts only permit title/alias/ID/file evidence here,

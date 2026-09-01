@@ -557,6 +557,7 @@ class SqliteCatalogRepository:
             "imdb_url": "",
             "filmaffinity_url": "",
             "myanimelist_url": "",
+            "tmdb_url": "",
             "wikipedia_title": "",
             "wikidata_id": "",
             "countries": [],
@@ -721,6 +722,9 @@ class SqliteCatalogRepository:
             elif source == "jikan":
                 item["myanimelist_url"] = row["url"]
                 item["mal_id"] = row["external_id"]
+            elif source == "tmdb":
+                item["tmdb_url"] = row["url"]
+                item["tmdb_id"] = row["external_id"] or item["tmdb_id"]
             elif source == "wikidata":
                 item["wikidata_id"] = row["external_id"]
 
@@ -885,7 +889,9 @@ class SqliteCatalogRepository:
             "imdb_url",
             "filmaffinity_url",
             "myanimelist_url",
+            "tmdb_url",
             "wikidata_id",
+            "tmdb_id",
             "mal_id",
         )
         if previous is None or any(
@@ -958,6 +964,12 @@ class SqliteCatalogRepository:
                 "jikan",
                 item.get("mal_id", ""),
                 item.get("myanimelist_url", ""),
+                "",
+            ),
+            (
+                "tmdb",
+                item.get("tmdb_id", ""),
+                item.get("tmdb_url", ""),
                 "",
             ),
             ("wikidata", item.get("wikidata_id", ""), "", ""),

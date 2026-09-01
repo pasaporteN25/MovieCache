@@ -46,6 +46,7 @@ from movie_inbox.domain.normalization import (
     normalize_rating,
     normalize_status,
 )
+from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.domain.titles import (
     clean_release_title,
     clean_whitespace,
@@ -246,6 +247,7 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
     imdb_url = str(row.get("imdb_url") or "")
     filmaffinity_url = str(row.get("filmaffinity_url") or "")
     myanimelist_url = str(row.get("myanimelist_url") or "")
+    tmdb_url = str(row.get("tmdb_url") or "")
     if link_field == "wikipedia_url":
         wikipedia_url = wikipedia_url or url
     elif link_field == "imdb_url":
@@ -254,6 +256,8 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
         filmaffinity_url = filmaffinity_url or url
     elif link_field == "myanimelist_url":
         myanimelist_url = myanimelist_url or url
+    elif link_field == "tmdb_url":
+        tmdb_url = tmdb_url or url
     return normalize_item(
         CatalogItem(
             id=str(row.get("id") or stable_id(url or local_path or local_name or title)),
@@ -271,13 +275,16 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
             watched_at=normalize_date(row.get("watched_at") or row.get("watchedAt")),
             rating=normalize_rating(row.get("rating")),
             year=str(row.get("year") or infer_year(title, local_name, local_path)),
+            release_dates=normalize_release_dates(_json_array(row.get("release_dates"))),
             description=str(row.get("description") or ""),
             wikipedia_url=wikipedia_url,
             imdb_url=imdb_url,
             filmaffinity_url=filmaffinity_url,
             myanimelist_url=myanimelist_url,
+            tmdb_url=tmdb_url,
             wikipedia_title=str(row.get("wikipedia_title") or ""),
             wikidata_id=str(row.get("wikidata_id") or ""),
+            tmdb_id=str(row.get("tmdb_id") or ""),
             mal_id=str(row.get("mal_id") or ""),
             duration_minutes=normalize_optional_positive_int(
                 row.get("duration_minutes") or row.get("duration")
@@ -295,6 +302,7 @@ def item_from_mapping(row: dict[str, object], default_status: str) -> CatalogIte
             ),
             cast=normalize_list(row.get("cast") or row.get("actors") or row.get("actor")),
             page_image=str(row.get("page_image") or ""),
+            backdrop_image=str(row.get("backdrop_image") or ""),
             wikipedia_extract=str(row.get("wikipedia_extract") or ""),
             en_catalogo=normalize_bool(row.get("en_catalogo"), default=False),
             local_files=[LocalFile.from_mapping(local_file) for local_file in local_files],
@@ -401,6 +409,18 @@ def normalize_url(url: str) -> str:
     return url
 
 
+def _json_array(value: object) -> list[object]:
+    if isinstance(value, list):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
 def build_catalog(urls: list[str], fetch: bool, delay: float, status: str) -> list[CatalogItem]:
     now = datetime.now(UTC).isoformat()
     items: list[CatalogItem] = []
@@ -435,8 +455,10 @@ def build_catalog(urls: list[str], fetch: bool, delay: float, status: str) -> li
                 filmaffinity_url=url
                 if source == "filmaffinity"
                 else metadata.get("filmaffinity_url", ""),
+                tmdb_url=url if source == "tmdb" else metadata.get("tmdb_url", ""),
                 wikipedia_title=metadata.get("wikipedia_title", ""),
                 wikidata_id=metadata.get("wikidata_id", ""),
+                tmdb_id=str(metadata.get("tmdb_id") or ""),
                 duration_minutes=normalize_optional_positive_int(metadata.get("duration_minutes")),
                 countries=normalize_list(metadata.get("countries")),
                 original_languages=normalize_list(metadata.get("original_languages")),

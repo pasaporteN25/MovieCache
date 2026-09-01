@@ -147,6 +147,7 @@ class TmdbAdapterTests(unittest.TestCase):
         self.assertEqual(result["kind"], "pelicula")
         self.assertEqual(result["year"], "1971")
         self.assertEqual(result["url"], "https://www.themoviedb.org/movie/48691")
+        self.assertEqual(result["tmdb_url"], "https://www.themoviedb.org/movie/48691")
         self.assertEqual(result["page_image"], "https://image.tmdb.org/t/p/w500/addio-poster.jpg")
         self.assertNotIn("rating", result)
         self.assertNotIn("vote_average", result)
@@ -316,8 +317,10 @@ class TmdbAdapterTests(unittest.TestCase):
 
             self.assertEqual(fetch_json.call_count, 1)
             self.assertEqual(item["tmdb_id"], "48691")
+            self.assertEqual(item["tmdb_url"], "https://www.themoviedb.org/movie/48691")
             self.assertEqual(item["imdb_url"], "https://www.imdb.com/title/tt0180396/")
             self.assertEqual(item["metadata_sources"]["tmdb_id"]["source"], "tmdb")
+            self.assertEqual(item["metadata_sources"]["tmdb_url"]["source"], "tmdb")
             self.assertEqual(item["metadata_sources"]["directors"]["source"], "tmdb")
         finally:
             configure_external_catalog("")

@@ -21,6 +21,11 @@ from movie_inbox.application.auth_service import (
     PasswordPolicyError,
 )
 from movie_inbox.application.collection_service import CollectionService
+from movie_inbox.application.external_retirement import (
+    RetirementCatalog,
+    TmdbRetirementService,
+    retirement_history_path,
+)
 from movie_inbox.application.home_service import EditorialHomeService
 from movie_inbox.application.identity_repository import IdentityRepositoryError
 from movie_inbox.application.import_service import ImportService
@@ -35,7 +40,10 @@ from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
-from movie_inbox.infrastructure.curation_history import MemoryCurationHistoryRepository
+from movie_inbox.infrastructure.curation_history import (
+    JsonCurationHistoryRepository,
+    MemoryCurationHistoryRepository,
+)
 from movie_inbox.infrastructure.external_catalog import configure_external_catalog
 from movie_inbox.infrastructure.home_snapshot_repository import SqliteHomeSnapshotRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
@@ -70,7 +78,17 @@ from movie_inbox.web.dependencies import (
 )
 from movie_inbox.web.image_warmer import ImageCacheWarmer
 from movie_inbox.web.responses import ApiRequestError, error_response, identity_payload
-from movie_inbox.web.routers import admin, catalog, club, curation, home, imports, scanner, search
+from movie_inbox.web.routers import (
+    admin,
+    catalog,
+    club,
+    curation,
+    home,
+    imports,
+    integrations,
+    scanner,
+    search,
+)
 from movie_inbox.web.security import LoginAttemptLimiter, viewer_allowed_hosts
 
 SECURITY_HEADERS = {
@@ -115,6 +133,38 @@ def create_app(config: ViewerConfig) -> FastAPI:
     owner = identity_repository.owner()
     if owner is None:
         raise RuntimeError("Movie Inbox owner account is unavailable")
+
+    def retirement_catalogs() -> list[RetirementCatalog]:
+        catalogs: list[RetirementCatalog] = []
+        for account_position, (_user, personal_catalog) in enumerate(
+            identity_repository.list_accounts(), start=1
+        ):
+            for source_position, source in enumerate(personal_catalog.sources, start=1):
+                catalogs.append(
+                    RetirementCatalog(
+                        f"active-{account_position}-source-{source_position}",
+                        Path(source.path),
+                        source.writable,
+                    )
+                )
+        for archive_position, archived in enumerate(
+            identity_repository.list_archived_members(), start=1
+        ):
+            for source_position, source in enumerate(archived.sources, start=1):
+                catalogs.append(
+                    RetirementCatalog(
+                        f"archive-{archive_position}-source-{source_position}",
+                        Path(source.path),
+                        source.writable,
+                    )
+                )
+        return catalogs
+
+    tmdb_retirement_service = TmdbRetirementService(
+        lambda path: catalog_service(path).repository,
+        JsonCurationHistoryRepository(retirement_history_path(instance_db)),
+        retirement_catalogs,
+    )
 
     def catalog_universe() -> list[dict[str, Any]]:
         universe: list[dict[str, Any]] = []
@@ -210,6 +260,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.scanner_workflow = scanner_workflow
     app.state.library_scheduler = library_scheduler
     app.state.image_warmer = image_warmer
+    app.state.tmdb_retirement_service = tmdb_retirement_service
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin)
     )
@@ -387,6 +438,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(imports.router)
     app.include_router(club.router)
     app.include_router(admin.router)
+    app.include_router(integrations.router)
     app.include_router(search.router)
     # FastAPI >=0.139's include_router is lazy: app.routes holds _IncludedRouter
     # wrappers instead of the included APIRoute objects. Flatten once so app.routes

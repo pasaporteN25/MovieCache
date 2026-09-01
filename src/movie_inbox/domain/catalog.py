@@ -18,6 +18,7 @@ from movie_inbox.domain.curation import (
 )
 from movie_inbox.domain.metadata import (
     METADATA_FIELDS,
+    compose_metadata_sources,
     merge_local_files,
     normalize_external_positive_id,
     normalize_local_files,
@@ -49,8 +50,10 @@ SOURCE_URL_FIELDS = {
     "imdb": "imdb_url",
     "filmaffinity": "filmaffinity_url",
     "jikan": "myanimelist_url",
+    "tmdb": "tmdb_url",
 }
 _MYANIMELIST_ANIME_PATH = re.compile(r"^/anime/(\d+)(?:/|$)", flags=re.IGNORECASE)
+_TMDB_MEDIA_PATH = re.compile(r"^/(movie|tv)/(\d+)(?:[-/]|$)", flags=re.IGNORECASE)
 LIST_FIELDS = {
     "alternative_titles",
     "countries",
@@ -118,6 +121,21 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
     item["myanimelist_url"] = f"https://myanimelist.net/anime/{mal_id}" if mal_id else ""
     if mal_id and str(item.get("source") or "") == "jikan":
         item["url"] = item["myanimelist_url"]
+    explicit_tmdb_id = normalize_external_positive_id(item.get("tmdb_id"))
+    tmdb_url = str(item.get("tmdb_url") or "")
+    if not tmdb_url and external_source_name(str(item.get("url") or "")) == "tmdb":
+        tmdb_url = str(item.get("url") or "")
+    tmdb_reference = themoviedb_media_reference(tmdb_url)
+    tmdb_id = explicit_tmdb_id or (tmdb_reference[1] if tmdb_reference else "")
+    tmdb_media_type = tmdb_reference[0] if tmdb_reference else ""
+    item["tmdb_id"] = tmdb_id
+    item["tmdb_url"] = (
+        f"https://www.themoviedb.org/{tmdb_media_type}/{tmdb_id}"
+        if tmdb_id and tmdb_media_type
+        else ""
+    )
+    if tmdb_id and str(item.get("source") or "") == "tmdb" and item["tmdb_url"]:
+        item["url"] = item["tmdb_url"]
     string_fields = {
         "id",
         "url",
@@ -132,6 +150,7 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         "imdb_url",
         "filmaffinity_url",
         "myanimelist_url",
+        "tmdb_url",
         "wikipedia_title",
         "wikidata_id",
         "page_image",
@@ -332,6 +351,17 @@ def myanimelist_anime_id(url: str) -> str:
     return normalize_external_positive_id(match.group(1)) if match else ""
 
 
+def themoviedb_media_reference(url: str) -> tuple[str, str] | None:
+    canonical = canonical_url(url)
+    if not canonical or external_source_name(canonical) != "tmdb":
+        return None
+    match = _TMDB_MEDIA_PATH.match(urlparse(canonical).path)
+    if not match:
+        return None
+    tmdb_id = normalize_external_positive_id(match.group(2))
+    return (match.group(1).lower(), tmdb_id) if tmdb_id else None
+
+
 def external_urls(item: Mapping[str, Any]) -> set[str]:
     urls = {trusted_external_url(str(item.get("url") or ""))}
     urls.update(
@@ -478,6 +508,8 @@ def possible_duplicate_candidates(
                 "imdb_url": existing.get("imdb_url", ""),
                 "filmaffinity_url": existing.get("filmaffinity_url", ""),
                 "myanimelist_url": existing.get("myanimelist_url", ""),
+                "tmdb_url": existing.get("tmdb_url", ""),
+                "tmdb_id": existing.get("tmdb_id", ""),
                 "wikidata_id": existing.get("wikidata_id", ""),
                 "mal_id": existing.get("mal_id", ""),
                 "en_catalogo": existing.get("en_catalogo", False),
@@ -626,6 +658,7 @@ def metadata_origin(item: Mapping[str, Any]) -> tuple[str, str]:
         "imdb": str(item.get("imdb_url") or ""),
         "filmaffinity": str(item.get("filmaffinity_url") or ""),
         "jikan": str(item.get("myanimelist_url") or ""),
+        "tmdb": str(item.get("tmdb_url") or ""),
     }
     if source in source_urls:
         return source, source_urls[source] or url
@@ -670,7 +703,11 @@ def merge_metadata_field(
     incoming_sources = ensure_metadata_sources(incoming)
     sources = ensure_metadata_sources(existing)
     if field in incoming_sources:
-        sources[field] = dict(incoming_sources[field])
+        incoming_source = dict(incoming_sources[field])
+        if before not in (None, "", [], {}) and field in sources:
+            incoming_source["source"] = compose_metadata_sources(sources[field], incoming_source)
+            incoming_source["url"] = str(sources[field].get("url") or incoming_source["url"])
+        sources[field] = incoming_source
     else:
         source, url = metadata_origin(incoming)
         sources[field] = metadata_source_record(source, url, False)

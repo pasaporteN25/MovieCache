@@ -19,6 +19,11 @@ METADATA_FIELDS = (
     "year",
     "release_dates",
     "description",
+    "wikipedia_url",
+    "imdb_url",
+    "filmaffinity_url",
+    "myanimelist_url",
+    "tmdb_url",
     "wikipedia_title",
     "wikidata_id",
     "duration_minutes",
@@ -119,6 +124,11 @@ def merge_local_files(primary: Any, secondary: Any) -> list[dict[str, Any]]:
 
 
 def normalize_metadata_sources(value: Any) -> dict[str, dict[str, Any]]:
+    if isinstance(value, str) and value.strip():
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            value = {}
     if not isinstance(value, Mapping):
         return {}
     normalized: dict[str, dict[str, Any]] = {}
@@ -135,6 +145,26 @@ def normalize_metadata_sources(value: Any) -> dict[str, dict[str, Any]]:
             "inferred": normalize_bool(row.get("inferred", False)),
         }
     return normalized
+
+
+def metadata_source_names(value: Any) -> tuple[str, ...]:
+    """Return the ordered contributors encoded in a provenance record.
+
+    Provenance remains backward compatible with the existing compact `source`
+    string. A `+` joins independent contributors (for example
+    `jikan+anime_offline_database`) and is deliberately not an authority order.
+    """
+    source = str(value.get("source") if isinstance(value, Mapping) else value or "")
+    return tuple(dict.fromkeys(part.strip() for part in source.split("+") if part.strip()))
+
+
+def compose_metadata_sources(*values: Any) -> str:
+    names: list[str] = []
+    for value in values:
+        for source in metadata_source_names(value):
+            if source not in names:
+                names.append(source)
+    return "+".join(names)
 
 
 def normalize_locked_fields(value: Any) -> list[str]:
