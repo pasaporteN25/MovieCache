@@ -41,19 +41,8 @@ en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implem
 queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
 ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
 de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
-consulta [F5.1] (cerrado), identidad/retirada [F5.2] y cumplimiento/UX [F5.3].
-
-#### [F5.3] Exponer TMDb con cumplimiento, resiliencia y validacion real
-- **Alcance**: mostrar la estanteria y health de TMDb solo cuando este configurado;
-  atribucion/logo y aviso de no-endorsement exigidos, imagenes permitidas y estado
-  comprensible para el owner. Respetar `429`/`Retry-After`, backoff/cooldown y mantener
-  el cache muy por debajo de seis meses.
-- **Validacion**: respuestas grabadas sin secretos y smoke voluntario con key sobre
-  `Addio Zio Tom`, `Fanny & Alexander`, `Verano 1993 (2017)` y un homonimo movie/TV;
-  comprobar titulos originales/traducidos/alternativos e IDs cruzados. Sin key, cero
-  llamadas, cero estanteria fantasma y cero degradacion.
-- **Depende de**: [F5.1] y [F5.2].
-- **Modelo sugerido**: Grande. Frontend, terminos, rate limit y evidencia live.
+consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres cerradas).
+[F5] queda completo.
 
 ### Frente: Bibliotecas y curaduria
 
@@ -422,6 +411,51 @@ TMDb intactas; `tests/test_matching.py` y `tests/test_metadata_authority.py` cub
 conflicto/coincidencia de `tmdb_id` y tipo de medio. Verificado con 533 pruebas
 unitarias, Ruff, formato, mypy estricto, `compileall` y `git diff --check`.
 2026-09-01, commit `0bc436c`.
+
+#### [F5.3] Exponer TMDb con cumplimiento, resiliencia y validacion real
+La estanteria y el health de TMDb quedan condicionados a la misma señal que ya usaba
+el backend: `externalHealth.sources.tmdb`, presente unicamente cuando el servidor tiene
+el token cargado (heredado de `/api/items` en cada carga de pagina). `catalog-search.js`
+suma `isExternalSourceConfigured()`/`configuredExternalSources()` y los usa en
+`requestedExternalSources()` (no se pide la fuente sin configurar), `renderManualResults()`
+(la seccion ni se renderiza) y el panel admin (`renderDatabaseMenu()` en
+`catalog-grid.js` solo agrega la fila TMDb si hay health). Verificado en vivo con dos
+instancias reales del servidor: con token, la busqueda de "Heat" muestra la estanteria
+TMDb (con error controlado por token invalido, sin crash) y la fila en `Administrar →
+Fuentes externas`; sin token, ninguna de las dos aparece — cero estanteria fantasma,
+cero fila fantasma. `hasExternalLink()`/`isExternalResult()` suman el host
+`themoviedb.org` para que un resultado o item TMDb participe en merge/comparacion igual
+que las demas fuentes.
+
+Atribucion: `static/img/tmdb-logo.svg` es el logo oficial "blue_short" descargado de
+`themoviedb.org/about/logos-attribution` (asset publico del brand kit de TMDb, pensado
+para este uso). Se sirve por `/static/img/*.svg` (nuevo tipo de contenido en
+`web/assets.py`, empaquetado via `pyproject.toml`) junto al aviso textual exacto
+exigido por los terminos ya investigados en [F3.1]: "Este producto usa TMDb y sus APIs
+pero no está avalado, certificado ni aprobado de ninguna forma por TMDb."; se renderiza
+siempre que la estanteria TMDb existe, sin condicionar a que haya resultados.
+
+Rate limit/backoff/cooldown y el TTL de cache ya eran genericos en
+`external/registry.py` (`_source_error_state()`, cooldowns por `Retry-After`) y cubrian
+TMDb automaticamente porque `TmdbAdapter` deja propagar `HTTPError`/`TimeoutError` sin
+capturarlos; no hizo falta código nuevo, solo prueba de integracion real:
+`test_tmdb_429_with_retry_after_opens_a_real_cooldown` (usa el adapter real via
+`default_source_adapters("secret")`, no un fake) y
+`test_search_cache_ttl_stays_far_under_the_six_month_retention_cap` (15 min contra el
+tope de 6 meses de los terminos). `tests/test_external_tmdb_live_smoke.py` agrega un
+smoke opt-in sobre el corpus ya recorded (`Addio Zio Tom`, `Fanny & Alexander`,
+`Verano 1993 (2017)`, homonimo `Heat` movie/TV vía `tt0113277`) gateado por la variable
+de entorno `MOVIE_INBOX_TMDB_LIVE_SMOKE_TOKEN`; sin ella queda `skipped`, nunca corre en
+CI ni afecta el gate. El banner de arranque de `server.py` ("adapter pending F5") quedo
+actualizado a texto correcto ahora que el adapter existe.
+
+**Criterio de cierre**: `tests/test_external_tmdb.py` (cooldown real + TTL),
+`tests/test_view_http.py::test_tmdb_attribution_logo_is_served_as_svg`,
+`tests/test_server_cli.py` (banner actualizado) y verificacion manual en navegador de
+ambos estados (configurado/no configurado) para estanteria, atribucion y panel admin.
+Verificado con 540 pruebas unitarias (536 activas + 4 skipped del smoke opt-in), Ruff,
+formato, mypy estricto, `compileall` y `git diff --check`.
+2026-09-01.
 
 #### [Q1] Mantener el contexto al refinar una busqueda de Comparar
 `runSearch()` ahora ramifica por `collectionSearchMode` antes de resetear nada: en

@@ -21,6 +21,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   automatico. El owner puede previsualizar y purgar de forma auditable toda contribucion
   TMDb persistida (respetando ediciones manuales, `locked_fields` y valores respaldados
   tambien por otra fuente) con historial y deshacer.
+- La estanteria de busqueda y el panel de salud muestran TMDb unicamente cuando la
+  instancia tiene el token configurado, con el logo oficial y el aviso de no-endoso
+  exigidos por sus terminos. `429`/`Retry-After`, backoff y cache muy por debajo del
+  tope de seis meses ya se heredaban del mecanismo generico de fuentes externas.
 
 ## [0.6.0] - 2026-08-31
 
