@@ -151,10 +151,12 @@
           || hasHost(item?.url, "imdb.com")
           || hasHost(item?.url, "filmaffinity.com")
           || hasHost(item?.url, "myanimelist.net")
+          || hasHost(item?.url, "themoviedb.org")
           || hasHost(item?.wikipedia_url, "wikipedia.org")
           || hasHost(item?.imdb_url, "imdb.com")
           || hasHost(item?.filmaffinity_url, "filmaffinity.com")
-          || hasHost(item?.myanimelist_url, "myanimelist.net");
+          || hasHost(item?.myanimelist_url, "myanimelist.net")
+          || hasHost(item?.tmdb_url, "themoviedb.org");
       }
 
       export function normalizeRating(value) {

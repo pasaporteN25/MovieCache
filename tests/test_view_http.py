@@ -1387,6 +1387,11 @@ class ViewerHttpTests(unittest.TestCase):
         # back in this form. Real behavioral coverage lives in
         # tests/browser/test_ui_browser.py.
 
+    def test_tmdb_attribution_logo_is_served_as_svg(self) -> None:
+        status, body = self.request("GET", "/static/img/tmdb-logo.svg")
+        self.assertEqual(status, 200)
+        self.assertIn(b"<svg", body)
+
     def test_static_assets_are_cached_with_etag_revalidation(self) -> None:
         first = self.client.get("/static/js/core/bootstrap.js")
         self.assertEqual(first.status_code, 200)

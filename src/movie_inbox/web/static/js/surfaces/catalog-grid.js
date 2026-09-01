@@ -226,6 +226,7 @@ import { renderEditorialHome } from "./home.js";
             ${externalDatabaseItem("IMDb", "imdb")}
             ${externalDatabaseItem("FilmAffinity", "filmaffinity")}
             ${externalDatabaseItem("Jikan", "jikan")}
+            ${externalHealth?.sources?.tmdb ? externalDatabaseItem("TMDb", "tmdb") : ""}
             ${externalOfflineDatabaseItem()}
             ${externalCacheItem()}
           </div>

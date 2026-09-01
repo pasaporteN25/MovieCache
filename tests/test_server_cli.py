@@ -107,7 +107,7 @@ class ServerCliTests(unittest.TestCase):
             config = run.call_args.args[0].state.viewer_config
             self.assertTrue(config.external_credentials.tmdb_configured)
             self.assertEqual(config.external_credentials.tmdb_read_access_token, token)
-            self.assertIn("TMDb credentials: configured (adapter pending F5)", stdout.getvalue())
+            self.assertIn("TMDb credentials: configured (opt-in source active)", stdout.getvalue())
             self.assertNotIn(token, stdout.getvalue())
             self.assertNotIn(token, repr(config))
             self.assertNotIn(token, repr(config.external_credentials))

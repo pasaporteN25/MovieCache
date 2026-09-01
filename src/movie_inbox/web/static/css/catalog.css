@@ -283,6 +283,13 @@
         padding-top: 8px;
       }
       .source-attribution a { color: var(--text-cyan-soft); }
+      .source-attribution-tmdb {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 10px;
+      }
+      .source-attribution-tmdb img { display: block; height: 12px; width: auto; }
       .source-search-spinner {
         border: 2px solid var(--control-border);
         border-right-color: var(--teal);

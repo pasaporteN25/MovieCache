@@ -41,14 +41,27 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
 
       export const SEARCH_TIMEOUT_MS = 10000;
 
-      export const EXTERNAL_SEARCH_SOURCES = ["wikipedia", "imdb", "filmaffinity", "jikan"];
+      export const EXTERNAL_SEARCH_SOURCES = ["wikipedia", "imdb", "filmaffinity", "jikan", "tmdb"];
 
       export const EXTERNAL_SOURCE_LABELS = {
         wikipedia: ["Wikipedia", "Artículos y datos enciclopédicos"],
         imdb: ["IMDb", "Títulos internacionales y reparto"],
         filmaffinity: ["FilmAffinity", "Referencias en español"],
-        jikan: ["Jikan", "Anime y títulos de MyAnimeList"]
+        jikan: ["Jikan", "Anime y títulos de MyAnimeList"],
+        tmdb: ["TMDb", "Traducciones, reparto e imágenes"]
       };
+
+      // TMDb es opt-in por instancia: sin token configurado en el servidor,
+      // no hay entrada de health para "tmdb" y la fuente queda invisible por
+      // completo (sin estanteria fantasma, sin consultas, sin degradacion).
+      export function isExternalSourceConfigured(source) {
+        if (source !== "tmdb") return true;
+        return Boolean(externalHealth?.sources?.tmdb);
+      }
+
+      export function configuredExternalSources() {
+        return EXTERNAL_SEARCH_SOURCES.filter(isExternalSourceConfigured);
+      }
       externalSourceSearchStates = emptyExternalSourceSearchStates();
 
       export function setManualResults(value) {
@@ -167,7 +180,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function emptyExternalSourceSearchStates() {
-        return Object.fromEntries(EXTERNAL_SEARCH_SOURCES.map((source) => [source, {
+        return Object.fromEntries(configuredExternalSources().map((source) => [source, {
           status: "idle",
           count: 0,
           error: "",
@@ -183,9 +196,8 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
 
       export function requestedExternalSources(source, includeExternal) {
         if (!includeExternal) return [];
-        return source === "all" || !EXTERNAL_SEARCH_SOURCES.includes(source)
-          ? [...EXTERNAL_SEARCH_SOURCES]
-          : [source];
+        if (source === "all" || !EXTERNAL_SEARCH_SOURCES.includes(source)) return configuredExternalSources();
+        return isExternalSourceConfigured(source) ? [source] : [];
       }
 
       export function setSearchBusy(busy) {
@@ -395,7 +407,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
 
       export async function retryExternalSource(source) {
         const query = fields.query.value.trim();
-        if (!EXTERNAL_SEARCH_SOURCES.includes(source) || query.length < 2 || externalSearchController) return;
+        if (!isExternalSourceConfigured(source) || !EXTERNAL_SEARCH_SOURCES.includes(source) || query.length < 2 || externalSearchController) return;
         const controller = new AbortController();
         externalSearchController = controller;
         if (!externalSourcesAttempted.includes(source)) externalSourcesAttempted.push(source);
@@ -551,6 +563,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           if (grouped[shelf]) grouped[shelf].push({ result, index });
         });
         fields.manualSearchResults.innerHTML = Object.entries(EXTERNAL_SOURCE_LABELS).map(([source, labels]) => {
+          if (!isExternalSourceConfigured(source)) return "";
           const rows = grouped[source];
           const state = externalSourceSearchStates[source] || { status: "idle", count: 0, error: "" };
           const visibleCount = manualSourceVisibleCounts[source] || SEARCH_PAGE_SIZE;
@@ -586,6 +599,12 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function externalSourceAttribution(source, rows) {
+        if (source === "tmdb") {
+          return `<div class="source-attribution source-attribution-tmdb">
+            <img src="/static/img/tmdb-logo.svg" alt="TMDb" width="92" height="12" loading="lazy">
+            <span>Este producto usa TMDb y sus APIs pero no está avalado, certificado ni aprobado de ninguna forma por TMDb.</span>
+          </div>`;
+        }
         if (source !== "jikan") return "";
         const hasOffline = rows.some(({ result }) => result.source === "anime_offline_database");
         const offlineConfigured = Boolean(externalHealth?.sources?.anime_offline_database);
@@ -771,12 +790,15 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           || result?.source === "imdb"
           || result?.source === "filmaffinity"
           || result?.source === "jikan"
+          || result?.source === "tmdb"
           || hasHost(result?.url, "wikipedia.org")
           || hasHost(result?.url, "imdb.com")
           || hasHost(result?.url, "filmaffinity.com")
           || hasHost(result?.url, "myanimelist.net")
+          || hasHost(result?.url, "themoviedb.org")
           || hasHost(result?.wikipedia_url, "wikipedia.org")
           || hasHost(result?.imdb_url, "imdb.com")
           || hasHost(result?.filmaffinity_url, "filmaffinity.com")
-          || hasHost(result?.myanimelist_url, "myanimelist.net");
+          || hasHost(result?.myanimelist_url, "myanimelist.net")
+          || hasHost(result?.tmdb_url, "themoviedb.org");
       }

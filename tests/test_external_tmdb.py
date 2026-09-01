@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import unittest
+from email.message import Message
 from unittest.mock import patch
+from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlparse
 
-from movie_inbox.external.registry import ExternalSourceService, default_source_adapters
+from movie_inbox.external.registry import (
+    SEARCH_CACHE_TTL_SECONDS,
+    ExternalSourceService,
+    default_source_adapters,
+)
 from movie_inbox.external.tmdb import (
     TmdbAdapter,
     fetch_tmdb_metadata,
@@ -333,6 +339,30 @@ class TmdbAdapterTests(unittest.TestCase):
             self.assertIn("tmdb", external_sources_snapshot()["sources"])
         finally:
             configure_external_catalog("")
+
+    @patch("movie_inbox.external.tmdb.fetch_json")
+    def test_tmdb_429_with_retry_after_opens_a_real_cooldown(self, fetch_json) -> None:
+        headers = Message()
+        headers["Retry-After"] = "90"
+        fetch_json.side_effect = HTTPError(
+            "https://api.themoviedb.org/3/search/multi", 429, "rate limited", headers, None
+        )
+        service = ExternalSourceService(default_source_adapters("secret"))
+
+        first, first_state = service.search("Fanny och Alexander", "tmdb")
+        second, second_state = service.search("Fanny och Alexander", "tmdb")
+
+        self.assertEqual(first, [])
+        self.assertEqual(second, [])
+        self.assertEqual(fetch_json.call_count, 1)
+        self.assertEqual(first_state["sources"]["tmdb"]["status"], "cooldown")
+        self.assertEqual(first_state["sources"]["tmdb"]["error_code"], "rate_limited")
+        self.assertGreaterEqual(first_state["sources"]["tmdb"]["retry_after_seconds"], 89)
+        self.assertGreaterEqual(second_state["sources"]["tmdb"]["retry_after_seconds"], 89)
+
+    def test_search_cache_ttl_stays_far_under_the_six_month_retention_cap(self) -> None:
+        six_months_seconds = 6 * 30 * 24 * 60 * 60
+        self.assertLess(SEARCH_CACHE_TTL_SECONDS, six_months_seconds / 100)
 
 
 if __name__ == "__main__":

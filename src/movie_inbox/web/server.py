@@ -286,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
         else "Managed scanner: disabled (no --library-root)"
     )
     print(
-        "TMDb credentials: configured (adapter pending F5)"
+        "TMDb credentials: configured (opt-in source active)"
         if config.external_credentials.tmdb_configured
         else "TMDb credentials: not configured"
     )
