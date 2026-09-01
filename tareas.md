@@ -44,29 +44,6 @@ de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo d
 consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres cerradas).
 [F5] queda completo.
 
-### Frente: Bibliotecas y curaduria
-
-#### [C2] Implementar resolucion N-a-1 de duplicados
-- **Alcance**: contrato de caso-grupo ya definido y verificado en [C1] (Hecho,
-  `case: {id, type, status, reason, evidence, members: [...]}`, identidad =
-  componente conexa de `_duplicate_refs`/`_duplicate_deferred_refs`, no union-find
-  crudo ni lista estatica de pares). Falta implementarlo de verdad en
-  `curation_service.py`/`curation_workflow.py`, mas cola, detalle, comparador,
-  auto-resolucion segura, historial y deshacer para 3+ items. Mantener cero merges
-  automaticos con conflictos — [C1] documento con una tabla trazada que
-  `auto_resolve_duplicates()` hoy no cumple esto para grupos de 3+ (un conflicto real
-  puede quedar tapado por ruido de referencias obsoletas del mismo lote).
-- **Decision pendiente que [C1] dejo explicitamente para aca**: si encadenar fusiones
-  de a pares para resolver un grupo de N, evaluar la conexion con la tarea de fondo
-  `task_47d7cd43` (bug de `apply_reviewed_merge`/`_default_choice` que puede pisar un
-  campo bloqueado vacio) antes de heredarla varias veces por grupo.
-- **Tambien pendiente**: actualizar `inbox-curation.js`/`merge.js`, que hoy asumen
-  literalmente 2 items (`primary`/`secondary`, "Entrada A"/"Entrada B").
-- **Criterio de cierre**: pruebas de dominio, servicio, HTTP y navegador para 3+ items,
-  incluidos cambios concurrentes y rollback.
-- **Depende de**: [C1] (cerrado).
-- **Modelo sugerido**: Grande. Cambio transversal y sensible a perdida de datos.
-
 ### Frente: Superficie publica y despliegue
 
 #### [W1] Definir contrato de presentacion publica
@@ -1371,6 +1348,45 @@ implementacion real del contrato de grupo, el arreglo de `auto_resolve_duplicate
 `task_47d7cd43`, y el frontend (`inbox-curation.js`/`merge.js`) que hoy asume
 literalmente 2 items ("Entrada A"/"Entrada B") — todo eso es [C2].
 2026-08-30.
+
+#### [C2] Implementar resolucion N-a-1 de duplicados
+`application/curation_service.py` aplica el contrato de [C1]: cada componente conexa
+de aristas pendientes/pospuestas produce un unico caso `duplicate` con `members` (2+),
+ID estable por referencias ordenadas, evidencia deduplicada de todas las aristas y
+orden alfabetico por el menor titulo del grupo. `counts.duplicates` cuenta decisiones
+reales, no `C(n,2)` pares repetidos.
+
+`domain/merge_review.py` suma una revision N-vias: cada campo expone el valor de todos
+los miembros, permite elegir la ficha superviviente y combina listas, fechas, archivos
+y disponibilidad sin escrituras intermedias. Los campos personales con valores en
+conflicto siguen siendo obligatorios. En el mismo cambio se cerro `task_47d7cd43`: si un
+campo vacio esta en `locked_fields`, su vacio queda como eleccion segura en vez de ser
+rellenado silenciosamente por otro miembro; dos valores bloqueados distintos exigen una
+decision humana.
+
+`CurationWorkflowService.merge_group()` captura todos los miembros, valida un
+`review_id` de contenido, calcula el resultado completo en memoria y recien entonces
+aplica una unica transicion multi-catalogo. El historial registra `merge_group` como una
+sola operacion; un fallo al escribirlo revierte todos los catalogos y Deshacer restaura
+cada miembro en su posicion. Una edicion concurrente invalida la revision sin cambios
+parciales. `auto_resolve_duplicates()` usa este mismo camino: un grupo limpio cuenta
+como un caso resuelto y un unico conflicto deja el grupo entero intacto con
+`needs_review: 1`, eliminando el ruido de referencias ya borradas de [C1]. Las decisiones
+grupales (`pending`/`deferred`/`not_duplicate`) tambien son atomicas y reversibles.
+
+La API acepta entre 2 y 50 referencias, valida su pertenencia y conserva tanto la
+referencia publica (`source-N`) como la interna para no filtrar rutas ni perder
+decisiones al volver a cargar la cola. `inbox-curation.js` muestra todas las fichas y
+busca sobre cualquiera de ellas; `merge.js` genera selectores de superviviente y de
+campo para N entradas, con estados de carga/error, foco visible, `aria-live`, textos
+largos y composicion responsive. La prueba Playwright recorre un grupo de tres, cambia
+el superviviente, resuelve un puntaje protegido y verifica el POST grupal.
+
+**Cierre**: pruebas de dominio, workflow, HTTP y navegador cubren trio identico,
+cuarteto con conflicto real, catalogos cruzados, rollback de historial, revision
+desactualizada, decision grupal, undo y campo bloqueado vacio. Verificado con 546
+pruebas (`4` omisiones opcionales), Ruff, formato, mypy estricto, sintaxis JavaScript,
+detector Impeccable y `git diff --check`. 2026-09-01, commit `1d5ebc8`.
 
 ---
 
