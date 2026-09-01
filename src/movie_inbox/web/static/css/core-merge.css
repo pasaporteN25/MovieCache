@@ -55,11 +55,14 @@
       }
       .merge-survivor-control {
         border: 0;
-        display: flex;
-        gap: 2px;
         margin: 0;
         min-width: 0;
         padding: 0;
+      }
+      .merge-survivor-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
       }
       .merge-survivor-control legend {
         color: var(--muted);
@@ -106,6 +109,9 @@
         gap: 12px;
         grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
         padding: 12px 18px;
+      }
+      .merge-comparator-summary.group {
+        grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
       }
       .merge-entry-summary {
         align-items: center;
@@ -192,6 +198,7 @@
       .merge-field-options { display: grid; gap: 7px; }
       .merge-field-options.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .merge-field-options.three { grid-template-columns: minmax(0, 1fr) minmax(150px, 0.7fr) minmax(0, 1fr); }
+      .merge-field-options.many { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
       .merge-choice {
         background: rgba(25, 29, 56, 0.5);
         border: 1px solid rgba(139, 124, 255, 0.34);
@@ -237,7 +244,7 @@
         overflow-wrap: anywhere;
         white-space: pre-wrap;
       }
-      .merge-value.empty { color: #898dab; font-style: italic; }
+      .merge-value.empty { color: var(--text-placeholder); font-style: italic; }
       .merge-list-value { display: flex; flex-wrap: wrap; gap: 4px; }
       .merge-list-value > span {
         background: rgba(120, 92, 255, 0.15);
@@ -317,9 +324,7 @@
 
         .merge-comparator-toolbar { align-items: stretch; display: grid; gap: 10px; padding: 10px 13px; }
 
-        .merge-survivor-control { display: grid; grid-template-columns: 1fr 1fr; }
-
-        .merge-survivor-control legend { grid-column: 1 / -1; }
+        .merge-survivor-options { display: grid; grid-template-columns: 1fr 1fr; }
 
         .merge-survivor-control span { max-width: none; white-space: normal; }
 
@@ -343,7 +348,8 @@
         .merge-field-group > header { padding-top: 14px; }
 
         .merge-field-options.two,
-        .merge-field-options.three { grid-template-columns: 1fr; }
+        .merge-field-options.three,
+        .merge-field-options.many { grid-template-columns: 1fr; }
 
         .merge-choice { min-height: 62px; }
 

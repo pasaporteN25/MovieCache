@@ -1496,9 +1496,14 @@ class ViewerHttpTests(unittest.TestCase):
 
         body = json.dumps(
             {
-                "id": duplicate["primary"]["id"],
-                "source_file": duplicate["primary"]["source_file"],
-                "other_reference": duplicate["secondary"]["ref"],
+                "members": [
+                    {
+                        "ref": member["ref"],
+                        "id": member["id"],
+                        "source_file": member["source_file"],
+                    }
+                    for member in duplicate["members"]
+                ],
                 "status": "not_duplicate",
             }
         )
@@ -1613,6 +1618,67 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200, raw_payload)
         self.assertEqual([item.id for item in repository.read()], ["heat-a", "heat-b"])
 
+    def test_group_merge_endpoint_collapses_and_restores_three_items(self) -> None:
+        repository = JsonCatalogRepository(self.catalog_path, normalize_item)
+        repository.write(
+            [
+                normalize_item({"id": item_id, "title": "Heat", "year": "1995"})
+                for item_id in ("heat-a", "heat-b", "heat-c")
+            ]
+        )
+        status, raw_payload = self.request(
+            "GET",
+            "/api/curation",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(status, 200, raw_payload)
+        duplicate = next(
+            case for case in json.loads(raw_payload)["cases"] if case["type"] == "duplicate"
+        )
+        references = [
+            {
+                "ref": member["ref"],
+                "id": member["id"],
+                "source_file": member["source_file"],
+            }
+            for member in duplicate["members"]
+        ]
+        compare_body = json.dumps({"members": references, "survivor": references[2]})
+        status, raw_payload = self.request(
+            "POST", "/api/curation/compare", compare_body, self.post_headers()
+        )
+        self.assertEqual(status, 200, raw_payload)
+        comparison = json.loads(raw_payload)
+        self.assertTrue(comparison["group"])
+        self.assertEqual(len(comparison["members"]), 3)
+        self.assertEqual(comparison["unresolved_count"], 0)
+
+        merge_body = json.dumps(
+            {
+                "members": references,
+                "survivor": references[2],
+                "review_id": comparison["review_id"],
+                "choices": {},
+                "history_mode": "persistent",
+            }
+        )
+        status, raw_payload = self.request(
+            "POST", "/api/curation/merge", merge_body, self.post_headers()
+        )
+        self.assertEqual(status, 200, raw_payload)
+        merged = json.loads(raw_payload)
+        self.assertEqual([item.id for item in repository.read()], [references[2]["id"]])
+        self.assertEqual(merged["operation"]["action"], "merge_group")
+
+        undo_body = json.dumps(
+            {"operation_id": merged["operation"]["id"], "history_mode": "persistent"}
+        )
+        status, raw_payload = self.request(
+            "POST", "/api/curation/undo", undo_body, self.post_headers()
+        )
+        self.assertEqual(status, 200, raw_payload)
+        self.assertEqual([item.id for item in repository.read()], ["heat-a", "heat-b", "heat-c"])
+
     def test_auto_resolve_endpoint_merges_clear_duplicates_and_leaves_conflicts_pending(
         self,
     ) -> None:
@@ -1663,7 +1729,7 @@ class ViewerHttpTests(unittest.TestCase):
             if case["type"] == "duplicate" and case["status"] == "pending"
         ]
         self.assertEqual(len(pending_duplicates), 1)
-        self.assertEqual(pending_duplicates[0]["primary"]["title"], "Sicario")
+        self.assertEqual(pending_duplicates[0]["members"][0]["title"], "Sicario")
 
     def test_curation_endpoints_expose_availability_alongside_the_manual_flag(self) -> None:
         (self.media_path / "Heat.1995.1080p.mkv").write_bytes(b"heat-video")

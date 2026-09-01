@@ -94,8 +94,7 @@ class CurationTests(unittest.TestCase):
 
         duplicate_cases = [case for case in payload["cases"] if case["type"] == "duplicate"]
         self.assertEqual(len(duplicate_cases), 1)
-        sides = {duplicate_cases[0]["primary"]["id"]: duplicate_cases[0]["primary"]}
-        sides[duplicate_cases[0]["secondary"]["id"]] = duplicate_cases[0]["secondary"]
+        sides = {member["id"]: member for member in duplicate_cases[0]["members"]}
         self.assertEqual(sides["heat-local"]["added_at"], "2026-01-01T00:00:00+00:00")
         self.assertEqual(sides["heat-imdb"]["added_at"], "2026-02-01T00:00:00+00:00")
         self.assertEqual(sides["heat-local"]["local_files"][0]["name"], "Heat.mkv")
@@ -124,11 +123,7 @@ class CurationTests(unittest.TestCase):
             self.assertNotIn("duplicate", {case["type"] for case in payload["cases"]})
 
     def test_not_duplicate_on_one_edge_of_a_trio_still_leaves_a_connected_path(self) -> None:
-        """[C1] characterization: marking one pair of a 3-way duplicate group as
-        `not_duplicate` does not remove either item from the queue, because the third
-        item still links them transitively. Both surviving pairs (a-c, b-c) stay as
-        separate cases today; isolating a member fully would require cutting both of
-        its edges, not just one."""
+        """One dismissed edge does not split a still-connected three-member case."""
         with tempfile.TemporaryDirectory() as temporary:
             repository = JsonCatalogRepository(Path(temporary) / "catalog.json", normalize_item)
             repository.write(
@@ -149,22 +144,14 @@ class CurationTests(unittest.TestCase):
             self.assertEqual(reason, "updated")
             payload = build_curation_payload(curation_rows(repository.read()))
             duplicate_cases = [case for case in payload["cases"] if case["type"] == "duplicate"]
-            self.assertEqual(payload["counts"]["duplicates"], 2)
-            pairs = {
-                frozenset({case["primary"]["id"], case["secondary"]["id"]})
-                for case in duplicate_cases
-            }
+            self.assertEqual(payload["counts"]["duplicates"], 1)
             self.assertEqual(
-                pairs,
-                {frozenset({"heat-a", "heat-c"}), frozenset({"heat-b", "heat-c"})},
+                {member["id"] for member in duplicate_cases[0]["members"]},
+                {"heat-a", "heat-b", "heat-c"},
             )
 
     def test_cross_file_group_with_colliding_ids_is_disambiguated_by_source_file(self) -> None:
-        """[C1] characterization: two catalog files can legitimately reuse the same
-        item id. `annotate_duplicate_items`/`curation_item_reference` already
-        disambiguate by `_source_file`, so a 3-way duplicate group spanning two files
-        (one id collision plus a third, distinct id) already produces the correct
-        pairwise cases today -- no code change needed for cross-file groups."""
+        """Cross-file id collisions remain distinct members of one group."""
         items = [
             *curation_rows(
                 [normalize_item({"id": "same-id", "title": "Heat", "year": "1995"})],
@@ -182,17 +169,14 @@ class CurationTests(unittest.TestCase):
         payload = build_curation_payload(items)
 
         duplicate_cases = [case for case in payload["cases"] if case["type"] == "duplicate"]
-        self.assertEqual(payload["counts"]["duplicates"], 3)
-        refs = {
-            frozenset({case["primary"]["ref"], case["secondary"]["ref"]})
-            for case in duplicate_cases
-        }
+        self.assertEqual(payload["counts"]["duplicates"], 1)
+        refs = {member["ref"] for member in duplicate_cases[0]["members"]}
         self.assertEqual(
             refs,
             {
-                frozenset({"same-id::catalog-a.json", "same-id::catalog-b.json"}),
-                frozenset({"same-id::catalog-a.json", "other::catalog-b.json"}),
-                frozenset({"same-id::catalog-b.json", "other::catalog-b.json"}),
+                "same-id::catalog-a.json",
+                "same-id::catalog-b.json",
+                "other::catalog-b.json",
             },
         )
 

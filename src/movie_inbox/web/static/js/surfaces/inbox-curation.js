@@ -243,6 +243,11 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         }
         const selected = curationCases.find((entry) => entry.id === selectedCurationCaseId);
         if (!selected) return;
+        if (actionName === "open-member") {
+          const member = caseMembers(selected).find((entry) => entry.ref === action.dataset.memberRef);
+          if (member) openCurationItem(member);
+          return;
+        }
         if (actionName === "open-primary") {
           openCurationItem(selected.primary);
           return;
@@ -255,7 +260,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           findLinkFromCuration(selected.primary);
           return;
         }
-        if (actionName === "compare-duplicate" && selected.secondary) {
+        if (actionName === "compare-duplicate" && caseMembers(selected).length >= 2) {
           openInternalMergeComparator(selected);
           return;
         }
@@ -276,10 +281,15 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           if (curationFilter === "duplicate" && entry.type !== "duplicate") return false;
           if (curationFilter === "missing_link" && entry.type !== "missing_link") return false;
           if (!query) return true;
-          const item = entry.primary || {};
-          return [item.title, item.year, item.kind]
+          const searchable = entry.type === "duplicate" ? caseMembers(entry) : [entry.primary || {}];
+          return searchable.flatMap((item) => [item.title, item.year, item.kind])
             .some((value) => normalizeText(value).includes(query));
         });
+      }
+
+      export function caseMembers(entry) {
+        if (Array.isArray(entry?.members)) return entry.members;
+        return [entry?.primary, entry?.secondary].filter(Boolean);
       }
 
       export function searchCurationQueue(event) {
@@ -368,7 +378,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         const selected = operation.id === selectedCurationCaseId;
         return `<button class="curation-queue-item history-item ${selected ? "selected" : ""}" type="button"
           data-curation-case="${escapeAttr(operation.id)}" aria-pressed="${selected}">
-          <span class="history-operation-mark" aria-hidden="true">${operation.action === "merge" ? "M" : "D"}</span>
+          <span class="history-operation-mark" aria-hidden="true">${operation.action.startsWith("merge") ? "M" : "D"}</span>
           <span class="curation-queue-copy">
             <span class="curation-queue-type">${escapeHtml(curationActionLabel(operation.action))}</span>
             <strong>${escapeHtml(operation.label || "Decisión de curaduría")}</strong>
@@ -397,6 +407,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
             <div><dt>Fecha</dt><dd>${escapeHtml(formatDateTime(operation.created_at))}</dd></div>
             <div><dt>Alcance</dt><dd>${operation.mode === "session" ? "Sólo esta sesión" : "Persistente"}</dd></div>
             ${summary.survivor_title ? `<div><dt>Entrada final</dt><dd>${escapeHtml(summary.survivor_title)}</dd></div>` : ""}
+            ${summary.member_count ? `<div><dt>Entradas tratadas</dt><dd>${escapeHtml(summary.member_count)}</dd></div>` : ""}
             ${changedFields.length ? `<div><dt>Campos revisados</dt><dd>${changedFields.length}</dd></div>` : ""}
           </dl>
           ${changedFields.length
@@ -414,20 +425,18 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
       export function curationActionLabel(action) {
         return {
           merge: "Combinación",
+          merge_group: "Combinación grupal",
           link_curation: "Referencia",
-          duplicate_curation: "Duplicado"
+          duplicate_curation: "Duplicado",
+          duplicate_group_curation: "Grupo de duplicados"
         }[action] || "Curaduría";
       }
 
       export function curationQueueItem(entry) {
-        const item = entry.primary;
+        const members = caseMembers(entry);
+        const item = entry.type === "duplicate" ? members[0] : entry.primary;
         const selected = entry.id === selectedCurationCaseId;
         const type = entry.type === "duplicate" ? "Duplicado" : "Sin referencia";
-        const collides = entry.type === "duplicate"
-          && entry.secondary
-          && String(item.title || "").trim() === String(entry.secondary.title || "").trim()
-          && String(item.year || "") === String(entry.secondary.year || "");
-        const needsPosition = collides && duplicateSignalsCollide(item, entry.secondary);
         return `<button class="curation-queue-item ${selected ? "selected" : ""}" type="button"
           data-curation-case="${escapeAttr(entry.id)}" aria-pressed="${selected}">
           ${curationThumb(item)}
@@ -435,10 +444,8 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
             <span class="curation-queue-type">${escapeHtml(type)}${entry.status === "deferred" ? " · Pospuesta" : ""}</span>
             <strong>${escapeHtml(item.title || "Sin título")}</strong>
             <small>${escapeHtml([item.year, item.kind].filter(Boolean).join(" · ") || "Sin año")}</small>
-            ${collides
-              ? `<small class="curation-queue-duplicate-hint">${needsPosition
-                  ? "Duplicado 1 de 2 ↔ Duplicado 2 de 2"
-                  : `${escapeHtml(sourceLabel(item.source))} ↔ ${escapeHtml(sourceLabel(entry.secondary.source))}`}</small>`
+            ${entry.type === "duplicate"
+              ? `<small class="curation-queue-duplicate-hint">${members.length} entradas conectadas</small>`
               : ""}
           </span>
           <span class="curation-queue-arrow" aria-hidden="true">→</span>
@@ -453,27 +460,31 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
 
       export function duplicateCurationDetail(entry) {
         const deferred = entry.status === "deferred";
-        const needsPosition = duplicateSignalsCollide(entry.primary, entry.secondary);
+        const members = caseMembers(entry);
         return `
           <header class="curation-case-heading">
             <div>
               <span class="curation-case-kicker">${deferred ? "Decisión pospuesta" : "Revisión necesaria"}</span>
               <h3>¿Son la misma obra?</h3>
             </div>
-            <span class="pill warning">Posible duplicado</span>
+            <span class="pill warning">${members.length} posibles duplicados</span>
           </header>
           ${curationEvidence(entry.evidence)}
-          <div class="curation-pair">
-            ${curationRecord(entry.primary, "Entrada A", "open-primary", needsPosition ? "Duplicado 1 de 2" : "")}
-            <div class="curation-pair-mark" aria-hidden="true">↔</div>
-            ${curationRecord(entry.secondary, "Entrada B", "open-secondary", needsPosition ? "Duplicado 2 de 2" : "")}
+          <div class="curation-group" aria-label="${members.length} entradas del grupo">
+            ${members.map((member, index) => curationRecord(
+              member,
+              `Entrada ${index + 1} de ${members.length}`,
+              "open-member",
+              "",
+              member.ref
+            )).join("")}
           </div>
           <footer class="curation-actions">
             ${deferred
-              ? `<button class="action-primary" type="button" data-curation-action="compare-duplicate">Comparar y combinar</button>
+              ? `<button class="action-primary" type="button" data-curation-action="compare-duplicate">Comparar ${members.length} entradas</button>
                  <button class="quiet-action" type="button" data-curation-action="duplicate-pending">Volver a pendientes</button>`
-              : `<button class="action-primary" type="button" data-curation-action="compare-duplicate">Comparar y combinar</button>
-                 <button class="quiet-action" type="button" data-curation-action="duplicate-not-duplicate">No son duplicados</button>
+              : `<button class="action-primary" type="button" data-curation-action="compare-duplicate">Comparar ${members.length} entradas</button>
+                 <button class="quiet-action" type="button" data-curation-action="duplicate-not-duplicate">Ninguna es la misma obra</button>
                  <button class="quiet-action" type="button" data-curation-action="duplicate-deferred">Posponer</button>`}
           </footer>
         `;
@@ -501,7 +512,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         `;
       }
 
-      export function curationRecord(item, label, action, positionLabel = "") {
+      export function curationRecord(item, label, action, positionLabel = "", memberRef = "") {
         if (!item) return "";
         return `<article class="curation-record">
           <span class="curation-record-label">${escapeHtml(label)}${positionLabel ? ` · ${escapeHtml(positionLabel)}` : ""}</span>
@@ -517,7 +528,8 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
               </div>
             </div>
           </div>
-          <button class="text-action curation-open-record" type="button" data-curation-action="${action}">Abrir ficha</button>
+          <button class="text-action curation-open-record" type="button" data-curation-action="${action}"
+            ${memberRef ? `data-member-ref="${escapeAttr(memberRef)}"` : ""}>Abrir ficha</button>
         </article>`;
       }
 
@@ -558,7 +570,9 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         if (!summary?.id) return;
         const contextIds = [...new Set(
           visibleCurationCases()
-            .flatMap((entry) => [entry.primary?.id, entry.secondary?.id])
+            .flatMap((entry) => entry.type === "duplicate"
+              ? caseMembers(entry).map((member) => member.id)
+              : [entry.primary?.id])
             .filter(Boolean)
         )];
         openDetail(summary.id, {
@@ -588,9 +602,11 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
 
       export async function updateDuplicateCuration(entry, status) {
         await postCurationDecision("/api/curation/duplicate", {
-          id: entry.primary.id,
-          source_file: entry.primary.source_file,
-          other_reference: entry.secondary.ref,
+          members: caseMembers(entry).map((member) => ({
+            ref: member.ref,
+            id: member.id,
+            source_file: member.source_file
+          })),
           status
         });
       }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -24,7 +24,9 @@ from movie_inbox.domain.curation import (
 )
 from movie_inbox.domain.merge_review import (
     MergeReviewError,
+    apply_group_reviewed_merge,
     apply_reviewed_merge,
+    build_group_merge_review,
     build_merge_review,
 )
 
@@ -99,6 +101,27 @@ class CurationWorkflowService:
         review["right"]["external"] = external
         review["right"]["_availability"] = self._decorated_item(right_item).get("_availability")
         review["can_select_survivor"] = not external
+        return review
+
+    def compare_group(
+        self,
+        members: Sequence[CatalogPointer],
+        *,
+        survivor: CatalogPointer | None = None,
+    ) -> dict[str, Any]:
+        states = self._capture_group(members)
+        survivor_state = self._group_survivor_state(states, survivor)
+        member_rows = [(_state_reference(state), state["item"]) for state in states]
+        review = build_group_merge_review(member_rows, _state_reference(survivor_state))
+        states_by_reference = {_state_reference(state): state for state in states}
+        for member in review["members"]:
+            state = states_by_reference[str(member["ref"])]
+            member["reference"] = {
+                "id": str(state.get("item_id") or ""),
+                "source_file": str(state.get("source_file") or ""),
+            }
+            member["external"] = False
+            member["_availability"] = self._decorated_item(state["item"]).get("_availability")
         return review
 
     def merge(
@@ -188,6 +211,71 @@ class CurationWorkflowService:
             "operation": public_operation(operation),
         }
 
+    def merge_group(
+        self,
+        members: Sequence[CatalogPointer],
+        *,
+        survivor: CatalogPointer | None = None,
+        choices: Mapping[str, Any] | None = None,
+        expected_review_id: str = "",
+        reference_aliases: Sequence[str] = (),
+        history_mode: str = "persistent",
+        session_id: str = "",
+    ) -> dict[str, Any]:
+        states = self._capture_group(members)
+        survivor_state = self._group_survivor_state(states, survivor)
+        member_rows = [(_state_reference(state), state["item"]) for state in states]
+        survivor_ref = _state_reference(survivor_state)
+        review = build_group_merge_review(member_rows, survivor_ref)
+        if expected_review_id and review["review_id"] != expected_review_id:
+            raise CurationConflict("comparison_stale")
+
+        removed_references = tuple(
+            dict.fromkeys(
+                [
+                    *(reference for reference, _ in member_rows if reference),
+                    *self._validated_group_references(states, reference_aliases),
+                ]
+            )
+        )
+        merged_item = apply_group_reviewed_merge(
+            member_rows,
+            survivor_ref,
+            choices or {},
+            removed_references=removed_references,
+        )
+        loser_states = [state for state in states if state is not survivor_state]
+        before = list(states)
+        after = [
+            _state_with_item(
+                survivor_state,
+                merged_item,
+                position=_after_group_merge_position(survivor_state, loser_states),
+            ),
+            *[_state_with_item(state, None) for state in loser_states],
+        ]
+        changed_fields = [field["key"] for field in review["fields"] if field["different"]]
+        operation = self._commit_operation(
+            action="merge_group",
+            label=f"Combinacion de {len(states)} entradas: {_item_title(merged_item)}",
+            before=before,
+            after=after,
+            history_mode=history_mode,
+            session_id=session_id,
+            summary={
+                "member_count": len(states),
+                "member_titles": [_state_title(state) for state in states],
+                "survivor_title": _item_title(merged_item),
+                "survivor_id": str(merged_item.get("id") or ""),
+                "changed_fields": changed_fields,
+                "external": False,
+            },
+        )
+        return {
+            "item": self._decorated_item(merged_item),
+            "operation": public_operation(operation),
+        }
+
     def auto_resolve_duplicates(
         self,
         items: list[dict[str, Any]],
@@ -195,29 +283,24 @@ class CurationWorkflowService:
         history_mode: str,
         session_id: str,
     ) -> dict[str, Any]:
-        """Merge duplicate pairs that need no human judgment call.
-
-        A pair is safe to auto-merge exactly when plain `merge(choices={})`
-        would not have raised: every differing field either has an
-        unambiguous default (the non-empty side wins, local_files/en_catalogo
-        combine) or doesn't differ at all. A field only requires a human
-        decision when both sides hold different non-empty personal data --
-        that case is left in the queue untouched, benefiting from the
-        disambiguation added in phase 1.
-        """
+        """Resolve each safe duplicate component as one atomic N-to-1 operation."""
         cases = build_curation_payload(items)["cases"]
         resolved = 0
         needs_review = 0
         for case in cases:
             if case["type"] != "duplicate" or case["status"] != "pending":
                 continue
-            left = CatalogPointer(Path(case["primary"]["source_file"]), case["primary"]["id"])
-            right = CatalogPointer(Path(case["secondary"]["source_file"]), case["secondary"]["id"])
+            members = [
+                CatalogPointer(Path(member["source_file"]), member["id"])
+                for member in case.get("members", [])
+            ]
             try:
-                review = self.compare(left, right=right)
-                self.merge(
-                    left,
-                    right=right,
+                review = self.compare_group(members)
+                if review["unresolved_count"]:
+                    needs_review += 1
+                    continue
+                self.merge_group(
+                    members,
                     choices={},
                     expected_review_id=review["review_id"],
                     history_mode=history_mode,
@@ -227,6 +310,46 @@ class CurationWorkflowService:
             except (MergeReviewError, CurationConflict, CurationItemNotFound):
                 needs_review += 1
         return {"resolved": resolved, "needs_review": needs_review}
+
+    def update_duplicate_group_decision(
+        self,
+        members: Sequence[CatalogPointer],
+        status: str,
+        *,
+        member_references: Sequence[str] = (),
+        history_mode: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        states = self._capture_group(members)
+        references = self._validated_group_references(states, member_references)
+        if not references:
+            references = [_state_reference(state) for state in states]
+        after: list[dict[str, Any]] = []
+        for state, own_reference in zip(states, references, strict=True):
+            updated = dict(state["item"])
+            for other_reference in references:
+                if other_reference != own_reference:
+                    apply_duplicate_curation_decision(updated, other_reference, status)
+            after.append(_state_with_item(state, normalize_item(updated).to_dict()))
+        labels = {
+            "pending": "Grupo devuelto a pendientes",
+            "deferred": "Grupo de duplicados pospuesto",
+            "not_duplicate": "Entradas del grupo marcadas como distintas",
+        }
+        operation = self._commit_operation(
+            action="duplicate_group_curation",
+            label=f"{labels.get(status, 'Decision de grupo')}: {len(states)} entradas",
+            before=list(states),
+            after=after,
+            history_mode=history_mode,
+            session_id=session_id,
+            summary={
+                "member_count": len(states),
+                "member_titles": [_state_title(state) for state in states],
+                "decision": status,
+            },
+        )
+        return {"operation": public_operation(operation)}
 
     def update_link_decision(
         self,
@@ -403,6 +526,47 @@ class CurationWorkflowService:
 
     def _capture(self, pointer: CatalogPointer) -> dict[str, Any]:
         return capture_catalog_state(self.repository_factory, pointer)
+
+    def _capture_group(self, members: Sequence[CatalogPointer]) -> list[dict[str, Any]]:
+        if len(members) < 2:
+            raise MergeReviewError("A duplicate group needs at least two members")
+        keys = [_pointer_key(pointer) for pointer in members]
+        if len(set(keys)) != len(keys):
+            raise MergeReviewError("Duplicate group contains the same item more than once")
+        states = [self._capture(pointer) for pointer in members]
+        references = [_state_reference(state) for state in states]
+        if len(set(references)) != len(references):
+            raise MergeReviewError("Duplicate group contains ambiguous references")
+        return states
+
+    @staticmethod
+    def _validated_group_references(
+        states: Sequence[Mapping[str, Any]], references: Sequence[str]
+    ) -> list[str]:
+        if not references:
+            return []
+        normalized = [str(reference or "").strip() for reference in references]
+        if len(normalized) != len(states) or len(set(normalized)) != len(normalized):
+            raise MergeReviewError("Duplicate group contains invalid public references")
+        for state, reference in zip(states, normalized, strict=True):
+            if not reference or reference.split("::", 1)[0] != str(state.get("item_id") or ""):
+                raise MergeReviewError("Duplicate group reference does not match its member")
+        return normalized
+
+    @staticmethod
+    def _group_survivor_state(
+        states: Sequence[dict[str, Any]], survivor: CatalogPointer | None
+    ) -> dict[str, Any]:
+        if survivor is None:
+            return states[0]
+        survivor_key = _pointer_key(survivor)
+        for state in states:
+            state_pointer = CatalogPointer(
+                Path(str(state.get("source_file") or "")), str(state.get("item_id") or "")
+            )
+            if _pointer_key(state_pointer) == survivor_key:
+                return state
+        raise MergeReviewError("Group survivor is not a member")
 
     def _commit_operation(
         self,
@@ -614,6 +778,19 @@ def _after_merge_position(
     ):
         return max(0, position - 1)
     return position
+
+
+def _after_group_merge_position(
+    survivor: Mapping[str, Any], losers: Sequence[Mapping[str, Any]]
+) -> int:
+    position = int(survivor.get("position") or 0)
+    removed_before = sum(
+        1
+        for loser in losers
+        if loser.get("source_file") == survivor.get("source_file")
+        and int(loser.get("position") or 0) < position
+    )
+    return max(0, position - removed_before)
 
 
 def _pointer_key(pointer: CatalogPointer) -> tuple[str, str]:

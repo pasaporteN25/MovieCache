@@ -338,7 +338,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIn("Disponible · Inventario verificado", akira_record)
         self.assertNotIn("manual:", akira_record)
 
-    def test_curation_search_keyboard_and_duplicate_position_fallback(self) -> None:
+    def test_curation_search_keyboard_and_three_member_duplicate_group(self) -> None:
         page = self.page
         availability = {"effective": False, "manual": False, "server": False, "file_count": 0}
         heat_a = {
@@ -354,7 +354,9 @@ class BrowserInterfaceTests(unittest.TestCase):
             "status": "to_watch",
             "_availability": availability,
         }
-        heat_b = {**heat_a, "id": "heat-b", "ref": "heat-b::catalog.json"}
+        heat_a["rating"] = 9
+        heat_b = {**heat_a, "id": "heat-b", "ref": "heat-b::catalog.json", "rating": 4}
+        heat_c = {**heat_a, "id": "heat-c", "ref": "heat-c::catalog.json", "rating": 0}
         akira = {
             **heat_a,
             "id": "akira",
@@ -368,8 +370,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                 "id": "duplicate-heat",
                 "type": "duplicate",
                 "status": "pending",
-                "primary": heat_a,
-                "secondary": heat_b,
+                "members": [heat_a, heat_b, heat_c],
                 "evidence": ["Mismo título y año"],
             },
             {
@@ -404,11 +405,36 @@ class BrowserInterfaceTests(unittest.TestCase):
             },
         ]
         compare_payload = {
-            "left": {**heat_a, "local_files_count": 0},
-            "right": {**heat_b, "local_files_count": 0},
-            "fields": [],
-            "groups": [],
-            "survivor_side": "left",
+            "group": True,
+            "members": [
+                {
+                    **member,
+                    "local_files_count": 0,
+                    "reference": {"id": member["id"], "source_file": member["source_file"]},
+                }
+                for member in (heat_a, heat_b, heat_c)
+            ],
+            "fields": [
+                {
+                    "key": "rating",
+                    "label": "Puntaje",
+                    "group": "personal",
+                    "strategy": "scalar",
+                    "protected": True,
+                    "locked": False,
+                    "different": True,
+                    "allowed": [heat_a["ref"], heat_b["ref"], heat_c["ref"]],
+                    "default_choice": "",
+                    "required": True,
+                    "values": [
+                        {"member_ref": heat_a["ref"], "value": 9},
+                        {"member_ref": heat_b["ref"], "value": 4},
+                        {"member_ref": heat_c["ref"], "value": 0},
+                    ],
+                }
+            ],
+            "groups": [{"key": "personal", "label": "Registro personal"}],
+            "survivor_ref": heat_a["ref"],
             "can_select_survivor": True,
             "different_count": 1,
             "review_id": "browser-position-fallback",
@@ -422,14 +448,39 @@ class BrowserInterfaceTests(unittest.TestCase):
                 body=json.dumps({"operations": history, "count": len(history)}),
             ),
         )
-        page.route(
-            "**/api/curation/compare",
-            lambda route: route.fulfill(
+
+        def compare_group(route) -> None:
+            request_body = route.request.post_data_json
+            survivor_id = str((request_body.get("survivor") or {}).get("id") or "heat-a")
+            payload = {
+                **compare_payload,
+                "survivor_ref": f"{survivor_id}::catalog.json",
+            }
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
+        merge_requests: list[dict[str, Any]] = []
+
+        def merge_group(route) -> None:
+            merge_requests.append(route.request.post_data_json)
+            route.fulfill(
                 status=200,
                 content_type="application/json",
-                body=json.dumps(compare_payload),
-            ),
-        )
+                body=json.dumps(
+                    {
+                        "ok": True,
+                        "reason": "merged",
+                        "item": heat_c,
+                        "operation": {
+                            "id": "merge-group-1",
+                            "action": "merge_group",
+                            "can_undo": True,
+                        },
+                    }
+                ),
+            )
+
+        page.route("**/api/curation/compare", compare_group)
+        page.route("**/api/curation/merge", merge_group)
         page.route(
             "**/api/curation",
             lambda route: route.fulfill(
@@ -472,24 +523,32 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
 
         duplicate = page.locator('[data-curation-case="duplicate-heat"]')
-        self.assertIn("Duplicado 1 de 2 ↔ Duplicado 2 de 2", duplicate.inner_text())
+        self.assertIn("3 entradas conectadas", duplicate.inner_text())
         duplicate.click()
         detail_text = page.locator("#curationDetail").text_content() or ""
-        self.assertIn("Entrada A · Duplicado 1 de 2", detail_text)
-        self.assertIn("Entrada B · Duplicado 2 de 2", detail_text)
+        self.assertIn("Entrada 1 de 3", detail_text)
+        self.assertIn("Entrada 2 de 3", detail_text)
+        self.assertIn("Entrada 3 de 3", detail_text)
 
-        page.get_by_role("button", name="Comparar y combinar").click()
+        page.get_by_role("button", name="Comparar 3 entradas").click()
         page.wait_for_selector("#mergeComparatorDialog[open]")
         page.wait_for_function(
             "document.querySelector('#mergeComparatorDialog').dataset.loading === 'false'"
         )
         self.assertEqual(
             page.locator("#mergeComparatorTitle").text_content(),
-            "Heat (Duplicado 1 de 2) / Heat (Duplicado 2 de 2)",
+            "Heat · 3 entradas",
         )
         summary_text = page.locator("#mergeComparatorSummary").text_content() or ""
-        self.assertIn("Entrada A · Duplicado 1 de 2", summary_text)
-        self.assertIn("Entrada B · Duplicado 2 de 2", summary_text)
+        self.assertIn("Entrada 1 de 3", summary_text)
+        self.assertIn("Entrada 2 de 3", summary_text)
+        self.assertIn("Entrada 3 de 3", summary_text)
+        self.assertEqual(
+            page.locator('#mergeSurvivorControl input[name="merge-survivor"]').count(), 3
+        )
+        self.assertEqual(
+            page.locator("#confirmReviewedMerge").text_content(), "Combinar 3 entradas"
+        )
         self.assertEqual(
             page.locator("#confirmReviewedMerge").get_attribute("aria-describedby"),
             "mergeDecisionStatus",
@@ -498,7 +557,18 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.locator("#mergeDecisionStatus").locator("xpath=..").get_attribute("aria-live"),
             "polite",
         )
-        page.locator("#cancelMergeComparator").click()
+        page.locator('input[name="merge-survivor"][value="heat-c::catalog.json"]').check()
+        page.wait_for_function(
+            "document.querySelector('#mergeComparatorDialog').dataset.loading === 'false'"
+        )
+        self.assertTrue(page.locator("#confirmReviewedMerge").is_disabled())
+        page.locator('[data-merge-choice="rating"][value="heat-a::catalog.json"]').check()
+        page.locator("#confirmReviewedMerge").click()
+        page.wait_for_function("!document.querySelector('#mergeComparatorDialog').open")
+        self.assertEqual(len(merge_requests), 1)
+        self.assertEqual(len(merge_requests[0]["members"]), 3)
+        self.assertEqual(merge_requests[0]["survivor"]["id"], "heat-c")
+        self.assertEqual(merge_requests[0]["choices"]["rating"], "heat-a::catalog.json")
 
         page.locator('[data-curation-filter="history"]').click()
         first_history = page.locator(".curation-queue-item.selected")

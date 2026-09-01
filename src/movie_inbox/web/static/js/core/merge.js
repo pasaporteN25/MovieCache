@@ -20,6 +20,17 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
       export let mergeRequestSequence = 0;
 
       export async function openInternalMergeComparator(entry) {
+        if (Array.isArray(entry?.members) && entry.members.length >= 2) {
+          await openMergeComparator({
+            type: "internal-group",
+            members: entry.members.map((member) => ({
+              ref: member.ref,
+              id: member.id,
+              source_file: member.source_file
+            }))
+          });
+          return;
+        }
         if (!entry?.primary || !entry?.secondary) return;
         await openMergeComparator({
           type: "internal",
@@ -69,24 +80,37 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
         fields.mergeDecisionStatus.textContent = "Leyendo entradas";
         fields.mergeDecisionMeta.textContent = "";
         if (!fields.mergeComparatorDialog.open) fields.mergeComparatorDialog.showModal();
-        await requestMergeComparison("left");
+        await requestMergeComparison(
+          mergeContext.type === "internal-group" ? mergeContext.members[0]?.ref : "left"
+        );
       }
 
-      export async function requestMergeComparison(survivorSide) {
+      export async function requestMergeComparison(survivorChoice) {
         if (!mergeContext) return;
         const requestId = ++mergeRequestSequence;
         const requestContext = mergeContext;
-        mergeContext.survivor_side = survivorSide;
+        if (mergeContext.type === "internal-group") mergeContext.survivor_ref = survivorChoice;
+        else mergeContext.survivor_side = survivorChoice;
         fields.mergeComparatorDialog.dataset.loading = "true";
         fields.confirmReviewedMerge.disabled = true;
         fields.mergeComparatorFeedback.textContent = "";
         try {
-          const body = {
-            left: mergeContext.left,
-            survivor_side: survivorSide
-          };
-          if (mergeContext.type === "internal") body.right = mergeContext.right;
-          else body.result = mergeContext.result;
+          let body;
+          if (mergeContext.type === "internal-group") {
+            const survivor = mergeReview?.members?.find((member) => member.ref === survivorChoice)?.reference
+              || mergeContext.members.find((member) => member.ref === survivorChoice);
+            body = {
+              members: mergeContext.members.map(({ ref, id, source_file }) => ({ ref, id, source_file })),
+              survivor: survivor ? { id: survivor.id, source_file: survivor.source_file } : null
+            };
+          } else {
+            body = {
+              left: mergeContext.left,
+              survivor_side: survivorChoice
+            };
+            if (mergeContext.type === "internal") body.right = mergeContext.right;
+            else body.result = mergeContext.result;
+          }
           const response = await apiFetch("/api/curation/compare", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -96,8 +120,7 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
           if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
           if (
             !payload
-            || !payload.left
-            || !payload.right
+            || (!(payload.group && Array.isArray(payload.members)) && (!payload.left || !payload.right))
             || !Array.isArray(payload.fields)
             || !Array.isArray(payload.groups)
           ) {
@@ -146,7 +169,11 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
         fields.mergeDecisionStatus.textContent = "Leyendo entradas";
         fields.mergeComparatorFeedback.textContent = "";
         fields.mergeComparatorFeedback.dataset.tone = "";
-        requestMergeComparison(mergeContext.survivor_side || "left");
+        requestMergeComparison(
+          mergeContext.type === "internal-group"
+            ? mergeContext.survivor_ref || mergeContext.members[0]?.ref
+            : mergeContext.survivor_side || "left"
+        );
       }
 
       export function mergeTitleFragment(item, other) {
@@ -156,33 +183,11 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
 
       export function renderMergeComparator() {
         if (!mergeReview) return;
-        const rawLeftTitle = mergeReview.left?.title || "Entrada A";
-        const rawRightTitle = mergeReview.right?.title || "Entrada B";
-        const titlesCollide = Boolean(mergeReview.left && mergeReview.right) && rawLeftTitle === rawRightTitle;
-        const needsPosition = titlesCollide
-          && String(mergeReview.left.year || "") === String(mergeReview.right.year || "")
-          && duplicateSignalsCollide(mergeReview.left, mergeReview.right);
-        const leftTitle = needsPosition
-          ? `${rawLeftTitle} (Duplicado 1 de 2)`
-          : (titlesCollide ? mergeTitleFragment(mergeReview.left, mergeReview.right) : rawLeftTitle);
-        const rightTitle = needsPosition
-          ? `${rawRightTitle} (Duplicado 2 de 2)`
-          : (titlesCollide ? mergeTitleFragment(mergeReview.right, mergeReview.left) : rawRightTitle);
-        fields.mergeComparatorTitle.textContent = `${leftTitle} / ${rightTitle}`;
-        fields.mergeComparatorSubtitle.textContent = mergeReview.can_select_survivor
-          ? "Elegí qué identidad permanece y resolvé los campos señalados."
-          : "La entrada del catálogo conservará su identidad.";
-        fields.mergeSurvivorControl.hidden = !mergeReview.can_select_survivor;
-        fields.mergeSurvivorLeft.textContent = `Conservar A · ${leftTitle}`;
-        fields.mergeSurvivorRight.textContent = `Conservar B · ${rightTitle}`;
-        fields.mergeSurvivorControl.querySelectorAll('input[name="merge-survivor"]').forEach((input) => {
-          input.checked = input.value === mergeReview.survivor_side;
-        });
-        fields.mergeComparatorSummary.innerHTML = `
-          ${mergeEntrySummary(mergeReview.left, "Entrada A", mergeReview.survivor_side === "left", needsPosition ? "Duplicado 1 de 2" : "")}
-          <span class="merge-summary-divider" aria-hidden="true">↔</span>
-          ${mergeEntrySummary(mergeReview.right, "Entrada B", mergeReview.survivor_side === "right", needsPosition ? "Duplicado 2 de 2" : "")}
-        `;
+        if (mergeReview.group) {
+          renderGroupMergeHeader();
+        } else {
+          renderPairMergeHeader();
+        }
 
         const visibleFields = mergeReview.fields.filter((field) => (
           fields.mergeShowAllFields.checked || field.different
@@ -203,6 +208,68 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
         updateMergeDecisionStatus();
       }
 
+      export function renderGroupMergeHeader() {
+        const members = mergeReview.members || [];
+        const sharedTitle = members.every((member) => member.title === members[0]?.title)
+          ? members[0]?.title
+          : "Grupo de duplicados";
+        fields.mergeComparatorTitle.textContent = `${sharedTitle || "Grupo de duplicados"} · ${members.length} entradas`;
+        fields.mergeComparatorSubtitle.textContent = "Elegí la ficha que conservará la identidad y resolvé cada diferencia del grupo.";
+        fields.mergeSurvivorControl.hidden = false;
+        fields.mergeSurvivorOptions.innerHTML = members.map((member, index) => `
+          <label>
+            <input type="radio" name="merge-survivor" value="${escapeAttr(member.ref)}"
+              ${member.ref === mergeReview.survivor_ref ? "checked" : ""}>
+            <span>Conservar ${index + 1} · ${escapeHtml(member.title || "Sin título")}</span>
+          </label>
+        `).join("");
+        fields.mergeComparatorSummary.classList.add("group");
+        fields.mergeComparatorSummary.innerHTML = members.map((member, index) => (
+          mergeEntrySummary(
+            member,
+            `Entrada ${index + 1} de ${members.length}`,
+            member.ref === mergeReview.survivor_ref
+          )
+        )).join("");
+        fields.confirmReviewedMerge.textContent = `Combinar ${members.length} entradas`;
+      }
+
+      export function renderPairMergeHeader() {
+        const rawLeftTitle = mergeReview.left?.title || "Entrada A";
+        const rawRightTitle = mergeReview.right?.title || "Entrada B";
+        const titlesCollide = Boolean(mergeReview.left && mergeReview.right) && rawLeftTitle === rawRightTitle;
+        const needsPosition = titlesCollide
+          && String(mergeReview.left.year || "") === String(mergeReview.right.year || "")
+          && duplicateSignalsCollide(mergeReview.left, mergeReview.right);
+        const leftTitle = needsPosition
+          ? `${rawLeftTitle} (Duplicado 1 de 2)`
+          : (titlesCollide ? mergeTitleFragment(mergeReview.left, mergeReview.right) : rawLeftTitle);
+        const rightTitle = needsPosition
+          ? `${rawRightTitle} (Duplicado 2 de 2)`
+          : (titlesCollide ? mergeTitleFragment(mergeReview.right, mergeReview.left) : rawRightTitle);
+        fields.mergeComparatorTitle.textContent = `${leftTitle} / ${rightTitle}`;
+        fields.mergeComparatorSubtitle.textContent = mergeReview.can_select_survivor
+          ? "Elegí qué identidad permanece y resolvé los campos señalados."
+          : "La entrada del catálogo conservará su identidad.";
+        fields.mergeSurvivorControl.hidden = !mergeReview.can_select_survivor;
+        fields.mergeSurvivorOptions.innerHTML = `
+          <label>
+            <input type="radio" name="merge-survivor" value="left" ${mergeReview.survivor_side === "left" ? "checked" : ""}>
+            <span>Conservar A · ${escapeHtml(leftTitle)}</span>
+          </label>
+          <label>
+            <input type="radio" name="merge-survivor" value="right" ${mergeReview.survivor_side === "right" ? "checked" : ""}>
+            <span>Conservar B · ${escapeHtml(rightTitle)}</span>
+          </label>`;
+        fields.mergeComparatorSummary.classList.remove("group");
+        fields.mergeComparatorSummary.innerHTML = `
+          ${mergeEntrySummary(mergeReview.left, "Entrada A", mergeReview.survivor_side === "left", needsPosition ? "Duplicado 1 de 2" : "")}
+          <span class="merge-summary-divider" aria-hidden="true">↔</span>
+          ${mergeEntrySummary(mergeReview.right, "Entrada B", mergeReview.survivor_side === "right", needsPosition ? "Duplicado 2 de 2" : "")}
+        `;
+        fields.confirmReviewedMerge.textContent = "Combinar entradas";
+      }
+
       export function mergeEntrySummary(item, label, survivor, positionLabel = "") {
         return `<article class="merge-entry-summary ${survivor ? "survivor" : ""}">
           ${curationThumb(item, true)}
@@ -221,13 +288,16 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
 
       export function mergeFieldRow(field) {
         const choice = mergeChoices[field.key] || "";
-        const states = [
-          { side: "left", label: "Entrada A", value: field.left },
-          ...(field.allowed.includes("combine")
-            ? [{ side: "combine", label: mergeCombineLabel(field), value: mergeCombinedValue(field) }]
-            : []),
-          { side: "right", label: "Entrada B", value: field.right }
-        ].filter((state) => field.allowed.includes(state.side));
+        const states = mergeReview?.group
+          ? groupMergeFieldStates(field)
+          : [
+              { side: "left", label: "Entrada A", value: field.left },
+              ...(field.allowed.includes("combine")
+                ? [{ side: "combine", label: mergeCombineLabel(field), value: mergeCombinedValue(field) }]
+                : []),
+              { side: "right", label: "Entrada B", value: field.right }
+            ].filter((state) => field.allowed.includes(state.side));
+        const sameValue = mergeReview?.group ? field.values?.[0]?.value : field.left;
         const options = field.different
           ? states.map((state) => `
               <label class="merge-choice ${state.side}">
@@ -238,7 +308,7 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
                 ${mergeValue(state.value, field)}
               </label>
             `).join("")
-          : `<div class="merge-field-same">${mergeValue(field.left, field)}<span>Coinciden</span></div>`;
+          : `<div class="merge-field-same">${mergeValue(sameValue, field)}<span>Coinciden</span></div>`;
         return `<article class="merge-field-row ${field.required && !choice ? "needs-decision" : ""}"
           data-merge-field="${escapeAttr(field.key)}">
           <header>
@@ -249,8 +319,32 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
               ${field.required && !choice ? '<span class="pill warning">elegir</span>' : ""}
             </span>
           </header>
-          <div class="merge-field-options ${states.length === 3 ? "three" : "two"}">${options}</div>
+          <div class="merge-field-options ${states.length > 3 ? "many" : states.length === 3 ? "three" : "two"}">${options}</div>
         </article>`;
+      }
+
+      export function groupMergeFieldStates(field) {
+        const members = mergeReview?.members || [];
+        const memberByRef = new Map(members.map((member, index) => [
+          member.ref,
+          { member, index }
+        ]));
+        const states = asList(field.values).map((entry) => {
+          const match = memberByRef.get(entry.member_ref);
+          return {
+            side: entry.member_ref,
+            label: `Entrada ${(match?.index ?? 0) + 1}`,
+            value: entry.value
+          };
+        });
+        if (field.allowed.includes("combine")) {
+          states.push({
+            side: "combine",
+            label: mergeCombineLabel(field),
+            value: mergeCombinedValue(field)
+          });
+        }
+        return states.filter((state) => field.allowed.includes(state.side));
       }
 
       export function mergeValue(value, field) {
@@ -287,9 +381,12 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
       }
 
       export function mergeCombinedValue(field) {
+        const values = mergeReview?.group
+          ? asList(field.values).map((entry) => entry.value)
+          : [field.left, field.right];
         if (field.strategy === "list") {
           const seen = new Set();
-          return [...asList(field.left), ...asList(field.right)].filter((value) => {
+          return values.flatMap((value) => asList(value)).filter((value) => {
             const key = normalizeText(value);
             if (!key || seen.has(key)) return false;
             seen.add(key);
@@ -298,7 +395,7 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
         }
         if (field.strategy === "local_files") {
           const seen = new Set();
-          return [...asList(field.left), ...asList(field.right)].filter((file) => {
+          return values.flatMap((value) => asList(value)).filter((file) => {
             const key = `${file.library_id || ""}|${file.relative_path || ""}|${file.path || ""}`.toLowerCase();
             if (seen.has(key)) return false;
             seen.add(key);
@@ -307,15 +404,15 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
         }
         if (field.strategy === "release_dates") {
           const seen = new Set();
-          return [...asList(field.left), ...asList(field.right)].filter((entry) => {
+          return values.flatMap((value) => asList(value)).filter((entry) => {
             const key = `${entry?.date || ""}|${entry?.country || ""}|${entry?.release_type || ""}`.toLowerCase();
             if (!entry?.date || seen.has(key)) return false;
             seen.add(key);
             return true;
           });
         }
-        if (field.strategy === "boolean_or") return Boolean(field.left || field.right);
-        return field.left;
+        if (field.strategy === "boolean_or") return values.some(Boolean);
+        return values[0];
       }
 
       export function mergeCombineLabel(field) {
@@ -343,7 +440,8 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
 
       export async function changeMergeSurvivor(event) {
         const input = event.target.closest('input[name="merge-survivor"]');
-        if (!input || !mergeReview || input.value === mergeReview.survivor_side) return;
+        const current = mergeReview?.group ? mergeReview.survivor_ref : mergeReview?.survivor_side;
+        if (!input || !mergeReview || input.value === current) return;
         fields.mergeComparatorFields.innerHTML = mergeComparatorLoading();
         fields.mergeDecisionStatus.textContent = "Recalculando resultado";
         await requestMergeComparison(input.value);
@@ -371,16 +469,30 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
         fields.mergeComparatorFeedback.textContent = "Guardando combinación…";
         fields.mergeComparatorFeedback.dataset.tone = "working";
         try {
-          const body = {
-            left: mergeContext.left,
-            survivor_side: mergeReview.survivor_side,
-            choices: mergeChoices,
-            review_id: mergeReview.review_id,
-            history_mode: curationHistoryMode
-          };
+          let body;
+          if (mergeContext.type === "internal-group") {
+            const survivor = mergeReview.members.find(
+              (member) => member.ref === mergeReview.survivor_ref
+            )?.reference;
+            body = {
+              members: mergeContext.members.map(({ ref, id, source_file }) => ({ ref, id, source_file })),
+              survivor: survivor ? { id: survivor.id, source_file: survivor.source_file } : null,
+              choices: mergeChoices,
+              review_id: mergeReview.review_id,
+              history_mode: curationHistoryMode
+            };
+          } else {
+            body = {
+              left: mergeContext.left,
+              survivor_side: mergeReview.survivor_side,
+              choices: mergeChoices,
+              review_id: mergeReview.review_id,
+              history_mode: curationHistoryMode
+            };
+          }
           if (mergeContext.type === "internal") {
             body.right = mergeContext.right;
-          } else {
+          } else if (mergeContext.type === "external") {
             body.incoming = mergeContext.incoming || mergeContext.result;
             body.incoming_reviewed = true;
           }

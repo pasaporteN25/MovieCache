@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
 
+from movie_inbox.application.curation_service import build_curation_payload
 from movie_inbox.application.curation_workflow import (
     CatalogPointer,
     CurationConflict,
@@ -132,6 +133,237 @@ class CurationWorkflowTests(unittest.TestCase):
             history = workflow.history("persistent", "session-a")
             self.assertEqual(history["operations"][0]["status"], "undone")
             self.assertFalse(history["operations"][0]["can_undo"])
+
+    def test_group_merge_is_one_operation_and_undo_restores_every_member(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat-a",
+                            "title": "Heat",
+                            "year": "1995",
+                            "rating": 9,
+                            "description": "Sinopsis externa",
+                            "local_files": [{"path": "D:/Heat.mkv", "name": "Heat.mkv"}],
+                        }
+                    ),
+                    normalize_item(
+                        {
+                            "id": "heat-b",
+                            "title": "Heat",
+                            "year": "1995",
+                            "rating": 4,
+                        }
+                    ),
+                    normalize_item(
+                        {
+                            "id": "heat-c",
+                            "title": "Heat",
+                            "year": "1995",
+                            "spanish_title": "Fuego contra fuego",
+                            "description": "",
+                            "locked_fields": ["description"],
+                        }
+                    ),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            members = [
+                CatalogPointer(catalog_path, "heat-a"),
+                CatalogPointer(catalog_path, "heat-b"),
+                CatalogPointer(catalog_path, "heat-c"),
+            ]
+            review = workflow.compare_group(members, survivor=members[2])
+            rating = next(field for field in review["fields"] if field["key"] == "rating")
+            self.assertTrue(rating["required"])
+            rating_choice = next(
+                member["ref"] for member in review["members"] if member["id"] == "heat-a"
+            )
+
+            result = workflow.merge_group(
+                members,
+                survivor=members[2],
+                choices={"rating": rating_choice},
+                expected_review_id=review["review_id"],
+                history_mode="persistent",
+                session_id="session-a",
+            )
+
+            remaining = repository.read()
+            self.assertEqual([item.id for item in remaining], ["heat-c"])
+            self.assertEqual(remaining[0].rating, 9)
+            self.assertEqual(remaining[0].spanish_title, "Fuego contra fuego")
+            self.assertEqual(remaining[0].description, "")
+            self.assertIn("description", remaining[0].locked_fields)
+            self.assertEqual(len(remaining[0].local_files), 1)
+            history = workflow.history("persistent", "session-a")
+            self.assertEqual(history["count"], 1)
+            self.assertEqual(history["operations"][0]["action"], "merge_group")
+
+            workflow.undo(
+                result["operation"]["id"],
+                history_mode="persistent",
+                session_id="session-a",
+            )
+            restored = repository.read()
+            self.assertEqual([item.id for item in restored], ["heat-a", "heat-b", "heat-c"])
+            self.assertEqual([item.rating for item in restored], [9, 4, 0])
+
+    def test_locked_empty_field_is_not_filled_implicitly_during_merge(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {
+                            "id": "heat-a",
+                            "title": "Heat",
+                            "description": "",
+                            "locked_fields": ["description"],
+                        }
+                    ),
+                    normalize_item(
+                        {
+                            "id": "heat-b",
+                            "title": "Heat",
+                            "description": "No debe entrar sin una decisión humana",
+                        }
+                    ),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            left = CatalogPointer(catalog_path, "heat-a")
+            right = CatalogPointer(catalog_path, "heat-b")
+            review = workflow.compare(left, right=right)
+            description = next(field for field in review["fields"] if field["key"] == "description")
+            self.assertEqual(description["default_choice"], "left")
+
+            workflow.merge(
+                left,
+                right=right,
+                choices={},
+                expected_review_id=review["review_id"],
+            )
+
+            stored = repository.get("heat-a")
+            assert stored is not None
+            self.assertEqual(stored.description, "")
+            self.assertIn("description", stored.locked_fields)
+
+    def test_group_merge_rejects_a_stale_review_without_partial_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-c", "title": "Heat", "year": "1995"}),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            members = [
+                CatalogPointer(catalog_path, item_id) for item_id in ("heat-a", "heat-b", "heat-c")
+            ]
+            review = workflow.compare_group(members)
+            repository.update_item(
+                "heat-b", lambda item: item.__setitem__("review", "Cambio concurrente")
+            )
+
+            with self.assertRaises(CurationConflict):
+                workflow.merge_group(
+                    members,
+                    expected_review_id=review["review_id"],
+                    history_mode="persistent",
+                    session_id="session-a",
+                )
+
+            self.assertEqual(len(repository.read()), 3)
+            self.assertEqual(repository.get("heat-b").review, "Cambio concurrente")
+
+    def test_group_history_failure_rolls_back_every_catalog(self) -> None:
+        class FailingHistory(MemoryCurationHistoryRepository):
+            def append(self, operation, namespace=""):
+                raise OSError("disk full")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            first_path = Path(temporary) / "catalog-a.json"
+            second_path = Path(temporary) / "catalog-b.json"
+            first = JsonCatalogRepository(first_path, normalize_item)
+            second = JsonCatalogRepository(second_path, normalize_item)
+            first.write([normalize_item({"id": "heat-a", "title": "Heat", "year": "1995"})])
+            second.write(
+                [
+                    normalize_item({"id": "heat-b", "title": "Heat", "year": "1995"}),
+                    normalize_item({"id": "heat-c", "title": "Heat", "year": "1995"}),
+                ]
+            )
+
+            def repository(path: Path):
+                return first if path.resolve() == first_path.resolve() else second
+
+            workflow = CurationWorkflowService(
+                repository,
+                FailingHistory(),
+                MemoryCurationHistoryRepository(),
+            )
+            members = [
+                CatalogPointer(first_path, "heat-a"),
+                CatalogPointer(second_path, "heat-b"),
+                CatalogPointer(second_path, "heat-c"),
+            ]
+            review = workflow.compare_group(members)
+
+            with self.assertRaises(OSError):
+                workflow.merge_group(
+                    members,
+                    expected_review_id=review["review_id"],
+                    history_mode="persistent",
+                    session_id="session-a",
+                )
+
+            self.assertEqual([item.id for item in first.read()], ["heat-a"])
+            self.assertEqual([item.id for item in second.read()], ["heat-b", "heat-c"])
+
+    def test_group_duplicate_decision_and_undo_update_all_members_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item({"id": item_id, "title": "Heat", "year": "1995"})
+                    for item_id in ("heat-a", "heat-b", "heat-c")
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            members = [
+                CatalogPointer(catalog_path, item_id) for item_id in ("heat-a", "heat-b", "heat-c")
+            ]
+
+            result = workflow.update_duplicate_group_decision(
+                members,
+                "not_duplicate",
+                history_mode="persistent",
+                session_id="session-a",
+            )
+            dismissed_rows = [item.to_dict() for item in repository.read()]
+            for row in dismissed_rows:
+                row["_source_file"] = str(catalog_path)
+            self.assertEqual(build_curation_payload(dismissed_rows)["counts"]["duplicates"], 0)
+
+            workflow.undo(
+                result["operation"]["id"],
+                history_mode="persistent",
+                session_id="session-a",
+            )
+            restored_rows = [item.to_dict() for item in repository.read()]
+            for row in restored_rows:
+                row["_source_file"] = str(catalog_path)
+            self.assertEqual(build_curation_payload(restored_rows)["counts"]["duplicates"], 1)
 
     def test_compare_and_merge_expose_availability_without_leaking_into_persisted_flag(
         self,
@@ -379,22 +611,17 @@ class CurationWorkflowTests(unittest.TestCase):
                 items, history_mode="persistent", session_id="session-a"
             )
 
-            self.assertEqual(result["resolved"], 2)
-            self.assertEqual(result["needs_review"], 1)
+            self.assertEqual(result["resolved"], 1)
+            self.assertEqual(result["needs_review"], 0)
             self.assertEqual(len(repository.read()), 1)
             history = workflow.history("persistent", "session-a")
-            self.assertEqual(history["count"], 2)
-            self.assertTrue(all(op["action"] == "merge" for op in history["operations"]))
+            self.assertEqual(history["count"], 1)
+            self.assertEqual(history["operations"][0]["action"], "merge_group")
 
-    def test_auto_resolve_on_a_quartet_with_one_conflict_leaves_mostly_stale_reference_noise(
+    def test_auto_resolve_on_a_quartet_with_one_conflict_leaves_the_group_intact(
         self,
     ) -> None:
-        """[C1] characterization: a static C(N,2) pair list processed in order means a
-        single real conflict (heat-a vs heat-d, rating 9 vs 4) produces only 1 genuine
-        `needs_review`, but the other 3 pairs involving already-merged heat-b/heat-c
-        raise `CurationItemNotFound` and get counted as `needs_review` too -- inflating
-        the count with stale-reference noise rather than real conflicts. See [C1] in
-        tareas.md for the full per-pair trace."""
+        """One real conflict blocks the entire group without stale-reference noise."""
         with tempfile.TemporaryDirectory() as temporary:
             catalog_path = Path(temporary) / "catalog.json"
             repository = JsonCatalogRepository(catalog_path, normalize_item)
@@ -415,9 +642,13 @@ class CurationWorkflowTests(unittest.TestCase):
                 items, history_mode="persistent", session_id="session-a"
             )
 
-            self.assertEqual(result, {"resolved": 2, "needs_review": 4})
+            self.assertEqual(result, {"resolved": 0, "needs_review": 1})
             survivors = {item.id: item.rating for item in repository.read()}
-            self.assertEqual(survivors, {"heat-a": 9, "heat-d": 4})
+            self.assertEqual(
+                survivors,
+                {"heat-a": 0, "heat-b": 0, "heat-c": 9, "heat-d": 4},
+            )
+            self.assertEqual(workflow.history("persistent", "session-a")["count"], 0)
 
     def test_auto_resolve_leaves_a_genuine_personal_conflict_for_manual_review(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

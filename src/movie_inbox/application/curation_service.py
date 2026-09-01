@@ -40,7 +40,7 @@ def curation_counts(items: list[dict[str, Any]]) -> dict[str, int]:
 
 def _duplicate_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_reference = {curation_item_reference(item): item for item in items}
-    seen: set[tuple[str, str]] = set()
+    edges: dict[tuple[str, str], str] = {}
     cases: list[dict[str, Any]] = []
     for item in items:
         left_reference = curation_item_reference(item)
@@ -55,24 +55,58 @@ def _duplicate_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 if left_reference <= right_key
                 else (right_key, left_reference)
             )
-            if len(set(pair)) < 2 or pair in seen:
+            if len(set(pair)) < 2:
                 continue
-            seen.add(pair)
-            left = by_reference.get(pair[0])
-            right = by_reference.get(pair[1])
-            if left is None or right is None:
+            if pair[0] in by_reference and pair[1] in by_reference:
+                previous = edges.get(pair)
+                edges[pair] = "pending" if "pending" in {previous, status} else "deferred"
+
+    adjacency: dict[str, set[str]] = {reference: set() for reference in by_reference}
+    for left_reference, right_reference in edges:
+        adjacency[left_reference].add(right_reference)
+        adjacency[right_reference].add(left_reference)
+
+    unseen = {reference for reference, neighbors in adjacency.items() if neighbors}
+    while unseen:
+        seed = min(unseen)
+        component: set[str] = set()
+        pending = [seed]
+        while pending:
+            reference = pending.pop()
+            if reference in component:
                 continue
-            cases.append(
-                {
-                    "id": f"duplicate:{_case_digest(*pair)}",
-                    "type": "duplicate",
-                    "status": status,
-                    "reason": "Posible obra repetida",
-                    "evidence": _duplicate_evidence(left, right),
-                    "primary": _item_summary(left),
-                    "secondary": _item_summary(right),
-                }
-            )
+            component.add(reference)
+            pending.extend(adjacency[reference] - component)
+        unseen -= component
+        member_references = sorted(component)
+        component_edges = [
+            (pair, status)
+            for pair, status in edges.items()
+            if pair[0] in component and pair[1] in component
+        ]
+        evidence: list[str] = []
+        for (left_reference, right_reference), _ in component_edges:
+            for row in _duplicate_evidence(
+                by_reference[left_reference], by_reference[right_reference]
+            ):
+                if row not in evidence:
+                    evidence.append(row)
+        cases.append(
+            {
+                "id": f"duplicate:{_case_digest(*member_references)}",
+                "type": "duplicate",
+                "status": (
+                    "pending"
+                    if any(status == "pending" for _, status in component_edges)
+                    else "deferred"
+                ),
+                "reason": "Posible obra repetida",
+                "evidence": evidence,
+                "members": [
+                    _item_summary(by_reference[reference]) for reference in member_references
+                ],
+            }
+        )
     return cases
 
 
@@ -151,8 +185,18 @@ def _case_digest(*values: str) -> str:
 
 
 def _case_sort_key(case: Mapping[str, Any]) -> tuple[int, int, str]:
+    members = case.get("members")
+    if isinstance(members, list):
+        titles = [
+            str(member.get("title") or "").casefold()
+            for member in members
+            if isinstance(member, Mapping)
+        ]
+        title = min(titles, default="")
+    else:
+        title = str(case.get("primary", {}).get("title") or "").casefold()
     return (
         1 if case.get("status") == "deferred" else 0,
         0 if case.get("type") == "duplicate" else 1,
-        str(case.get("primary", {}).get("title") or "").casefold(),
+        title,
     )

@@ -26,6 +26,20 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   exigidos por sus terminos. `429`/`Retry-After`, backoff y cache muy por debajo del
   tope de seis meses ya se heredaban del mecanismo generico de fuentes externas.
 
+### Cambiado
+
+- Curaduria presenta cada componente conectada de duplicados como un solo caso de dos
+  o mas entradas. La mesa permite elegir la identidad superviviente y resolver valores
+  de todo el grupo; la combinacion N-a-1, su historial y Deshacer son una unica
+  operacion atomica incluso cuando participan varios catalogos.
+- La resolucion automatica cuenta y procesa grupos, no pares obsoletos: un conflicto
+  personal conserva intactos todos los miembros para revision humana.
+
+### Corregido
+
+- Una fusion revisada ya no completa silenciosamente un campo vacio marcado en
+  `locked_fields`; el valor bloqueado se conserva salvo decision humana explicita.
+
 ## [0.6.0] - 2026-08-31
 
 ### Agregado

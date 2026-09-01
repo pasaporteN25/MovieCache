@@ -176,7 +176,7 @@
       .curation-thumb-frame.large { height: 144px; width: 96px; }
       .curation-thumb {
         align-items: center;
-        background: linear-gradient(145deg, #242957, var(--poster-deep));
+        background: linear-gradient(145deg, var(--surface-shade), var(--poster-deep));
         color: var(--text-highlight);
         display: flex;
         font-family: var(--font-display);
@@ -241,12 +241,18 @@
         text-transform: uppercase;
       }
       .curation-evidence ul { display: grid; gap: 4px; margin: 0; padding-left: 18px; }
-      .curation-evidence li { color: #e8ddc8; font-size: var(--text-meta); }
+      .curation-evidence li { color: var(--text-gold-soft); font-size: var(--text-meta); }
       .curation-pair {
         align-items: stretch;
         display: grid;
         gap: 10px;
         grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
+      }
+      .curation-group {
+        align-items: stretch;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
       }
       .curation-pair-mark {
         align-self: center;
@@ -433,6 +439,8 @@
 
 @media (max-width: 860px) {
         .curation-pair { grid-template-columns: minmax(0, 1fr); }
+
+        .curation-group { grid-template-columns: minmax(0, 1fr); }
 
         .curation-pair-mark { transform: rotate(90deg); }
 }

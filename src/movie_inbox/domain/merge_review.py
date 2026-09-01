@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -104,9 +104,9 @@ def build_merge_review(
         raise MergeReviewError("Invalid external side")
     left_item = normalize_item(left).to_dict()
     right_item = normalize_item(right).to_dict()
-    locked = set(normalize_locked_fields(left_item.get("locked_fields"))) | set(
-        normalize_locked_fields(right_item.get("locked_fields"))
-    )
+    left_locked = set(normalize_locked_fields(left_item.get("locked_fields")))
+    right_locked = set(normalize_locked_fields(right_item.get("locked_fields")))
+    locked = left_locked | right_locked
     fields: list[dict[str, Any]] = []
     unresolved = 0
     for definition in MERGE_FIELDS:
@@ -122,6 +122,7 @@ def build_merge_review(
             survivor_side,
             protected=protected,
             external_side=external_side,
+            locked_sides=(definition.key in left_locked, definition.key in right_locked),
         )
         required = different and protected and not default_choice
         if required:
@@ -152,6 +153,150 @@ def build_merge_review(
         "different_count": sum(1 for field in fields if field["different"]),
         "unresolved_count": unresolved,
     }
+
+
+def build_group_merge_review(
+    members: Sequence[tuple[str, Mapping[str, Any]]],
+    survivor_ref: str,
+) -> dict[str, Any]:
+    """Build one N-way review whose choices reference stable catalog members."""
+    normalized_members = _normalized_group_members(members)
+    member_refs = [reference for reference, _ in normalized_members]
+    if survivor_ref not in member_refs:
+        raise MergeReviewError("Invalid group survivor")
+
+    locked_by_member = {
+        reference: set(normalize_locked_fields(item.get("locked_fields")))
+        for reference, item in normalized_members
+    }
+    fields: list[dict[str, Any]] = []
+    unresolved = 0
+    for definition in MERGE_FIELDS:
+        values = [
+            (reference, _plain_value(item.get(definition.key)))
+            for reference, item in normalized_members
+        ]
+        different = not _group_equivalent(definition, [value for _, value in values])
+        locked_refs = [
+            reference
+            for reference, _ in normalized_members
+            if definition.key in locked_by_member[reference]
+        ]
+        protected = definition.protected or bool(locked_refs)
+        allowed = _group_allowed_choices(definition, member_refs)
+        default_choice = _group_default_choice(
+            definition,
+            values,
+            survivor_ref,
+            protected=protected,
+            locked_refs=locked_refs,
+        )
+        required = different and protected and not default_choice
+        if required:
+            unresolved += 1
+        fields.append(
+            {
+                "key": definition.key,
+                "label": definition.label,
+                "group": definition.group,
+                "strategy": definition.strategy,
+                "protected": protected,
+                "locked": bool(locked_refs),
+                "different": different,
+                "allowed": allowed,
+                "default_choice": default_choice,
+                "required": required,
+                "values": [
+                    {"member_ref": reference, "value": value} for reference, value in values
+                ],
+            }
+        )
+    return {
+        "review_id": group_merge_review_id(normalized_members),
+        "survivor_ref": survivor_ref,
+        "members": [
+            {**_item_summary(item), "ref": reference} for reference, item in normalized_members
+        ],
+        "groups": [{"key": key, "label": label} for key, label in MERGE_GROUPS],
+        "fields": fields,
+        "different_count": sum(1 for field in fields if field["different"]),
+        "unresolved_count": unresolved,
+        "can_select_survivor": True,
+        "group": True,
+    }
+
+
+def group_merge_review_id(members: Sequence[tuple[str, Mapping[str, Any]]]) -> str:
+    normalized_members = _normalized_group_members(members)
+    payload = json.dumps(
+        [
+            {"ref": reference, "item": _snapshot_payload(item)}
+            for reference, item in normalized_members
+        ],
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def apply_group_reviewed_merge(
+    members: Sequence[tuple[str, Mapping[str, Any]]],
+    survivor_ref: str,
+    choices: Mapping[str, Any],
+    *,
+    removed_references: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Collapse a reviewed duplicate group without intermediate writes."""
+    normalized_members = _normalized_group_members(members)
+    review = build_group_merge_review(normalized_members, survivor_ref)
+    member_items = dict(normalized_members)
+    survivor = member_items[survivor_ref]
+    result = dict(survivor)
+    sources_by_member = {
+        reference: ensure_metadata_sources(item) for reference, item in normalized_members
+    }
+    result_sources = ensure_metadata_sources(survivor)
+
+    for row in review["fields"]:
+        key = str(row["key"])
+        choice = str(choices.get(key) or row["default_choice"] or "")
+        if not row["different"]:
+            continue
+        if choice not in row["allowed"]:
+            if row["required"]:
+                raise MergeReviewError(f"Missing decision for protected field: {key}")
+            raise MergeReviewError(f"Invalid decision for field: {key}")
+        value_by_member = {str(value["member_ref"]): value.get("value") for value in row["values"]}
+        result[key] = _selected_group_value(row["strategy"], choice, value_by_member)
+        if choice == "combine":
+            if any(key in source for source in sources_by_member.values()):
+                result_sources[key] = metadata_source_record("manual_merge", "", False)
+        elif key in sources_by_member[choice]:
+            result_sources[key] = sources_by_member[choice][key]
+
+    result["id"] = str(survivor.get("id") or "")
+    result["metadata_sources"] = result_sources
+    result["locked_fields"] = normalize_locked_fields(
+        [
+            field
+            for _, item in normalized_members
+            for field in normalize_locked_fields(item.get("locked_fields"))
+        ]
+    )
+    result["duplicate_decisions"] = _merged_group_duplicate_decisions(
+        [item for _, item in normalized_members], removed_references
+    )
+    result["curation_updated_at"] = curation_timestamp()
+    result["added_at"] = str(survivor.get("added_at") or _oldest_group_date(normalized_members))
+
+    local_files = normalize_local_files(result.get("local_files"))
+    if local_files:
+        result["local_name"] = str(result.get("local_name") or local_files[0].get("name") or "")
+        result["local_path"] = str(result.get("local_path") or local_files[0].get("path") or "")
+    if has_external_link(result):
+        result["link_curation_status"] = "resolved"
+    return normalize_item(result).to_dict()
 
 
 def merge_review_id(left: Mapping[str, Any], right: Mapping[str, Any]) -> str:
@@ -245,6 +390,14 @@ def _allowed_choices(definition: MergeField) -> list[str]:
     return ["left", "right"]
 
 
+def _group_allowed_choices(definition: MergeField, member_refs: list[str]) -> list[str]:
+    if definition.strategy in FORCED_COMBINE_STRATEGIES:
+        return ["combine"]
+    if definition.strategy in {"list", "release_dates"}:
+        return [*member_refs, "combine"]
+    return list(member_refs)
+
+
 def _default_choice(
     definition: MergeField,
     left: Any,
@@ -253,11 +406,17 @@ def _default_choice(
     *,
     protected: bool,
     external_side: str,
+    locked_sides: tuple[bool, bool] = (False, False),
 ) -> str:
     if _equivalent(definition, left, right):
         return ""
     if definition.strategy in FORCED_COMBINE_STRATEGIES:
         return "combine"
+    left_locked, right_locked = locked_sides
+    if left_locked or right_locked:
+        if left_locked and right_locked:
+            return ""
+        return "left" if left_locked else "right"
     if definition.group == "personal" and external_side:
         return "right" if external_side == "left" else "left"
     left_has_value = _meaningful(definition.key, left)
@@ -279,6 +438,53 @@ def _default_choice(
     return survivor_side
 
 
+def _group_default_choice(
+    definition: MergeField,
+    values: list[tuple[str, Any]],
+    survivor_ref: str,
+    *,
+    protected: bool,
+    locked_refs: list[str],
+) -> str:
+    plain_values = [value for _, value in values]
+    if _group_equivalent(definition, plain_values):
+        return ""
+    if definition.strategy in FORCED_COMBINE_STRATEGIES:
+        return "combine"
+    if locked_refs:
+        locked_values = [value for reference, value in values if reference in locked_refs]
+        if _group_equivalent(definition, locked_values):
+            return locked_refs[0]
+        return ""
+    if definition.strategy in {"list", "release_dates"}:
+        return "combine"
+
+    meaningful = [
+        (reference, value) for reference, value in values if _meaningful(definition.key, value)
+    ]
+    meaningful_groups: list[list[tuple[str, Any]]] = []
+    for candidate in meaningful:
+        for group in meaningful_groups:
+            if _equivalent(definition, group[0][1], candidate[1]):
+                group.append(candidate)
+                break
+        else:
+            meaningful_groups.append([candidate])
+    if len(meaningful_groups) == 1:
+        return meaningful_groups[0][0][0]
+    if definition.key == "kind":
+        specific = [
+            reference
+            for reference, value in values
+            if str(value or "") in {"serie", "anime", "documental"}
+        ]
+        if len(specific) == 1:
+            return specific[0]
+    if protected:
+        return ""
+    return survivor_ref
+
+
 def _selected_value(strategy: str, choice: str, left: Any, right: Any) -> Any:
     if choice == "left":
         return _plain_value(left)
@@ -297,6 +503,35 @@ def _selected_value(strategy: str, choice: str, left: Any, right: Any) -> Any:
     raise MergeReviewError("Field cannot be combined")
 
 
+def _selected_group_value(
+    strategy: str,
+    choice: str,
+    values: Mapping[str, Any],
+) -> Any:
+    if choice != "combine":
+        if choice not in values:
+            raise MergeReviewError("Invalid group merge choice")
+        return _plain_value(values[choice])
+    if strategy == "list":
+        merged: list[str] = []
+        for value in values.values():
+            merged = merge_lists(merged, _string_list(value))
+        return merged
+    if strategy == "local_files":
+        merged_files: list[dict[str, Any]] = []
+        for value in values.values():
+            merged_files = merge_local_files(merged_files, normalize_local_files(value))
+        return merged_files
+    if strategy == "release_dates":
+        merged_dates: list[dict[str, Any]] = []
+        for value in values.values():
+            merged_dates = merge_release_dates(merged_dates, value)
+        return merged_dates
+    if strategy == "boolean_or":
+        return any(bool(value) for value in values.values())
+    raise MergeReviewError("Field cannot be combined")
+
+
 def _equivalent(definition: MergeField, left: Any, right: Any) -> bool:
     if definition.strategy == "list":
         return {value.casefold() for value in _string_list(left)} == {
@@ -307,6 +542,13 @@ def _equivalent(definition: MergeField, left: Any, right: Any) -> bool:
     if definition.strategy == "release_dates":
         return normalize_release_dates(left) == normalize_release_dates(right)
     return bool(left == right)
+
+
+def _group_equivalent(definition: MergeField, values: Sequence[Any]) -> bool:
+    if len(values) < 2:
+        return True
+    first = values[0]
+    return all(_equivalent(definition, first, value) for value in values[1:])
 
 
 def _meaningful(key: str, value: Any) -> bool:
@@ -355,6 +597,19 @@ def _merged_duplicate_decisions(
     return decisions
 
 
+def _merged_group_duplicate_decisions(
+    members: Sequence[Mapping[str, Any]],
+    removed_references: tuple[str, ...],
+) -> dict[str, dict[str, str]]:
+    decisions: dict[str, dict[str, str]] = {}
+    for member in members:
+        decisions.update(normalize_duplicate_decisions(member.get("duplicate_decisions")))
+    for reference in removed_references:
+        decisions.pop(reference, None)
+        decisions.pop(reference.split("::", 1)[0], None)
+    return decisions
+
+
 def _oldest_date(left: Mapping[str, Any], right: Mapping[str, Any]) -> str:
     dates = sorted(
         value
@@ -362,6 +617,27 @@ def _oldest_date(left: Mapping[str, Any], right: Mapping[str, Any]) -> str:
         if value
     )
     return dates[0] if dates else ""
+
+
+def _oldest_group_date(members: Sequence[tuple[str, Mapping[str, Any]]]) -> str:
+    dates = sorted(str(item.get("added_at") or "") for _, item in members if item.get("added_at"))
+    return dates[0] if dates else ""
+
+
+def _normalized_group_members(
+    members: Sequence[tuple[str, Mapping[str, Any]]],
+) -> list[tuple[str, dict[str, Any]]]:
+    if len(members) < 2:
+        raise MergeReviewError("A duplicate group needs at least two members")
+    normalized: list[tuple[str, dict[str, Any]]] = []
+    seen: set[str] = set()
+    for raw_reference, raw_item in members:
+        reference = str(raw_reference or "").strip()
+        if not reference or reference in seen:
+            raise MergeReviewError("Duplicate group contains an invalid member")
+        seen.add(reference)
+        normalized.append((reference, normalize_item(raw_item).to_dict()))
+    return sorted(normalized, key=lambda row: row[0])
 
 
 def _snapshot_payload(item: Mapping[str, Any]) -> dict[str, Any]:

@@ -53,6 +53,11 @@ def compare_curation(
 ) -> JSONResponse:
     try:
         catalog = session_catalog(request)
+        group = _group_inputs(catalog, body)
+        if group is not None:
+            members, survivor, _ = group
+            review = request_workflow(request).compare_group(members, survivor=survivor)
+            return JSONResponse(catalog.public_payload(review))
         left, right, incoming = comparison_inputs(catalog, body)
         review = request_workflow(request).compare(
             left,
@@ -79,6 +84,19 @@ def merge_curation(
 ) -> JSONResponse:
     try:
         catalog = session_catalog(request)
+        group = _group_inputs(catalog, body)
+        if group is not None:
+            members, survivor, member_references = group
+            result = request_workflow(request).merge_group(
+                members,
+                survivor=survivor,
+                choices=body.get("choices") if isinstance(body.get("choices"), dict) else {},
+                expected_review_id=str(body.get("review_id") or ""),
+                reference_aliases=member_references,
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
+            )
+            return JSONResponse({"ok": True, "reason": "merged", **result})
         left, right, incoming = comparison_inputs(catalog, body)
         result = request_workflow(request).merge(
             left,
@@ -192,13 +210,24 @@ def curate_duplicate(
 ) -> JSONResponse:
     try:
         catalog = session_catalog(request)
-        result = request_workflow(request).update_duplicate_decision(
-            catalog_pointer(catalog, body),
-            str(body.get("other_reference") or ""),
-            str(body.get("status") or ""),
-            history_mode=str(body.get("history_mode") or "persistent"),
-            session_id=history_session_id(request),
-        )
+        group = _group_inputs(catalog, body)
+        if group is not None:
+            members, _, member_references = group
+            result = request_workflow(request).update_duplicate_group_decision(
+                members,
+                str(body.get("status") or ""),
+                member_references=member_references,
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
+            )
+        else:
+            result = request_workflow(request).update_duplicate_decision(
+                catalog_pointer(catalog, body),
+                str(body.get("other_reference") or ""),
+                str(body.get("status") or ""),
+                history_mode=str(body.get("history_mode") or "persistent"),
+                session_id=history_session_id(request),
+            )
         return JSONResponse({"ok": True, "reason": "updated", **result})
     except (
         ValueError,
@@ -207,3 +236,22 @@ def curate_duplicate(
         CatalogRepositoryError,
     ) as error:
         return curation_application_error_response(error)
+
+
+def _group_inputs(catalog: Any, body: dict[str, Any]) -> tuple[list[Any], Any, list[str]] | None:
+    raw_members = body.get("members")
+    if not isinstance(raw_members, list):
+        return None
+    if not 2 <= len(raw_members) <= 50:
+        raise ValueError("A duplicate group needs between 2 and 50 members")
+    members = [catalog_pointer(catalog, member) for member in raw_members]
+    member_references = [
+        str(member.get("ref") or "") if isinstance(member, dict) else "" for member in raw_members
+    ]
+    if not all(member_references):
+        member_references = []
+    raw_survivor = body.get("survivor")
+    survivor = (
+        catalog_pointer(catalog, raw_survivor) if isinstance(raw_survivor, dict) else members[0]
+    )
+    return members, survivor, member_references
