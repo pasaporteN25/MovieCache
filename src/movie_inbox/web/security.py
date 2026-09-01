@@ -70,6 +70,39 @@ class LoginAttemptLimiter:
         return attempts
 
 
+class PublicReadLimiter:
+    """In-memory token bucket for one public presentation/IP pair.
+
+    It permits a short opening burst without permitting an unlimited minute-long
+    scrape: capacity 20, then one request per second (60 per minute sustained).
+    """
+
+    def __init__(
+        self,
+        *,
+        burst: int = 20,
+        refill_per_second: float = 1.0,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.burst = max(1, burst)
+        self.refill_per_second = max(0.01, refill_per_second)
+        self.clock = clock
+        self._buckets: dict[str, tuple[float, float]] = {}
+        self._lock = threading.Lock()
+
+    def consume(self, key: str) -> int:
+        """Consume one read and return seconds to wait, or zero when allowed."""
+        now = self.clock()
+        with self._lock:
+            tokens, updated_at = self._buckets.get(key, (float(self.burst), now))
+            tokens = min(float(self.burst), tokens + (now - updated_at) * self.refill_per_second)
+            if tokens >= 1:
+                self._buckets[key] = (tokens - 1, now)
+                return 0
+            self._buckets[key] = (tokens, now)
+            return max(1, int((1 - tokens) / self.refill_per_second + 0.999))
+
+
 def normalize_public_origin(value: str) -> str:
     raw = str(value or "").strip()
     if not raw:

@@ -234,7 +234,7 @@ class IdentityTests(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
-            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
@@ -248,6 +248,7 @@ class IdentityTests(unittest.TestCase):
             self.assertIn("import_drafts", tables)
             self.assertIn("import_draft_items", tables)
             self.assertIn("home_featured_snapshots", tables)
+            self.assertIn("public_presentations", tables)
 
     def test_v7_scanner_history_is_repaired_without_losing_existing_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -304,7 +305,7 @@ class IdentityTests(unittest.TestCase):
                     "FROM scanner_history"
                 ).fetchone()
 
-            self.assertEqual(version, 10)
+            self.assertEqual(version, 11)
             self.assertTrue(
                 {"catalog_before_json", "catalog_after_json", "catalog_path"} <= columns
             )

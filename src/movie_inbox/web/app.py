@@ -36,6 +36,7 @@ from movie_inbox.application.library_service import (
 )
 from movie_inbox.application.member_service import MemberService
 from movie_inbox.application.privacy_service import PrivacyService
+from movie_inbox.application.public_presentation_service import PublicPresentationService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.domain.identity import AuthenticatedIdentity
@@ -52,6 +53,9 @@ from movie_inbox.infrastructure.import_repository import SqliteImportDraftReposi
 from movie_inbox.infrastructure.library_repository import SqliteLibraryRepository
 from movie_inbox.infrastructure.library_scanner import scan_media_files
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
+from movie_inbox.infrastructure.public_presentation_repository import (
+    SqlitePublicPresentationRepository,
+)
 from movie_inbox.infrastructure.scanner_history import SqliteScannerHistoryRepository
 from movie_inbox.infrastructure.starter_collections import (
     AKIRA_KUROSAWA_SEED_KEY,
@@ -86,10 +90,11 @@ from movie_inbox.web.routers import (
     home,
     imports,
     integrations,
+    public_presentations,
     scanner,
     search,
 )
-from movie_inbox.web.security import LoginAttemptLimiter, viewer_allowed_hosts
+from movie_inbox.web.security import LoginAttemptLimiter, PublicReadLimiter, viewer_allowed_hosts
 
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
@@ -212,6 +217,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
         ),
     )
     collection_service = CollectionService(collection_repository)
+    public_presentation_service = PublicPresentationService(
+        SqlitePublicPresentationRepository(instance_db), collection_repository
+    )
     home_service = EditorialHomeService()
     home_snapshot_repository = SqliteHomeSnapshotRepository(instance_db)
     import_repository = SqliteImportDraftRepository(instance_db)
@@ -225,6 +233,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         poll_seconds=config.library_scheduler_poll_seconds,
     )
     login_limiter = LoginAttemptLimiter()
+    public_presentation_limiter = PublicReadLimiter()
     image_warmer = ImageCacheWarmer(config)
 
     @asynccontextmanager
@@ -250,6 +259,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.privacy_service = privacy_service
     app.state.collection_repository = collection_repository
     app.state.collection_service = collection_service
+    app.state.public_presentation_service = public_presentation_service
+    app.state.public_presentation_limiter = public_presentation_limiter
     app.state.home_service = home_service
     app.state.home_snapshot_repository = home_snapshot_repository
     app.state.import_repository = import_repository
@@ -270,7 +281,10 @@ def create_app(config: ViewerConfig) -> FastAPI:
         path = request.url.path
         identity: AuthenticatedIdentity | None = None
         response: Response
-        token = str(request.cookies.get(AUTH_SESSION_COOKIE) or "")
+        is_public_presentation = path.startswith("/public/") or path.startswith("/p/")
+        token = (
+            "" if is_public_presentation else str(request.cookies.get(AUTH_SESSION_COOKIE) or "")
+        )
         if token and not path.startswith("/static/") and path != "/healthz":
             try:
                 identity = auth_service.authenticate(token)
@@ -440,6 +454,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(admin.router)
     app.include_router(integrations.router)
     app.include_router(search.router)
+    app.include_router(public_presentations.router)
     # FastAPI >=0.139's include_router is lazy: app.routes holds _IncludedRouter
     # wrappers instead of the included APIRoute objects. Flatten once so app.routes
     # stays a real route list for callers (openapi, tests, ...).

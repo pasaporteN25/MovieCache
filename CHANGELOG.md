@@ -6,6 +6,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
+- El owner puede crear una cartelera publica opt-in desde una coleccion propia. Cada
+  enlace usa una capacidad opaca almacenada solo como hash, sirve un snapshot v1
+  minimizado y puede refrescarse o revocarse sin exponer Club, sesiones, catalogos,
+  IDs, rutas, imagenes ni estado personal.
 - Jikan incorpora direccion desde staff solamente al elegir una candidata, con un
   presupuesto maximo de dos llamadas, atribucion visible y cooldown por fuente para
   `429`/`Retry-After`, timeouts y errores 5xx.

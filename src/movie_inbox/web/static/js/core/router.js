@@ -4,6 +4,7 @@ import { API_TOKEN, apiFetch } from "./http.js";
 import { currentIdentity, currentView, inboxMode, items, setCurrentView, setInboxModeValue, setSelectedExistingIdForSearch } from "./state.js";
 import { loadLibraries } from "../surfaces/admin-libraries.js";
 import { loadImageCacheStatus, loadMembers, syncImageCacheStatusPolling } from "../surfaces/admin-members.js";
+import { loadPublicPresentations } from "../surfaces/admin-public-presentations.js";
 import { COLLECTION_MULTI_FILTER_KEYS, applyCollectionRoute, collectionRouteValues, collectionSearchMessage, render, renderHeaderStats, resetCollectionFilters, setCollectionSearchMode } from "../surfaces/catalog-grid.js";
 import { activeQuery, clearManualSearch, manualResults, renderManualResults, runSearch, setCatalogMergeResults, setManualResults, setSearchState, setSelectedManualIndex, showFixedLocalItemForLink } from "../surfaces/catalog-search.js";
 import { loadClub } from "../surfaces/club.js";
@@ -60,7 +61,7 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
 
       export function goToAdmin(options = {}) {
         showView("admin", options);
-        Promise.all([loadMembers(), loadLibraries(), loadImageCacheStatus()]);
+        Promise.all([loadMembers(), loadLibraries(), loadImageCacheStatus(), loadPublicPresentations()]);
       }
 
       export function showView(view, options = {}) {
@@ -240,6 +241,8 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         showView(requestedView, { updateHistory: false, scroll: false });
         if (requestedView === "inbox") loadCurrentInbox();
         if (requestedView === "club") loadClub();
-        if (requestedView === "admin") loadMembers();
+        if (requestedView === "admin") {
+          loadMembers();
+          loadPublicPresentations();
+        }
       }
-

@@ -182,7 +182,66 @@
         transition: opacity 180ms var(--ease-out);
       }
       .member-list[aria-busy="true"] { opacity: 0.55; }
-      .member-list-empty {
+.public-presentation-form {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: 820px;
+      }
+      .public-presentation-form label {
+        color: var(--muted);
+        display: grid;
+        font-family: var(--font-label);
+        font-size: var(--text-label);
+        font-weight: 800;
+        gap: 7px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .public-presentation-form input,
+      .public-presentation-form select,
+      .public-presentation-form textarea {
+        box-sizing: border-box;
+        font-family: var(--font-body);
+        font-size: var(--text-small);
+        letter-spacing: normal;
+        text-transform: none;
+        width: 100%;
+      }
+      .public-presentation-form-description,
+      .public-presentation-form-actions { grid-column: 1 / -1; }
+      .public-presentation-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      .public-presentation-preview {
+        border: 1px solid var(--soft-signal-line);
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+        max-width: 820px;
+        padding: 14px;
+      }
+      .public-presentation-preview strong { color: var(--text-cyan-soft); }
+      .public-presentation-preview span { color: var(--muted); font-size: var(--text-small); }
+      .public-presentation-preview code { overflow-wrap: anywhere; }
+      .public-presentation-preview ol { margin: 0; padding-left: 22px; }
+      .public-presentation-preview small { color: var(--muted); }
+      .public-presentation-admin-list {
+        border-top: 1px solid var(--line);
+        display: grid;
+        margin-top: 18px;
+        max-width: 1080px;
+      }
+      .public-presentation-admin-row {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        padding: 14px 0;
+      }
+      .public-presentation-admin-row > div:first-child { display: grid; gap: 6px; }
+      .public-presentation-admin-row strong { color: var(--ink); }
+      .public-presentation-admin-row p { color: var(--muted); font-size: var(--text-meta); margin: 0; }
+.member-list-empty {
         color: var(--muted);
         display: grid;
         gap: 5px;
@@ -391,6 +450,10 @@
         .member-row-actions { display: grid; grid-template-columns: 1fr 1fr; justify-content: stretch; }
 
         .member-row-actions button { min-height: 44px; width: 100%; }
+
+        .public-presentation-form { grid-template-columns: 1fr; }
+        .public-presentation-admin-row { align-items: start; flex-direction: column; }
+        .public-presentation-admin-row .member-row-actions { width: 100%; }
 
         .member-dialog {
           box-sizing: border-box;

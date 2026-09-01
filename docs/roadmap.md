@@ -244,7 +244,9 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 1. **Cerrado 2026-09-01.** [W1] fijo el contrato y threat model de presentacion
    publica opt-in: una capacidad opaca de solo lectura, snapshot minimo, sin cache de
    contenido y separada de Club/sesiones privadas. Ver ADR-0001 y esquema v1.
-2. [W2] Landing publica aislada de sesiones y endpoints privados.
+2. **Cerrado 2026-09-01.** [W2] entrega una landing publica opt-in de snapshots
+   revocables: la lectura anonima no usa cookies ni endpoints privados, y el owner la
+   crea, previsualiza, refresca o revoca desde Admin. Ver ADR-0001.
 3. [D1] HTTPS guiado mediante reverse proxy soportado.
 4. [W3] Diseno de paquetes/sincronizacion entre homeservers sin servicio central
    involuntario.

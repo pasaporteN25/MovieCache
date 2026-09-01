@@ -49,6 +49,13 @@ def render_password_change_html(title: str, api_token: str) -> str:
     )
 
 
+def render_public_presentation_html(capability: str) -> str:
+    template = _asset("public.html").decode("utf-8")
+    return template.replace(
+        "__PUBLIC_PRESENTATION_CAPABILITY__", html.escape(capability, quote=True)
+    )
+
+
 def static_asset(name: str) -> tuple[bytes, str] | None:
     content_type = _static_content_type(name)
     if content_type is None:

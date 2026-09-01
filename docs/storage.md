@@ -12,7 +12,7 @@ La identidad de la instancia vive en una segunda base SQLite. Esta separacion ev
 - Una migracion debe ser reversible mediante una exportacion JSON verificada.
 - `instance.db` debe tratarse como un secreto y respaldarse separado de los JSON exportados.
 
-## Base de instancia v8
+## Base de instancia v11
 
 La base de instancia contiene:
 
@@ -43,6 +43,9 @@ La base de instancia contiene:
   mas recientes de cada usuario.
 - `scanner_history`: decisiones reversibles del Scanner, incluido el estado del
   inventario y, cuando corresponde, de la ficha personal creada o reutilizada.
+- `public_presentations`: snapshots publicos opt-in, propiedad del owner, hash de una
+  capacidad opaca y estado revocable. No contiene cuentas, rutas, IDs externos ni
+  metadata del catalogo fuera de la allowlist publica v1.
 
 El primer bootstrap adopta el catalogo existente de forma logica. Registra sus rutas absolutas bajo el owner, pero no reescribe ni mueve el archivo. Arranques posteriores validan ese vinculo y rechazan una ruta distinta para evitar abrir accidentalmente datos ajenos bajo la misma identidad.
 
@@ -58,10 +61,12 @@ borradores de importacion acotados; la v5 agrega bibliotecas administradas, reco
 e inventario compartido; la v6 agrega las dos selecciones destacadas mas recientes de
 cada usuario; la v7 agrega el historial reversible del Scanner; y la v8 completa sus
 snapshots de catalogo en instalaciones que hubieran aplicado una definicion temprana
-de v7. La primera seleccion editorial registrada para una fecha queda fija. Ese
-historial guarda referencias, orden y motivo, no copias de obras ni rutas. Las cuentas
-existentes conservan sus catalogos privados y ninguna coleccion se sigue
-automaticamente. Una version superior se rechaza en lugar de reinterpretarse.
+de v7. La v9 suma reglas de exclusion por biblioteca, la v10 las colecciones derivadas
+de disponibilidad y la v11 snapshots de carteleras publicas revocables. La primera
+seleccion editorial registrada para una fecha queda fija. Ese historial guarda
+referencias, orden y motivo, no copias de obras ni rutas. Las cuentas existentes
+conservan sus catalogos privados y ninguna coleccion se sigue automaticamente. Una
+version superior se rechaza en lugar de reinterpretarse.
 
 ## Disponibilidad con procedencia
 

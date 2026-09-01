@@ -12,6 +12,7 @@
           <a href="#adminSummary">Resumen</a>
           <a href="#adminLibraries">Bibliotecas</a>
           <a href="#adminMembers">Miembros</a>
+          <a href="#adminPublicPresentations">Carteleras públicas</a>
           <a href="#adminDatabase">Base de datos</a>
           <a href="#adminExternal">Fuentes externas</a>
           <a href="#adminMatching">Matching y duplicados</a>
@@ -80,6 +81,38 @@
               <span id="archivedMemberCount">0 archivos</span>
             </div>
             <div id="archivedMemberList" class="member-list archived-member-list"></div>
+          </div>
+        </section>
+
+        <section id="adminPublicPresentations" class="admin-section public-presentations-admin" aria-labelledby="adminPublicPresentationsTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminPublicPresentationsTitle">Carteleras públicas</h3>
+              <p>Una selección puntual de disponibilidad. Nunca se publica tu catálogo ni se reutiliza Club.</p>
+            </div>
+            <span class="member-state member-state-attention">OPT-IN</span>
+          </div>
+          <form id="publicPresentationForm" class="public-presentation-form">
+            <label>Origen
+              <select id="publicPresentationCollection" required>
+                <option value="">Cargando colecciones propias…</option>
+              </select>
+            </label>
+            <label>Título público
+              <input id="publicPresentationTitle" type="text" minlength="2" maxlength="120" placeholder="Funciones disponibles" required>
+            </label>
+            <label class="public-presentation-form-description">Descripción opcional
+              <textarea id="publicPresentationDescription" rows="2" maxlength="2000" placeholder="Qué puede encontrar quien abra esta cartelera."></textarea>
+            </label>
+            <div class="public-presentation-form-actions">
+              <button id="previewPublicPresentation" class="quiet-action" type="button">Previsualizar snapshot</button>
+              <button id="createPublicPresentation" type="submit">Publicar cartelera</button>
+            </div>
+          </form>
+          <p id="publicPresentationFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+          <div id="publicPresentationPreview" class="public-presentation-preview" hidden></div>
+          <div id="publicPresentationList" class="public-presentation-admin-list" aria-live="polite">
+            <p class="member-list-empty">Abrí Administrar para consultar las carteleras activas.</p>
           </div>
         </section>
 

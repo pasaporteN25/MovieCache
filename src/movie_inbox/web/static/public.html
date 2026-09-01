@@ -1,0 +1,50 @@
+<!--
+THESIS: una cartelera pública confirma disponibilidad, no expone un catálogo.
+OWN-WORLD: archivo azul nocturno, señal CRT cyan, rótulo magenta y etiquetas de alquiler.
+STORY: visitante entiende qué está disponible y puede recorrerlo sin dar datos propios.
+FIRST VIEWPORT: marquesina ancha, sello de disponible y primera fila de obras sobre un riel.
+FORM: séptima estructura asignada, tablero de funciones de trasnoche; lista vertical con riel lateral.
+-->
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>Cartelera disponible · Movie Inbox</title>
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/public.css">
+  </head>
+  <body class="public-presentation-page">
+    <main id="publicPresentation" class="public-presentation" data-capability="__PUBLIC_PRESENTATION_CAPABILITY__" aria-live="polite">
+      <div class="public-presentation__frame">
+        <header class="public-presentation__marquee">
+          <p class="public-presentation__kicker">ARCHIVO DE FUNCIONES · ACCESO PUBLICO</p>
+          <div class="public-presentation__headline">
+            <div>
+              <p class="public-presentation__eyebrow">CARTELERA</p>
+              <h1>Preparando funciones</h1>
+            </div>
+            <span class="public-presentation__signal"><i aria-hidden="true"></i> DISPONIBLE</span>
+          </div>
+          <p id="publicPresentationDescription" class="public-presentation__description" hidden></p>
+        </header>
+
+        <section class="public-presentation__program" aria-label="Funciones disponibles">
+          <div class="public-presentation__program-head">
+            <p id="publicPresentationCount" class="public-presentation__count">CARGANDO ARCHIVO</p>
+            <p class="public-presentation__notice">SELECCION CURADA · SIN CUENTA</p>
+          </div>
+          <ol id="publicPresentationList" class="public-presentation__list"></ol>
+          <p id="publicPresentationStatus" class="public-presentation__status">Leyendo cartelera…</p>
+        </section>
+
+        <footer class="public-presentation__footer">
+          <span>MOVIE INBOX</span>
+          <span>FICHA PUBLICA · SOLO LECTURA</span>
+        </footer>
+      </div>
+    </main>
+    <script src="/static/public.js" defer></script>
+  </body>
+</html>

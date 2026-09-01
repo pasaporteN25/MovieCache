@@ -338,10 +338,47 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIn("Disponible · Inventario verificado", akira_record)
         self.assertNotIn("manual:", akira_record)
 
+    def test_public_landing_renders_a_revocable_snapshot_without_a_session(self) -> None:
+        page = self.page
+        headers = {
+            "X-Movie-Inbox-Token": self.config.api_token,
+            "Origin": self.base_url,
+            "Content-Type": "application/json",
+        }
+        collections = page.request.get(f"{self.base_url}/api/collections", headers=headers).json()
+        collection = collections["collections"][0]
+        created = page.request.post(
+            f"{self.base_url}/api/public-presentations",
+            data=json.dumps(
+                {
+                    "collection_id": collection["id"],
+                    "title": "Funciones de prueba",
+                    "description": "Sólo disponibilidad verificada.",
+                }
+            ),
+            headers=headers,
+        )
+        self.assertEqual(created.status, 201)
+        public_url = f"{self.base_url}{created.json()['url']}"
+
+        anonymous = self.browser.new_context(viewport={"width": 390, "height": 844})
+        try:
+            public_page = anonymous.new_page()
+            public_page.goto(public_url)
+            public_page.locator("h1").filter(has_text="Funciones de prueba").wait_for()
+            self.assertIn(
+                "Sólo disponibilidad verificada.", public_page.locator("body").inner_text()
+            )
+            self.assertIn("FUNCIONES", public_page.locator("#publicPresentationCount").inner_text())
+            self.assertFalse(public_page.locator("#currentUserName").count())
+            self.assertEqual(public_page.locator(".public-presentation__item").count(), 31)
+        finally:
+            anonymous.close()
+
     def test_curation_search_keyboard_and_three_member_duplicate_group(self) -> None:
         page = self.page
         availability = {"effective": False, "manual": False, "server": False, "file_count": 0}
-        heat_a = {
+        heat_a: dict[str, Any] = {
             "id": "heat-a",
             "ref": "heat-a::catalog.json",
             "source_file": "catalog.json",

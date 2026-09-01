@@ -8,6 +8,7 @@ import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionRoot, goToI
 import { CATALOG_PAGE_SIZE, inboxMode } from "./state.js";
 import { addLibraryExclusionRuleRow, browseManagedLibraryPath, checkManagedLibraryPath, closeLibraryDialog, handleLibraryAction, handleLibraryExclusionRuleRowClick, handleLibraryPathDirectory, openLibraryDialog, parentLibraryPath, saveManagedLibrary, toggleLibraryShareAvailabilityFields, useBrowsedLibraryPath } from "../surfaces/admin-libraries.js";
 import { archiveMemberAccount, closeArchiveMemberDialog, closeEditMemberDialog, closeMemberDialog, closePrivacyDialog, closeTemporaryPasswordDialog, copyTemporaryPassword, createMember, handleArchivedMemberAction, handleMemberAction, handleVisibilityChange, openMemberDialog, openPrivacyDialog, refreshAdminData, saveMemberProfile, savePrivacyPreferences, syncPrivacyControls } from "../surfaces/admin-members.js";
+import { createPublicPresentation, handlePublicPresentationAction, previewPublicPresentation } from "../surfaces/admin-public-presentations.js";
 import { applyCollectionYearRange, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
@@ -117,6 +118,10 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       });
       fields.memberForm.addEventListener("submit", createMember);
       fields.memberList.addEventListener("click", handleMemberAction);
+      fields.publicPresentationForm.addEventListener("submit", createPublicPresentation);
+      fields.previewPublicPresentation.addEventListener("click", previewPublicPresentation);
+      fields.publicPresentationList.addEventListener("click", handlePublicPresentationAction);
+      fields.publicPresentationPreview.addEventListener("click", handlePublicPresentationAction);
       fields.archivedMemberList.addEventListener("click", handleArchivedMemberAction);
       fields.closeMemberDialog.addEventListener("click", closeMemberDialog);
       fields.cancelMemberDialog.addEventListener("click", closeMemberDialog);

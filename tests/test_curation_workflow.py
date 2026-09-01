@@ -283,7 +283,10 @@ class CurationWorkflowTests(unittest.TestCase):
                 )
 
             self.assertEqual(len(repository.read()), 3)
-            self.assertEqual(repository.get("heat-b").review, "Cambio concurrente")
+            changed = repository.get("heat-b")
+            self.assertIsNotNone(changed)
+            assert changed is not None
+            self.assertEqual(changed.review, "Cambio concurrente")
 
     def test_group_history_failure_rolls_back_every_catalog(self) -> None:
         class FailingHistory(MemoryCurationHistoryRepository):

@@ -24,15 +24,15 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [W2] | Landing publica opt-in aislada | W1 cerrado |
-| 2 | [D1] | Guia HTTPS/reverse proxy segura | — |
-| 3 | [W3] | Diseno de paquetes entre homeservers | W1 + contrato portable |
-| 4 | [A1] | API versionada para dispositivos | D1 |
-| 5 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
-| 6 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 1 | [D1] | Guia HTTPS/reverse proxy segura | — |
+| 2 | [W3] | Diseno de paquetes entre homeservers | W1 + contrato portable |
+| 3 | [A1] | API versionada para dispositivos | D1 |
+| 4 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
+| 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
 - **En curso:** ninguna tarea.
-- **Cerrado recientemente:** [C2] y [W1]. El detalle verificable permanece en `Hecho`.
+- **Cerrado recientemente:** [C2], [W1] y [W2]. El detalle verificable permanece en
+  `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
@@ -61,14 +61,6 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 [F5] queda completo.
 
 ### Frente: Superficie publica y despliegue
-
-#### [W2] Implementar landing publica opt-in
-- **Alcance**: construir la presentacion aprobada en [W1] sin reutilizar endpoints ni
-  tokens privados; controles owner para activar, previsualizar y revocar.
-- **Criterio de cierre**: pruebas de aislamiento/autorizacion/cache y aceptacion visual
-  responsive; instancia nueva permanece privada.
-- **Depende de**: [W1.1], [W1.2], [W1.3].
-- **Modelo sugerido**: Grande. Backend, seguridad y frontend publico.
 
 #### [D1] Documentar HTTPS guiado para homeservers
 - **Alcance**: receta soportada para reverse proxy (primero Nginx), certificados,
@@ -129,6 +121,32 @@ Sin tareas activas.
 ## Hecho
 
 ### Frente: Superficie publica y despliegue
+
+#### [W2.1] Persistir snapshots y separar la lectura publica
+Se suma la migracion de instancia v11 con `public_presentations`: guarda solo el hash
+SHA-256 de una capacidad URL-safe de 256 bits y un snapshot allowlist v1 de hasta 200
+obras. El router publico propio sirve unicamente `GET`/`HEAD` para `/p/{capacidad}` y
+`/public/v1/presentations/{capacidad}`; no interpreta cookies, no emite sesiones y
+responde `404` uniforme para capacidades inexistentes, invalidas o revocadas. La
+lectura lleva `no-store`, CSP sin terceros, `no-referrer`, robots cerrados y limite de
+20 en rafaga / 60 por minuto por IP+capacidad.
+2026-09-01.
+
+#### [W2.2] Dar controles privados y revocables al owner
+El panel admin permite elegir una coleccion propia, previsualizar el snapshot, crear la
+cartelera, refrescarla de forma deliberada y revocarla. La URL con capacidad plana se
+muestra una sola vez al crearla; listados posteriores guardan solo su resumen. Todo el
+flujo owner usa las rutas privadas autenticadas y CSRF existentes; la pagina publica
+queda desligada de Club, del catalogo personal y de tokens privados.
+2026-09-01.
+
+#### [W2.3] Publicar una cartelera responsive y verificar el limite
+La landing anonima renderiza el contrato v1 como cartelera de videoclub sin imagenes,
+IDs, enlaces externos ni estado de visitante. El navegador pide el JSON con
+`credentials: omit`. Las pruebas HTTP verifican allowlist profunda, aislamiento con y
+sin cookie, cabeceras, revocacion y ausencia de `Set-Cookie`; la prueba Playwright
+abre una instancia anonima en viewport movil y valida la cartelera completa.
+2026-09-01.
 
 #### [W1.1] Delimitar la presentacion publica y su privacidad
 **Cerrado 2026-09-01.** El ADR-0001 decide que la primera superficie publica no es

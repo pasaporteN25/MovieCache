@@ -716,8 +716,9 @@ El checkout contiene codigo, no datos. En un servidor, el catalogo y `instance.d
 
 El despliegue reproducible con una instancia nueva, importacion inicial y medios de solo lectura esta documentado en [docs/docker.md](docs/docker.md). El despliegue nativo, los flags de proxy y las plantillas de `systemd`/Nginx estan en [docs/deployment.md](docs/deployment.md). La estructura de almacenamiento y la migracion reversible estan en [docs/storage.md](docs/storage.md). La secuencia de versiones vive en [docs/roadmap.md](docs/roadmap.md) y el gate de busqueda de `v0.3.0` en [docs/search-quality.md](docs/search-quality.md). En Docker el proceso escucha dentro del contenedor, pero el puerto del host permanece publicado en loopback; Nginx o una VPN controlan el acceso externo.
 
-La futura landing publica no reutilizara Club ni el catalogo personal: su contrato
-cerrado, sus limites de privacidad y el modelo de amenazas viven en
+La landing publica opt-in no reutiliza Club ni el catalogo personal: publica solo un
+snapshot revocable y minimizado de una coleccion que el owner eligio. Su contrato,
+limites de privacidad y modelo de amenazas viven en
 [docs/adr/0001-public-presentation.md](docs/adr/0001-public-presentation.md), con el
 payload allowlist versionado en
 [docs/public-presentation-v1.schema.json](docs/public-presentation-v1.schema.json).

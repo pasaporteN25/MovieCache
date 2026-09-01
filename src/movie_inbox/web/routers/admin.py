@@ -16,6 +16,11 @@ from movie_inbox.application.identity_repository import (
     IdentityRepositoryError,
 )
 from movie_inbox.application.member_service import MemberAuthorizationError
+from movie_inbox.application.public_presentation_repository import PublicPresentationRepositoryError
+from movie_inbox.application.public_presentation_service import (
+    PublicPresentationNotFound,
+    PublicPresentationValidationError,
+)
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.web.catalog_api import load_items
 from movie_inbox.web.dependencies import (
@@ -33,6 +38,95 @@ from movie_inbox.web.responses import (
 )
 
 router = APIRouter()
+
+
+@router.get("/api/public-presentations", dependencies=[Depends(require_token)])
+def public_presentations(request: Request) -> JSONResponse:
+    identity = require_owner(request)
+    service = request.app.state.public_presentation_service
+    try:
+        return JSONResponse({"presentations": service.list_for_owner(identity.user.id)})
+    except PublicPresentationRepositoryError:
+        return error_response("public_presentations_unavailable", 503)
+
+
+@router.post("/api/public-presentations/preview")
+def preview_public_presentation(
+    request: Request,
+    body: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    identity = require_owner(request)
+    service = request.app.state.public_presentation_service
+    try:
+        return JSONResponse({"presentation": service.preview(identity.user.id, body)})
+    except PublicPresentationValidationError as error:
+        return error_response(str(error), 400)
+    except PublicPresentationRepositoryError:
+        return error_response("public_presentations_unavailable", 503)
+
+
+@router.post("/api/public-presentations")
+def create_public_presentation(
+    request: Request,
+    body: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    identity = require_owner(request)
+    service = request.app.state.public_presentation_service
+    try:
+        presentation, capability = service.create(identity.user.id, body)
+        return JSONResponse(
+            {
+                "ok": True,
+                "reason": "public_presentation_created",
+                "presentation": presentation,
+                "url": f"/p/{capability}",
+            },
+            status_code=201,
+        )
+    except PublicPresentationValidationError as error:
+        return error_response(str(error), 400)
+    except PublicPresentationRepositoryError:
+        return error_response("public_presentations_unavailable", 503)
+
+
+@router.post("/api/public-presentations/{presentation_id}/refresh")
+def refresh_public_presentation(
+    presentation_id: str,
+    request: Request,
+    _: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    identity = require_owner(request)
+    service = request.app.state.public_presentation_service
+    try:
+        presentation = service.refresh(identity.user.id, presentation_id)
+        return JSONResponse(
+            {"ok": True, "reason": "public_presentation_refreshed", "presentation": presentation}
+        )
+    except PublicPresentationNotFound:
+        return error_response("public_presentation_not_found", 404)
+    except PublicPresentationValidationError as error:
+        return error_response(str(error), 400)
+    except PublicPresentationRepositoryError:
+        return error_response("public_presentations_unavailable", 503)
+
+
+@router.post("/api/public-presentations/{presentation_id}/revoke")
+def revoke_public_presentation(
+    presentation_id: str,
+    request: Request,
+    _: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    identity = require_owner(request)
+    service = request.app.state.public_presentation_service
+    try:
+        presentation = service.revoke(identity.user.id, presentation_id)
+        return JSONResponse(
+            {"ok": True, "reason": "public_presentation_revoked", "presentation": presentation}
+        )
+    except PublicPresentationNotFound:
+        return error_response("public_presentation_not_found", 404)
+    except PublicPresentationRepositoryError:
+        return error_response("public_presentations_unavailable", 503)
 
 
 @router.get("/api/members", dependencies=[Depends(require_token)])

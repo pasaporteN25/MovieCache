@@ -1024,6 +1024,79 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertFalse(item.en_catalogo)
         self.assertEqual(item.extra["collection_sources"][0]["collection_id"], collection["id"])
 
+    def test_public_presentation_is_opt_in_isolated_and_revocable(self) -> None:
+        collections = self.client.get(
+            "/api/collections", headers={"X-Movie-Inbox-Token": self.config.api_token}
+        )
+        self.assertEqual(collections.status_code, 200, collections.content)
+        collection = collections.json()["collections"][0]
+
+        missing = self.client.get("/public/v1/presentations/not-a-real-capability")
+        created = self.client.post(
+            "/api/public-presentations",
+            content=json.dumps(
+                {
+                    "collection_id": collection["id"],
+                    "title": "Funciones disponibles",
+                    "description": "Selección abierta del videoclub.",
+                }
+            ),
+            headers=self.post_headers(),
+        )
+
+        self.assertEqual(missing.status_code, 404, missing.content)
+        self.assertEqual(created.status_code, 201, created.content)
+        created_payload = created.json()
+        self.assertTrue(created_payload["url"].startswith("/p/"))
+        self.assertNotIn("capability", created_payload["presentation"])
+
+        public_path = created_payload["url"].replace("/p/", "/public/v1/presentations/", 1)
+        landing = self.client.get(created_payload["url"])
+        with_cookie = self.client.get(public_path)
+        with TestClient(create_app(self.config), base_url="http://127.0.0.1:8765") as anonymous:
+            without_cookie = anonymous.get(public_path)
+
+        self.assertEqual(with_cookie.status_code, 200, with_cookie.content)
+        self.assertEqual(without_cookie.status_code, 200, without_cookie.content)
+        self.assertEqual(landing.status_code, 200, landing.content)
+        self.assertIn(b'id="publicPresentation"', landing.content)
+        self.assertIn(b"/static/public.js", landing.content)
+        self.assertNotIn("set-cookie", landing.headers)
+        self.assertEqual(with_cookie.json(), without_cookie.json())
+        self.assertEqual(with_cookie.headers["cache-control"], "no-store")
+        self.assertEqual(with_cookie.headers["referrer-policy"], "no-referrer")
+        self.assertEqual(with_cookie.headers["x-robots-tag"], "noindex, nofollow, noarchive")
+        self.assertNotIn("set-cookie", with_cookie.headers)
+        item = with_cookie.json()["items"][0]
+        self.assertTrue({"position", "title", "kind"}.issubset(item))
+        self.assertTrue(
+            set(item).issubset(
+                {
+                    "position",
+                    "title",
+                    "original_title",
+                    "year",
+                    "kind",
+                    "genres",
+                    "duration_minutes",
+                }
+            )
+        )
+        self.assertNotIn('"id":', with_cookie.text)
+        self.assertNotIn("url", with_cookie.text)
+        self.assertNotIn("page_image", with_cookie.text)
+
+        revoked = self.client.post(
+            f"/api/public-presentations/{created_payload['presentation']['id']}/revoke",
+            content="{}",
+            headers=self.post_headers(),
+        )
+        unavailable = self.client.get(public_path)
+
+        self.assertEqual(revoked.status_code, 200, revoked.content)
+        self.assertEqual(revoked.json()["presentation"]["status"], "revoked")
+        self.assertEqual(unavailable.status_code, 404, unavailable.content)
+
     def test_import_draft_previews_and_idempotently_writes_the_personal_catalog(self) -> None:
         raw_private_path = "D:/Private/Ikiru.mkv"
         created = self.client.post(
