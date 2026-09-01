@@ -35,30 +35,13 @@ consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
 ### Frente: Fuentes externas y especializacion de anime
 
-La epica [F2] se divide en tres entregas moderadas: contrato de composicion [F2.1]
-(cerrado), fuente en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
+La epica [F2] quedo cerrada en tres entregas: contrato de composicion [F2.1], fuente
+en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
 en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
 queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
 ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
 de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
 consulta [F5.1] (cerrado), identidad/retirada [F5.2] y cumplimiento/UX [F5.3].
-
-#### [F2.3] Construir indice offline de anime y fallback
-- **Alcance**: comando explicito `sync/stats/lookup` para el ultimo snapshot de
-  `anime-offline-database`, en SQLite separado y reconstruible; indexar `mal_id`, IDs
-  cruzados, titulo y sinonimos. No descargar ni distribuir el snapshot por defecto.
-  Usarlo para completar aliases/IDs y como resultado secundario etiquetado cuando
-  Jikan falla, limita o no encuentra nada; nunca presentar una fila offline como si
-  viniera de Jikan.
-- **Licencia/operacion**: conservar snapshot e indice fuera del catalogo, mostrar
-  atribucion ODbL/DbCL al usar datos y documentar version/fecha del snapshot. El ultimo
-  release conocido (2026-27, 2026-07-04) es finito: no prometer actualidad en vivo.
-- **Criterio de cierre**: build atomico, version de esquema, busqueda multilingue y
-  composicion determinista probadas sin red; casos de Jikan ok/vacio/429/5xx/timeout;
-  estadisticas de tamaño y tiempo con el snapshot real, previa autorizacion si hace
-  falta descargarlo.
-- **Depende de**: [F2.1]; la activacion en producto depende de [F2.2].
-- **Modelo sugerido**: Grande. Indice local, licencia y resiliencia entre dos fuentes.
 
 #### [F5.2] Integrar identidad, procedencia y retirada de datos TMDb
 - **Alcance**: persistir `tmdb_id` como identidad fuerte de movie/TV; un ID compartido
@@ -180,43 +163,7 @@ consulta [F5.1] (cerrado), identidad/retirada [F5.2] y cumplimiento/UX [F5.3].
 
 ## En curso
 
-### Frente: Fuentes externas y especializacion de anime
-
-#### [F2.2] Integrar Jikan como fuente de anime en vivo
-- **Alcance**: incorporar `mal_id` y `myanimelist_url` como identidad persistente
-  (modelo, JSON, SQLite, import/export, privacidad y comparador), implementar busqueda
-  `/anime` y detalle bajo demanda, y sumar una estanteria Jikan distinguible en la UI.
-  No consultar detalle ni staff para cada candidato: busqueda liviana primero; al elegir
-  uno, detalle y staff dentro de un presupuesto acotado.
-- **Avance 2026-08-31**: Jikan ya esta registrado como cuarta fuente en vivo. La
-  busqueda sigue siendo liviana y el detalle se consulta solo al seleccionar una fila.
-  `mal_id` y `myanimelist_url` son identidad canonica de punta a punta: modelo,
-  esquema JSON v8, tabla generica `external_ids` de SQLite, import/export, privacidad,
-  busqueda local, comparador, Curaduria y materializacion web. Un ID compartido acepta
-  la identidad y dos IDs distintos bloquean el match por titulo/año. La UI agrega una
-  estanteria Jikan con los mismos estados independientes de carga/error/reintento, link
-  MyAnimeList en la ficha, editor de ID y host de portadas limitado exactamente a
-  `cdn.myanimelist.net`.
-- **Contrato ya probado**: el parser valida filas no confiables, conserva Unicode,
-  deduplica titulos/sinonimos, normaliza fecha/generos/productores y excluye score,
-  ranking y duracion por episodio. Hay cobertura sin red para URL hostil, seleccion
-  bajo demanda, migracion JSON, ida y vuelta SQLite, importacion, identidad fuerte y
-  conflicto. Una prueba de navegador busca, selecciona y envia una ficha Jikan sin
-  perder su ID MAL.
-- **Reglas heredadas de [F2.1]**: `kind=anime`; nunca copiar `score` a `rating`; Jikan
-  llena campos vacios pero no pisa ediciones manuales/bloqueadas; `mal_id` compartido
-  puede ser evidencia fuerte, uno divergente nunca se resuelve por titulo solamente.
-  Respetar `429`/`Retry-After`, timeout y cooldown por fuente; no ocultar una caida como
-  una busqueda vacia.
-- **Criterio de cierre restante**: respetar `429`/`Retry-After` y abrir un cooldown
-  visible por fuente, incorporar staff/direccion solo en el detalle elegido con un
-  presupuesto acotado, y mostrar la atribucion/no-afiliacion acordada. Completar esos
-  caminos con respuestas grabadas para 429/5xx/timeout y health/cache. Smoke live no
-  obligatorio y fuera del gate.
-- **Verificacion del corte**: 490 tests unitarios y 16 de navegador, Ruff, formato,
-  mypy estricto, `compileall`, detector Impeccable y `git diff --check` en verde.
-- **Depende de**: [F2.1] (cerrado).
-- **Modelo sugerido**: Grande. Cruza identidad, persistencia, red y frontend.
+Sin tareas activas.
 
 ## Hecho
 
@@ -274,6 +221,50 @@ concreta de que [F2.3] no es optimizacion prematura. Este item cierra el diseño
 identidad, red y UI ya comenzaron a materializarse en [F2.2], mientras que el indice
 offline sigue separado en [F2.3].
 2026-08-31.
+
+#### [F2.2] Integrar Jikan como fuente de anime en vivo
+Jikan queda integrado como cuarta fuente, conservando `mal_id` y
+`myanimelist_url` como identidad canonica de punta a punta. La busqueda usa una sola
+consulta liviana; al seleccionar un candidato se permiten solamente detalle y staff,
+con un maximo de dos llamadas adicionales. Staff aporta direccion solo para roles
+`Director` y una falla en esa consulta no descarta el resto de la ficha.
+
+La resiliencia es por fuente: `429` respeta `Retry-After`, mientras timeout y `5xx`
+abren cooldowns acotados. Health expone estado, codigo, vencimiento y segundos hasta
+el reintento; las respuestas fallidas no entran al cache. En la interfaz, Jikan tiene
+estanteria y estados propios, reintento visible, atribucion y aviso de no afiliacion a
+MyAnimeList. La pasada de diseño Impeccable convirtio cooldown, procedencia y fallback
+en estados legibles y accesibles, sin agregar colores literales nuevos.
+
+Quedaron cubiertos sin red: seleccion y staff, fallo parcial de staff, `429` con
+`Retry-After`, timeout, `503`, health/cooldown, cache, identidad fuerte y envio de una
+ficha desde navegador. Verificacion conjunta de [F2.2]-[F2.3]: 520 tests, Ruff,
+formato, mypy estricto, sintaxis JavaScript y `git diff --check` en verde.
+2026-08-31, commit `322d741`.
+
+#### [F2.3] Construir indice offline de anime y fallback
+Se incorporo `movie-inbox anime-dataset sync/stats/lookup` para construir de forma
+atomica un SQLite separado y versionado desde un JSON/JSONL provisto por el owner. La
+aplicacion no descarga ni distribuye el dataset: exige licencia ODbL/DbCL, URL HTTPS y
+registra fecha, SHA-256, version y estadisticas. El indice conserva `mal_id`, IDs
+cruzados, titulos y sinonimos con normalizacion Unicode y busqueda multilingue.
+
+Con Jikan disponible, el indice solo completa aliases e IDs compatibles y conserva
+la autoridad/procedencia de cada dato. Si Jikan responde vacio, `429`, `5xx` o
+timeout, el resultado offline aparece como fuente propia dentro de la estanteria de
+anime; nunca se rotula como Jikan. La activacion es opt-in por
+`--anime-offline-index` o `MOVIE_INBOX_ANIME_OFFLINE_INDEX`; Docker cuenta con un
+overlay de ejemplo que monta el archivo en modo solo lectura. Sin indice configurado
+no hay llamadas al filesystem ni filas fantasma.
+
+El build de control con el snapshot oficial `2026-27` proceso 41.520 entradas utiles
+y omitio 17, genero 248.348 titulos/aliases y 189.506 referencias cruzadas en 7,9 s.
+El indice resultante midio 77,5 MB y el snapshot de 62.331.124 bytes verifico el
+SHA-256 publicado `8a63189782176fe19e00eca275288ba855ce54d6cb4d7ae97ec71450f861b1aa`.
+El snapshot y el indice temporales se eliminaron despues de la medicion. Docker no
+estaba instalado en el host de validacion; la estructura del overlay quedo cubierta
+por una prueba automatizada.
+2026-08-31, commit `322d741`.
 
 #### [F3.1] Evaluar terminos y costo operativo de TMDb
 TMDb es viable para esta app personal solo como fuente opcional. Requiere token/API
