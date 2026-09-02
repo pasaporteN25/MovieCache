@@ -314,8 +314,8 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const title = displayTitle(item) || `Obra ${index + 1}`;
         const meta = [item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Ficha por completar";
         const reason = entry?.reason?.label || "Selección del archivo";
-        return `<button class="home-shelf-tape" type="button" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entry?.key || "")}" aria-label="${escapeAttr(`${title}. ${reason}. Opción ${index + 1}`)}">
-          <span class="home-shelf-tape-mark" aria-hidden="true"></span>
+        return `<button class="home-shelf-tape vhs-cassette" type="button" data-vhs-state="${selected ? "selected" : "closed"}" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entry?.key || "")}" aria-label="${escapeAttr(`${title}. ${reason}. Opción ${index + 1}`)}">
+          <span class="vhs-cassette-shell" aria-hidden="true"></span>
           <span class="home-shelf-tape-copy">
             <strong>${escapeHtml(title)}</strong>
             <small>${escapeHtml(meta)}</small>
@@ -338,7 +338,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const artwork = poster
           ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">`
           : `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
-        return `<aside class="home-shelf-preview" data-home-shelf-preview="${escapeAttr(sectionId)}" aria-labelledby="home-shelf-preview-${escapeAttr(sectionId)}">
+        return `<aside class="home-shelf-preview vhs-case" data-vhs-state="open" data-home-shelf-preview="${escapeAttr(sectionId)}" aria-labelledby="home-shelf-preview-${escapeAttr(sectionId)}">
           <div class="home-shelf-preview-art">${artwork}</div>
           <div class="home-shelf-preview-copy">
             <span>${escapeHtml(isCollection ? `En ${origin.collection_title || "una colección seguida"}` : reason.label || "Selección del archivo")}</span>

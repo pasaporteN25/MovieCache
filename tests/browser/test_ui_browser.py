@@ -341,6 +341,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(shelf.count(), 2)
         self.assertEqual(shelf.nth(0).get_attribute("tabindex"), "0")
         self.assertEqual(shelf.nth(1).get_attribute("tabindex"), "-1")
+        self.assertEqual(shelf.nth(0).get_attribute("data-vhs-state"), "selected")
+        self.assertEqual(shelf.nth(1).get_attribute("data-vhs-state"), "closed")
+        self.assertIn(
+            "vhs-cassette-frame-v1.png",
+            shelf.nth(0)
+            .locator(".vhs-cassette-shell")
+            .evaluate("element => getComputedStyle(element).backgroundImage"),
+        )
 
         shelf.nth(0).focus()
         page.keyboard.press("ArrowRight")
@@ -349,8 +357,13 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("document.activeElement.dataset.entryKey"), "available-akira"
         )
         self.assertEqual(shelf.nth(1).get_attribute("aria-pressed"), "true")
+        self.assertEqual(shelf.nth(1).get_attribute("data-vhs-state"), "selected")
         self.assertEqual(
             page.locator('[data-home-shelf-preview="available"] h3').text_content(), "Akira"
+        )
+        self.assertEqual(
+            page.locator('[data-home-shelf-preview="available"]').get_attribute("data-vhs-state"),
+            "open",
         )
         page.keyboard.press("Tab")
         self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "open-detail")
@@ -373,6 +386,13 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         self.assertFalse(
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+        page.emulate_media(reduced_motion="reduce")
+        self.assertEqual(
+            shelf.nth(0)
+            .locator(".vhs-cassette-shell")
+            .evaluate("element => getComputedStyle(element).transitionDuration"),
+            "0s",
         )
 
     def test_ficha_description_dialog_focus_and_naming(self) -> None:

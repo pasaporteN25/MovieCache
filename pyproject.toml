@@ -35,6 +35,7 @@ where = ["src"]
     "static/js/*.js",
     "static/js/core/*.js",
     "static/js/surfaces/*.js",
+    "static/img/*.png",
     "static/img/*.svg",
 ]
 "movie_inbox.search_lab" = ["corpus/*.json"]

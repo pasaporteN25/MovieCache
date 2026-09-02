@@ -9,6 +9,7 @@ from pathlib import PurePosixPath
 _CONTENT_TYPES_BY_SUFFIX = {
     ".css": "text/css; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
+    ".png": "image/png",
     ".svg": "image/svg+xml",
 }
 

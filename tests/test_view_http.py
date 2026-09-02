@@ -1386,6 +1386,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b".dvd-case", css)
         self.assertIn(b".dvd-front-statuses", css)
         self.assertIn(b".home-shelf-rail", css)
+        self.assertIn(b".vhs-cassette", css)
         self.assertIn(b".spotlight-selector", css)
         self.assertIn(b".collection-filter-toolbar", css)
         self.assertIn(b".filter-segments", css)
@@ -1464,6 +1465,12 @@ class ViewerHttpTests(unittest.TestCase):
         status, body = self.request("GET", "/static/img/tmdb-logo.svg")
         self.assertEqual(status, 200)
         self.assertIn(b"<svg", body)
+
+    def test_vhs_frame_is_a_packaged_local_png_asset(self) -> None:
+        status, body = self.request("GET", "/static/img/vhs-cassette-frame-v1.png")
+        self.assertEqual(status, 200)
+        self.assertTrue(body.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertGreater(len(body), 1000)
 
     def test_static_assets_are_cached_with_etag_revalidation(self) -> None:
         first = self.client.get("/static/js/core/bootstrap.js")

@@ -7,7 +7,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-        button, .dvd-flipper, .dvd-case, .detail-drawer { transition: none; }
+        button, .dvd-flipper, .dvd-case, .detail-drawer, .vhs-cassette-shell, .home-shelf-tape-copy { transition: none; }
         .dvd-cover-image,
         .dvd-placeholder,
         .drawer-poster,

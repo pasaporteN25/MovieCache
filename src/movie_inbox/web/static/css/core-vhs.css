@@ -1,0 +1,40 @@
+      /* Marco reusable: la carcasa no contiene títulos, estados ni datos del owner. */
+      .vhs-cassette {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        color: var(--ink);
+        display: block;
+        overflow: visible;
+        padding: 0;
+        position: relative;
+      }
+      .vhs-cassette-shell {
+        background: url("../img/vhs-cassette-frame-v1.png") center / contain no-repeat;
+        inset: 0;
+        pointer-events: none;
+        position: absolute;
+        transition: filter 180ms var(--ease-out), transform 260ms var(--ease-out);
+      }
+      .vhs-cassette[data-vhs-state="closed"] .vhs-cassette-shell { filter: saturate(0.78) brightness(0.86); }
+      .vhs-cassette[data-vhs-state="selected"] .vhs-cassette-shell {
+        filter: saturate(1.06) brightness(1.12);
+        transform: translateY(-3px);
+      }
+      .vhs-cassette:focus-visible { outline: var(--focus-ring); outline-offset: 5px; }
+      .vhs-case {
+        background: linear-gradient(105deg, color-mix(in srgb, var(--violet) 10%, var(--surface-deep)), var(--surface-deep) 52%);
+        border-block: 1px solid var(--line);
+        min-width: 0;
+        position: relative;
+      }
+      .vhs-case[data-vhs-state="open"]::before {
+        background: linear-gradient(180deg, transparent, rgba(var(--violet-rgb), 0.44), transparent);
+        content: "";
+        inset-block: 12%;
+        left: clamp(104px, 12vw, 148px);
+        pointer-events: none;
+        position: absolute;
+        width: 1px;
+      }
+

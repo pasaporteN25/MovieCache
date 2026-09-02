@@ -347,32 +347,25 @@
         scroll-snap-type: inline proximity;
       }
       .home-shelf-tape {
-        align-content: stretch;
-        background: linear-gradient(135deg, var(--surface-deep), color-mix(in srgb, var(--violet) 13%, var(--surface-deep)));
-        border: 1px solid var(--line);
-        border-radius: var(--radius-case);
-        color: var(--ink);
-        display: grid;
-        flex: 0 0 clamp(172px, 18vw, 230px);
-        gap: 8px;
-        grid-template-columns: 10px minmax(0, 1fr);
-        min-height: 94px;
-        padding: 10px;
+        aspect-ratio: 1.78 / 1;
+        flex: 0 0 clamp(244px, 24vw, 330px);
+        min-height: 0;
         scroll-snap-align: start;
         text-align: left;
       }
-      .home-shelf-tape-mark {
-        background: linear-gradient(180deg, var(--gold), var(--red));
-        border-radius: 999px;
-        display: block;
-        margin: 3px 0;
-        opacity: 0.78;
-      }
       .home-shelf-tape-copy {
         align-content: center;
+        background: color-mix(in srgb, var(--surface-deep) 78%, transparent);
+        border-block: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
         display: grid;
         gap: 5px;
+        inset: 30% 28% 25%;
         min-width: 0;
+        padding: 7px 10px;
+        position: absolute;
+        text-align: center;
+        transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out);
+        z-index: 1;
       }
       .home-shelf-tape strong {
         -webkit-box-orient: vertical;
@@ -380,7 +373,7 @@
         color: var(--ink);
         display: -webkit-box;
         font-family: var(--font-display);
-        font-size: var(--text-small);
+        font-size: var(--text-caption);
         font-style: italic;
         letter-spacing: 0.015em;
         line-height: 1;
@@ -392,35 +385,30 @@
         -webkit-line-clamp: 1;
         color: var(--muted);
         display: -webkit-box;
-        font-size: var(--text-caption);
+        font-size: var(--text-label);
         line-height: 1.25;
         overflow: hidden;
       }
-      .home-shelf-tape:hover { background: color-mix(in srgb, var(--teal) 11%, var(--surface-deep)); }
-      .home-shelf-tape[aria-pressed="true"] {
-        background: linear-gradient(135deg, color-mix(in srgb, var(--red) 22%, var(--surface-deep)), color-mix(in srgb, var(--violet) 20%, var(--surface-deep)));
-        border-color: var(--red);
+      .home-shelf-tape:hover .home-shelf-tape-copy {
+        background: color-mix(in srgb, var(--teal) 13%, var(--surface-deep));
+        border-color: color-mix(in srgb, var(--teal) 62%, transparent);
       }
-      .home-shelf-tape[aria-pressed="true"] .home-shelf-tape-mark { opacity: 1; }
-      .home-shelf-tape:focus-visible {
-        outline: 3px solid var(--teal);
-        outline-offset: 3px;
-        position: relative;
-        z-index: 1;
+      .home-shelf-tape[data-vhs-state="selected"] .home-shelf-tape-copy {
+        background: color-mix(in srgb, var(--red) 18%, var(--surface-deep));
+        border-color: var(--gold);
       }
       .home-shelf-preview {
         align-items: stretch;
-        border-block: 1px solid var(--line);
         display: grid;
         gap: clamp(14px, 2vw, 26px);
         grid-template-columns: minmax(86px, 116px) minmax(0, 1fr);
-        margin-top: 3px;
+        margin-top: 8px;
         min-width: 0;
-        padding: 14px 0;
+        padding: 16px;
       }
       .home-shelf-preview-art {
-        background: var(--surface-deep);
-        border: 1px solid var(--line);
+        background: var(--case);
+        border: 1px solid color-mix(in srgb, var(--violet) 46%, var(--line));
         min-height: 142px;
         overflow: hidden;
         position: relative;
@@ -461,6 +449,8 @@
         display: grid;
         justify-items: start;
         min-width: 0;
+        position: relative;
+        z-index: 1;
       }
       .home-shelf-preview-copy > span {
         color: var(--gold);
@@ -581,7 +571,7 @@
       }
 
 @media (max-width: 1100px) {
-        .home-shelf-tape { flex-basis: 210px; }
+        .home-shelf-tape { flex-basis: 290px; }
 }
 
 @media (max-width: 640px) {
@@ -597,9 +587,9 @@
 
         .home-shelf-rail { gap: 9px; scroll-snap-type: inline mandatory; }
 
-        .home-shelf-tape { flex-basis: min(72vw, 244px); min-height: 88px; }
+        .home-shelf-tape { flex-basis: min(84vw, 330px); }
 
-        .home-shelf-preview { grid-template-columns: 82px minmax(0, 1fr); }
+        .home-shelf-preview { grid-template-columns: 82px minmax(0, 1fr); padding: 12px; }
 
         .home-shelf-preview-art { min-height: 124px; }
 
