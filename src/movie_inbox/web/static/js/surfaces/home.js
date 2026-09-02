@@ -1,4 +1,4 @@
-import { cachedImageSrc, card, posterVariant } from "../core/card.js";
+import { cachedImageSrc, posterVariant } from "../core/card.js";
 import { editorialRevision, loadCatalog, setEditorialRevision } from "../core/catalog-data.js";
 import { detailLinks, drawerPoster, factsPanel } from "../core/detail.js";
 import { fields } from "../core/fields.js";
@@ -14,10 +14,13 @@ import { closeSharedDetail, openCollection } from "./club.js";
 
       export const editorialFeaturedCache = new Map();
 
+      export const homeShelfSelections = new Map();
+
       export let spotlightIndex = 0;
 
       export function setEditorialHome(value) {
         editorialHome = value;
+        homeShelfSelections.clear();
       }
 
       export async function goToHomeCollection(collectionId) {
@@ -245,6 +248,35 @@ import { closeSharedDetail, openCollection } from "./club.js";
         selectSpotlight((spotlightIndex + offsets[event.key] + count) % count, true);
       }
 
+      export function selectHomeShelfEntry(sectionId, key, restoreFocus = false) {
+        const section = editorialHome.sections.find((entry) => entry.id === sectionId);
+        const entries = Array.isArray(section?.items) ? section.items : [];
+        const index = entries.findIndex((entry) => entry?.key === key);
+        if (index < 0) return;
+        homeShelfSelections.set(sectionId, index);
+        renderEditorialSections();
+        if (restoreFocus) {
+          fields.homeSections.querySelector(`[data-click="home-shelf-select"][data-section-id="${CSS.escape(sectionId)}"][data-entry-index="${index}"]`)?.focus();
+        }
+      }
+
+      export function moveHomeShelf(event) {
+        const control = event.target.closest("[data-click='home-shelf-select']");
+        if (!control) return;
+        const sectionId = control.dataset.sectionId || "";
+        const section = editorialHome.sections.find((entry) => entry.id === sectionId);
+        const entries = Array.isArray(section?.items) ? section.items : [];
+        if (!entries.length) return;
+        const offsets = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+        let nextIndex = Number(control.dataset.entryIndex || 0);
+        if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = entries.length - 1;
+        else if (event.key in offsets) nextIndex = (nextIndex + offsets[event.key] + entries.length) % entries.length;
+        else return;
+        event.preventDefault();
+        selectHomeShelfEntry(sectionId, entries[nextIndex].key || "", true);
+      }
+
       export function renderEditorialSections() {
         fields.homeSections.innerHTML = editorialHome.sections
           .filter((section) => Array.isArray(section.items) && section.items.length)
@@ -254,36 +286,68 @@ import { closeSharedDetail, openCollection } from "./club.js";
 
       export function editorialSection(section, sectionIndex) {
         const action = section.action || {};
+        const entries = Array.isArray(section.items) ? section.items : [];
+        const sectionId = String(section.id || `editorial-${sectionIndex}`);
+        const selectedIndex = Math.max(0, Math.min(entries.length - 1, homeShelfSelections.get(sectionId) || 0));
+        const selectedEntry = entries[selectedIndex];
         const actionButton = action.kind
-          ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(section.id || "")}">${escapeHtml(action.label || "Explorar")}</button>`
+          ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(action.label || "Explorar")}</button>`
           : "";
-        return `<section class="home-program" data-home-section="${escapeAttr(section.id || "editorial")}" aria-labelledby="home-section-${escapeAttr(section.id || sectionIndex)}">
+        return `<section class="home-program" data-home-section="${escapeAttr(sectionId)}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
           <header class="home-program-heading">
             <div>
               <span class="section-kicker">${escapeHtml(section.eyebrow || "Programación personal")}</span>
-              <h2 id="home-section-${escapeAttr(section.id || sectionIndex)}">${escapeHtml(section.title || "Selección")}</h2>
+              <h2 id="home-section-${escapeAttr(sectionId)}">${escapeHtml(section.title || "Selección")}</h2>
               <p>${escapeHtml(section.description || "")}</p>
             </div>
             ${actionButton}
           </header>
-          <div class="home-program-grid">
-            ${section.items.map((entry, index) => editorialEntry(entry, index, sectionIndex === 0)).join("")}
+          <div class="home-shelf-rail" role="group" aria-label="Opciones de ${escapeAttr(section.title || "la estantería")}">
+            ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, index === selectedIndex)).join("")}
           </div>
+          ${homeShelfPreview(sectionId, selectedEntry)}
         </section>`;
       }
 
-      export function editorialEntry(entry, index, prioritize) {
+      export function homeShelfTape(entry, index, sectionId, selected) {
+        const item = entry?.item || {};
+        const title = displayTitle(item) || `Obra ${index + 1}`;
+        const meta = [item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Ficha por completar";
+        const reason = entry?.reason?.label || "Selección del archivo";
+        return `<button class="home-shelf-tape" type="button" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entry?.key || "")}" aria-label="${escapeAttr(`${title}. ${reason}. Opción ${index + 1}`)}">
+          <span class="home-shelf-tape-mark" aria-hidden="true"></span>
+          <span class="home-shelf-tape-copy">
+            <strong>${escapeHtml(title)}</strong>
+            <small>${escapeHtml(meta)}</small>
+          </span>
+        </button>`;
+      }
+
+      export function homeShelfPreview(sectionId, entry) {
         const item = entry?.item || {};
         const origin = entry?.origin || {};
-        const options = origin.kind === "collection"
-          ? {
-              action: "open-home-collection-detail",
-              actionId: origin.collection_item_id || item.id || "",
-              entryKey: entry.key || "",
-              collectionTitle: origin.collection_title || "Colección"
-            }
-          : {};
-        return `<div class="home-editorial-item">${card(item, index, prioritize, options)}</div>`;
+        const title = displayTitle(item) || "Sin título";
+        const poster = String(item.page_image || "").trim();
+        const reason = entry?.reason || {};
+        const metadata = [item.year, firstListValue(item.directors), firstListValue(item.genres)].filter(Boolean);
+        const summary = String(reason.detail || item.wikipedia_extract || item.description || "").trim();
+        const isCollection = origin.kind === "collection";
+        const detailAction = isCollection
+          ? `<button type="button" class="home-shelf-preview-action" data-click="open-home-collection-detail" data-key="${escapeAttr(entry?.key || "")}">Ver ficha del Club</button>`
+          : `<button type="button" class="home-shelf-preview-action" data-click="open-detail" data-id="${escapeAttr(item.id || "")}">Abrir ficha</button>`;
+        const artwork = poster
+          ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">`
+          : `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
+        return `<aside class="home-shelf-preview" data-home-shelf-preview="${escapeAttr(sectionId)}" aria-labelledby="home-shelf-preview-${escapeAttr(sectionId)}">
+          <div class="home-shelf-preview-art">${artwork}</div>
+          <div class="home-shelf-preview-copy">
+            <span>${escapeHtml(isCollection ? `En ${origin.collection_title || "una colección seguida"}` : reason.label || "Selección del archivo")}</span>
+            <h3 id="home-shelf-preview-${escapeAttr(sectionId)}">${escapeHtml(title)}</h3>
+            ${metadata.length ? `<p class="home-shelf-preview-meta">${metadata.map(escapeHtml).join(" · ")}</p>` : ""}
+            <p class="home-shelf-preview-summary">${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
+            ${detailAction}
+          </div>
+        </aside>`;
       }
 
       export function editorialPersonalIds() {

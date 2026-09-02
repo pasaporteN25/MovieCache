@@ -283,6 +283,98 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
 
+    def test_home_shelves_use_existing_sections_with_keyboard_preview_and_touch_scroll(
+        self,
+    ) -> None:
+        page = self.page
+
+        def add_home_shelves(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 2:
+                home["sections"] = [
+                    {
+                        "id": "available",
+                        "eyebrow": "Para ver ahora",
+                        "title": "Disponible esta noche",
+                        "description": (
+                            "Pendientes que tu biblioteca física confirma como disponibles."
+                        ),
+                        "action": {
+                            "kind": "catalog",
+                            "label": "Ver colección",
+                            "filters": {
+                                "status": ["to_watch"],
+                                "availability": ["available"],
+                            },
+                        },
+                        "items": [
+                            {
+                                "key": "available-heat",
+                                "origin": {"kind": "catalog"},
+                                "item": items[0],
+                                "reason": {
+                                    "label": "Lista para ver",
+                                    "detail": "El inventario confirma que está disponible.",
+                                },
+                            },
+                            {
+                                "key": "available-akira",
+                                "origin": {"kind": "catalog"},
+                                "item": items[1],
+                                "reason": {
+                                    "label": "Lista para ver",
+                                    "detail": "El inventario confirma que está disponible.",
+                                },
+                            },
+                        ],
+                    }
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_home_shelves)
+        self._open_and_wait_for_catalog(page)
+        shelf = page.locator('[data-home-section="available"] .home-shelf-tape')
+        self.assertEqual(shelf.count(), 2)
+        self.assertEqual(shelf.nth(0).get_attribute("tabindex"), "0")
+        self.assertEqual(shelf.nth(1).get_attribute("tabindex"), "-1")
+
+        shelf.nth(0).focus()
+        page.keyboard.press("ArrowRight")
+
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.entryKey"), "available-akira"
+        )
+        self.assertEqual(shelf.nth(1).get_attribute("aria-pressed"), "true")
+        self.assertEqual(
+            page.locator('[data-home-shelf-preview="available"] h3').text_content(), "Akira"
+        )
+        page.keyboard.press("Tab")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "open-detail")
+
+        shelf.nth(0).click()
+        self.assertEqual(
+            page.locator('[data-home-shelf-preview="available"] h3').text_content(), "Heat"
+        )
+        page.set_viewport_size({"width": 390, "height": 844})
+        self.assertEqual(
+            page.locator(".home-shelf-rail").evaluate(
+                "element => getComputedStyle(element).overflowX"
+            ),
+            "auto",
+        )
+        self.assertTrue(
+            page.locator(".home-shelf-rail").evaluate(
+                "element => element.scrollWidth > element.clientWidth"
+            )
+        )
+        self.assertFalse(
+            page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+
     def test_ficha_description_dialog_focus_and_naming(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)
