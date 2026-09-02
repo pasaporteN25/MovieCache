@@ -24,15 +24,14 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [D1] | Guia HTTPS/reverse proxy segura | — |
-| 2 | [U1] | Inicio videoclub: selector A + estanterias C | cierre v0.7.0 |
-| 3 | [A1] | API versionada para dispositivos | D1 |
-| 4 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
-| 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 1 | [U1] | Inicio videoclub: selector A + estanterias C | cierre v0.7.0 |
+| 2 | [A1] | API versionada para dispositivos | D1 |
+| 3 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
+| 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [D1.3], pendiente de ejecutar la validación Nginx descartable en CI.
-- **Cerrado recientemente:** [C2], [W1], [W2] y [W3]. El detalle verificable permanece
-  en `Hecho`.
+- **En curso:** ninguna tarea; [D1] y [W3] ya tienen validacion y cierre verificables.
+- **Cerrado recientemente:** [C2], [D1], [W1], [W2] y [W3]. El detalle verificable
+  permanece en `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
@@ -61,14 +60,6 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 [F5] queda completo.
 
 ### Frente: Superficie publica y despliegue
-
-#### [D1.3] Ejecutar la validacion descartable de la receta Nginx
-- **Alcance**: comprobar en CI el bootstrap HTTP y la configuración HTTPS con un
-  certificado efímero, y registrar el resultado del primer pipeline que la ejecute.
-- **Criterio de cierre**: ambos `nginx -t` pasan dentro de un contenedor temporal y el
-  checklist de release conserva la comprobación de hosts, loopback y renovación.
-- **Depende de**: [D1.1], [D1.2].
-- **Modelo sugerido**: Chico. Validación reproducible ya preparada; no cambia datos.
 
 ### Frente: Inicio videoclub (candidato v0.8.0)
 
@@ -175,6 +166,15 @@ HTTP, certificado SAN, Nginx de dos hosts, cabeceras reenviadas sin spoofing de 
 HSTS opt-in, ausencia deliberada de WebSocket y hook de renovación. Las plantillas de
 Nginx restringen la cartelera a sus rutas/activos y quitan de los logs cualquier
 capacidad. Docker, systemd, `.env` y el checklist de release usan los nuevos orígenes.
+
+#### [D1.3] Ejecutar la validacion descartable de la receta Nginx
+**Cerrado 2026-09-02.** El workflow `tests` #76 para `f3287f2` termino exitoso e
+incluyo la comprobacion temporal de ambos templates con `nginx -t`. El error observado
+en el run #75 correspondia a `a8009da`, anterior a `ea2b68e`, que normaliza las rutas
+Windows al pedir repositorios de catalogo durante el retiro externo. La regresion queda
+cubierta por `tests/test_external_retirement.py`; la ejecucion local del modulo y la
+suite completa la reproducen en verde. El checklist conserva hosts separados, loopback
+y renovacion como controles de release.
 
 #### [W3] Disenar paquetes compartibles y sincronizacion entre homeservers
 **Cerrado 2026-09-02.** Se dividio y cerro en tres partes para separar las decisiones
