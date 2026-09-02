@@ -25,15 +25,14 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
 | 1 | [D1] | Guia HTTPS/reverse proxy segura | — |
-| 2 | [W3] | Diseno de paquetes entre homeservers | W1 + contrato portable |
-| 3 | [U1] | Inicio videoclub: selector A + estanterias C | cierre v0.7.0 |
-| 4 | [A1] | API versionada para dispositivos | D1 |
-| 5 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
-| 6 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 2 | [U1] | Inicio videoclub: selector A + estanterias C | cierre v0.7.0 |
+| 3 | [A1] | API versionada para dispositivos | D1 |
+| 4 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
+| 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
 - **En curso:** [D1.3], pendiente de ejecutar la validación Nginx descartable en CI.
-- **Cerrado recientemente:** [C2], [W1] y [W2]. El detalle verificable permanece en
-  `Hecho`.
+- **Cerrado recientemente:** [C2], [W1], [W2] y [W3]. El detalle verificable permanece
+  en `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
@@ -70,14 +69,6 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
   checklist de release conserva la comprobación de hosts, loopback y renovación.
 - **Depende de**: [D1.1], [D1.2].
 - **Modelo sugerido**: Chico. Validación reproducible ya preparada; no cambia datos.
-
-#### [W3] Disenar paquetes compartibles y sincronizacion entre homeservers
-- **Alcance**: casos de uso, identidad de instancia, export/import firmado o manual,
-  conflictos, revocacion y privacidad. No asumir un servicio central.
-- **Criterio de cierre**: ADR y prototipo descartable sin red publica involuntaria;
-  implementacion productiva queda como tarea posterior.
-- **Depende de**: [W1.1], [W1.2], [W1.3] y contrato portable estable.
-- **Modelo sugerido**: Grande. Distribucion, conflictos y modelo de amenazas.
 
 ### Frente: Inicio videoclub (candidato v0.8.0)
 
@@ -184,6 +175,38 @@ HTTP, certificado SAN, Nginx de dos hosts, cabeceras reenviadas sin spoofing de 
 HSTS opt-in, ausencia deliberada de WebSocket y hook de renovación. Las plantillas de
 Nginx restringen la cartelera a sus rutas/activos y quitan de los logs cualquier
 capacidad. Docker, systemd, `.env` y el checklist de release usan los nuevos orígenes.
+
+#### [W3] Disenar paquetes compartibles y sincronizacion entre homeservers
+**Cerrado 2026-09-02.** Se dividio y cerro en tres partes para separar las decisiones
+de confianza del experimento de formato. `docs/adr/0002-homeserver-package-exchange.md`
+define el limite de intercambio entre owners sin servicio central; el contrato y
+prototipo son offline y no abren rutas, listeners ni clientes HTTP. La implementacion
+productiva queda como trabajo posterior: identidad persistida, receipts, preview privado,
+firma interoperable y pairing directo requieren sus propias tareas.
+
+##### [W3.1] Casos de uso, identidad y privacidad
+**Cerrado 2026-09-02.** El intercambio aprobado es de una coleccion curada que dos
+owners ya decidieron compartir, por archivo o un canal que eligieron; no hay cuenta
+global, directorio, DNS, descubrimiento ni relay. Cada homeserver futuro se identifica
+con un UUID aleatorio persistente, sin usuario, host o dominio. El payload excluye por
+allowlist rutas, archivos, bibliotecas, disponibilidad, estado personal, procedencia,
+sesiones, configuracion y enlaces remotos.
+
+##### [W3.2] Contrato, conflictos y revocacion
+**Cerrado 2026-09-02.** `docs/homeserver-package-v1.schema.json` fija el manifiesto
+versionado, la coleccion portable y su integridad SHA-256. El modo manual exige confirmar
+digest/origen por un canal independiente; `ed25519` queda reservado para una entrega con
+JCS, claves locales, rotacion y vectores cruzados, no se simula una firma. El importador
+futuro primero hara preview privado: IDs externos compatibles+tipo sugieren merge, IDs
+incompatibles lo bloquean y titulo/año/director nunca fusionan solos. Un paquete es una
+foto: revocarlo no borra una copia ajena y la sincronizacion/pairing quedan fuera de v1.
+
+##### [W3.3] Prototipo descartable sin red
+**Cerrado 2026-09-02.** `scripts/homeserver_package_prototype.py` construye e
+inspecciona exclusivamente un `.mipkg` manual (`manifest.json` + `payload.json`): JSON
+estricto, allowlist, limite de 1 MiB, digest, nombres ZIP exactos y sin extraccion.
+No importa catalogos ni modifica la aplicacion. `tests/test_homeserver_package_prototype.py`
+cubre ronda completa, manipulación/doble entrada y campos privados/ZIP extra rechazados.
 
 #### [W2.1] Persistir snapshots y separar la lectura publica
 Se suma la migracion de instancia v11 con `public_presentations`: guarda solo el hash
