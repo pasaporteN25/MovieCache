@@ -63,7 +63,7 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 
 ### Frente: Inicio videoclub (siguiente entrega de interfaz)
 
-**Decisión 2026-09-01.** La lámina generada 1 es una referencia de dirección, no un
+**Decisión 2026-09-02.** La lámina generada 1 es una referencia de dirección, no un
 asset ni contenido de la aplicación. [U1] resolvió una primera versión navegable; [U2]
 la reemplaza visualmente antes de iniciar [A2]. El objetivo no es sumar un tema
 decorativo: Inicio debe sentirse como el videoclub material de la referencia, con una
@@ -75,9 +75,9 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
 #### [U2] Reconstruir Inicio como videoclub material
 - **Alcance**: sustituir la composición visual de [U1] sin cambiar el contrato
   editorial ni las rutas existentes. Arriba, una cartelera disponible de estética
-  nocturna con una lista navegable tipo WIMP; abajo, estanterías físicas cuyas obras
-  se ven de perfil. La selección revela una caja de frente y `Ver más` abre una ficha
-  material que contiene el cassette VHS y la información extendida.
+  nocturna con una lista navegable tipo Winamp; abajo, estanterías físicas cuyas obras
+  se ven de perfil. La selección revela una previsualización con el VHS existente, caja
+  frontal, lectura suficiente y una acción explícita de edición cuando corresponde.
 - **Criterio de cierre**: teclado, puntero, touch, foco, lector de pantalla y reducción
   de movimiento permiten hacer el mismo recorrido; las portadas y textos siguen siendo
   HTML/datos vivos; no se filtran rutas, fuentes privadas ni estado de otra persona; la
@@ -88,30 +88,45 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
 - **Modelo sugerido**: Grande. Cambia composición, objetos reutilizables, navegación y
   detalle sobre varias superficies, con requisitos de accesibilidad y de assets.
 
+  - [ ] **[U2.0] Integrar navegación y utilidades en el escenario.** Definir un
+    "mostrador de control" compacto que pertenezca al videoclub y ordene Inicio,
+    Colección, Bandeja y Club como destinos; Buscar, Agregar y Usuario como utilidades
+    distinguibles. Debe conservar las rutas, atajos, sesión, estado activo y navegación
+    móvil existentes, no esconderlas tras gestos ni duplicar la barra actual. Cierre:
+    arquitectura de información y prototipo navegable en escritorio/móvil, con foco y
+    accesos equivalentes antes de reemplazar la cabecera.
   - [ ] **[U2.1] Fijar y prototipar la cartelera-lista.** Reemplazar el panel actual por
-    una lista compacta de reproducción tipo WIMP, operable con flechas, Home/End y
+    una lista compacta de reproducción tipo Winamp, operable con flechas, Home/End y
     Enter; sumar la ambientación original/licenciada `Noche de cine` y hacer visible
     `Cartelera disponible`. La lista es la navegación primaria; click/tap se conservan
     como alternativa, no como requisito. Cierre: brief, asset auditado, estados de
-    carga/vacío/error y pruebas de foco/teclado/móvil sin cambiar `/api/home`.
+    carga/vacío/error y pruebas de foco/teclado/móvil sin cambiar `/api/home`. En el
+    tamaño de escritorio previsto, el escenario completo ocupa el viewport sin scroll
+    vertical; en móvil, alturas bajas, teclado virtual o zoom alto puede crecer y hacer
+    scroll vertical para no recortar contenido.
   - [ ] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Mostrar las
     obras de perfil sobre una repisa real, con título legible, disponibilidad y foco
-    inequívoco; al seleccionar una, revelar debajo o junto a la fila su caja frontal con
-    portada y el resumen breve. Mantener scroll táctil, roving tabindex y las acciones
-    editoriales actuales. Cierre: layout responsive con títulos largos, sin poster como
-    único portador de información, y pruebas visuales/de interacción.
+    inequívoco. En escritorio, un selector de categoría muestra una sola estantería
+    editorial activa —no apila todas las filas verticalmente— y esa estantería se
+    recorre lateralmente. Al seleccionar un lomo, revelar debajo o junto a la fila una
+    previsualización basada en `vhs-cassette-frame-v1.png`, caja frontal/portada y la
+    información extendida que sea posible leer sin abrir el dossier. `Editar mi ficha`
+    aparece solamente para una obra editable; `Ver más` conserva el detalle completo.
+    Mantener scroll lateral táctil, roving tabindex y las acciones editoriales actuales.
+    Cierre: layout responsive con títulos largos, sin poster como único portador de
+    información, y pruebas visuales/de interacción.
   - [ ] **[U2.3] Abrir la caja para el detalle extendido.** `Ver más` parte de la caja
     frontal y abre una transición reversible hacia un dossier donde el cassette VHS
     negro acompaña sinopsis, ficha y acciones existentes. La animación es decorativa,
     se omite con `prefers-reduced-motion`, no bloquea Escape/foco y no duplica rutas ni
     datos. Cierre: componente reutilizable, estados de carga/fallo de portada y pruebas
     de navegación, diálogo y movimiento reducido.
-  - [ ] **[U2.4] Resolver la edición desde la ficha sin ambigüedad.** Diseñar y validar
-    una acción secundaria explícita (`Editar mi ficha` o equivalente) que entre al
-    editor actual o a un modo de edición del dossier según permisos. Seleccionar una
-    obra o abrir su caja nunca muta datos. Cierre: decisión documentada, flujos de obra
-    propia/obra de Club/solo lectura y pruebas de que no aparecen controles de escritura
-    donde no corresponden.
+  - [ ] **[U2.4] Conectar edición explícita desde la previsualización y la ficha.**
+    Implementar la acción secundaria `Editar mi ficha` hacia el editor actual o un modo
+    de edición del dossier según permisos. Seleccionar una obra, abrir su caja o leer su
+    información nunca muta datos; obra de Club y superficies de sólo lectura muestran
+    solamente las acciones permitidas. Cierre: flujos de obra propia/obra de Club/solo
+    lectura y pruebas de que no aparecen controles de escritura donde no corresponden.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
