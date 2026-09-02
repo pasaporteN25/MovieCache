@@ -1,0 +1,89 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Movie Inbox Device API",
+    "version": "1.0.0",
+    "description": "Contract for native devices. This is not the historical browser API under /api/."
+  },
+  "servers": [{"url": "https://{baseUrl}", "variables": {"baseUrl": {"default": "movie-inbox.example"}}}],
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "createDeviceSession",
+        "security": [],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginRequest"}}}},
+        "responses": {"201": {"description": "Device session", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceSession"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "429": {"$ref": "#/components/responses/RateLimited"}}
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "refreshDeviceSession",
+        "security": [],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefreshRequest"}}}},
+        "responses": {"200": {"description": "Rotated device session", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceSession"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/auth/session": {
+      "delete": {"operationId": "revokeCurrentDeviceSession", "responses": {"204": {"description": "Revoked"}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/me": {
+      "get": {"operationId": "getDeviceIdentity", "responses": {"200": {"description": "Authenticated identity", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Identity"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}}
+    },
+    "/api/v1/catalog/items": {
+      "get": {
+        "operationId": "listCatalogItems",
+        "parameters": [{"$ref": "#/components/parameters/CatalogCursor"}, {"$ref": "#/components/parameters/PageSize"}],
+        "responses": {"200": {"description": "Personal catalog page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemPage"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/catalog/items/{itemId}": {
+      "get": {
+        "operationId": "getCatalogItem",
+        "parameters": [{"$ref": "#/components/parameters/ItemId"}],
+        "responses": {"200": {"description": "Catalog item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogItem"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/v1/catalog/items/{itemId}/personal": {
+      "patch": {
+        "operationId": "patchPersonalItemState",
+        "parameters": [{"$ref": "#/components/parameters/ItemId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalPatch"}}}},
+        "responses": {"200": {"description": "Updated item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogItem"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "searchPersonalCatalog",
+        "parameters": [{"name": "q", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 200}}, {"$ref": "#/components/parameters/CatalogCursor"}, {"$ref": "#/components/parameters/PageSize"}],
+        "responses": {"200": {"description": "Personal catalog search page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemPage"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"deviceBearer": {"type": "http", "scheme": "bearer", "bearerFormat": "opaque"}},
+    "parameters": {
+      "ItemId": {"name": "itemId", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 128}},
+      "CatalogCursor": {"name": "cursor", "in": "query", "schema": {"type": ["string", "null"], "maxLength": 512}},
+      "PageSize": {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50, "minimum": 1, "maximum": 100}}
+    },
+    "responses": {
+      "Unauthorized": {"description": "Missing, invalid, expired or revoked device session", "headers": {"WWW-Authenticate": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "RateLimited": {"description": "Login rate limit", "headers": {"Retry-After": {"schema": {"type": "integer", "minimum": 1}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "InvalidRequest": {"description": "Invalid request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "NotFound": {"description": "No accessible item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+    },
+    "schemas": {
+      "LoginRequest": {"type": "object", "additionalProperties": false, "required": ["username", "password", "device_name"], "properties": {"username": {"type": "string", "minLength": 3, "maxLength": 64}, "password": {"type": "string", "minLength": 1, "maxLength": 1024, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
+      "RefreshRequest": {"type": "object", "additionalProperties": false, "required": ["refresh_token"], "properties": {"refresh_token": {"type": "string", "minLength": 32, "maxLength": 512, "writeOnly": true}}},
+      "DeviceSession": {"type": "object", "additionalProperties": false, "required": ["access_token", "refresh_token", "token_type", "access_expires_at", "refresh_expires_at", "identity"], "properties": {"access_token": {"type": "string", "minLength": 32, "writeOnly": true}, "refresh_token": {"type": "string", "minLength": 32, "writeOnly": true}, "token_type": {"const": "Bearer"}, "access_expires_at": {"type": "string", "format": "date-time"}, "refresh_expires_at": {"type": "string", "format": "date-time"}, "identity": {"$ref": "#/components/schemas/Identity"}}},
+      "Identity": {"type": "object", "additionalProperties": false, "required": ["user", "catalog"], "properties": {"user": {"type": "object", "additionalProperties": false, "required": ["id", "username", "role"], "properties": {"id": {"type": "string"}, "username": {"type": "string"}, "role": {"enum": ["owner", "member"]}}}, "catalog": {"type": "object", "additionalProperties": false, "required": ["id", "name"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}}},
+      "ItemPage": {"type": "object", "additionalProperties": false, "required": ["items", "next_cursor"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogItem"}}, "next_cursor": {"type": ["string", "null"]}}},
+      "CatalogItem": {"type": "object", "additionalProperties": false, "required": ["id", "title", "kind", "personal", "availability"], "properties": {"id": {"type": "string"}, "title": {"type": "string"}, "original_title": {"type": ["string", "null"]}, "year": {"type": ["string", "null"]}, "kind": {"type": "string"}, "image_url": {"type": ["string", "null"], "format": "uri"}, "genres": {"type": "array", "items": {"type": "string"}}, "runtime_minutes": {"type": ["integer", "null"], "minimum": 0}, "personal": {"$ref": "#/components/schemas/PersonalState"}, "availability": {"$ref": "#/components/schemas/Availability"}}},
+      "PersonalState": {"type": "object", "additionalProperties": false, "required": ["status", "watched_at", "rating", "review"], "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}}},
+      "PersonalPatch": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}}},
+      "Availability": {"type": "object", "additionalProperties": false, "required": ["state", "count"], "properties": {"state": {"type": "string"}, "count": {"type": "integer", "minimum": 0}}},
+      "Error": {"type": "object", "additionalProperties": false, "required": ["error"], "properties": {"error": {"type": "object", "additionalProperties": false, "required": ["code"], "properties": {"code": {"type": "string"}}}}}
+    }
+  },
+  "security": [{"deviceBearer": []}]
+}

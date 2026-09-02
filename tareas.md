@@ -81,6 +81,17 @@ adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado
 - **Depende de**: [T4], [D1].
 - **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
 
+  - [x] **[A1.1] Congelar contrato de dispositivo v1.** ADR y OpenAPI estático para
+    HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
+    patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
+    prueba de que la superficie y la serialización no heredan rutas o paths internos.
+  - [ ] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
+    access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
+    dependencias Bearer que no acepten cookie ni el token CSRF web.
+  - [ ] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
+    paginación/cursor, lectura de disponibilidad resumida, patch idempotente de estado
+    personal y fixtures cliente-servidor contra el contrato congelado.
+
 #### [A2] Cliente Android basico
 - **Alcance**: login seguro, lectura/busqueda/detalle y edicion de estado, fecha vista,
   puntaje y review; disponibilidad fisica solo lectura, sin offline ni administracion.
