@@ -29,8 +29,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 3 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea; [D1], [W3], [U1.1] y [U1.2] ya tienen validacion y cierre verificables.
-- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1.1] y [U1.2]. El detalle verificable
+- **En curso:** ninguna tarea; [D1], [W3] y [U1] ya tienen validacion y cierre verificables.
+- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3] y [U1]. El detalle verificable
   permanece en `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
@@ -70,20 +70,6 @@ un tema decorativo sino reorganizar Inicio: arriba la variante A como selector p
 y abajo la variante C como estanterías de descubrimiento. La cartelera pública puede
 adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado de
 [W1]/[W2] y nunca gana acciones privadas.
-
-#### [U1.3] Crear un kit VHS reutilizable y aplicar el sistema por superficie
-- **Alcance**: abrir un trabajo de arte separado para producir el kit de activos
-  (marco/caja VHS, texturas y variantes) y su licencia; los títulos, estados y botones
-  se renderizan como HTML localizado, nunca dentro de una imagen. Implementar el
-  componente con estados cerrada, seleccionada y abierta, `prefers-reduced-motion` y
-  fallback sin animación. Aplicarlo primero a Inicio privado; evaluar en una tarea
-  posterior la adaptación de la cartelera pública sin ampliar su payload v1.
-- **Criterio de cierre**: assets auditables, componente reutilizable y pruebas visuales
-  de escritorio/móvil/teclado; no hay requests externos ni contenido de owner dentro
-  de los assets.
-- **Depende de**: [U1.2].
-- **Modelo sugerido**: Grande. Requiere una dirección de arte coherente y preserva
-  accesibilidad, i18n y los límites de privacidad públicos.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
@@ -150,6 +136,17 @@ explícita al detalle. Flechas, Home/End, Enter y clic actualizan la selección 
 trampas de foco; móvil conserva scroll táctil dentro de la tira, no de la página. La
 prueba de navegador cubre esa interacción y el ancho; la caja VHS/activos reutilizables
 quedan deliberadamente para [U1.3].
+
+#### [U1.3] Crear un kit VHS reutilizable y aplicar el sistema por superficie
+**Cerrado 2026-09-02, commit `ca537b7`.** El kit compartido `core-vhs.css` define una
+carcasa `closed`/`selected` y una caja `open`; Inicio la aplica a sus estanterías sin
+mover datos del catálogo a una imagen. El PNG RGBA local
+`static/img/vhs-cassette-frame-v1.png` no contiene texto, logos, obras ni información
+del owner; títulos, metadatos, foco y botones siguen siendo HTML. Su hash, licencia GPL,
+procedencia C2PA y prompt están auditados en `docs/assets/vhs-cassette-frame-v1.md`, y
+`pyproject.toml`/el servidor declaran y sirven PNG estático. La prueba de navegador
+cubre los tres estados, teclado, móvil y movimiento reducido; el asset se sirve desde la
+misma instancia. La cartelera pública y su payload v1 no se tocaron.
 
 ### Frente: Superficie publica y despliegue
 
