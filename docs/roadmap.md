@@ -125,6 +125,16 @@ navegador, mas Ruff, formato, mypy estricto, compileall, los dos gates de Search
 `git diff --check`. El pipeline remoto valida ademas Linux, Windows 3.14, wheel limpio y
 el ciclo Docker completo con estado persistente y backup privado.
 
+### Próximos incrementos propuestos
+
+- **v0.7.0** cierra la exposición segura de una instancia personal: [W1]/[W2] ya
+  entregaron la cartelera pública opt-in; [D1] documenta HTTPS/reverse proxy y [W3]
+  define el intercambio entre homeservers sin introducir un servicio central.
+- **v0.8.0** queda reservado para [U1], un refactor de Inicio con la variante A como
+  selector fijo navegable por flechas/Enter y la variante C como estanterías
+  horizontales de VHS. La dirección visual generada es referencia; los assets y el
+  componente accesible se trabajan por separado después del cierre de v0.7.0.
+
 ## Implementado en el incremento de descubrimiento y scanner
 
 - Buscar el catalogo personal en el servidor, incluyendo titulos originales,

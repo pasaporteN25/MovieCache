@@ -26,9 +26,10 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | --- | --- | --- | --- |
 | 1 | [D1] | Guia HTTPS/reverse proxy segura | — |
 | 2 | [W3] | Diseno de paquetes entre homeservers | W1 + contrato portable |
-| 3 | [A1] | API versionada para dispositivos | D1 |
-| 4 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
-| 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 3 | [U1] | Inicio videoclub: selector A + estanterias C | cierre v0.7.0 |
+| 4 | [A1] | API versionada para dispositivos | D1 |
+| 5 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
+| 6 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
 - **En curso:** ninguna tarea.
 - **Cerrado recientemente:** [C2], [W1] y [W2]. El detalle verificable permanece en
@@ -77,6 +78,53 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
   implementacion productiva queda como tarea posterior.
 - **Depende de**: [W1.1], [W1.2], [W1.3] y contrato portable estable.
 - **Modelo sugerido**: Grande. Distribucion, conflictos y modelo de amenazas.
+
+### Frente: Inicio videoclub (candidato v0.8.0)
+
+**Decisión 2026-09-01.** La lámina generada 1 es una referencia de dirección, no un
+asset ni contenido de la aplicación. El rediseño no comienza durante v0.7.0: primero
+se cierran [D1] y [W3] y se publica ese incremento. El objetivo posterior no es sumar
+un tema decorativo sino reorganizar Inicio: arriba la variante A como selector principal
+y abajo la variante C como estanterías de descubrimiento. La cartelera pública puede
+adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado de
+[W1]/[W2] y nunca gana acciones privadas.
+
+#### [U1.1] Definir el selector fijo de Inicio a partir de la variante A
+- **Alcance**: reemplazar el carrusel actual por una lista/selector principal fija con
+  opciones navegables por flechas; Enter abre la información contextual de la opción
+  activa. Definir qué opciones reales representa, la selección inicial, foco, teclado,
+  lector de pantalla, móvil, carga y estados vacíos; no inventar navegación paralela.
+- **Criterio de cierre**: brief y prototipo navegable que demuestren que flechas,
+  Enter, Tab y toque llevan al mismo detalle sin ocultar la navegación existente.
+- **Depende de**: cierre publicado de v0.7.0.
+- **Modelo sugerido**: Grande. Cambia la jerarquía de Inicio y sus contratos de foco.
+
+#### [U1.2] Convertir la variante C en estanterías horizontales con señales reales
+- **Alcance**: diseñar varias filas desplazables horizontalmente debajo del selector:
+  al menos `Disponible esta noche`, `Tu archivo pide memoria` y las demás categorías
+  que puedan sostenerse con datos existentes. Cada VHS muestra información mínima; al
+  seleccionarlo revela portada y ficha breve, y la acción explícita de expandir abre
+  la caja para detalle/edición. Definir fuentes de datos, prioridad, ausencia de filas
+  y límites de cantidad antes de programar.
+- **Criterio de cierre**: contrato por estantería (consulta, orden, vacío y destino),
+  más prototipo responsive que conserve scroll táctil y navegación por teclado.
+- **Depende de**: [U1.1].
+- **Modelo sugerido**: Grande. Une información editorial, gestos y edición sin mezclar
+  superficies ni estados personales.
+
+#### [U1.3] Crear un kit VHS reutilizable y aplicar el sistema por superficie
+- **Alcance**: abrir un trabajo de arte separado para producir el kit de activos
+  (marco/caja VHS, texturas y variantes) y su licencia; los títulos, estados y botones
+  se renderizan como HTML localizado, nunca dentro de una imagen. Implementar el
+  componente con estados cerrada, seleccionada y abierta, `prefers-reduced-motion` y
+  fallback sin animación. Aplicarlo primero a Inicio privado; evaluar en una tarea
+  posterior la adaptación de la cartelera pública sin ampliar su payload v1.
+- **Criterio de cierre**: assets auditables, componente reutilizable y pruebas visuales
+  de escritorio/móvil/teclado; no hay requests externos ni contenido de owner dentro
+  de los assets.
+- **Depende de**: [U1.2].
+- **Modelo sugerido**: Grande. Requiere una dirección de arte coherente y preserva
+  accesibilidad, i18n y los límites de privacidad públicos.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
