@@ -4,7 +4,7 @@ Gestor self-hosted para organizar obras, disponibilidad fisica y memoria persona
 
 ## Estado del proyecto
 
-La version estable actual es **v0.6.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+La version estable actual es **v0.7.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
 
 v0.3.0 cerro el gate de calidad de busqueda (cero falsos positivos conocidos en
 auto-match y merge, con `movie-inbox search-lab run --enforce` como gate real en CI).
@@ -21,12 +21,10 @@ extremos y la busqueda externa reconoce titulos multilingues verificados contra 
 mismo identificador de IMDb. El acceso conserva el carnet de videoclub con una
 secuencia de credenciales mas clara y adaptable.
 
-v0.6.0 profundiza descubrimiento y operacion familiar: diagnostica regresiones
-multilingues sin red, conserva consultas ambiguas como `Verano 1993`, permite buscar
-por direccion sin usarla como prueba de identidad y suma un prototipo opt-in del indice
-oficial no comercial de IMDb. Las bibliotecas aceptan exclusiones propias y el admin
-puede publicar su disponibilidad como una coleccion de Club sin exponer rutas ni
-archivos. Detalle completo de las versiones en [CHANGELOG.md](CHANGELOG.md).
+v0.7.0 suma una cartelera publica opt-in, aislada del catalogo y de las sesiones, mas
+una receta reproducible de HTTPS/Nginx con hosts privado y publico separados. Tambien
+define y prueba, sin habilitar red, el formato de intercambio manual entre homeservers.
+Detalle completo de las versiones en [CHANGELOG.md](CHANGELOG.md).
 
 El paquete instalable y la interfaz web son el camino recomendado. Los lanzadores de
 compatibilidad con v0.1 (`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`,

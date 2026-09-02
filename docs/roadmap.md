@@ -125,12 +125,23 @@ navegador, mas Ruff, formato, mypy estricto, compileall, los dos gates de Search
 `git diff --check`. El pipeline remoto valida ademas Linux, Windows 3.14, wheel limpio y
 el ciclo Docker completo con estado persistente y backup privado.
 
+### v0.7.0: exposición segura y contratos portables — publicado 2026-09-02
+
+La cartelera pública opt-in queda aislada del catálogo, Club y sesiones mediante una
+capacidad revocable y un snapshot allowlist v1. La receta de despliegue fija hosts
+privado/público separados, HTTPS, loopback y renovación; los dos templates Nginx se
+validaron en CI con certificados efímeros. El intercambio entre homeservers queda
+delimitado como paquete manual offline: tiene contrato versionado, identidad técnica,
+integridad, límites de privacidad y un prototipo que no abre red ni modifica la
+aplicación. La firma interoperable, receipts, preview privado y pairing directo siguen
+como trabajo posterior, no como una capacidad anunciada.
+
+Gate de salida: 553 pruebas unitarias (4 omitidas), Ruff, formato, mypy estricto,
+compileall y `git diff --check` en verde; GitHub Actions #78 confirma Linux, Windows,
+wheel limpio, Chromium y Docker Compose con estado persistente.
+
 ### Próximos incrementos propuestos
 
-- **v0.7.0** cierra la exposición segura de una instancia personal: [W1]/[W2] ya
-  entregaron la cartelera pública opt-in; [D1.1]/[D1.2] ya fijaron HTTPS/reverse proxy
-  y queda su prueba descartable [D1.3]; [W3] define el intercambio entre homeservers
-  sin introducir un servicio central.
 - **v0.8.0** queda reservado para [U1], un refactor de Inicio con la variante A como
   selector fijo navegable por flechas/Enter y la variante C como estanterías
   horizontales de VHS. La dirección visual generada es referencia; los assets y el

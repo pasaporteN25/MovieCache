@@ -2,7 +2,7 @@
 
 Los cambios relevantes del proyecto se documentan en este archivo.
 
-## [Sin publicar]
+## [0.7.0] - 2026-09-02
 
 ### Agregado
 
@@ -29,6 +29,13 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   instancia tiene el token configurado, con el logo oficial y el aviso de no-endoso
   exigidos por sus terminos. `429`/`Retry-After`, backoff y cache muy por debajo del
   tope de seis meses ya se heredaban del mecanismo generico de fuentes externas.
+- La receta de despliegue separa el host privado de la aplicacion del host publico de
+  cartelera, ambos por HTTPS y con Uvicorn limitado a loopback. Incluye bootstrap ACME,
+  renovacion, cabeceras de proxy sin spoofing y validacion temporal de Nginx en CI.
+- El contrato de paquetes entre homeservers define una coleccion portable por archivo,
+  identidad tecnica de instancia, integridad, conflictos, revocacion y privacidad sin
+  servicio central. El prototipo manual es solo offline: no abre red ni importa datos
+  de la instancia; Ed25519 queda reservado para una entrega interoperable posterior.
 
 ### Cambiado
 
