@@ -12,7 +12,7 @@ import { createPublicPresentation, handlePublicPresentationAction, previewPublic
 import { applyCollectionYearRange, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
-import { activateHomeSection, addHomeCollectionItem, goToHomeCollection, loadEditorialFeaturedDate, moveSpotlight, openHomeCollectionDetail, refreshEditorialHome, selectSpotlight } from "../surfaces/home.js";
+import { activateHomeSection, addHomeCollectionItem, goToHomeCollection, loadEditorialFeaturedDate, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, selectSpotlight } from "../surfaces/home.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
@@ -34,8 +34,6 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "add-home-collection-item": () => addHomeCollectionItem(target.dataset.collectionId || "", id, target),
           "open-home-collection": () => goToHomeCollection(target.dataset.collectionId || id),
           "home-section-action": () => activateHomeSection(target.dataset.sectionId || ""),
-          "spotlight-previous": () => moveSpotlight(-1, "spotlight-previous"),
-          "spotlight-next": () => moveSpotlight(1, "spotlight-next"),
           "spotlight-select": () => selectSpotlight(Number(target.dataset.index || 0), true),
           "home-date-today": () => loadEditorialFeaturedDate(todayLocalDate()),
           "home-date-yesterday": () => loadEditorialFeaturedDate(localDateOffset(-1)),
@@ -90,6 +88,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       // --- wiring: reproduced verbatim from the original app.js bootstrap ---
       document.querySelector("#refresh").addEventListener("click", refreshAdminData);
       fields.searchButton.addEventListener("click", () => runSearch());
+      fields.spotlightStage.addEventListener("keydown", moveSpotlightSelector);
       fields.homeButton.addEventListener("click", goHome);
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
       fields.inboxButton.addEventListener("click", () => goToInbox());

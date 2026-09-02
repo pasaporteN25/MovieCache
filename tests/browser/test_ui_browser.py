@@ -228,6 +228,61 @@ class BrowserInterfaceTests(unittest.TestCase):
             self.assertIsNotNone(box, selector)
             self.assertGreaterEqual(box["height"], 44, selector)
 
+    def test_home_selector_keeps_one_tab_stop_and_changes_preview_with_arrows(self) -> None:
+        page = self.page
+
+        def add_second_featured(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            home = payload.get("home") or {}
+            items = payload.get("items") or []
+            if len(items) >= 2:
+                home["featured"] = [
+                    {
+                        "key": "browser-selector-heat",
+                        "item": items[0],
+                        "origin": {"kind": "catalog"},
+                        "reason": {
+                            "label": "Función destacada",
+                            "detail": "Disponible para la prueba del selector.",
+                        },
+                    },
+                    {
+                        "key": "browser-selector-alternate",
+                        "item": items[1],
+                        "origin": {"kind": "catalog"},
+                        "reason": {
+                            "label": "Otra función disponible",
+                            "detail": "Alternativa para la prueba del selector.",
+                        },
+                    },
+                ]
+                home["hero"] = home["featured"][0]
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_second_featured)
+        self._open_and_wait_for_catalog(page)
+        selector = page.locator(".spotlight-selector-option")
+        self.assertEqual(selector.count(), 2)
+        self.assertEqual(selector.nth(0).get_attribute("tabindex"), "0")
+        self.assertEqual(selector.nth(1).get_attribute("tabindex"), "-1")
+
+        selector.nth(0).focus()
+        page.keyboard.press("ArrowDown")
+
+        self.assertEqual(page.evaluate("document.activeElement.dataset.index"), "1")
+        self.assertEqual(selector.nth(1).get_attribute("aria-pressed"), "true")
+        self.assertEqual(page.locator("#spotlight-selected-title").inner_text(), "AKIRA")
+        page.keyboard.press("Enter")
+        self.assertEqual(page.locator("#spotlight-selected-title").inner_text(), "AKIRA")
+
+        page.keyboard.press("Tab")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "open-detail")
+        page.set_viewport_size({"width": 390, "height": 844})
+        self.assertFalse(
+            page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+
     def test_ficha_description_dialog_focus_and_naming(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)

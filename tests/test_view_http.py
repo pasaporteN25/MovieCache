@@ -1386,7 +1386,7 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b".dvd-case", css)
         self.assertIn(b".dvd-front-statuses", css)
         self.assertIn(b".home-program-grid", css)
-        self.assertIn(b".spotlight-program", css)
+        self.assertIn(b".spotlight-selector", css)
         self.assertIn(b".collection-filter-toolbar", css)
         self.assertIn(b".filter-segments", css)
         self.assertIn(b".home-empty-state", css)

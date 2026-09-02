@@ -181,56 +181,68 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const cover = !realBackdrop && poster
           ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="eager" fetchpriority="high" decoding="async">`
           : "";
-        const navigation = featured.length > 1
-          ? `<div class="spotlight-navigation" aria-label="Navegar recomendaciones">
-              <button class="spotlight-step" type="button" data-click="spotlight-previous" aria-label="Recomendación anterior">&#8249;</button>
-              <span>${spotlightIndex + 1} / ${featured.length}</span>
-              <button class="spotlight-step" type="button" data-click="spotlight-next" aria-label="Recomendación siguiente">&#8250;</button>
-            </div>`
-          : "";
-        const program = featured.length > 1
-          ? `<div class="spotlight-program" aria-label="Recomendaciones del día">
-              ${featured.map((candidate, index) => {
-                const candidateTitle = displayTitle(candidate.item || {}) || `Recomendación ${index + 1}`;
-                return `<button type="button" aria-pressed="${index === spotlightIndex ? "true" : "false"}" data-click="spotlight-select" data-index="${index}">
-                  <span>${String(index + 1).padStart(2, "0")}</span>
-                  <strong>${escapeHtml(candidateTitle)}</strong>
-                </button>`;
-              }).join("")}
-            </div>`
-          : "";
-        fields.spotlightStage.innerHTML = `<div class="spotlight-viewport">
-          <article class="spotlight-slide poster-${posterVariant(item.id || title)}">
+        const selector = `<nav class="spotlight-selector" aria-label="Selección de la cartelera">
+          <div class="spotlight-selector-heading">
+            <span>Elegí una función</span>
+            <strong>${String(spotlightIndex + 1).padStart(2, "0")} / ${String(featured.length).padStart(2, "0")}</strong>
+          </div>
+          <div class="spotlight-selector-options">
+            ${featured.map((candidate, index) => {
+              const candidateTitle = displayTitle(candidate.item || {}) || `Recomendación ${index + 1}`;
+              const candidateReason = candidate.reason?.label || "Selección del día";
+              const selected = index === spotlightIndex;
+              return `<button class="spotlight-selector-option" type="button" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="spotlight-select" data-index="${index}" aria-label="${escapeAttr(`${candidateTitle}. ${candidateReason}. Recomendación ${index + 1} de ${featured.length}`)}">
+                <span>${String(index + 1).padStart(2, "0")}</span>
+                <strong>${escapeHtml(candidateTitle)}</strong>
+                <small>${escapeHtml(candidateReason)}</small>
+              </button>`;
+            }).join("")}
+          </div>
+        </nav>`;
+        fields.spotlightStage.innerHTML = `<div class="spotlight-layout">
+          ${selector}
+          <div class="spotlight-viewport">
+          <article id="spotlight-feature" class="spotlight-slide poster-${posterVariant(item.id || title)}" aria-labelledby="spotlight-selected-title">
             ${image}${cover}
             <div class="spotlight-copy">
               <span class="spotlight-reason">${escapeHtml(reason.label || "Selección del día")}</span>
-              <strong>${escapeHtml(title)}</strong>
+              <h3 id="spotlight-selected-title">${escapeHtml(title)}</h3>
               ${metadata.length ? `<span class="spotlight-metadata">${metadata.map(escapeHtml).join(" · ")}</span>` : ""}
               <p>${escapeHtml(summary || "Una obra disponible de tu archivo personal para considerar esta noche.")}</p>
               <button class="spotlight-cta" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Ver ficha</button>
             </div>
           </article>
-          ${navigation}
-        </div>${program}`;
+          </div>
+        </div>`;
       }
 
       export function selectSpotlight(index, restoreFocus = false) {
         if (!editorialHome.featured.length) return;
         spotlightIndex = Math.max(0, Math.min(editorialHome.featured.length - 1, index));
         renderEditorialHero();
-        if (restoreFocus && document.body.dataset.inputMethod === "keyboard") {
+        if (restoreFocus) {
           fields.spotlightStage.querySelector(`[data-click="spotlight-select"][data-index="${spotlightIndex}"]`)?.focus();
         }
       }
 
-      export function moveSpotlight(offset, action = "") {
+      export function moveSpotlightSelector(event) {
+        if (!event.target.closest("[data-click='spotlight-select']")) return;
         const count = editorialHome.featured.length;
-        if (count < 2) return;
-        spotlightIndex = (spotlightIndex + offset + count) % count;
-        renderEditorialHero();
-        if (action && document.body.dataset.inputMethod === "keyboard") {
-          fields.spotlightStage.querySelector(`[data-click="${action}"]`)?.focus();
+        if (!count) return;
+        const offsets = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+        if (event.key === "Home") {
+          event.preventDefault();
+          selectSpotlight(0, true);
+          return;
         }
+        if (event.key === "End") {
+          event.preventDefault();
+          selectSpotlight(count - 1, true);
+          return;
+        }
+        if (!(event.key in offsets)) return;
+        event.preventDefault();
+        selectSpotlight((spotlightIndex + offsets[event.key] + count) % count, true);
       }
 
       export function renderEditorialSections() {
@@ -395,4 +407,3 @@ import { closeSharedDetail, openCollection } from "./club.js";
           fields.homeView.setAttribute("aria-busy", "false");
         }
       }
-
