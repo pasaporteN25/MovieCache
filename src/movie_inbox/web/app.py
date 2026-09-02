@@ -273,7 +273,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
     app.add_middleware(
-        TrustedHostMiddleware, allowed_hosts=viewer_allowed_hosts(config.public_origin)
+        TrustedHostMiddleware,
+        allowed_hosts=viewer_allowed_hosts(config.public_origin, config.public_presentation_origin),
     )
 
     @app.middleware("http")

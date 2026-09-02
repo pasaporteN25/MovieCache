@@ -275,15 +275,21 @@ colecciones, inventario y configuracion de bibliotecas.
 ## Nginx y acceso por red
 
 Por defecto Compose publica `127.0.0.1:8765`, de modo que solamente el host y un proxy
-local pueden conectarse. Para Nginx, mantener ese bind y cambiar:
+local pueden conectarse. Para Nginx, mantener ese bind y declarar los dos orígenes si se
+habilita una cartelera pública en un host separado:
 
 ```dotenv
-MOVIE_INBOX_PUBLIC_ORIGIN=https://peliculas.example.com
+MOVIE_INBOX_PUBLIC_ORIGIN=https://inbox.example.com
+MOVIE_INBOX_PUBLIC_PRESENTATION_ORIGIN=https://cartelera.example.com
 MOVIE_INBOX_FORWARDED_ALLOW_IPS=IP_EXACTA_DEL_PROXY
 ```
 
 No usar `*` para proxies confiables. Nginx termina HTTPS y reenvia al puerto loopback;
-no debe servir el volumen de datos ni el directorio de imports.
+no debe servir el volumen de datos ni el directorio de imports. La configuración
+soportada para ambos hosts, emisión de certificado y renovación está en
+[deployment.md](deployment.md#nginx-https-y-acceso-por-internet). El host de cartelera
+solo entrega `/p/`, `/public/` y sus assets mínimos; no usarlo como acceso directo a la
+aplicación.
 
 Para acceso directo dentro de una LAN sin Nginx se puede cambiar
 `MOVIE_INBOX_BIND_ADDRESS`, pero `MOVIE_INBOX_PUBLIC_ORIGIN` debe coincidir exactamente

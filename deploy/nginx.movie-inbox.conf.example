@@ -1,29 +1,64 @@
+# Replace both hostnames before installing. This is the supported two-host layout:
+# inbox.example.com exposes the authenticated app; cartelera.example.com exposes only
+# an anonymous, revocable public presentation. Both proxy to loopback only.
+
 server {
     listen 80;
-    server_name movies.example.com;
-    return 301 https://$host$request_uri;
+    server_name inbox.example.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/letsencrypt;
+        default_type text/plain;
+    }
+
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    listen 80;
+    server_name cartelera.example.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/letsencrypt;
+        default_type text/plain;
+    }
+
+    location / { return 301 https://$host$request_uri; }
 }
 
 server {
     listen 443 ssl;
-    server_name movies.example.com;
+    server_name inbox.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/movies.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/movies.example.com/privkey.pem;
-
+    ssl_certificate /etc/letsencrypt/live/movie-inbox/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/movie-inbox/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_timeout 1d;
+    server_tokens off;
     client_max_body_size 2m;
 
-    # Movie Inbox authenticates local accounts. A private VPN or optional
-    # auth_basic layer can still be added as defense in depth.
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy same-origin always;
+    add_header X-Frame-Options DENY always;
+    # Enable only after confirming both names are permanently HTTPS:
+    # add_header Strict-Transport-Security "max-age=15552000" always;
+
+    # The private origin does not serve anonymous presentation capabilities.
+    location = /p { access_log off; return 404; }
+    location ^~ /p/ { access_log off; return 404; }
+    location = /public { access_log off; return 404; }
+    location ^~ /public/ { access_log off; return 404; }
 
     location = /image-cache {
         access_log off;
         proxy_pass http://127.0.0.1:8765;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Connection "";
         proxy_read_timeout 60s;
     }
 
@@ -31,9 +66,77 @@ server {
         proxy_pass http://127.0.0.1:8765;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Connection "";
         proxy_read_timeout 60s;
     }
+}
+
+server {
+    listen 443 ssl;
+    server_name cartelera.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/movie-inbox/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/movie-inbox/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_timeout 1d;
+    server_tokens off;
+    client_max_body_size 64k;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header X-Frame-Options DENY always;
+    # Enable only after confirming both names are permanently HTTPS:
+    # add_header Strict-Transport-Security "max-age=15552000" always;
+
+    # Capability-bearing requests are deliberately excluded from access logs.
+    location ^~ /p/ {
+        access_log off;
+        proxy_pass http://127.0.0.1:8765;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Connection "";
+        proxy_read_timeout 30s;
+    }
+
+    location ^~ /public/ {
+        access_log off;
+        proxy_pass http://127.0.0.1:8765;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Connection "";
+        proxy_read_timeout 30s;
+    }
+
+    location = /static/public.js {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    location = /static/css/public.css {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    location = /static/css/tokens.css {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # No login, private API or generic static bundle is reachable on this host.
+    location / { return 404; }
 }

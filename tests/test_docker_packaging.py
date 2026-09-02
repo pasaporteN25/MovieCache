@@ -49,6 +49,8 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("cap_drop:\n      - ALL", compose)
         self.assertIn("no-new-privileges=true", compose)
         self.assertIn("127.0.0.1}", compose)
+        self.assertIn("--public-presentation-origin", compose)
+        self.assertIn("MOVIE_INBOX_PUBLIC_PRESENTATION_ORIGIN", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_MODE:-after-access", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS:-3", compose)
         self.assertIn("movie-inbox-backup:", compose)
@@ -74,7 +76,25 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS=3", environment)
         self.assertIn("MOVIE_INBOX_BACKUP_PATH=./backups", environment)
         self.assertIn("MOVIE_INBOX_BACKUP_RETENTION_DAYS=14", environment)
+        self.assertIn("MOVIE_INBOX_PUBLIC_PRESENTATION_ORIGIN=", environment)
         self.assertNotIn("MOVIE_INBOX_OWNER_PASSWORD=", environment)
+
+    def test_nginx_templates_keep_private_and_capability_routes_separate(self) -> None:
+        full = (ROOT / "deploy" / "nginx.movie-inbox.conf.example").read_text(encoding="utf-8")
+        bootstrap = (ROOT / "deploy" / "nginx.movie-inbox.http-bootstrap.conf.example").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("server_name inbox.example.com", full)
+        self.assertIn("server_name cartelera.example.com", full)
+        self.assertIn("location ^~ /p/", full)
+        self.assertIn("location ^~ /public/", full)
+        self.assertIn("location / { return 404; }", full)
+        self.assertIn("proxy_set_header X-Forwarded-For $remote_addr", full)
+        self.assertNotIn("$proxy_add_x_forwarded_for", full)
+        self.assertGreaterEqual(full.count("access_log off"), 4)
+        self.assertIn("/.well-known/acme-challenge/", bootstrap)
+        self.assertIn("location / { return 404; }", bootstrap)
 
     def test_tmdb_compose_overlay_is_opt_in_and_file_backed(self) -> None:
         base_compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
@@ -142,6 +162,8 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertNotIn('tar -tzf "$archive"', workflow)
         self.assertIn("ReadonlyRootfs", workflow)
         self.assertIn("test ! -w /imports", workflow)
+        self.assertIn("Validate Nginx proxy templates", workflow)
+        self.assertIn("nginx:stable-alpine nginx -t", workflow)
 
 
 if __name__ == "__main__":

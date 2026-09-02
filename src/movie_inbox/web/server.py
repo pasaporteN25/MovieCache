@@ -47,6 +47,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="External origin, for example https://movies.example.com.",
     )
     parser.add_argument(
+        "--public-presentation-origin",
+        default="",
+        help=(
+            "Optional dedicated HTTPS origin for /p/ and /public/ presentation routes, "
+            "for example https://cartelera.example.com."
+        ),
+    )
+    parser.add_argument(
         "--forwarded-allow-ips",
         default="127.0.0.1",
         help="Comma-separated proxy IPs trusted by Uvicorn for forwarded headers.",
@@ -200,6 +208,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(error))
     try:
         public_origin = normalize_public_origin(args.public_origin)
+        public_presentation_origin = normalize_public_origin(args.public_presentation_origin)
     except InvalidPublicOrigin as error:
         parser.error(str(error))
     if args.host.casefold() not in {"127.0.0.1", "localhost", "::1"} and not public_origin:
@@ -227,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         session_ttl_seconds=args.session_days * 24 * 60 * 60,
         host=args.host,
         public_origin=public_origin,
+        public_presentation_origin=public_presentation_origin,
         forwarded_allow_ips=args.forwarded_allow_ips,
         image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),
         image_cache_warm=args.image_cache_warm_mode == "after-access",
@@ -296,6 +306,8 @@ def main(argv: list[str] | None = None) -> int:
         else "Anime offline fallback: not configured"
     )
     print(f"Open {url}")
+    if public_presentation_origin:
+        print(f"Public presentation origin: {public_presentation_origin}")
     print("Press Ctrl+C to stop.")
 
     if not args.no_open:

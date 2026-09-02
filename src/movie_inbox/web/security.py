@@ -139,13 +139,16 @@ def viewer_allowed_origins(port: int, public_origin: str = "") -> set[str]:
     return {origin.casefold() for origin in origins}
 
 
-def viewer_allowed_hosts(public_origin: str = "") -> list[str]:
+def viewer_allowed_hosts(
+    public_origin: str = "", public_presentation_origin: str = ""
+) -> list[str]:
     hosts = {"127.0.0.1", "localhost"}
-    normalized = normalize_public_origin(public_origin)
-    if normalized:
-        hostname = urlparse(normalized).hostname
-        if hostname:
-            hosts.add(hostname.casefold())
+    for origin in (public_origin, public_presentation_origin):
+        normalized = normalize_public_origin(origin)
+        if normalized:
+            hostname = urlparse(normalized).hostname
+            if hostname:
+                hosts.add(hostname.casefold())
     return sorted(hosts)
 
 

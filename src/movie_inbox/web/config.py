@@ -44,6 +44,7 @@ class ViewerConfig:
     session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS
     host: str = "127.0.0.1"
     public_origin: str = ""
+    public_presentation_origin: str = ""
     forwarded_allow_ips: str = "127.0.0.1"
     image_cache_total_bytes: int = DEFAULT_IMAGE_CACHE_TOTAL_BYTES
     image_cache_warm: bool = True

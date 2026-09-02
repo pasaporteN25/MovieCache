@@ -45,6 +45,10 @@ class HttpSecurityTests(unittest.TestCase):
         )
         self.assertIn("movies.example.com", viewer_allowed_hosts("https://movies.example.com"))
         self.assertIn(
+            "cartelera.example.com",
+            viewer_allowed_hosts("https://movies.example.com", "https://cartelera.example.com"),
+        )
+        self.assertIn(
             "https://movies.example.com", viewer_allowed_origins(8765, "https://movies.example.com")
         )
         with self.assertRaises(InvalidPublicOrigin):

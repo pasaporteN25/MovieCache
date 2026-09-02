@@ -32,6 +32,8 @@ services:
       - "8765"
       - --public-origin
       - ${MOVIE_INBOX_PUBLIC_ORIGIN:-http://localhost:8765}
+      - --public-presentation-origin
+      - ${MOVIE_INBOX_PUBLIC_PRESENTATION_ORIGIN:-}
       - --forwarded-allow-ips
       - ${MOVIE_INBOX_FORWARDED_ALLOW_IPS:-127.0.0.1}
       - --session-days

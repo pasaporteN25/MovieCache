@@ -2987,6 +2987,30 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(root.status_code, 200)
         self.assertEqual(response.status_code, 200, response.content)
 
+    def test_dedicated_presentation_host_is_allowed_but_cannot_submit_login(self) -> None:
+        proxy_config = replace(
+            self.config,
+            public_origin="https://inbox.example.com",
+            public_presentation_origin="https://cartelera.example.com",
+        )
+        with TestClient(
+            create_app(proxy_config), base_url="https://cartelera.example.com"
+        ) as client:
+            public_route = client.get("/p/not-a-real-capability")
+            login = client.post(
+                "/auth/login",
+                content=json.dumps({"username": "lucas", "password": self.owner_password}),
+                headers={
+                    "X-Movie-Inbox-Token": proxy_config.api_token,
+                    "Origin": "https://cartelera.example.com",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        self.assertEqual(public_route.status_code, 404)
+        self.assertEqual(login.status_code, 403)
+        self.assertEqual(login.json()["reason"], "invalid_origin")
+
     def test_json_body_limit_is_enforced(self) -> None:
         body = json.dumps({"id": "heat", "review": "x" * MAX_JSON_BODY_BYTES})
         status, payload = self.request("POST", "/api/personal", body, self.post_headers())

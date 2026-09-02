@@ -80,7 +80,8 @@ El proceso de aplicacion debe seguir escuchando solamente en loopback. `--public
   --member-catalog-dir /var/lib/movie-inbox/member-catalogs \
   --host 127.0.0.1 \
   --port 8765 \
-  --public-origin https://movies.example.com \
+  --public-origin https://inbox.example.com \
+  --public-presentation-origin https://cartelera.example.com \
   --forwarded-allow-ips 127.0.0.1 \
   --image-cache-dir /var/lib/movie-inbox/image-cache \
   --image-cache-total-mb 512 \
@@ -116,18 +117,140 @@ sudo systemctl status movie-inbox
 
 Antes de iniciarla hay que reemplazar dominio, rutas y usuario en la unidad. El healthcheck no devuelve rutas ni datos del catalogo.
 
-## Nginx y acceso
+## Nginx, HTTPS y acceso por Internet
 
-La plantilla [nginx.movie-inbox.conf.example](../deploy/nginx.movie-inbox.conf.example) termina HTTPS, limita el cuerpo a 2 MB, preserva el `Host` publico y reenvia headers al proceso local. Movie Inbox presenta su propio login; `auth_basic` puede agregarse como una segunda barrera, pero no es necesario para el flujo normal.
+La configuración soportada usa **dos nombres HTTPS** que terminan en el mismo Nginx
+local y un solo proceso Movie Inbox en loopback:
+
+| Host | Expone | No expone |
+| --- | --- | --- |
+| `inbox.example.com` | Login, aplicación autenticada, API privada e imágenes cacheadas | `/p/` y `/public/` |
+| `cartelera.example.com` | Solo `/p/{capacidad}`, `/public/v1/...` y los tres assets de la cartelera | Login, `/api/`, Club, catálogo, imágenes cacheadas y el bundle general |
+
+El segundo host no es una forma de iniciar sesión alternativa: su única finalidad es
+mantener la capacidad pública fuera del origen que contiene la cookie privada. Ambos
+nombres deben resolver hacia el servidor y aceptar TCP 80/443. HTTP-01 de Let's
+Encrypt usa estrictamente el puerto 80; si no se puede abrir, hay que optar por DNS-01,
+no desviar el servicio a un puerto no estándar. [Documentación de desafíos de Let's
+Encrypt](https://letsencrypt.org/docs/challenge-types/).
+
+### 1. Preparar el proceso y el DNS
+
+Usar los nombres reales en la unidad y reiniciar antes de poner Nginx en producción:
 
 ```bash
-sudo cp deploy/nginx.movie-inbox.conf.example /etc/nginx/sites-available/movie-inbox
-sudo ln -s /etc/nginx/sites-available/movie-inbox /etc/nginx/sites-enabled/movie-inbox
+sudoedit /etc/systemd/system/movie-inbox.service
+sudo systemctl daemon-reload
+sudo systemctl restart movie-inbox
+curl --fail http://127.0.0.1:8765/healthz
+```
+
+La línea `ExecStart` debe conservar `--host 127.0.0.1` y declarar ambos orígenes:
+
+```text
+--public-origin https://inbox.example.com \
+--public-presentation-origin https://cartelera.example.com \
+--forwarded-allow-ips 127.0.0.1
+```
+
+El segundo argumento amplía solamente la allowlist de `Host` de la app para que Nginx
+pueda entregarle la cartelera; login, CSRF y las escrituras siguen aceptando únicamente
+`--public-origin`. Nunca usar `*` en `--forwarded-allow-ips`: Nginx sobrescribe
+`X-Forwarded-For` con la IP que recibió y Uvicorn confía solo en el proxy loopback.
+
+### 2. Emitir el certificado sin publicar la app HTTP
+
+En Debian/Ubuntu instalar Nginx, Certbot y crear un webroot que no pertenece al repo ni
+a la aplicación:
+
+```bash
+sudo apt install nginx certbot
+sudo install -d -o root -g root -m 0755 /var/lib/letsencrypt
+sudo cp deploy/nginx.movie-inbox.http-bootstrap.conf.example \
+  /etc/nginx/sites-available/movie-inbox
+sudo ln -s /etc/nginx/sites-available/movie-inbox \
+  /etc/nginx/sites-enabled/movie-inbox
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-Movie Inbox autentica la cuenta antes de entregar el visor. La cookie de sesion es `HttpOnly`, `SameSite=Strict` y `Secure` bajo este origen HTTPS; el token opaco nunca aparece en la URL y SQLite guarda solamente su hash. El token anti-CSRF, la validacion de `Origin` y la sesion se exigen juntos. Uvicorn no registra access logs y Nginx omite el log del proxy de imagenes para no guardar URLs del catalogo.
+Reemplazar los dos dominios de la plantilla antes de copiarla. El bootstrap responde
+solo a `/.well-known/acme-challenge/` y devuelve `404` para todo lo demás, por lo que
+no deja una app HTTP expuesta mientras se emite el primer certificado.
+
+```bash
+sudo certbot certonly --webroot -w /var/lib/letsencrypt \
+  --cert-name movie-inbox \
+  -d inbox.example.com -d cartelera.example.com
+```
+
+El nombre `movie-inbox` es el directorio del certificado compartido por los dos SAN,
+no un hostname. Verificar los nombres que Certbot muestra antes de continuar.
+
+### 3. Activar el proxy de dos hosts
+
+Instalar [nginx.movie-inbox.conf.example](../deploy/nginx.movie-inbox.conf.example),
+reemplazando los dominios de ejemplo, y validar antes de recargar:
+
+```bash
+sudo cp deploy/nginx.movie-inbox.conf.example /etc/nginx/sites-available/movie-inbox
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+La plantilla conserva `Host`, `X-Forwarded-Host` y el esquema HTTPS para el proceso
+local. Sobrescribe —no concatena— `X-Forwarded-For` con `$remote_addr`, para que un
+cliente de Internet no pueda falsificar su IP ante los límites de login o cartelera.
+Nginx documenta `proxy_set_header` y las cabeceras por defecto en su [módulo de
+proxy](https://nginx.org/en/docs/http/ngx_http_proxy_module.html).
+
+Las rutas de capacidad tienen `access_log off` en ambos hosts; una URL compartida no
+termina en el access log de Nginx. La cartelera tampoco acepta el bundle general: solo
+sus CSS y JavaScript mínimos. Actualmente Movie Inbox no usa WebSocket, por lo que la
+plantilla no reenvía `Upgrade` ni `Connection: upgrade`; agregarlo sin una función que
+lo requiera ensancharía la superficie innecesariamente.
+
+La cabecera HSTS queda comentada deliberadamente. Habilitarla solo después de comprobar
+ambos nombres por HTTPS y de decidir que no se volverá a servir HTTP; para revertir una
+política ya publicada se envía temporalmente `max-age=0` desde HTTPS.
+
+### 4. Renovar y diagnosticar
+
+Crear un hook de despliegue para que Nginx relea certificados renovados:
+
+```bash
+sudo install -d -m 0755 /etc/letsencrypt/renewal-hooks/deploy
+printf '%s\n' '#!/bin/sh' 'systemctl reload nginx' | \
+  sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx >/dev/null
+sudo chmod 700 /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
+sudo certbot renew --dry-run
+```
+
+Certbot ejecuta los deploy hooks solamente cuando una renovación se completa; el
+`--dry-run` confirma el recorrido sin consumir el certificado real. Consultar el timer
+instalado por la distribución (`systemctl list-timers | grep certbot`) y sus registros
+si una renovación falla. [Documentación de Certbot](https://eff-certbot.readthedocs.io/).
+
+Después de cada cambio, estas comprobaciones deben pasar:
+
+```bash
+sudo ss -ltnp | grep 8765                 # solo 127.0.0.1:8765 o [::1]:8765
+curl --fail https://inbox.example.com/healthz
+curl -I https://cartelera.example.com/api/items       # 404 de Nginx
+curl -I https://inbox.example.com/p/capacidad-falsa   # 404 de Nginx
+curl -I https://cartelera.example.com/p/capacidad-falsa  # 404 uniforme de la app
+sudo nginx -T
+```
+
+No copiar una capacidad real en una terminal compartida ni en un ticket: aunque Nginx
+no la registra, el historial de shell podría conservarla. El diagnóstico de una URL
+real se realiza creando una capacidad temporal y revocándola inmediatamente después.
+
+Movie Inbox autentica la cuenta antes de entregar el visor privado. La cookie de sesión
+es `HttpOnly`, `SameSite=Strict` y `Secure` bajo el origen HTTPS; el token opaco nunca
+aparece en la URL y SQLite guarda solamente su hash. El token anti-CSRF, la validación
+de `Origin` y la sesión se exigen juntos. Uvicorn no registra access logs y Nginx omite
+el log del proxy de imágenes para no guardar URLs del catálogo.
 
 ## Checklist de publicacion
 

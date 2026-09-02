@@ -9,7 +9,7 @@ User=movie-inbox
 Group=movie-inbox
 WorkingDirectory=/opt/movie-inbox
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/movie-inbox/.venv/bin/movie-inbox serve /var/lib/movie-inbox/movie-inbox.db --instance-db /var/lib/movie-inbox/instance.db --member-catalog-dir /var/lib/movie-inbox/member-catalogs --host 127.0.0.1 --port 8765 --public-origin https://movies.example.com --forwarded-allow-ips 127.0.0.1 --image-cache-dir /var/lib/movie-inbox/image-cache --image-cache-total-mb 512 --library-root /srv/media/peliculas --no-open
+ExecStart=/opt/movie-inbox/.venv/bin/movie-inbox serve /var/lib/movie-inbox/movie-inbox.db --instance-db /var/lib/movie-inbox/instance.db --member-catalog-dir /var/lib/movie-inbox/member-catalogs --host 127.0.0.1 --port 8765 --public-origin https://inbox.example.com --public-presentation-origin https://cartelera.example.com --forwarded-allow-ips 127.0.0.1 --image-cache-dir /var/lib/movie-inbox/image-cache --image-cache-total-mb 512 --library-root /srv/media/peliculas --no-open
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30

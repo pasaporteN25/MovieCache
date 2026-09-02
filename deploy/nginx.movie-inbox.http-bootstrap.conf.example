@@ -1,0 +1,26 @@
+# Install this HTTP-only configuration first, obtain the certificate, then replace it
+# with nginx.movie-inbox.conf.example. Replace both names before using it.
+
+server {
+    listen 80;
+    server_name inbox.example.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/letsencrypt;
+        default_type text/plain;
+    }
+
+    location / { return 404; }
+}
+
+server {
+    listen 80;
+    server_name cartelera.example.com;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/lib/letsencrypt;
+        default_type text/plain;
+    }
+
+    location / { return 404; }
+}

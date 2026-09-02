@@ -42,6 +42,10 @@ class ServerCliTests(unittest.TestCase):
                         str(media),
                         "--image-cache-warm-interval-seconds",
                         "4",
+                        "--public-origin",
+                        "https://inbox.example.com",
+                        "--public-presentation-origin",
+                        "HTTPS://Cartelera.Example.com:443/",
                         "--no-open",
                     ]
                 )
@@ -57,6 +61,11 @@ class ServerCliTests(unittest.TestCase):
             self.assertEqual(app.state.viewer_config.library_allowed_roots, (str(media.resolve()),))
             self.assertTrue(app.state.viewer_config.image_cache_warm)
             self.assertEqual(app.state.viewer_config.image_cache_warm_interval_seconds, 4)
+            self.assertEqual(app.state.viewer_config.public_origin, "https://inbox.example.com")
+            self.assertEqual(
+                app.state.viewer_config.public_presentation_origin,
+                "https://cartelera.example.com",
+            )
 
     def test_non_loopback_bind_requires_public_origin(self) -> None:
         with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as raised:

@@ -128,8 +128,9 @@ el ciclo Docker completo con estado persistente y backup privado.
 ### Próximos incrementos propuestos
 
 - **v0.7.0** cierra la exposición segura de una instancia personal: [W1]/[W2] ya
-  entregaron la cartelera pública opt-in; [D1] documenta HTTPS/reverse proxy y [W3]
-  define el intercambio entre homeservers sin introducir un servicio central.
+  entregaron la cartelera pública opt-in; [D1.1]/[D1.2] ya fijaron HTTPS/reverse proxy
+  y queda su prueba descartable [D1.3]; [W3] define el intercambio entre homeservers
+  sin introducir un servicio central.
 - **v0.8.0** queda reservado para [U1], un refactor de Inicio con la variante A como
   selector fijo navegable por flechas/Enter y la variante C como estanterías
   horizontales de VHS. La dirección visual generada es referencia; los assets y el

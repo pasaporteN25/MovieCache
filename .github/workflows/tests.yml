@@ -115,6 +115,27 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Validate Nginx proxy templates
+        shell: bash
+        run: |
+          nginx_test_dir="$(mktemp -d)"
+          trap 'rm -rf "$nginx_test_dir"' EXIT
+          mkdir -p "$nginx_test_dir/conf.d" "$nginx_test_dir/live/movie-inbox"
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -keyout "$nginx_test_dir/live/movie-inbox/privkey.pem" \
+            -out "$nginx_test_dir/live/movie-inbox/fullchain.pem" \
+            -subj '/CN=movie-inbox.test' >/dev/null 2>&1
+          cp deploy/nginx.movie-inbox.http-bootstrap.conf.example \
+            "$nginx_test_dir/conf.d/movie-inbox.conf"
+          docker run --rm \
+            -v "$nginx_test_dir/conf.d:/etc/nginx/conf.d:ro" \
+            nginx:stable-alpine nginx -t
+          cp deploy/nginx.movie-inbox.conf.example \
+            "$nginx_test_dir/conf.d/movie-inbox.conf"
+          docker run --rm \
+            -v "$nginx_test_dir/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$nginx_test_dir/live/movie-inbox:/etc/letsencrypt/live/movie-inbox:ro" \
+            nginx:stable-alpine nginx -t
       - name: Prepare isolated Docker inputs
         shell: bash
         run: |

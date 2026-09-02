@@ -31,7 +31,7 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 5 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
 | 6 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea.
+- **En curso:** [D1.3], pendiente de ejecutar la validación Nginx descartable en CI.
 - **Cerrado recientemente:** [C2], [W1] y [W2]. El detalle verificable permanece en
   `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
@@ -63,13 +63,13 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 
 ### Frente: Superficie publica y despliegue
 
-#### [D1] Documentar HTTPS guiado para homeservers
-- **Alcance**: receta soportada para reverse proxy (primero Nginx), certificados,
-  headers, WebSocket si aplica, renovacion y diagnostico; Movie Inbox no termina TLS.
-- **Criterio de cierre**: configuracion de ejemplo validada en un entorno descartable y
-  checklist que no exponga el servicio accidentalmente.
-- **Depende de**: —
-- **Modelo sugerido**: Medio. Documentacion operativa con impacto de seguridad.
+#### [D1.3] Ejecutar la validacion descartable de la receta Nginx
+- **Alcance**: comprobar en CI el bootstrap HTTP y la configuración HTTPS con un
+  certificado efímero, y registrar el resultado del primer pipeline que la ejecute.
+- **Criterio de cierre**: ambos `nginx -t` pasan dentro de un contenedor temporal y el
+  checklist de release conserva la comprobación de hosts, loopback y renovación.
+- **Depende de**: [D1.1], [D1.2].
+- **Modelo sugerido**: Chico. Validación reproducible ya preparada; no cambia datos.
 
 #### [W3] Disenar paquetes compartibles y sincronizacion entre homeservers
 - **Alcance**: casos de uso, identidad de instancia, export/import firmado o manual,
@@ -169,6 +169,21 @@ Sin tareas activas.
 ## Hecho
 
 ### Frente: Superficie publica y despliegue
+
+#### [D1.1] Fijar la topología privada/pública de HTTPS
+**Cerrado 2026-09-01.** La receta soportada separa `inbox` (login y aplicación) de
+`cartelera` (solo `/p/`, `/public/` y tres assets mínimos), ambos detrás de Nginx y
+contra un único Uvicorn loopback. `--public-presentation-origin` permite ese segundo
+host en la allowlist de `Host`, pero no se agrega a los orígenes de login/CSRF. Las
+pruebas confirman que el host público admite una lectura anónima uniforme y rechaza el
+login con `invalid_origin`.
+
+#### [D1.2] Documentar proxy, certificado, renovación y diagnóstico
+**Cerrado 2026-09-01.** `docs/deployment.md` describe bootstrap ACME sin aplicación
+HTTP, certificado SAN, Nginx de dos hosts, cabeceras reenviadas sin spoofing de IP,
+HSTS opt-in, ausencia deliberada de WebSocket y hook de renovación. Las plantillas de
+Nginx restringen la cartelera a sus rutas/activos y quitan de los logs cualquier
+capacidad. Docker, systemd, `.env` y el checklist de release usan los nuevos orígenes.
 
 #### [W2.1] Persistir snapshots y separar la lectura publica
 Se suma la migracion de instancia v11 con `public_presentations`: guarda solo el hash

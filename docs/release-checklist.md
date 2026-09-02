@@ -96,6 +96,9 @@ Usar siempre la biblioteca descartable preparada para este gate.
 - Sin perdida de inventario ante offline, permisos o reinicio.
 - Rutas y fingerprints visibles solamente para el owner.
 - Backup completo con checksum verificable y restauracion de `instance.db` ensayada.
+- Si la candidata usa acceso por Internet: `nginx -t`, `certbot renew --dry-run`, el
+  proceso escucha solo en loopback y el host de cartelera devuelve `404` para `/api/`
+  mientras que el host privado devuelve `404` para `/p/`.
 - Sin errores nuevos en consola durante la secuencia principal.
 - Changelog, version de paquete y version runtime sincronizados.
 
