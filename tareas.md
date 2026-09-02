@@ -29,8 +29,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 3 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea; [D1] y [W3] ya tienen validacion y cierre verificables.
-- **Cerrado recientemente:** [C2], [D1], [W1], [W2] y [W3]. El detalle verificable
+- **En curso:** ninguna tarea; [D1], [W3] y [U1.1] ya tienen validacion y cierre verificables.
+- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3] y [U1.1]. El detalle verificable
   permanece en `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
@@ -70,16 +70,6 @@ un tema decorativo sino reorganizar Inicio: arriba la variante A como selector p
 y abajo la variante C como estanterías de descubrimiento. La cartelera pública puede
 adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado de
 [W1]/[W2] y nunca gana acciones privadas.
-
-#### [U1.1] Definir el selector fijo de Inicio a partir de la variante A
-- **Alcance**: reemplazar el carrusel actual por una lista/selector principal fija con
-  opciones navegables por flechas; Enter abre la información contextual de la opción
-  activa. Definir qué opciones reales representa, la selección inicial, foco, teclado,
-  lector de pantalla, móvil, carga y estados vacíos; no inventar navegación paralela.
-- **Criterio de cierre**: brief y prototipo navegable que demuestren que flechas,
-  Enter, Tab y toque llevan al mismo detalle sin ocultar la navegación existente.
-- **Depende de**: cierre publicado de v0.7.0.
-- **Modelo sugerido**: Grande. Cambia la jerarquía de Inicio y sus contratos de foco.
 
 #### [U1.2] Convertir la variante C en estanterías horizontales con señales reales
 - **Alcance**: diseñar varias filas desplazables horizontalmente debajo del selector:
@@ -149,6 +139,18 @@ adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado
 Sin tareas activas.
 
 ## Hecho
+
+### Frente: Inicio videoclub
+
+#### [U1.1] Definir el selector fijo de Inicio a partir de la variante A
+**Cerrado 2026-09-02, commit `f6a1c60`.** El carrusel inferior se reemplazó por un
+selector editorial fijo que gobierna una única ficha panorámica, sin tocar las secciones
+inferiores. `docs/briefs/home-selector-v1.md` fija el contrato: una a cuatro opciones,
+estado vacío existente, orden selector → ficha en móvil y ninguna ruta/dato nuevo. El
+selector usa botones nativos con roving tabindex; flechas, Home/End, Enter y clic
+actualizan la ficha y conservan el foco, mientras `Ver ficha` abre el dossier ya
+existente. `tests/browser/test_ui_browser.py` cubre foco, teclas, activación y ancho
+móvil; la suite de navegador completa quedó en verde.
 
 ### Frente: Superficie publica y despliegue
 
