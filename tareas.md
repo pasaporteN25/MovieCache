@@ -29,8 +29,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 3 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea; [D1], [W3] y [U1.1] ya tienen validacion y cierre verificables.
-- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3] y [U1.1]. El detalle verificable
+- **En curso:** ninguna tarea; [D1], [W3], [U1.1] y [U1.2] ya tienen validacion y cierre verificables.
+- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1.1] y [U1.2]. El detalle verificable
   permanece en `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
@@ -70,19 +70,6 @@ un tema decorativo sino reorganizar Inicio: arriba la variante A como selector p
 y abajo la variante C como estanterías de descubrimiento. La cartelera pública puede
 adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado de
 [W1]/[W2] y nunca gana acciones privadas.
-
-#### [U1.2] Convertir la variante C en estanterías horizontales con señales reales
-- **Alcance**: diseñar varias filas desplazables horizontalmente debajo del selector:
-  al menos `Disponible esta noche`, `Tu archivo pide memoria` y las demás categorías
-  que puedan sostenerse con datos existentes. Cada VHS muestra información mínima; al
-  seleccionarlo revela portada y ficha breve, y la acción explícita de expandir abre
-  la caja para detalle/edición. Definir fuentes de datos, prioridad, ausencia de filas
-  y límites de cantidad antes de programar.
-- **Criterio de cierre**: contrato por estantería (consulta, orden, vacío y destino),
-  más prototipo responsive que conserve scroll táctil y navegación por teclado.
-- **Depende de**: [U1.1].
-- **Modelo sugerido**: Grande. Une información editorial, gestos y edición sin mezclar
-  superficies ni estados personales.
 
 #### [U1.3] Crear un kit VHS reutilizable y aplicar el sistema por superficie
 - **Alcance**: abrir un trabajo de arte separado para producir el kit de activos
@@ -151,6 +138,18 @@ selector usa botones nativos con roving tabindex; flechas, Home/End, Enter y cli
 actualizan la ficha y conservan el foco, mientras `Ver ficha` abre el dossier ya
 existente. `tests/browser/test_ui_browser.py` cubre foco, teclas, activación y ancho
 móvil; la suite de navegador completa quedó en verde.
+
+#### [U1.2] Convertir la variante C en estanterías horizontales con señales reales
+**Cerrado 2026-09-02, commit `d5eae4b`.** `docs/briefs/home-shelves-v1.md` registra el
+contrato de las filas sin modificar `/api/items`: el orden y los datos provienen de
+`EditorialHomeService` (`available`, `followed`, `memory`, `route`/`recent` y
+`anniversary`), cada una conserva hasta seis obras, su razón y su destino existente;
+las vacías se omiten. La interfaz presenta etiquetas compactas en una tira horizontal
+con selección roving y una ficha breve de portada, procedencia, metadatos y acción
+explícita al detalle. Flechas, Home/End, Enter y clic actualizan la selección sin
+trampas de foco; móvil conserva scroll táctil dentro de la tira, no de la página. La
+prueba de navegador cubre esa interacción y el ancho; la caja VHS/activos reutilizables
+quedan deliberadamente para [U1.3].
 
 ### Frente: Superficie publica y despliegue
 
