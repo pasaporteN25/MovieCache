@@ -102,6 +102,25 @@ adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado
 - **Depende de**: [A1].
 - **Modelo sugerido**: Grande. Proyecto cliente multiplataforma potencial.
 
+  - [ ] **[A2.1] Fundacion Android y conexion segura.** Modulo Android nativo con
+    Kotlin/Compose, Hilt/KSP, Retrofit/OkHttp y serializacion; configuracion de URL HTTPS
+    por instancia, excepcion HTTP solo para loopback de debug, almacenamiento Keystore de
+    tokens y flujo de login/refresh/logout contra `/api/v1/auth/*`. Cierre: `assembleDebug`
+    y pruebas MockWebServer sin secretos en logs, memoria o backups.
+  - [ ] **[A2.2] Lectura del catalogo personal.** Estados Compose para catalogo paginado,
+    busqueda local y detalle, con loading/error/empty explicitos, Coil para imagenes y
+    disponibilidad solo lectura. Cierre: pruebas de repositorio y de UI para páginas,
+    cursor inválido, sesión vencida y campos desconocidos compatibles.
+  - [ ] **[A2.3] Edicion personal y gate de cliente.** Formulario de estado, fecha vista,
+    puntaje y review con `PATCH` parcial, manejo de conflicto/error y cierre de sesión;
+    matriz API/cliente, pruebas de rotación, recreación de Activity y configuración de
+    instancia. No agrega offline, Scanner, administración ni mutaciones compartidas.
+
+**Nota de arranque A2, 2026-09-02.** El checkout todavía no contiene un proyecto Android.
+La terminal disponible detecta Java 8 y no detecta Gradle ni `ANDROID_SDK_ROOT`; A2.1 debe
+ejecutarse en un entorno con JDK 17+ y Android SDK configurado antes de poder prometer un
+APK o una prueba de emulador reproducible.
+
 #### [I1] Evaluar Radarr, Sonarr y Letterboxd
 - **Alcance**: separar importacion, enlaces e inventario; revisar autenticacion,
   licencias, IDs, webhooks/rate limits y que datos personales saldrian de la instancia.
