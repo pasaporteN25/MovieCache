@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import json
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from movie_inbox.application.repository import CatalogRepository
@@ -394,6 +394,66 @@ class CatalogService:
             item["watched_at"] = normalize_date(watched_at)
             item["rating"] = normalize_rating(rating)
             item["review"] = review.strip()
+
+        return self._update_item(item_id, update)
+
+    def patch_personal(self, item_id: str, values: Mapping[str, Any]) -> tuple[bool, str]:
+        """Apply a partial personal-state edit without accepting metadata fields."""
+        if not item_id:
+            raise ValueError("Missing item id")
+        allowed = {"status", "watched_at", "rating", "review"}
+        requested = set(values)
+        if not requested or requested - allowed:
+            raise ValueError("Invalid personal fields")
+        status = ""
+        if "status" in values:
+            raw_status = values["status"]
+            if not isinstance(raw_status, str) or raw_status not in {"to_watch", "watched"}:
+                raise ValueError("Invalid status")
+            status = raw_status
+        watched_at: str | None = None
+        if "watched_at" in values:
+            raw_watched_at = values["watched_at"]
+            if raw_watched_at is not None and not isinstance(raw_watched_at, str):
+                raise ValueError("Invalid watched_at")
+            watched_at = normalize_date(raw_watched_at)
+            if raw_watched_at and not watched_at:
+                raise ValueError("Invalid watched_at")
+            if watched_at:
+                try:
+                    date.fromisoformat(watched_at)
+                except ValueError as error:
+                    raise ValueError("Invalid watched_at") from error
+        rating: int | None = None
+        if "rating" in values:
+            raw_rating = values["rating"]
+            if raw_rating is not None and (
+                not isinstance(raw_rating, int) or isinstance(raw_rating, bool)
+            ):
+                raise ValueError("Invalid rating")
+            rating = normalize_rating(raw_rating)
+        review: str | None = None
+        if "review" in values:
+            raw_review = values["review"]
+            if raw_review is not None and not isinstance(raw_review, str):
+                raise ValueError("Invalid review")
+            review = str(raw_review or "").strip()
+            if len(review) > 10_000:
+                raise ValueError("Review is too long")
+
+        def update(item: dict[str, Any]) -> None:
+            if status:
+                item["status"] = status
+                if status == "to_watch":
+                    item["watched_at"] = ""
+                elif "watched_at" not in values:
+                    item["watched_at"] = str(item.get("watched_at") or today_date())
+            if "watched_at" in values and status != "to_watch":
+                item["watched_at"] = watched_at or ""
+            if "rating" in values:
+                item["rating"] = rating or 0
+            if "review" in values:
+                item["review"] = review or ""
 
         return self._update_item(item_id, update)
 

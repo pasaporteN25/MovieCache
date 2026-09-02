@@ -89,9 +89,10 @@ adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado
     access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
     dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
     desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
-  - [ ] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
-    paginación/cursor, lectura de disponibilidad resumida, patch idempotente de estado
-    personal y fixtures cliente-servidor contra el contrato congelado.
+  - [x] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
+    paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
+    estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
+    expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
 
 #### [A2] Cliente Android basico
 - **Alcance**: login seguro, lectura/busqueda/detalle y edicion de estado, fecha vista,

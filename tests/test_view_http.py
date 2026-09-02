@@ -167,6 +167,131 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(attempts[5].json(), {"error": {"code": "too_many_attempts"}})
         self.assertGreater(int(attempts[5].headers["Retry-After"]), 0)
 
+    def test_device_catalog_contract_is_paginated_private_and_mutable(self) -> None:
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(
+            [
+                normalize_item(
+                    {
+                        "id": "akira",
+                        "title": "Akira",
+                        "year": "1988",
+                        "kind": "anime",
+                        "genres": ["Animacion"],
+                        "description": "Neo Tokio.",
+                        "local_path": "D:/private/Akira.mkv",
+                        "local_files": [{"path": "D:/private/Akira.mkv", "name": "Akira.mkv"}],
+                    }
+                ),
+                normalize_item(
+                    {
+                        "id": "heat",
+                        "title": "Heat",
+                        "year": "1995",
+                        "kind": "pelicula",
+                        "description": "Los Angeles.",
+                    }
+                ),
+                normalize_item({"id": "z", "title": "Z", "year": "1969"}),
+            ]
+        )
+        created = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {
+                    "username": "lucas",
+                    "password": self.owner_password,
+                    "device_name": "Pixel de Lucas",
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        headers = {"Authorization": f"Bearer {created.json()['access_token']}"}
+
+        me = self.client.get("/api/v1/me", headers=headers)
+        first_page = self.client.get("/api/v1/catalog/items?limit=1", headers=headers)
+        self.assertEqual(me.status_code, 200, me.content)
+        self.assertEqual(set(me.json()), {"user", "catalog"})
+        self.assertEqual(first_page.status_code, 200, first_page.content)
+        self.assertEqual(first_page.headers["X-Movie-Inbox-Api-Version"], "1")
+        self.assertEqual(first_page.json()["items"][0]["title"], "Akira")
+        self.assertIsNotNone(first_page.json()["next_cursor"])
+
+        second_page = self.client.get(
+            "/api/v1/catalog/items",
+            params={"limit": "2", "cursor": first_page.json()["next_cursor"]},
+            headers=headers,
+        )
+        self.assertEqual(second_page.status_code, 200, second_page.content)
+        heat = next(item for item in second_page.json()["items"] if item["title"] == "Heat")
+        self.assertNotEqual(heat["id"], "heat")
+        self.assertEqual(
+            set(heat),
+            {
+                "id",
+                "title",
+                "original_title",
+                "year",
+                "kind",
+                "description",
+                "image_url",
+                "genres",
+                "runtime_minutes",
+                "personal",
+                "availability",
+            },
+        )
+        self.assertNotIn("private", json.dumps(first_page.json()))
+        self.assertEqual(set(heat["availability"]), {"state", "count"})
+
+        detail = self.client.get(f"/api/v1/catalog/items/{heat['id']}", headers=headers)
+        search = self.client.get("/api/v1/search?q=Heat", headers=headers)
+        patched = self.client.patch(
+            f"/api/v1/catalog/items/{heat['id']}/personal",
+            content=json.dumps(
+                {
+                    "status": "watched",
+                    "watched_at": "2026-09-02",
+                    "rating": 9,
+                    "review": "Una noche intensa.",
+                }
+            ),
+            headers={**headers, "Content-Type": "application/json"},
+        )
+        cleared = self.client.patch(
+            f"/api/v1/catalog/items/{heat['id']}/personal",
+            content=json.dumps({"rating": None, "review": None}),
+            headers={**headers, "Content-Type": "application/json"},
+        )
+        invalid_cursor = self.client.get(
+            "/api/v1/catalog/items?cursor=not-a-cursor", headers=headers
+        )
+        self.assertEqual(detail.status_code, 200, detail.content)
+        self.assertEqual(search.status_code, 200, search.content)
+        self.assertEqual([item["title"] for item in search.json()["items"]], ["Heat"])
+        self.assertEqual(patched.status_code, 200, patched.content)
+        self.assertEqual(
+            patched.json()["personal"],
+            {
+                "status": "watched",
+                "watched_at": "2026-09-02",
+                "rating": 9,
+                "review": "Una noche intensa.",
+            },
+        )
+        self.assertEqual(cleared.status_code, 200, cleared.content)
+        self.assertIsNone(cleared.json()["personal"]["rating"])
+        self.assertIsNone(cleared.json()["personal"]["review"])
+        self.assertEqual(invalid_cursor.status_code, 400, invalid_cursor.content)
+        self.assertEqual(invalid_cursor.json(), {"error": {"code": "invalid_request"}})
+
+        persisted = JsonCatalogRepository(self.catalog_path, normalize_item).get("heat")
+        assert persisted is not None
+        self.assertEqual(
+            (persisted.status, persisted.watched_at, persisted.rating, persisted.review),
+            ("watched", "2026-09-02", 0, ""),
+        )
+
     def test_owner_can_browse_and_check_only_configured_library_paths(self) -> None:
         films = self.media_path / "Peliculas"
         films.mkdir()

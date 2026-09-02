@@ -307,6 +307,14 @@ def update_item_personal(
     return catalog_service(path).update_personal(item_id, watched_at, rating, review)
 
 
+def patch_item_personal(
+    path: Path,
+    item_id: str,
+    values: dict[str, Any],
+) -> tuple[bool, str]:
+    return catalog_service(path).patch_personal(item_id, values)
+
+
 def update_link_curation(path: Path, item_id: str, status: str) -> tuple[bool, str]:
     return catalog_service(path).update_link_curation(item_id, status)
 

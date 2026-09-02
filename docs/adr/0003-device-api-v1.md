@@ -87,7 +87,8 @@ desconocidos como no accionables. Las respuestas JSON incluyen
 ## Consecuencias
 
 A1.1 fijó el contrato. A1.2 implementó el almacenamiento y ciclo de vida de sesiones
-por dispositivo; A1.3 implementará los
-serializadores/rutas y las pruebas de compatibilidad contra esta especificación. A2
+por dispositivo; A1.3 implementó el serializador allowlist, cursores firmados,
+lectura/paginación/búsqueda local, disponibilidad resumida y `PATCH` idempotente de
+estado personal. Las pruebas HTTP verifican el contrato contra una instancia real. A2
 puede consumir solo una versión de A1 cerrada y no debe usar los endpoints web
 históricos como atajo.

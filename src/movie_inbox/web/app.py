@@ -94,6 +94,7 @@ from movie_inbox.web.routers import (
     club,
     curation,
     device_auth,
+    device_catalog,
     home,
     imports,
     integrations,
@@ -468,6 +469,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(integrations.router)
     app.include_router(search.router)
     app.include_router(device_auth.router)
+    app.include_router(device_catalog.router)
     app.include_router(public_presentations.router)
     # FastAPI >=0.139's include_router is lazy: app.routes holds _IncludedRouter
     # wrappers instead of the included APIRoute objects. Flatten once so app.routes
