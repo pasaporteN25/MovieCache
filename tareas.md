@@ -24,9 +24,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U1] | Inicio videoclub: selector A + estanterias C | cierre v0.7.0 |
-| 2 | [A1] | API versionada para dispositivos | D1 |
-| 3 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
+| 1 | [U2] | Inicio videoclub material: cartelera + estanterias de lomos | U1 |
+| 2 | [A2] | Cliente Android basico | A1 + entorno Android |
+| 3 | [I1] | Evaluacion de integraciones | A1 |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
 - **En curso:** ninguna tarea; [D1], [W3] y [U1] ya tienen validacion y cierre verificables.
@@ -61,15 +61,57 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 
 ### Frente: Superficie publica y despliegue
 
-### Frente: Inicio videoclub (candidato v0.8.0)
+### Frente: Inicio videoclub (siguiente entrega de interfaz)
 
 **Decisión 2026-09-01.** La lámina generada 1 es una referencia de dirección, no un
-asset ni contenido de la aplicación. El rediseño no comienza durante v0.7.0: primero
-se cierran [D1] y [W3] y se publica ese incremento. El objetivo posterior no es sumar
-un tema decorativo sino reorganizar Inicio: arriba la variante A como selector principal
-y abajo la variante C como estanterías de descubrimiento. La cartelera pública puede
-adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado de
-[W1]/[W2] y nunca gana acciones privadas.
+asset ni contenido de la aplicación. [U1] resolvió una primera versión navegable; [U2]
+la reemplaza visualmente antes de iniciar [A2]. El objetivo no es sumar un tema
+decorativo: Inicio debe sentirse como el videoclub material de la referencia, con una
+cartelera de lista y estanterías de lomos. La cartelera pública puede adoptar el sistema
+más adelante, pero conserva el contrato aislado de [W1]/[W2] y nunca gana acciones
+privadas. El brief durable, que permite trabajar aun si la lámina no está adjunta a una
+siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
+
+#### [U2] Reconstruir Inicio como videoclub material
+- **Alcance**: sustituir la composición visual de [U1] sin cambiar el contrato
+  editorial ni las rutas existentes. Arriba, una cartelera disponible de estética
+  nocturna con una lista navegable tipo WIMP; abajo, estanterías físicas cuyas obras
+  se ven de perfil. La selección revela una caja de frente y `Ver más` abre una ficha
+  material que contiene el cassette VHS y la información extendida.
+- **Criterio de cierre**: teclado, puntero, touch, foco, lector de pantalla y reducción
+  de movimiento permiten hacer el mismo recorrido; las portadas y textos siguen siendo
+  HTML/datos vivos; no se filtran rutas, fuentes privadas ni estado de otra persona; la
+  página funciona con una, cuatro o ninguna recomendación y se verifica en desktop y
+  móvil.
+- **Depende de**: [U1]. **Precede a**: [A2] por decisión de producto; no necesita
+  modificar su API ni bloquear una futura configuración del entorno Android.
+- **Modelo sugerido**: Grande. Cambia composición, objetos reutilizables, navegación y
+  detalle sobre varias superficies, con requisitos de accesibilidad y de assets.
+
+  - [ ] **[U2.1] Fijar y prototipar la cartelera-lista.** Reemplazar el panel actual por
+    una lista compacta de reproducción tipo WIMP, operable con flechas, Home/End y
+    Enter; sumar la ambientación original/licenciada `Noche de cine` y hacer visible
+    `Cartelera disponible`. La lista es la navegación primaria; click/tap se conservan
+    como alternativa, no como requisito. Cierre: brief, asset auditado, estados de
+    carga/vacío/error y pruebas de foco/teclado/móvil sin cambiar `/api/home`.
+  - [ ] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Mostrar las
+    obras de perfil sobre una repisa real, con título legible, disponibilidad y foco
+    inequívoco; al seleccionar una, revelar debajo o junto a la fila su caja frontal con
+    portada y el resumen breve. Mantener scroll táctil, roving tabindex y las acciones
+    editoriales actuales. Cierre: layout responsive con títulos largos, sin poster como
+    único portador de información, y pruebas visuales/de interacción.
+  - [ ] **[U2.3] Abrir la caja para el detalle extendido.** `Ver más` parte de la caja
+    frontal y abre una transición reversible hacia un dossier donde el cassette VHS
+    negro acompaña sinopsis, ficha y acciones existentes. La animación es decorativa,
+    se omite con `prefers-reduced-motion`, no bloquea Escape/foco y no duplica rutas ni
+    datos. Cierre: componente reutilizable, estados de carga/fallo de portada y pruebas
+    de navegación, diálogo y movimiento reducido.
+  - [ ] **[U2.4] Resolver la edición desde la ficha sin ambigüedad.** Diseñar y validar
+    una acción secundaria explícita (`Editar mi ficha` o equivalente) que entre al
+    editor actual o a un modo de edición del dossier según permisos. Seleccionar una
+    obra o abrir su caja nunca muta datos. Cierre: decisión documentada, flujos de obra
+    propia/obra de Club/solo lectura y pruebas de que no aparecen controles de escritura
+    donde no corresponden.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
