@@ -111,6 +111,63 @@ class IdentityTests(unittest.TestCase):
             now[0] = 1_061.0
             self.assertIsNone(service.authenticate(token))
 
+    def test_device_tokens_are_hashed_rotated_and_revocable_independently(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            now = [1_000.0]
+            root = Path(temporary)
+            catalog_path = root / "catalog.json"
+            JsonCatalogRepository(catalog_path, normalize_item).write([])
+            database = root / "instance.db"
+            service = AuthService(
+                SqliteIdentityRepository(database),
+                clock=lambda: now[0],
+                device_access_ttl_seconds=60,
+                device_refresh_ttl_seconds=300,
+            )
+            service.bootstrap_owner(
+                "owner",
+                "a-long-local-password",
+                catalog_name="Mi catalogo",
+                source_paths=[str(catalog_path)],
+                write_path=str(catalog_path),
+            )
+
+            session = service.login_device("owner", "a-long-local-password", "Pixel de Lucas")
+            self.assertIsNotNone(service.authenticate_device(session.access_token))
+            with closing(sqlite3.connect(database)) as connection:
+                access_hash, refresh_hash, device_name = connection.execute(
+                    "SELECT access_token_hash, refresh_token_hash, device_name FROM device_sessions"
+                ).fetchone()
+            self.assertEqual(device_name, "Pixel de Lucas")
+            self.assertEqual(access_hash, session_token_hash(session.access_token))
+            self.assertEqual(refresh_hash, session_token_hash(session.refresh_token))
+            self.assertNotEqual(access_hash, session.access_token)
+            self.assertNotEqual(refresh_hash, session.refresh_token)
+
+            now[0] = 1_010.0
+            rotated = service.refresh_device_session(session.refresh_token)
+            assert rotated is not None
+            self.assertNotEqual(rotated.access_token, session.access_token)
+            self.assertNotEqual(rotated.refresh_token, session.refresh_token)
+            self.assertIsNone(service.authenticate_device(session.access_token))
+            self.assertIsNone(service.refresh_device_session(session.refresh_token))
+            self.assertIsNotNone(service.authenticate_device(rotated.access_token))
+
+            service.logout_device(rotated.access_token)
+            self.assertIsNone(service.authenticate_device(rotated.access_token))
+            self.assertIsNone(service.refresh_device_session(rotated.refresh_token))
+
+            password_token, password_identity = service.login("owner", "a-long-local-password")
+            replacement = service.login_device("owner", "a-long-local-password", "Tablet de Lucas")
+            service.change_password(
+                password_identity,
+                "a-long-local-password",
+                "a-different-local-password",
+            )
+            self.assertIsNone(service.authenticate(password_token))
+            self.assertIsNone(service.authenticate_device(replacement.access_token))
+            self.assertIsNone(service.refresh_device_session(replacement.refresh_token))
+
     def test_catalog_binding_cannot_be_silently_replaced(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -234,7 +291,7 @@ class IdentityTests(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
-            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
             self.assertIn("user_privacy_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
@@ -249,6 +306,7 @@ class IdentityTests(unittest.TestCase):
             self.assertIn("import_draft_items", tables)
             self.assertIn("home_featured_snapshots", tables)
             self.assertIn("public_presentations", tables)
+            self.assertIn("device_sessions", tables)
 
     def test_v7_scanner_history_is_repaired_without_losing_existing_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -305,7 +363,7 @@ class IdentityTests(unittest.TestCase):
                     "FROM scanner_history"
                 ).fetchone()
 
-            self.assertEqual(version, 11)
+            self.assertEqual(version, 12)
             self.assertTrue(
                 {"catalog_before_json", "catalog_after_json", "catalog_path"} <= columns
             )

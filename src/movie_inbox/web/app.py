@@ -81,12 +81,19 @@ from movie_inbox.web.dependencies import (
     set_auth_cookie,
 )
 from movie_inbox.web.image_warmer import ImageCacheWarmer
-from movie_inbox.web.responses import ApiRequestError, error_response, identity_payload
+from movie_inbox.web.responses import (
+    ApiRequestError,
+    DeviceApiRequestError,
+    device_error_response,
+    error_response,
+    identity_payload,
+)
 from movie_inbox.web.routers import (
     admin,
     catalog,
     club,
     curation,
+    device_auth,
     home,
     imports,
     integrations,
@@ -272,6 +279,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.library_scheduler = library_scheduler
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
+    app.state.device_login_limiter = login_limiter
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=viewer_allowed_hosts(config.public_origin, config.public_presentation_origin),
@@ -319,6 +327,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
             response = error_response("authentication_required", 401)
         else:
             response = await call_next(request)
+        if path.startswith("/api/v1/"):
+            response.headers.setdefault("X-Movie-Inbox-Api-Version", "1")
         return apply_security_headers(response)
 
     def apply_security_headers(response: Response) -> Response:
@@ -329,6 +339,8 @@ def create_app(config: ViewerConfig) -> FastAPI:
 
     @app.exception_handler(ApiRequestError)
     async def api_request_error(_: Request, error: ApiRequestError) -> JSONResponse:
+        if isinstance(error, DeviceApiRequestError):
+            return device_error_response(error)
         return error_response(error.reason, error.status_code)
 
     @app.get("/healthz")
@@ -455,6 +467,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(admin.router)
     app.include_router(integrations.router)
     app.include_router(search.router)
+    app.include_router(device_auth.router)
     app.include_router(public_presentations.router)
     # FastAPI >=0.139's include_router is lazy: app.routes holds _IncludedRouter
     # wrappers instead of the included APIRoute objects. Flatten once so app.routes

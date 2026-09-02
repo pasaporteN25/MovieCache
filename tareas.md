@@ -85,9 +85,10 @@ adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado
     HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
     patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
     prueba de que la superficie y la serialización no heredan rutas o paths internos.
-  - [ ] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
+  - [x] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
     access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
-    dependencias Bearer que no acepten cookie ni el token CSRF web.
+    dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
+    desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
   - [ ] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
     paginación/cursor, lectura de disponibilidad resumida, patch idempotente de estado
     personal y fixtures cliente-servidor contra el contrato congelado.

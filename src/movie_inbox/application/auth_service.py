@@ -8,6 +8,7 @@ import hmac
 import secrets
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from movie_inbox.application.identity_repository import IdentityRepository
 from movie_inbox.domain.identity import (
@@ -21,6 +22,8 @@ PASSWORD_MIN_LENGTH = 12
 PASSWORD_MAX_LENGTH = 1024
 SESSION_TOKEN_BYTES = 48
 DEFAULT_SESSION_TTL_SECONDS = 14 * 24 * 60 * 60
+DEFAULT_DEVICE_ACCESS_TTL_SECONDS = 15 * 60
+DEFAULT_DEVICE_REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60
 SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
@@ -33,6 +36,21 @@ class AuthenticationError(ValueError):
 
 class PasswordPolicyError(ValueError):
     """Raised when a password does not meet the local policy."""
+
+
+class PasswordChangeRequiredError(ValueError):
+    """Raised when a device cannot bypass the mandatory web password change."""
+
+
+@dataclass(frozen=True)
+class DeviceSession:
+    """Plain device credentials returned once; persistence only receives their hashes."""
+
+    access_token: str
+    refresh_token: str
+    identity: AuthenticatedIdentity
+    access_expires_at: int
+    refresh_expires_at: int
 
 
 class PasswordHasher:
@@ -86,11 +104,18 @@ class AuthService:
         repository: IdentityRepository,
         *,
         session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS,
+        device_access_ttl_seconds: int = DEFAULT_DEVICE_ACCESS_TTL_SECONDS,
+        device_refresh_ttl_seconds: int = DEFAULT_DEVICE_REFRESH_TTL_SECONDS,
         clock: Callable[[], float] = time.time,
         hasher: PasswordHasher | None = None,
     ) -> None:
         self.repository = repository
         self.session_ttl_seconds = max(60, int(session_ttl_seconds))
+        self.device_access_ttl_seconds = max(60, int(device_access_ttl_seconds))
+        self.device_refresh_ttl_seconds = max(
+            self.device_access_ttl_seconds + 60,
+            int(device_refresh_ttl_seconds),
+        )
         self.clock = clock
         self.hasher = hasher or PasswordHasher()
         self._dummy_hash = self.hasher.hash("movie-inbox-dummy-password")
@@ -115,6 +140,58 @@ class AuthService:
         )
 
     def login(self, username: str, password: str) -> tuple[str, AuthenticatedIdentity]:
+        user, catalog = self._authenticated_user(username, password)
+        return self._create_session(user, catalog)
+
+    def login_device(self, username: str, password: str, device_name: str) -> DeviceSession:
+        user, catalog = self._authenticated_user(username, password)
+        if user.must_change_password:
+            raise PasswordChangeRequiredError("password_change_required")
+        return self._create_device_session(user, catalog, validate_device_name(device_name))
+
+    def refresh_device_session(self, refresh_token: str) -> DeviceSession | None:
+        if not refresh_token or len(refresh_token) > 512:
+            return None
+        now = int(self.clock())
+        access_expires_at = now + self.device_access_ttl_seconds
+        refresh_expires_at = now + self.device_refresh_ttl_seconds
+        access_token = secrets.token_urlsafe(SESSION_TOKEN_BYTES)
+        next_refresh_token = secrets.token_urlsafe(SESSION_TOKEN_BYTES)
+        identity = self.repository.rotate_device_session(
+            session_token_hash(refresh_token),
+            session_token_hash(access_token),
+            session_token_hash(next_refresh_token),
+            now,
+            access_expires_at,
+            refresh_expires_at,
+        )
+        if identity is None or identity.user.must_change_password:
+            return None
+        return DeviceSession(
+            access_token,
+            next_refresh_token,
+            identity,
+            access_expires_at,
+            refresh_expires_at,
+        )
+
+    def authenticate_device(self, access_token: str) -> AuthenticatedIdentity | None:
+        if not access_token or len(access_token) > 512:
+            return None
+        now = int(self.clock())
+        token_hash = session_token_hash(access_token)
+        identity = self.repository.device_session_identity(token_hash, now)
+        if identity is not None:
+            self.repository.touch_device_session(token_hash, now)
+        return identity
+
+    def logout_device(self, access_token: str) -> None:
+        if access_token and len(access_token) <= 512:
+            self.repository.delete_device_session(session_token_hash(access_token))
+
+    def _authenticated_user(
+        self, username: str, password: str
+    ) -> tuple[UserAccount, PersonalCatalog]:
         try:
             normalized_username = normalize_username(username)
         except ValueError:
@@ -135,7 +212,7 @@ class AuthService:
         catalog = self.repository.default_catalog_for(user.id)
         if catalog is None:
             raise AuthenticationError("catalog_unavailable")
-        return self._create_session(user, catalog)
+        return user, catalog
 
     def change_password(
         self,
@@ -177,6 +254,34 @@ class AuthService:
         self.repository.save_session(session_token_hash(token), user.id, now, expires_at)
         return token, AuthenticatedIdentity(user=user, catalog=catalog, expires_at=expires_at)
 
+    def _create_device_session(
+        self,
+        user: UserAccount,
+        catalog: PersonalCatalog,
+        device_name: str,
+    ) -> DeviceSession:
+        now = int(self.clock())
+        access_expires_at = now + self.device_access_ttl_seconds
+        refresh_expires_at = now + self.device_refresh_ttl_seconds
+        access_token = secrets.token_urlsafe(SESSION_TOKEN_BYTES)
+        refresh_token = secrets.token_urlsafe(SESSION_TOKEN_BYTES)
+        self.repository.save_device_session(
+            session_token_hash(access_token),
+            session_token_hash(refresh_token),
+            user.id,
+            device_name,
+            now,
+            access_expires_at,
+            refresh_expires_at,
+        )
+        return DeviceSession(
+            access_token,
+            refresh_token,
+            AuthenticatedIdentity(user=user, catalog=catalog, expires_at=access_expires_at),
+            access_expires_at,
+            refresh_expires_at,
+        )
+
     def authenticate(self, token: str) -> AuthenticatedIdentity | None:
         if not token or len(token) > 512:
             return None
@@ -200,6 +305,13 @@ def validate_password(password: str) -> str:
         )
     if len(value) > PASSWORD_MAX_LENGTH:
         raise PasswordPolicyError("Password is too long")
+    return value
+
+
+def validate_device_name(device_name: str) -> str:
+    value = str(device_name or "").strip()
+    if not 1 <= len(value) <= 80 or any(ord(character) < 32 for character in value):
+        raise ValueError("invalid_device_name")
     return value
 
 

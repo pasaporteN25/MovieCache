@@ -139,6 +139,35 @@ class IdentityRepository(Protocol):
 
     def delete_user_sessions(self, user_id: str) -> int: ...
 
+    def save_device_session(
+        self,
+        access_token_hash: str,
+        refresh_token_hash: str,
+        user_id: str,
+        device_name: str,
+        created_at: int,
+        access_expires_at: int,
+        refresh_expires_at: int,
+    ) -> None: ...
+
+    def device_session_identity(
+        self, access_token_hash: str, now: int
+    ) -> AuthenticatedIdentity | None: ...
+
+    def rotate_device_session(
+        self,
+        refresh_token_hash: str,
+        access_token_hash: str,
+        next_refresh_token_hash: str,
+        now: int,
+        access_expires_at: int,
+        refresh_expires_at: int,
+    ) -> AuthenticatedIdentity | None: ...
+
+    def touch_device_session(self, access_token_hash: str, seen_at: int) -> None: ...
+
+    def delete_device_session(self, access_token_hash: str) -> None: ...
+
     def owner(self) -> UserAccount | None: ...
 
     def validate_owner_catalog(

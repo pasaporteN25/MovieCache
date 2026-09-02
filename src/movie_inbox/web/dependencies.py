@@ -13,6 +13,7 @@ from fastapi import Depends, Request, Response
 from movie_inbox.application.collection_repository import CollectionRepositoryError
 from movie_inbox.application.curation_workflow import CatalogPointer
 from movie_inbox.application.home_service import EditorialHomeService, home_image_items
+from movie_inbox.application.identity_repository import IdentityRepositoryError
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.privacy import ItemPrivacyOverride
 from movie_inbox.infrastructure.home_snapshot_repository import HomeSnapshotRepositoryError
@@ -24,7 +25,12 @@ from movie_inbox.web.catalog_api import (
     write_path_for,
 )
 from movie_inbox.web.config import ViewerConfig
-from movie_inbox.web.responses import MAX_IMPORT_BODY_BYTES, ApiRequestError, read_json_object
+from movie_inbox.web.responses import (
+    MAX_IMPORT_BODY_BYTES,
+    ApiRequestError,
+    DeviceApiRequestError,
+    read_json_object,
+)
 from movie_inbox.web.security import viewer_allowed_origins
 
 AUTH_SESSION_COOKIE = "movie_inbox_auth"
@@ -165,6 +171,41 @@ async def login_json(request: Request) -> dict[str, Any]:
     require_token(request)
     require_origin(request)
     return await read_json_object(request)
+
+
+async def device_json(request: Request) -> dict[str, Any]:
+    """Read a device body without inheriting browser CSRF requirements."""
+    try:
+        return await read_json_object(request)
+    except ApiRequestError as error:
+        raise DeviceApiRequestError("invalid_request", 400) from error
+
+
+def require_device_identity(request: Request) -> AuthenticatedIdentity:
+    authorization = str(request.headers.get("Authorization") or "")
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.casefold() != "bearer" or not separator or not token or " " in token:
+        raise DeviceApiRequestError(
+            "device_authentication_required",
+            401,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        identity = cast(
+            AuthenticatedIdentity | None,
+            request.app.state.auth_service.authenticate_device(token),
+        )
+    except IdentityRepositoryError as error:
+        raise DeviceApiRequestError("identity_store_unavailable", 503) from error
+    if identity is None:
+        raise DeviceApiRequestError(
+            "device_session_invalid",
+            401,
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
+        )
+    if identity.user.must_change_password:
+        raise DeviceApiRequestError("password_change_required", 403)
+    return identity
 
 
 def history_session_id(request: Request) -> str:
@@ -319,12 +360,12 @@ def requires_authentication(path: str) -> bool:
         or path == "/image-cache"
         or path == "/auth/change-password"
         or path == "/auth/logout"
-        or path.startswith("/api/")
+        or (path.startswith("/api/") and not path.startswith("/api/v1/"))
     )
 
 
 def blocked_until_password_change(path: str) -> bool:
-    if path.startswith("/static/") or path == "/healthz":
+    if path.startswith("/static/") or path.startswith("/api/v1/") or path == "/healthz":
         return False
     return path not in {
         "/login",

@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 11
+INSTANCE_SCHEMA_VERSION = 12
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -348,6 +348,23 @@ CREATE INDEX ix_public_presentations_owner_updated
 ON public_presentations(owner_user_id, updated_at DESC);
 """
 
+INSTANCE_SCHEMA_V12 = """
+CREATE TABLE device_sessions (
+    access_token_hash TEXT PRIMARY KEY,
+    refresh_token_hash TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_name TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    access_expires_at INTEGER NOT NULL,
+    refresh_expires_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    CHECK (access_expires_at < refresh_expires_at)
+);
+CREATE INDEX ix_device_sessions_user ON device_sessions(user_id);
+CREATE INDEX ix_device_sessions_refresh_expiry
+ON device_sessions(refresh_token_hash, refresh_expires_at);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -359,6 +376,7 @@ INSTANCE_MIGRATIONS = {
     9: ("per-library exclusion rules", INSTANCE_SCHEMA_V9),
     10: ("shared library availability collections", INSTANCE_SCHEMA_V10),
     11: ("revocable public availability presentations", INSTANCE_SCHEMA_V11),
+    12: ("revocable opaque device sessions", INSTANCE_SCHEMA_V12),
 }
 
 
@@ -555,6 +573,9 @@ class SqliteIdentityRepository:
                     )
                     if not active:
                         connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+                        connection.execute(
+                            "DELETE FROM device_sessions WHERE user_id = ?", (user_id,)
+                        )
                     updated = connection.execute(
                         "SELECT * FROM users WHERE id = ?", (user_id,)
                     ).fetchone()
@@ -803,6 +824,7 @@ class SqliteIdentityRepository:
                         connection.rollback()
                         raise IdentityNotFound("Account was not found")
                     connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+                    connection.execute("DELETE FROM device_sessions WHERE user_id = ?", (user_id,))
                     updated = connection.execute(
                         "SELECT * FROM users WHERE id = ?", (user_id,)
                     ).fetchone()
@@ -1055,13 +1077,181 @@ class SqliteIdentityRepository:
             try:
                 with closing(self._connect()) as connection:
                     self._initialize(connection)
-                    cursor = connection.execute(
+                    web_cursor = connection.execute(
                         "DELETE FROM sessions WHERE user_id = ?", (user_id,)
                     )
+                    device_cursor = connection.execute(
+                        "DELETE FROM device_sessions WHERE user_id = ?", (user_id,)
+                    )
                     connection.commit()
-                    return max(0, cursor.rowcount)
+                    return max(0, web_cursor.rowcount) + max(0, device_cursor.rowcount)
             except sqlite3.Error as error:
                 raise IdentityRepositoryError(f"Cannot clear sessions from: {self.path}") from error
+
+    def save_device_session(
+        self,
+        access_token_hash: str,
+        refresh_token_hash: str,
+        user_id: str,
+        device_name: str,
+        created_at: int,
+        access_expires_at: int,
+        refresh_expires_at: int,
+    ) -> None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    connection.execute(
+                        "DELETE FROM device_sessions WHERE refresh_expires_at <= ?",
+                        (created_at,),
+                    )
+                    connection.execute(
+                        """INSERT INTO device_sessions(
+                            access_token_hash, refresh_token_hash, user_id, device_name,
+                            created_at, access_expires_at, refresh_expires_at, last_seen_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            access_token_hash,
+                            refresh_token_hash,
+                            user_id,
+                            device_name,
+                            created_at,
+                            access_expires_at,
+                            refresh_expires_at,
+                            created_at,
+                        ),
+                    )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot create device session in: {self.path}"
+                ) from error
+
+    def device_session_identity(
+        self,
+        access_token_hash: str,
+        now: int,
+    ) -> AuthenticatedIdentity | None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    row = connection.execute(
+                        """SELECT users.*, device_sessions.access_expires_at
+                        FROM device_sessions
+                        JOIN users ON users.id = device_sessions.user_id
+                        WHERE device_sessions.access_token_hash = ?
+                            AND device_sessions.access_expires_at > ?
+                            AND device_sessions.refresh_expires_at > ?
+                            AND users.active = 1""",
+                        (access_token_hash, now, now),
+                    ).fetchone()
+                    if row is None:
+                        connection.execute(
+                            "DELETE FROM device_sessions WHERE refresh_expires_at <= ?", (now,)
+                        )
+                        connection.commit()
+                        return None
+                    user = _user(row)
+                    catalog = self._catalog(connection, user.id)
+                    if catalog is None:
+                        return None
+                    return AuthenticatedIdentity(user, catalog, int(row["access_expires_at"]))
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot validate device session in: {self.path}"
+                ) from error
+
+    def rotate_device_session(
+        self,
+        refresh_token_hash: str,
+        access_token_hash: str,
+        next_refresh_token_hash: str,
+        now: int,
+        access_expires_at: int,
+        refresh_expires_at: int,
+    ) -> AuthenticatedIdentity | None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    row = connection.execute(
+                        """SELECT users.*, device_sessions.device_name
+                        FROM device_sessions
+                        JOIN users ON users.id = device_sessions.user_id
+                        WHERE device_sessions.refresh_token_hash = ?
+                            AND device_sessions.refresh_expires_at > ?
+                            AND users.active = 1""",
+                        (refresh_token_hash, now),
+                    ).fetchone()
+                    if row is None:
+                        connection.execute(
+                            "DELETE FROM device_sessions WHERE refresh_expires_at <= ?", (now,)
+                        )
+                        connection.commit()
+                        return None
+                    user = _user(row)
+                    catalog = self._catalog(connection, user.id)
+                    if catalog is None:
+                        connection.rollback()
+                        return None
+                    cursor = connection.execute(
+                        """UPDATE device_sessions
+                        SET access_token_hash = ?, refresh_token_hash = ?, access_expires_at = ?,
+                            refresh_expires_at = ?, last_seen_at = ?
+                        WHERE refresh_token_hash = ? AND refresh_expires_at > ?""",
+                        (
+                            access_token_hash,
+                            next_refresh_token_hash,
+                            access_expires_at,
+                            refresh_expires_at,
+                            now,
+                            refresh_token_hash,
+                            now,
+                        ),
+                    )
+                    if cursor.rowcount != 1:
+                        connection.rollback()
+                        return None
+                    connection.commit()
+                    return AuthenticatedIdentity(user, catalog, access_expires_at)
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot refresh device session in: {self.path}"
+                ) from error
+
+    def touch_device_session(self, access_token_hash: str, seen_at: int) -> None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute(
+                        "UPDATE device_sessions SET last_seen_at = ? WHERE access_token_hash = ?",
+                        (seen_at, access_token_hash),
+                    )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot update device session in: {self.path}"
+                ) from error
+
+    def delete_device_session(self, access_token_hash: str) -> None:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute(
+                        "DELETE FROM device_sessions WHERE access_token_hash = ?",
+                        (access_token_hash,),
+                    )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot delete device session from: {self.path}"
+                ) from error
 
     def owner(self) -> UserAccount | None:
         with self._thread_lock:

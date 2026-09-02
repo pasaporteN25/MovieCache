@@ -41,11 +41,13 @@ no se “descubren” desde el cliente ni se conceden por ser owner.
 ### Autenticación y transporte
 
 El cliente acepta una URL base HTTPS con certificado válido y envía credenciales solo a
-`POST /api/v1/auth/login`. A1.2 emitirá pares opacos de access/refresh token asociados
+`POST /api/v1/auth/login`. A1.2 emite pares opacos de access/refresh token asociados
 a un dispositivo; el access token viaja en `Authorization: Bearer`, nunca en una cookie
 ni en la URL. El refresh token se usa solamente en la renovación y el cliente debe
 guardarlo en almacenamiento seguro de la plataforma. Cerrar o revocar borra el estado
-de esa sesión sin afectar las sesiones web ni otros dispositivos.
+de esa sesión sin afectar las sesiones web ni otros dispositivos. A1.2 implementa esos
+tokens como hashes en SQLite, rota ambos valores en una transacción y los invalida al
+cambiar la contraseña, desactivar o archivar una cuenta.
 
 La API no usa el header de token ni la comprobación `Origin` de la shell web: son una
 defensa CSRF para cookies y no un sustituto de autenticación de un cliente nativo. No
@@ -84,8 +86,8 @@ desconocidos como no accionables. Las respuestas JSON incluyen
 
 ## Consecuencias
 
-A1.1 fija el contrato sin declarar endpoints productivos todavía. A1.2 implementará
-el almacenamiento y ciclo de vida de sesiones por dispositivo; A1.3 implementará los
+A1.1 fijó el contrato. A1.2 implementó el almacenamiento y ciclo de vida de sesiones
+por dispositivo; A1.3 implementará los
 serializadores/rutas y las pruebas de compatibilidad contra esta especificación. A2
 puede consumir solo una versión de A1 cerrada y no debe usar los endpoints web
 históricos como atajo.

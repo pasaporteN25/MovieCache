@@ -95,6 +95,78 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(cache_status, 403)
         self.assertEqual(path_status, 403)
 
+    def test_device_login_rotation_and_logout_do_not_reuse_web_authentication(self) -> None:
+        body = json.dumps(
+            {
+                "username": "lucas",
+                "password": self.owner_password,
+                "device_name": "Pixel de Lucas",
+            }
+        )
+        device_headers = {"Content-Type": "application/json"}
+        missing_bearer = self.client.delete("/api/v1/auth/session")
+        created = self.client.post("/api/v1/auth/login", content=body, headers=device_headers)
+
+        self.assertEqual(missing_bearer.status_code, 401, missing_bearer.content)
+        self.assertEqual(
+            missing_bearer.json(), {"error": {"code": "device_authentication_required"}}
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertEqual(created.headers["X-Movie-Inbox-Api-Version"], "1")
+        self.assertNotIn("set-cookie", {name.casefold() for name in created.headers})
+        first = created.json()
+        self.assertEqual(first["token_type"], "Bearer")
+        self.assertNotIn("session", first["identity"])
+
+        refreshed = self.client.post(
+            "/api/v1/auth/refresh",
+            content=json.dumps({"refresh_token": first["refresh_token"]}),
+            headers=device_headers,
+        )
+        stale = self.client.delete(
+            "/api/v1/auth/session",
+            headers={"Authorization": f"Bearer {first['access_token']}"},
+        )
+        self.assertEqual(refreshed.status_code, 200, refreshed.content)
+        self.assertNotEqual(refreshed.json()["access_token"], first["access_token"])
+        self.assertEqual(stale.status_code, 401, stale.content)
+
+        current_access = refreshed.json()["access_token"]
+        revoked = self.client.delete(
+            "/api/v1/auth/session",
+            headers={"Authorization": f"Bearer {current_access}"},
+        )
+        refresh_after_logout = self.client.post(
+            "/api/v1/auth/refresh",
+            content=json.dumps({"refresh_token": refreshed.json()["refresh_token"]}),
+            headers=device_headers,
+        )
+        web_session = self.client.get(
+            "/api/session",
+            headers={"X-Movie-Inbox-Token": self.config.api_token},
+        )
+        self.assertEqual(revoked.status_code, 204, revoked.content)
+        self.assertEqual(refresh_after_logout.status_code, 401, refresh_after_logout.content)
+        self.assertEqual(web_session.status_code, 200, web_session.content)
+
+    def test_device_login_uses_the_shared_credential_rate_limit(self) -> None:
+        body = json.dumps(
+            {
+                "username": "lucas",
+                "password": "incorrect-password",
+                "device_name": "Pixel de Lucas",
+            }
+        )
+        headers = {"Content-Type": "application/json"}
+        attempts = [
+            self.client.post("/api/v1/auth/login", content=body, headers=headers) for _ in range(6)
+        ]
+
+        self.assertTrue(all(response.status_code == 401 for response in attempts[:5]))
+        self.assertEqual(attempts[5].status_code, 429, attempts[5].content)
+        self.assertEqual(attempts[5].json(), {"error": {"code": "too_many_attempts"}})
+        self.assertGreater(int(attempts[5].headers["Retry-After"]), 0)
+
     def test_owner_can_browse_and_check_only_configured_library_paths(self) -> None:
         films = self.media_path / "Peliculas"
         films.mkdir()

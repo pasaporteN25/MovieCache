@@ -39,6 +39,21 @@ class ApiRequestError(ValueError):
         self.status_code = status_code
 
 
+class DeviceApiRequestError(ApiRequestError):
+    """A v1 device API error with its own stable response envelope."""
+
+    def __init__(
+        self,
+        code: str,
+        status_code: int,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(code, status_code)
+        self.code = code
+        self.headers = headers or {}
+
+
 async def read_json_object(
     request: Request,
     max_bytes: int = MAX_JSON_BODY_BYTES,
@@ -135,6 +150,14 @@ def repository_error_response(error: CatalogRepositoryError) -> JSONResponse:
 
 def error_response(reason: str, status_code: int) -> JSONResponse:
     return JSONResponse({"ok": False, "reason": reason}, status_code=status_code)
+
+
+def device_error_response(error: DeviceApiRequestError) -> JSONResponse:
+    return JSONResponse(
+        {"error": {"code": error.code}},
+        status_code=error.status_code,
+        headers=error.headers,
+    )
 
 
 def identity_payload(identity: AuthenticatedIdentity) -> dict[str, Any]:
