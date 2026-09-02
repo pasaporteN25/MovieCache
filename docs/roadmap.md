@@ -140,12 +140,22 @@ Gate de salida: 553 pruebas unitarias (4 omitidas), Ruff, formato, mypy estricto
 compileall y `git diff --check` en verde; GitHub Actions #78 confirma Linux, Windows,
 wheel limpio, Chromium y Docker Compose con estado persistente.
 
+### v0.8.0: inicio editorial de videoclub — publicado 2026-09-02
+
+Inicio deja atrás el carrusel temporal: la variante A es un selector fijo navegable
+por teclado que abre el detalle de la obra elegida y la variante C organiza las mismas
+secciones editoriales en estanterías horizontales. El kit de VHS es un componente
+reutilizable, accesible y adaptable; su asset genérico fue auditado y se entrega dentro
+del paquete. El incremento no agrega endpoints, peticiones externas ni contenido de
+usuarios al frontend.
+
+Gate de salida: 554 pruebas unitarias (4 omitidas), 20 pruebas de navegador, Ruff,
+formato, mypy estricto, compileall y `git diff --check` en verde.
+
 ### Próximos incrementos propuestos
 
-- **v0.8.0** queda reservado para [U1], un refactor de Inicio con la variante A como
-  selector fijo navegable por flechas/Enter y la variante C como estanterías
-  horizontales de VHS. La dirección visual generada es referencia; los assets y el
-  componente accesible se trabajan por separado después del cierre de v0.7.0.
+- **v0.9.0** comienza con [A1], una API versionada y sesiones revocables por
+  dispositivo para habilitar un cliente Android sin reutilizar cookies del navegador.
 
 ## Implementado en el incremento de descubrimiento y scanner
 

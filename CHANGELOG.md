@@ -2,6 +2,23 @@
 
 Los cambios relevantes del proyecto se documentan en este archivo.
 
+## [0.8.0] - 2026-09-02
+
+### Agregado
+
+- Inicio reemplaza el carrusel por un selector editorial fijo, navegable con flechas,
+  Inicio/Fin, Enter y foco de teclado, y suma estanterías horizontales para las
+  categorías editoriales existentes sin abrir nuevos endpoints ni alterar el catálogo.
+- Las tarjetas y su preview reutilizan un kit visual de VHS con estados explícitos,
+  movimiento reducido, foco visible y adaptación móvil. El asset genérico generado
+  para el cassette está auditado, versionado y se distribuye dentro del paquete.
+
+### Cambiado
+
+- La pantalla principal mantiene la selección y el desplazamiento de estantería al
+  cambiar de categoría, por teclado, puntero o touch, conservando los estados vacíos
+  y los límites de privacidad de cada sección.
+
 ## [0.7.0] - 2026-09-02
 
 ### Agregado
