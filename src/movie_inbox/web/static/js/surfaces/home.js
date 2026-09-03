@@ -63,6 +63,48 @@ import { closeSharedDetail, openCollection } from "./club.js";
         return /\bmin(?:uto)?s?\b/i.test(text) ? text : `${text} min`;
       }
 
+      function homeSignalHash(seed) {
+        let value = 2166136261;
+        for (const character of String(seed || "movie-inbox")) {
+          value ^= character.codePointAt(0);
+          value = Math.imul(value, 16777619);
+        }
+        return value >>> 0;
+      }
+
+      export function homeSignalPoints(seed, sampleCount = 46) {
+        const count = Math.max(12, Number(sampleCount) || 46);
+        let state = homeSignalHash(seed) || 1;
+        const points = [];
+        for (let index = 0; index < count; index += 1) {
+          state ^= state << 13;
+          state ^= state >>> 17;
+          state ^= state << 5;
+          state >>>= 0;
+          const progress = index / (count - 1);
+          const envelope = 0.42 + (Math.sin(progress * Math.PI) * 0.58);
+          const noise = ((state & 0xffff) / 0xffff) - 0.5;
+          const harmonic = Math.sin((progress * Math.PI * 8) + ((state >>> 24) / 34));
+          const y = 29 + ((noise * 25) + (harmonic * 5)) * envelope;
+          points.push(`${(progress * 360).toFixed(1)},${Math.max(5, Math.min(53, y)).toFixed(1)}`);
+        }
+        return points.join(" ");
+      }
+
+      function homeSignalMarkup(item) {
+        const seed = String(item?.id || displayTitle(item) || "movie-inbox");
+        const marker = 36 + (homeSignalHash(seed) % 289);
+        const points = homeSignalPoints(seed);
+        return `<div class="spotlight-preview-signal" data-signal-seed="${escapeAttr(seed)}" aria-hidden="true">
+          <svg viewBox="0 0 360 58" preserveAspectRatio="none" focusable="false">
+            <path class="spotlight-signal-grid" d="M0 8H360 M0 29H360 M0 50H360 M45 0V58 M90 0V58 M135 0V58 M180 0V58 M225 0V58 M270 0V58 M315 0V58" />
+            <polyline class="spotlight-signal-echo" points="${points}" />
+            <polyline class="spotlight-signal-wave" points="${points}" />
+            <line class="spotlight-signal-marker" x1="${marker}" y1="3" x2="${marker}" y2="55" />
+          </svg>
+        </div>`;
+      }
+
       function playlistEntries(source = playlistSource) {
         if (source === "daily" || !source) return editorialHome.featured || [];
         if (source.startsWith("shelf:")) {
@@ -320,7 +362,6 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const selector = `<aside class="spotlight-selector" aria-label="Cartelera automática">
           <div class="spotlight-selector-heading">
             <span>${escapeHtml(homeDatePeriodLabel(editorialHome.generated_for))}</span>
-            <strong>${String(spotlightIndex + 1).padStart(2, "0")} / ${String(featured.length).padStart(2, "0")}</strong>
           </div>
           <div class="spotlight-poster-card">
             <button class="spotlight-poster-trigger" type="button" data-click="spotlight-select" data-index="${spotlightIndex}" aria-label="Seleccionar ${escapeAttr(carouselTitle)} de la cartelera">
@@ -375,7 +416,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
               ${homeDateControlMarkup()}
             </div>
             <div class="spotlight-table-wrap">
-              <table class="spotlight-playlist" role="grid" aria-label="Playlist de ${escapeAttr(sourceLabel)}">
+              <table class="spotlight-playlist" data-row-count="${Math.min(sourceEntries.length, 6)}" role="grid" aria-label="Playlist de ${escapeAttr(sourceLabel)}">
                 <thead><tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Año</th><th scope="col">Tipo</th><th scope="col">Géneros</th><th scope="col">Duración</th></tr></thead>
                 <tbody>${tableRows || `<tr><td colspan="6" class="playlist-empty">No hay obras en esta fuente.</td></tr>`}</tbody>
               </table>
@@ -384,11 +425,11 @@ import { closeSharedDetail, openCollection } from "./club.js";
               <div class="spotlight-preview-actions">${previewViewAction}${previewEditAction}</div>
               <div class="spotlight-preview-art">${selectedItem.page_image ? `<img src="${escapeAttr(cachedImageSrc(String(selectedItem.page_image)))}" alt="" loading="lazy" decoding="async">` : `<span class="poster-${posterVariant(selectedItem.id || selectedTitle)}" aria-hidden="true"></span>`}</div>
               <div class="spotlight-copy">
-                <span class="spotlight-reason">${escapeHtml(selectedReason.label || sourceLabel)}</span>
                 <h3 id="spotlight-selected-title">${escapeHtml(selectedTitle)}</h3>
                 <span class="spotlight-metadata">${escapeHtml([selectedItem.year, selectedItem.kind, firstListValue(selectedItem.genres)].filter(Boolean).join(" · ") || "Ficha por completar")}</span>
                 <p>${escapeHtml(selectedSummary || "Una obra disponible de tu archivo personal para considerar esta noche.")}</p>
               </div>
+              ${homeSignalMarkup(selectedItem)}
               <dl class="spotlight-preview-facts">
                 <div><dt>Disponibilidad</dt><dd>${selectedAvailability.effective ? "Disponible" : "No disponible"}</dd></div>
                 <div><dt>Estado</dt><dd>${escapeHtml(selectedStatus)}</dd></div>

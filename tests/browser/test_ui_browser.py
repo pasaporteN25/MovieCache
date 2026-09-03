@@ -308,6 +308,39 @@ class BrowserInterfaceTests(unittest.TestCase):
             ),
         )
         self._open_and_wait_for_catalog(page)
+        for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
+            page.set_viewport_size({"width": width, "height": height})
+            layout_metrics = page.evaluate(
+                """() => {
+                    const stats = document.querySelector('#stats').getBoundingClientRect();
+                    const statsStyle = getComputedStyle(document.querySelector('#stats'));
+                    const rows = [...document.querySelectorAll('[data-playlist-entry]')];
+                    const tableWrap = document.querySelector('.spotlight-table-wrap').getBoundingClientRect();
+                    return {
+                        viewportHeight: window.innerHeight,
+                        pageHeight: document.documentElement.scrollHeight,
+                        headerHeight: document.querySelector('.app-header').getBoundingClientRect().height,
+                        statsHeight: stats.height,
+                        statsLineHeight: parseFloat(statsStyle.lineHeight),
+                        firstRowHeight: rows[0]?.getBoundingClientRect().height || 0,
+                        lastRowBottom: rows.at(-1)?.getBoundingClientRect().bottom || 0,
+                        tableBottom: tableWrap.bottom
+                    };
+                }"""
+            )
+            self.assertLessEqual(layout_metrics["pageHeight"], height + 1, layout_metrics)
+            self.assertLessEqual(layout_metrics["headerHeight"], 70, layout_metrics)
+            self.assertLessEqual(
+                layout_metrics["statsHeight"],
+                layout_metrics["statsLineHeight"] * 1.35,
+                layout_metrics,
+            )
+            self.assertGreaterEqual(layout_metrics["firstRowHeight"], 20, layout_metrics)
+            self.assertLessEqual(
+                abs(layout_metrics["lastRowBottom"] - layout_metrics["tableBottom"]),
+                2,
+                layout_metrics,
+            )
 
         self.assertEqual(
             page.locator("#spotlightTitle").inner_text().strip().casefold(),
@@ -330,6 +363,16 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         self.assertEqual(page.locator(".spotlight-poster-caption").count(), 0)
         self.assertEqual(page.locator(".spotlight-carousel-controls").count(), 0)
+        self.assertEqual(page.locator(".spotlight-selector-heading strong").count(), 0)
+        self.assertEqual(page.locator(".spotlight-reason").count(), 0)
+        self.assertEqual(page.locator(".spotlight-preview-signal[aria-hidden='true']").count(), 1)
+        signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
+        self.assertEqual(
+            page.locator("#spotlight").evaluate(
+                "element => getComputedStyle(element).borderTopWidth"
+            ),
+            "0px",
+        )
         self.assertEqual(
             page.locator(".spotlight-selector").evaluate(
                 "element => getComputedStyle(element).borderRightWidth"
@@ -392,6 +435,10 @@ class BrowserInterfaceTests(unittest.TestCase):
             ),
             "true",
         )
+        self.assertEqual(
+            page.locator(".spotlight-signal-wave").get_attribute("points"),
+            signal_points,
+        )
 
     def test_home_selector_keeps_one_tab_stop_and_changes_preview_with_arrows(self) -> None:
         page = self.page
@@ -431,6 +478,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(selector.count(), 2)
         self.assertEqual(selector.nth(0).get_attribute("tabindex"), "0")
         self.assertEqual(selector.nth(1).get_attribute("tabindex"), "-1")
+        self.assertLessEqual(selector.nth(0).bounding_box()["height"], 40)
+        first_signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
 
         selector.nth(0).focus()
         selected_before = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
@@ -452,6 +501,14 @@ class BrowserInterfaceTests(unittest.TestCase):
                 "home-date-today",
                 "home-date-yesterday",
             },
+        )
+        page.locator("[data-playlist-entry]").nth(1).click()
+        second_signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
+        self.assertNotEqual(second_signal_points, first_signal_points)
+        page.locator("[data-playlist-entry]").nth(0).click()
+        self.assertEqual(
+            page.locator(".spotlight-signal-wave").get_attribute("points"),
+            first_signal_points,
         )
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertTrue(page.locator(".spotlight-date-control-mobile").is_visible())

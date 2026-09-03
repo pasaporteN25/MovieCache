@@ -30,10 +30,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea. [U2-R.0–U2-R.3] ya fijaron referencia, escenario, estados
-  y mueble continuo. [U2-R.4] conserva su núcleo funcional pero reabre su aceptación
-  visual por la revisión anotada del 2026-09-03; la siguiente tarea accionable es
-  [U2-R.4e], antes de [U2-R.5].
+- **En curso:** ninguna tarea. [U2-R.0–U2-R.4] ya fijaron referencia, escenario, estados,
+  mueble continuo y franja superior aceptada. La siguiente tarea accionable es
+  [U2-R.5], la contratapa determinista de `Ver más`.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -154,7 +153,7 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
     - **Cierre**: las categorías dejan de reemplazarse mediante pestañas y conviven en un
       único mueble con scroll real. En desktop se ve el siguiente bay cortado; teclado,
       touch y rueda disponen de caminos equivalentes, y móvil conserva su presentación.
-  - [ ] **[U2-R.4] Sincronizar playlist, lomo y preview y cerrar la composición
+  - [x] **[U2-R.4] Sincronizar playlist, lomo y preview y cerrar la composición
     superior.** Click/Enter en un bay cambia la fuente; click/Enter en un lomo
     selecciona/alinea su fila; flechas en la lista seleccionan y llevan a vista el lomo
     correspondiente. Preview, fila y lomo deben compartir ID tras cada camino. Poner
@@ -174,45 +173,47 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
     - [x] **[U2-R.4d] Corregir encastre y programa temporal.** Respetar la abertura real
       del marco sin recortar el poster, usar la placa como rótulo dinámico `Hoy`/`Ayer`
       e integrar el selector temporal al flujo del encabezado Winamp sin superposición.
-    - [ ] **[U2-R.4e] Explorar el mostrador superior con dirección de diseño.** Encargar a
+    - [x] **[U2-R.4e] Explorar el mostrador superior con dirección de diseño.** Encargar a
       un subagente de diseño 2–3 composiciones acotadas para la barra, usando como entrada
       el north star y la revisión anotada. Debe mantener marca → Inicio y
       `Colección` + `Menú`, resolver marca/estadísticas en una única línea y evitar una
       barra genérica o más alta. Entregar comparación visual y una recomendación antes
       de tocar código. **Modelo: Grande. Sin dependencia técnica; primera prioridad.**
-    - [ ] **[U2-R.4f] Implementar el mostrador elegido.** Llevar la variante confirmada a
+    - [x] **[U2-R.4f] Implementar el mostrador elegido.** Llevar la variante confirmada a
       `index.shell-open.html` y `css/core.css`; conservar handlers, permisos, foco,
       contadores y ancho sin wrap en desktop, con fallback de altura/zoom y sin modificar
       la navegación móvil. **Modelo: Medio. Depende de U2-R.4e.**
-    - [ ] **[U2-R.4g] Liberar y jerarquizar la cartelera.** Eliminar el rectángulo exterior
+    - [x] **[U2-R.4g] Liberar y jerarquizar la cartelera.** Eliminar el rectángulo exterior
       que encajona la marquesina, agrandar y centrar el marco dentro de su columna,
       centrar `Hoy`/`Ayer` en la placa y retirar el contador `01 / 06`. Preservar encastre
       completo del poster, autoplay independiente, click/Enter y puntos en el zócalo.
       **Modelo: Medio. Depende de U2-R.4f.**
-    - [ ] **[U2-R.4h] Rebalancear la playlist de hasta seis funciones.** Distribuir las
+    - [x] **[U2-R.4h] Rebalancear la playlist de hasta seis funciones.** Distribuir las
       filas para aprovechar la altura disponible sin scroll ni enormes huecos laterales;
       mantener tabla real, columnas, selección/al aire y legibilidad en 1–6 resultados.
       Probar títulos/géneros largos y que una lista corta no produzca filas absurdamente
       altas. **Modelo: Medio. Depende de U2-R.4g.**
-    - [ ] **[U2-R.4i] Destilar la preview del reproductor.** Retirar el motivo redundante
+    - [x] **[U2-R.4i] Destilar la preview del reproductor.** Retirar el motivo redundante
       `Disponible y pendiente` sobre el título, conservar identidad, metadatos y hechos
       útiles una sola vez, y redistribuir acciones, miniatura y ficha sin romper el gate
       de edición para obras propias/Club. **Modelo: Medio. Depende de U2-R.4h.**
-    - [ ] **[U2-R.4j] Incorporar una señal temporal decorativa y determinista.** Ocupar el
+    - [x] **[U2-R.4j] Incorporar una señal temporal decorativa y determinista.** Ocupar el
       centro libre de la preview con una visualización SVG/CSS estable derivada del ID:
       aspecto de forma de onda/espectro sobre una línea de tiempo, claramente decorativa,
       `aria-hidden`, sin afirmar que proviene del audio real. Debe variar entre obras sin
       cambiar al rerenderizar y degradar a un trazo estático con reduced motion.
       **Modelo: Medio. Depende de U2-R.4i.**
-    - [ ] **[U2-R.4k] Gate visual de la franja superior.** Comparar implementación con
+    - [x] **[U2-R.4k] Gate visual de la franja superior.** Comparar implementación con
       `u2-r4-annotated-review-v1.png` en 1280×720, 1440×900 y 1920×1080; verificar 1/6
       funciones, poster roto, textos extensos, teclado, autoplay, zoom y ausencia de
       scroll vertical. Documentar capturas y no cerrar R.4 sólo por tests verdes.
       **Modelo: Medio. Depende de U2-R.4f–U2-R.4j.**
-    - **Estado parcial**: fila, lomo y preview activa ya comparten entry/item después de
-      todos los caminos de interacción; el carrusel permanece independiente y el mueble
-      tiene una sola preview física. La aceptación visual superior queda reabierta hasta
-      cerrar [U2-R.4e–U2-R.4k].
+    - **Cierre 2026-09-03**: se eligió una marquesina abierta y continua, con marca y
+      estadísticas en una línea y `Colección`/`Menú` como placas contiguas. La cartelera
+      queda libre de caja y contador; seis filas llenan el reproductor sin inflar listas
+      cortas; preview, fila y lomo comparten selección, y la preview elimina razones
+      redundantes y suma una señal decorativa estable por obra. El gate y las decisiones
+      están documentados en `docs/design/u2-r4-upper-gate-v1.md`.
   - [ ] **[U2-R.5] Implementar la contratapa determinista.** Extraer un mapper puro de ID
     opaco → una de 4–5 plantillas estables; componer sobre
     `vhs-back-cover-shell-v1.png` sinopsis, créditos, año, duración, géneros,
