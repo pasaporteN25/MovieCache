@@ -1194,6 +1194,10 @@
   .spotlight-poster-fallback { transform: none; }
 }
 
+/* The compact date switch is rendered with the playlist on desktop, while the
+   original header control remains the responsive/mobile presentation. */
+.spotlight-date-control-desktop { display: none; }
+
 /* U2-R.2 visual acceptance recovery. The marquee asset keeps its native
    portrait ratio; the playlist and preview read as one late-night player. */
 @media (min-width: 861px) {
@@ -1222,42 +1226,59 @@
     outline-offset: 2px;
   }
 
-  .spotlight-date-control {
+  .spotlight-date-control-mobile { display: none; }
+
+  .spotlight-date-control-desktop {
     align-items: center;
-    background: linear-gradient(180deg, #251c12, #0d0b09);
-    border: 1px solid rgba(var(--gold-rgb), .68);
-    box-shadow: 0 3px 9px rgba(0, 0, 0, .58), inset 0 1px rgba(255, 236, 189, .14);
+    background: transparent;
+    border: 0;
+    border-left: 1px solid rgba(var(--teal-rgb), .28);
+    box-shadow: none;
+    display: flex;
     flex-direction: row;
-    gap: 0;
-    padding: 2px;
-    position: absolute;
-    right: 10px;
-    top: 3px;
-    z-index: 5;
+    gap: 6px;
+    padding: 0 0 0 9px;
+    position: static;
+    z-index: auto;
   }
 
-  .spotlight-date-tabs { gap: 2px; }
-
-  .spotlight-date-tabs button {
-    background: #11131a;
-    border: 1px solid #453824;
-    color: #b9b3a7;
+  .spotlight-date-control-label {
+    color: #77aeb2;
     font-family: var(--font-label);
-    font-size: 9px;
-    min-height: 20px;
-    padding: 2px 8px;
+    font-size: 7px;
+    letter-spacing: .08em;
     text-transform: uppercase;
   }
 
-  .spotlight-date-tabs button[aria-pressed="true"] {
-    background: linear-gradient(180deg, #db9f3f, #6f4515);
-    border-color: var(--gold);
-    box-shadow: inset 0 2px 4px rgba(255, 240, 196, .32), 0 0 8px rgba(var(--gold-rgb), .2);
-    color: #090804;
-    transform: translateY(1px);
+  .spotlight-date-tabs {
+    border: 0;
+    display: inline-grid;
+    gap: 1px;
+    grid-template-columns: repeat(2, 34px);
   }
 
-  .spotlight-date { display: none; }
+  .spotlight-date-control-desktop .spotlight-date-tabs button {
+    background: #071014;
+    border: 1px solid rgba(var(--teal-rgb), .28);
+    color: #b9b3a7;
+    font-family: var(--font-label);
+    font-size: 7px;
+    min-height: 17px;
+    padding: 1px 4px;
+    text-transform: uppercase;
+  }
+
+  .spotlight-date-control-desktop .spotlight-date-tabs button + button { border-left: 1px solid rgba(var(--teal-rgb), .28); }
+
+  .spotlight-date-control-desktop .spotlight-date-tabs button[aria-pressed="true"] {
+    background: linear-gradient(180deg, #db9f3f, #6f4515);
+    border-color: var(--gold);
+    box-shadow: inset 0 1px 2px rgba(255, 240, 196, .28), 0 0 6px rgba(var(--gold-rgb), .14);
+    color: #090804;
+    transform: none;
+  }
+
+  .spotlight-date-control-desktop .spotlight-date { display: none; }
 
   .spotlight-layout { grid-template-columns: minmax(245px, 28%) minmax(0, 1fr); }
 
@@ -1305,22 +1326,33 @@
     text-shadow: 0 1px rgba(255, 242, 201, .36);
   }
 
+  .spotlight-selector-heading span {
+    font-size: 10px;
+    letter-spacing: .12em;
+  }
+
+  .spotlight-selector-heading strong { opacity: .72; }
+
   .spotlight-poster-card {
-    bottom: 14%;
+    aspect-ratio: 675 / 1016;
     display: block;
+    height: 66.1%;
     left: 50%;
+    overflow: hidden;
     padding: 0;
     position: absolute;
-    top: 15.5%;
+    top: 19.1%;
     transform: translateX(-50%);
-    width: clamp(108px, 15vh, 130px);
+    width: auto;
     z-index: 2;
   }
 
   .spotlight-poster-trigger {
     align-content: stretch;
+    background: #030302;
     gap: 0;
     height: 100%;
+    overflow: hidden;
     padding: 0;
   }
 
@@ -1331,7 +1363,7 @@
     box-shadow: 0 7px 14px rgba(0, 0, 0, .72);
     height: 100%;
     max-height: none;
-    object-fit: cover;
+    object-fit: contain;
     transform: none;
     width: 100%;
   }
@@ -1359,7 +1391,17 @@
   .spotlight-playlist-head {
     background: linear-gradient(180deg, #10181c, #050b0f);
     border-bottom-color: rgba(var(--teal-rgb), .55);
-    padding: 5px 138px 4px 10px;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 4px 8px 4px 10px;
+  }
+
+  .spotlight-playlist-source {
+    align-items: center;
+    display: flex;
+    gap: 9px;
+    min-width: 0;
   }
 
   .spotlight-playlist-head span,

@@ -167,6 +167,9 @@ de [U3] y [A2]. La referencia vinculante es
     - [x] **[U2-R.4c] Pulido de cartelera y encuadre.** Llenar el hueco con el poster sin
       caption redundante ni flechas, integrar puntos al zócalo, liberar el fondo,
       agrupar `Colección`/`Menú`, contener Hoy/Ayer y sostener 1280×720 poblado.
+    - [x] **[U2-R.4d] Corregir encastre y programa temporal.** Respetar la abertura real
+      del marco sin recortar el poster, usar la placa como rótulo dinámico `Hoy`/`Ayer`
+      e integrar el selector temporal al flujo del encabezado Winamp sin superposición.
     - **Cierre**: fila, lomo y preview activa comparten entry/item después de todos los
       caminos de interacción; el carrusel permanece independiente. El mueble tiene una
       sola preview física y la cartelera elimina controles e información redundantes sin

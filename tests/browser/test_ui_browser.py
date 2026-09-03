@@ -262,6 +262,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self,
     ) -> None:
         page = self.page
+        marquee_featured: list[dict[str, Any]] = []
 
         def add_marquee_items(route) -> None:
             response = route.fetch()
@@ -277,15 +278,35 @@ class BrowserInterfaceTests(unittest.TestCase):
                             **items[index % len(items)],
                             "id": f"marquee-item-{index}",
                             "title": f"Cartelera {index + 1}",
+                            "page_image": "https://example.invalid/marquee-test-poster.svg",
                         },
                     }
                     for index in range(6)
                 ]
                 home["limits"] = {**(home.get("limits") or {}), "featured_items": 6}
+                marquee_featured[:] = home["featured"]
             payload["home"] = home
             route.fulfill(response=response, json=payload)
 
+        def serve_marquee_date(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            requested_date = route.request.url.split("date=", 1)[1].split("&", 1)[0]
+            payload["generated_for"] = requested_date
+            payload["featured"] = marquee_featured
+            payload["limits"] = {**(payload.get("limits") or {}), "featured_items": 6}
+            route.fulfill(response=response, json=payload)
+
         page.route("**/api/items?*", add_marquee_items)
+        page.route("**/api/home?*", serve_marquee_date)
+        page.route(
+            "**/image-cache?*",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="image/svg+xml",
+                body="""<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><rect width="600" height="900" fill="#101727"/><rect x="12" y="12" width="576" height="876" fill="none" stroke="#efb83e" stroke-width="24"/><path d="M0 0L600 900M600 0L0 900" stroke="#20d7df" stroke-width="18"/><circle cx="300" cy="420" r="130" fill="#ff2e95"/><text x="300" y="760" text-anchor="middle" fill="white" font-size="54">POSTER</text></svg>""",
+            ),
+        )
         self._open_and_wait_for_catalog(page)
 
         self.assertEqual(
@@ -327,6 +348,25 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         self.assertLessEqual(poster_fill["width"], 1)
         self.assertLessEqual(poster_fill["height"], 1)
+        poster_geometry = page.locator(".spotlight-poster-card").evaluate(
+            """element => {
+                const selector = element.closest('.spotlight-selector').getBoundingClientRect();
+                const card = element.getBoundingClientRect();
+                const poster = element.querySelector('.spotlight-poster, .spotlight-poster-fallback');
+                return {
+                    topRatio: (card.top - selector.top) / selector.height,
+                    bottomRatio: (card.bottom - selector.top) / selector.height,
+                    objectFit: poster ? getComputedStyle(poster).objectFit : ''
+                };
+            }"""
+        )
+        self.assertGreaterEqual(poster_geometry["topRatio"], 0.18)
+        self.assertLessEqual(poster_geometry["bottomRatio"], 0.87)
+        self.assertEqual(poster_geometry["objectFit"], "contain")
+        self.assertEqual(
+            page.locator(".spotlight-selector-heading span").inner_text().strip().casefold(),
+            "hoy",
+        )
 
         catalog_box = page.locator("#catalogButton").bounding_box()
         menu_box = page.locator("#systemMenu > summary").bounding_box()
@@ -334,14 +374,23 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIsNotNone(menu_box)
         self.assertLessEqual(abs(menu_box["x"] - (catalog_box["x"] + catalog_box["width"])), 1)
 
-        date_box = page.locator(".spotlight-date-control").bounding_box()
-        player_head_box = page.locator(".spotlight-playlist-head").bounding_box()
-        self.assertIsNotNone(date_box)
-        self.assertIsNotNone(player_head_box)
-        self.assertGreaterEqual(date_box["y"], player_head_box["y"] - 1)
-        self.assertLessEqual(
-            date_box["y"] + date_box["height"],
-            player_head_box["y"] + player_head_box["height"] + 1,
+        desktop_date_control = page.locator(
+            ".spotlight-playlist-head > .spotlight-date-control-desktop"
+        )
+        self.assertEqual(desktop_date_control.count(), 1)
+        self.assertEqual(
+            desktop_date_control.evaluate("element => getComputedStyle(element).position"),
+            "static",
+        )
+        desktop_date_control.locator('[data-click="home-date-yesterday"]').click()
+        page.wait_for_function(
+            "document.querySelector('.spotlight-selector-heading span')?.textContent.trim() === 'Ayer'"
+        )
+        self.assertEqual(
+            desktop_date_control.locator('[data-click="home-date-yesterday"]').get_attribute(
+                "aria-pressed"
+            ),
+            "true",
         )
 
     def test_home_selector_keeps_one_tab_stop_and_changes_preview_with_arrows(self) -> None:
@@ -396,9 +445,17 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.keyboard.press("Tab")
         self.assertIn(
             page.evaluate("document.activeElement.dataset.click"),
-            {"spotlight-select", "spotlight-air-select", "playlist-select"},
+            {
+                "spotlight-select",
+                "spotlight-air-select",
+                "playlist-select",
+                "home-date-today",
+                "home-date-yesterday",
+            },
         )
         page.set_viewport_size({"width": 390, "height": 844})
+        self.assertTrue(page.locator(".spotlight-date-control-mobile").is_visible())
+        self.assertFalse(page.locator(".spotlight-date-control-desktop").is_visible())
         self.assertFalse(
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )

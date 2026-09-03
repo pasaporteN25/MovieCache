@@ -41,10 +41,12 @@ composición previa a U2 y se rediseñará en una entrega separada.
 La zona superior tiene dos piezas coordinadas pero no acopladas de forma destructiva:
 
 1. Una cartelera vertical pequeña a la izquierda, con poster dinámico e indicadores.
-  El marco conserva su relación vertical 2:3; el poster ocupa por completo el hueco
-  interior y no repite título, estado ni disponibilidad. No lleva flechas propias: rota
-  automáticamente y la exploración manual vive en la playlist. Los puntos se apoyan en
-  el zócalo inferior del marco, no en una caja exterior.
+  El marco conserva su relación vertical 2:3; el poster entero se encastra en el hueco
+  interior sin recortar sus laterales ni invadir la placa o el zócalo. La placa superior
+  muestra `Hoy` o `Ayer` según la programación cargada, pero no repite título, estado ni
+  disponibilidad. No lleva flechas propias: rota automáticamente y la exploración manual
+  vive en la playlist. Los puntos se apoyan en el zócalo inferior del marco, no en una
+  caja exterior.
 2. Una lista tabular densa tipo Winamp con título, año, tipo, géneros y duración, más un
   panel compacto de preview debajo. La programación diaria muestra hasta seis funciones
   visibles en el encuadre desktop objetivo.
@@ -62,8 +64,9 @@ camino. La fila seleccionada, el lomo seleccionado y el preview representan siem
 misma obra.
 
 No se reserva una barra horizontal independiente para repetir el título de la
-cartelera. Hoy/Ayer vive como un interruptor físico compacto dentro del encabezado del
-reproductor: debe ser claro y accesible sin competir con la lista ni con el marco.
+cartelera. Hoy/Ayer vive en el flujo del encabezado del reproductor como un interruptor
+físico compacto, no posicionado sobre él: debe ser claro y accesible sin tapar la fuente,
+la lista ni sus encabezados.
 
 La posible transición futura entre posters como una tira vertical continua —un cuadro
 sale mientras el siguiente entra, como cinta detrás del marco— se prototipa fuera del

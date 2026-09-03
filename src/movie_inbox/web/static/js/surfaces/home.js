@@ -273,8 +273,6 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const hasSections = editorialHome.sections.some((section) => section.items?.length);
         fields.homeEmpty.hidden = Boolean(editorialHome.featured.length || hasSections);
         fields.homeSections.hidden = !hasSections;
-        fields.homeDate.dateTime = editorialHome.generated_for || "";
-        fields.homeDate.textContent = homeDateLabel(editorialHome.generated_for);
         syncHomeDateControl();
         const collectionsUnavailable = editorialHome.warnings.includes("collections_unavailable");
         const historyUnavailable = editorialHome.warnings.includes("home_history_unavailable");
@@ -302,6 +300,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         fields.spotlightStage.classList.toggle("is-empty", !carouselEntry?.item && !selectedEntry?.item);
         if (!carouselEntry?.item && !selectedEntry?.item) {
           fields.spotlightStage.innerHTML = `<div class="spotlight-empty">
+            ${homeDateControlMarkup()}
             <strong>La pantalla espera una obra disponible</strong>
             <span>Vinculá un archivo o declará una obra disponible para encabezar la cartelera del día.</span>
           </div>`;
@@ -320,7 +319,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
           : `<div class="spotlight-poster-fallback poster-${posterVariant(carouselItem.id || carouselTitle)}" aria-hidden="true"><span>Sin portada</span></div>`;
         const selector = `<aside class="spotlight-selector" aria-label="Cartelera automática">
           <div class="spotlight-selector-heading">
-            <span>Cartelera disponible</span>
+            <span>${escapeHtml(homeDatePeriodLabel(editorialHome.generated_for))}</span>
             <strong>${String(spotlightIndex + 1).padStart(2, "0")} / ${String(featured.length).padStart(2, "0")}</strong>
           </div>
           <div class="spotlight-poster-card">
@@ -371,7 +370,10 @@ import { closeSharedDetail, openCollection } from "./club.js";
         fields.spotlightStage.innerHTML = `<div class="spotlight-layout">
           ${selector}
           <div class="spotlight-viewport">
-            <div class="spotlight-playlist-head"><span>Fuente</span><strong data-playlist-source>${escapeHtml(sourceLabel)}</strong></div>
+            <div class="spotlight-playlist-head">
+              <div class="spotlight-playlist-source"><span>Fuente</span><strong data-playlist-source>${escapeHtml(sourceLabel)}</strong></div>
+              ${homeDateControlMarkup()}
+            </div>
             <div class="spotlight-table-wrap">
               <table class="spotlight-playlist" role="grid" aria-label="Playlist de ${escapeAttr(sourceLabel)}">
                 <thead><tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Año</th><th scope="col">Tipo</th><th scope="col">Géneros</th><th scope="col">Duración</th></tr></thead>
@@ -824,6 +826,26 @@ import { closeSharedDetail, openCollection } from "./club.js";
         return `${prefix} · ${label}`;
       }
 
+      export function homeDatePeriodLabel(value) {
+        if (value === localDateOffset(-1)) return "Ayer";
+        if (!value || value === todayLocalDate()) return "Hoy";
+        return "Archivo";
+      }
+
+      function homeDateControlMarkup() {
+        const selected = editorialHome.generated_for || todayLocalDate();
+        const todaySelected = selected === todayLocalDate();
+        const yesterdaySelected = selected === localDateOffset(-1);
+        return `<div class="spotlight-date-control spotlight-date-control-desktop" data-home-date-control>
+          <span class="spotlight-date-control-label">Programación</span>
+          <div class="spotlight-date-tabs" role="group" aria-label="Día de las recomendaciones">
+            <button type="button" data-click="home-date-today" aria-pressed="${todaySelected}">Hoy</button>
+            <button type="button" data-click="home-date-yesterday" aria-pressed="${yesterdaySelected}">Ayer</button>
+          </div>
+          <time class="spotlight-date" data-home-date-label datetime="${escapeAttr(selected)}">${escapeHtml(homeDateLabel(selected))}</time>
+        </div>`;
+      }
+
       export function rememberEditorialFeatured(payload) {
         const date = String(payload?.generated_for || "");
         if (!date) return;
@@ -835,8 +857,22 @@ import { closeSharedDetail, openCollection } from "./club.js";
 
       export function syncHomeDateControl() {
         const selected = editorialHome.generated_for || todayLocalDate();
-        fields.homeDateToday.setAttribute("aria-pressed", String(selected === todayLocalDate()));
-        fields.homeDateYesterday.setAttribute("aria-pressed", String(selected === localDateOffset(-1)));
+        document.querySelectorAll('[data-click="home-date-today"]').forEach((button) => {
+          button.setAttribute("aria-pressed", String(selected === todayLocalDate()));
+        });
+        document.querySelectorAll('[data-click="home-date-yesterday"]').forEach((button) => {
+          button.setAttribute("aria-pressed", String(selected === localDateOffset(-1)));
+        });
+        document.querySelectorAll("#homeDate, [data-home-date-label]").forEach((time) => {
+          time.dateTime = selected;
+          time.textContent = homeDateLabel(selected);
+        });
+      }
+
+      function setHomeDateControlsDisabled(disabled) {
+        document.querySelectorAll('[data-click="home-date-today"], [data-click="home-date-yesterday"]').forEach((button) => {
+          button.disabled = disabled;
+        });
       }
 
       export function applyEditorialFeaturedDate(localDate, snapshot) {
@@ -854,8 +890,6 @@ import { closeSharedDetail, openCollection } from "./club.js";
         spotlightIndex = 0;
         carouselItemId = "";
         renderEditorialHero();
-        fields.homeDate.dateTime = localDate;
-        fields.homeDate.textContent = homeDateLabel(localDate);
         syncHomeDateControl();
       }
 
@@ -868,8 +902,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
           return;
         }
         const isYesterday = requestedDate === localDateOffset(-1);
-        fields.homeDateToday.disabled = true;
-        fields.homeDateYesterday.disabled = true;
+        setHomeDateControlsDisabled(true);
         fields.spotlight.setAttribute("aria-busy", "true");
         fields.homeFeedback.hidden = false;
         fields.homeFeedback.textContent = isYesterday
@@ -890,8 +923,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
           fields.homeFeedback.hidden = false;
           fields.homeFeedback.innerHTML = `No pudimos recuperar esas recomendaciones. <button type="button" data-click="${retryAction}">Reintentar</button>`;
         } finally {
-          fields.homeDateToday.disabled = false;
-          fields.homeDateYesterday.disabled = false;
+          setHomeDateControlsDisabled(false);
           fields.spotlight.setAttribute("aria-busy", "false");
         }
       }
