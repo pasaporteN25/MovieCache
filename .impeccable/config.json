@@ -20,6 +20,24 @@
         ],
         "createdAt": "2026-08-21T23:36:39.132Z",
         "reason": "Agent: brand h1 gradient uses the 3 documented signal colors (ink/teal/pink), not a generic palette; user approved adding the exception"
+      },
+      {
+        "rule": "side-tab",
+        "value": "6px solid var(--teal)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-03T01:50:46.883Z",
+        "reason": "False positive: this is a CSS-triangle play-indicator glyph (border-hack triangle icon) on a Winamp-style row, not a card side-accent border."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(25, 20, 54, 0.78)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-03T02:43:39.868Z",
+        "reason": "User confirmed: intentional opacity reduction on the pre-existing spotlight-bar gradient color so the audited noche-de-cine-v1.png ambience becomes visible through it."
       }
     ]
   }

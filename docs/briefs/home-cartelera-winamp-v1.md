@@ -23,22 +23,33 @@ ambientación de noche de cine detrás.
   (el fondo y el borde superior ya lo eran).
 - **Ambientación "Noche de cine".** `.spotlight-ambience` es una capa decorativa
   (`aria-hidden="true"`, `pointer-events: none`, `z-index: 0`) detrás de la barra y el
-  escenario, compuesta enteramente con gradientes CSS (glow rosa/cyan, viñeta y puntos
-  tipo bokeh en violeta/dorado) — cero fotos, logos, actores o texto. No es el asset
-  final.
+  escenario. La capa de fondo es el asset real auditado
+  `night-cinema-ambient-v1.png` (`background-size: cover`, centrado); encima sólo un
+  tinte de marca liviano (un degradé vertical y dos glows rosa/cyan de baja opacidad),
+  sin taparla — cero logos, actores ni texto agregado por CSS.
 
-## Asset real disponible, 2026-09-02
+## Asset real integrado, 2026-09-02
 
-El fondo original auditado está disponible como
+El fondo original auditado vive en
 `src/movie_inbox/web/static/img/night-cinema-ambient-v1.png`; su prompt, procedencia,
-hash y licencia viven en `docs/assets/night-cinema-ambient-v1.md`. No contiene texto,
+hash y licencia están en `docs/assets/night-cinema-ambient-v1.md`. No contiene texto,
 logos, actores, obras, portadas, cajas ni datos de una instancia.
 
-La próxima integración visual puede agregar una única capa
-`background-image: url("../img/night-cinema-ambient-v1.png"), ...` a
-`.spotlight-ambience` en `home.css`, manteniendo los gradientes CSS actuales como
-relleno/blend. No requiere tocar HTML ni JS. Hasta esa entrega, la ambientación CSS
-sigue siendo la alternativa visible y original.
+**Hallazgo al integrarlo.** La primera versión de esta entrega ya dejaba
+`.spotlight-ambience` lista para recibir la imagen, pero al probarla con datos reales
+quedó casi invisible: `.spotlight-selector` tenía un `background-color` opaco
+(`var(--case)`) como capa de respaldo y `.spotlight-bar` usaba alfas de 0.92–0.98, así
+que ambos paneles tapaban entre 92% y 100% del fondo. Además, dentro de la propia
+`.spotlight-ambience` los gradientes CSS estaban listados *antes* que la imagen en el
+`background-image`, y como la primera capa listada es la más cercana a quien mira, esos
+gradientes (incluida una capa oscura de hasta 0.85 de alfa) tapaban buena parte de la
+foto incluso donde sí se veía. Se corrigieron los tres puntos: la imagen pasó a ser la
+capa de fondo (no la última detrás de gradientes competidores), los gradientes bajaron
+a un tinte liviano, `.spotlight-bar` bajó a 0.78–0.86 de alfa y `.spotlight-selector`
+reemplazó su `background-color` opaco por un degradé con alfa 0.88–0.9. El contraste de
+texto (blanco/dorado sobre el panel, ya con la imagen detrás) se verificó visualmente en
+un servidor descartable: sigue siendo alto porque la foto es mayormente oscura y los
+puntos de luz que la definen no caen sostenidamente debajo del texto.
 
 ## Estados heredados, sin cambios de comportamiento
 

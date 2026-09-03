@@ -6,16 +6,18 @@
         overflow: hidden;
         position: relative;
       }
-      /* Ambientación "Noche de cine": autoría 100% CSS (sin foto ni logo) hasta que
-         exista un asset auditado como vhs-cassette-frame-v1.png. Cuando llegue, se
-         agrega como una capa `background-image` adicional acá, sin tocar el HTML. */
+      /* Ambientación "Noche de cine": `night-cinema-ambient-v1.png` (auditado en
+         docs/assets/night-cinema-ambient-v1.md) es la capa de fondo; los gradientes
+         encima son solo un tinte de marca liviano, no deben taparla. */
       .spotlight-ambience {
-        background:
-          radial-gradient(120% 160% at 14% -25%, rgba(var(--red-rgb), 0.2), transparent 55%),
-          radial-gradient(95% 150% at 104% -10%, rgba(var(--teal-rgb), 0.16), transparent 58%),
-          repeating-radial-gradient(circle at 20% 32%, rgba(var(--gold-rgb), 0.05) 0 2px, transparent 2px 48px),
-          repeating-radial-gradient(circle at 82% 68%, rgba(var(--violet-rgb), 0.06) 0 2px, transparent 2px 54px),
-          linear-gradient(180deg, rgba(9, 11, 29, 0.15) 0%, rgba(9, 11, 29, 0.85) 78%);
+        background-image:
+          linear-gradient(180deg, rgba(9, 11, 29, 0.05) 0%, rgba(9, 11, 29, 0.55) 100%),
+          radial-gradient(120% 160% at 14% -25%, rgba(var(--red-rgb), 0.1), transparent 55%),
+          radial-gradient(95% 150% at 104% -10%, rgba(var(--teal-rgb), 0.08), transparent 58%),
+          url("../img/night-cinema-ambient-v1.png");
+        background-position: 0 0, 0 0, 0 0, center;
+        background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+        background-size: 100% 100%, auto, auto, cover;
         inset: 0;
         pointer-events: none;
         position: absolute;
@@ -23,7 +25,7 @@
       }
       .spotlight-bar {
         align-items: center;
-        background: linear-gradient(90deg, rgba(15, 18, 40, 0.98), rgba(25, 20, 54, 0.92));
+        background: linear-gradient(90deg, rgba(15, 18, 40, 0.86), rgba(25, 20, 54, 0.78));
         border-bottom: 1px solid rgba(var(--red-rgb), 0.42);
         display: flex;
         justify-content: space-between;
@@ -88,9 +90,9 @@
         min-height: 310px;
       }
       .spotlight-selector {
-        background:
-          linear-gradient(180deg, rgba(25, 29, 56, 0.98), rgba(8, 10, 24, 0.98)),
-          var(--case);
+        /* Alpha < 1 (en vez del var(--case) opaco anterior) deja pasar la
+           ambientación "noche de cine" detrás del panel de la lista. */
+        background: linear-gradient(180deg, rgba(25, 29, 56, 0.88), rgba(8, 10, 24, 0.9));
         border-right: 1px solid rgba(var(--violet-rgb), 0.48);
         display: grid;
         grid-template-rows: auto minmax(0, 1fr);

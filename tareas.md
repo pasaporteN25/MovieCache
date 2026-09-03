@@ -91,8 +91,8 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
   - [x] **[U2.0] Integrar navegación y utilidades en el escenario.** Ver detalle en
     `Hecho`.
   - [x] **[U2.1] Fijar y prototipar la cartelera-lista.** Ver detalle en `Hecho`. El
-    asset original auditado `night-cinema-ambient-v1.png` está listo para la siguiente
-    integración de CSS; la ambientación actual sigue siendo CSS hasta esa entrega.
+    asset auditado `night-cinema-ambient-v1.png` ya está integrado como fondo real de
+    `.spotlight-ambience`.
   - [ ] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Mostrar las
     obras de perfil sobre una repisa real, con título legible, disponibilidad y foco
     inequívoco. En escritorio, un selector de categoría muestra una sola estantería
@@ -203,20 +203,28 @@ maestro); las filas del selector bajan de 64px a 52px con un indicador triangula
 decorativo en la fila activa, más denso y parecido a una lista de reproducción.
 
 `.spotlight-ambience` agrega una capa `aria-hidden`/`pointer-events: none` detrás de
-la barra y el escenario con una ambientación "Noche de cine" 100% CSS (glow rosa/cyan,
-viñeta, puntos bokeh violeta/dorado) — sin fotos, logos, actores ni texto. El asset
-raster auditado que pedía el brief maestro (igual que `vhs-cassette-frame-v1.png`)
-queda pendiente: esta sesión no tiene herramienta de generación de imágenes, así que el
-owner lo va a generar por su cuenta con el prompt entregado en la conversación; el
-brief deja documentado el archivo, la ficha de procedencia y la única línea de CSS que
-hace falta tocar cuando llegue.
+la barra y el escenario. El owner generó y auditó `night-cinema-ambient-v1.png`
+(prompt, procedencia C2PA, hash y licencia en `docs/assets/night-cinema-ambient-v1.md`)
+y quedó integrado como fondo real de esa capa, con un tinte de marca liviano encima
+(sin logos, actores ni texto agregado por CSS).
+
+La primera integración dejaba el fondo casi invisible: `.spotlight-selector` tenía un
+`background-color` opaco de respaldo y `.spotlight-bar` alfas de 0.92–0.98 (92-100% de
+tapado), y dentro de `.spotlight-ambience` los gradientes CSS estaban listados antes
+que la imagen en el `background-image` (la primera capa listada es la más cercana a
+quien mira), tapándola aún donde sí se veía. Se corrigió reordenando la imagen como
+capa de fondo real, aligerando los gradientes a un tinte y bajando `.spotlight-bar` a
+0.78–0.86 y `.spotlight-selector` a un degradé con alfa 0.88–0.9 en vez del color
+opaco. Verificado visualmente en un servidor descartable (1280px y 375px, con y sin
+`page_image` para aislar el efecto): la ambientación ahora se distingue como puntos de
+luz reales, y el contraste del texto de la lista se mantiene alto porque la foto es
+mayormente oscura.
 
 Estados de carga, vacío y advertencia/error ya existían de U1.1-U1.3 y no cambiaron.
 Verificado con una prueba de navegador nueva
 (`test_home_marquee_shows_the_available_billboard_label_and_decorative_ambience`) más
 toda la suite existente sin tocar un assert: 560 pruebas unitarias, 22 de navegador,
-Ruff, formato, mypy estricto, `compileall` y `git diff --check` en verde. Verificado
-también visualmente en un servidor descartable en 1280px y 375px.
+Ruff, formato, mypy estricto, `compileall` y `git diff --check` en verde.
 
 #### [U2.0] Integrar navegación y utilidades en el escenario
 **Cerrado 2026-09-02.** `docs/briefs/home-control-desk-v1.md` fija la arquitectura de
