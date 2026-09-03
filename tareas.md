@@ -90,15 +90,9 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
 
   - [x] **[U2.0] Integrar navegación y utilidades en el escenario.** Ver detalle en
     `Hecho`.
-  - [ ] **[U2.1] Fijar y prototipar la cartelera-lista.** Reemplazar el panel actual por
-    una lista compacta de reproducción tipo Winamp, operable con flechas, Home/End y
-    Enter; sumar la ambientación original/licenciada `Noche de cine` y hacer visible
-    `Cartelera disponible`. La lista es la navegación primaria; click/tap se conservan
-    como alternativa, no como requisito. Cierre: brief, asset auditado, estados de
-    carga/vacío/error y pruebas de foco/teclado/móvil sin cambiar `/api/home`. En el
-    tamaño de escritorio previsto, el escenario completo ocupa el viewport sin scroll
-    vertical; en móvil, alturas bajas, teclado virtual o zoom alto puede crecer y hacer
-    scroll vertical para no recortar contenido.
+  - [x] **[U2.1] Fijar y prototipar la cartelera-lista.** Ver detalle en `Hecho`. El
+    asset "Noche de cine" real queda pendiente de que el owner lo genere (prompt
+    entregado en la conversación); mientras tanto la ambientación es CSS original.
   - [ ] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Mostrar las
     obras de perfil sobre una repisa real, con título legible, disponibilidad y foco
     inequívoco. En escritorio, un selector de categoría muestra una sola estantería
@@ -198,6 +192,31 @@ Sin tareas activas.
 ## Hecho
 
 ### Frente: Inicio videoclub
+
+#### [U2.1] Fijar y prototipar la cartelera-lista
+**Cerrado 2026-09-02.** `docs/briefs/home-cartelera-winamp-v1.md` documenta la
+entrega. U1.1 ya había resuelto la mecánica de teclado (flechas, Home/End, Enter vía
+semántica nativa de `<button>`) y click/tap como alternativa; esta entrega es
+puramente visual y no toca `/api/home` ni `home_service.py`. El kicker de la sección
+pasa de "Programación personal" a `Cartelera disponible` (el término exacto del brief
+maestro); las filas del selector bajan de 64px a 52px con un indicador triangular
+decorativo en la fila activa, más denso y parecido a una lista de reproducción.
+
+`.spotlight-ambience` agrega una capa `aria-hidden`/`pointer-events: none` detrás de
+la barra y el escenario con una ambientación "Noche de cine" 100% CSS (glow rosa/cyan,
+viñeta, puntos bokeh violeta/dorado) — sin fotos, logos, actores ni texto. El asset
+raster auditado que pedía el brief maestro (igual que `vhs-cassette-frame-v1.png`)
+queda pendiente: esta sesión no tiene herramienta de generación de imágenes, así que el
+owner lo va a generar por su cuenta con el prompt entregado en la conversación; el
+brief deja documentado el archivo, la ficha de procedencia y la única línea de CSS que
+hace falta tocar cuando llegue.
+
+Estados de carga, vacío y advertencia/error ya existían de U1.1-U1.3 y no cambiaron.
+Verificado con una prueba de navegador nueva
+(`test_home_marquee_shows_the_available_billboard_label_and_decorative_ambience`) más
+toda la suite existente sin tocar un assert: 560 pruebas unitarias, 22 de navegador,
+Ruff, formato, mypy estricto, `compileall` y `git diff --check` en verde. Verificado
+también visualmente en un servidor descartable en 1280px y 375px.
 
 #### [U2.0] Integrar navegación y utilidades en el escenario
 **Cerrado 2026-09-02.** `docs/briefs/home-control-desk-v1.md` fija la arquitectura de

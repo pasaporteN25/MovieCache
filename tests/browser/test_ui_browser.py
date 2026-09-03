@@ -255,6 +255,31 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.wait_for_selector("#collectionView:not([hidden])")
         page.wait_for_function("document.activeElement.id === 'catalogTitle'")
 
+    def test_home_marquee_shows_the_available_billboard_label_and_decorative_ambience(
+        self,
+    ) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        self.assertEqual(
+            page.locator("#spotlight .eyebrow").inner_text().strip().casefold(),
+            "cartelera disponible",
+        )
+
+        ambience = page.locator(".spotlight-ambience")
+        self.assertEqual(ambience.count(), 1)
+        self.assertEqual(ambience.get_attribute("aria-hidden"), "true")
+        self.assertEqual(
+            ambience.evaluate("element => getComputedStyle(element).pointerEvents"), "none"
+        )
+        # Decorative-only: it must not sit above the real controls it shares a
+        # stacking context with, or it would silently swallow clicks/taps.
+        stage_z_index = page.locator(".spotlight-stage").evaluate(
+            "element => getComputedStyle(element).zIndex"
+        )
+        ambience_z_index = ambience.evaluate("element => getComputedStyle(element).zIndex")
+        self.assertGreater(int(stage_z_index or "0"), int(ambience_z_index or "0"))
+
     def test_home_selector_keeps_one_tab_stop_and_changes_preview_with_arrows(self) -> None:
         page = self.page
 
