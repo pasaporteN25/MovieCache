@@ -93,17 +93,8 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
   - [x] **[U2.1] Fijar y prototipar la cartelera-lista.** Ver detalle en `Hecho`. El
     asset auditado `night-cinema-ambient-v1.png` ya está integrado como fondo real de
     `.spotlight-ambience`.
-  - [ ] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Mostrar las
-    obras de perfil sobre una repisa real, con título legible, disponibilidad y foco
-    inequívoco. En escritorio, un selector de categoría muestra una sola estantería
-    editorial activa —no apila todas las filas verticalmente— y esa estantería se
-    recorre lateralmente. Al seleccionar un lomo, revelar debajo o junto a la fila una
-    previsualización basada en `vhs-cassette-frame-v1.png`, caja frontal/portada y la
-    información extendida que sea posible leer sin abrir el dossier. `Editar mi ficha`
-    aparece solamente para una obra editable; `Ver más` conserva el detalle completo.
-    Mantener scroll lateral táctil, roving tabindex y las acciones editoriales actuales.
-    Cierre: layout responsive con títulos largos, sin poster como único portador de
-    información, y pruebas visuales/de interacción.
+  - [x] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Ver
+    detalle en `Hecho`.
   - [ ] **[U2.3] Abrir la caja para el detalle extendido.** `Ver más` parte de la caja
     frontal y abre una transición reversible hacia un dossier donde el cassette VHS
     negro acompaña sinopsis, ficha y acciones existentes. La animación es decorativa,
@@ -192,6 +183,33 @@ Sin tareas activas.
 ## Hecho
 
 ### Frente: Inicio videoclub
+
+#### [U2.2] Convertir cada fila editorial en una estantería de lomos
+**Cerrado 2026-09-03.** `docs/briefs/home-shelves-v2.md` documenta la entrega, que
+reemplaza el tratamiento visual de U1.2 sin tocar `/api/home` ni `home_service.py`.
+`#homeShelfCategories` suma un selector de categorías con roving tabindex
+(flechas/Home/End/clic): en escritorio (`min-width: 861px`) sólo la estantería activa
+se muestra (`.home-program[data-active="false"] { display: none; }`), sin apilar todas
+las filas; en móvil (`≤860px`) el selector se oculta y todas vuelven a apilarse y hacer
+scroll vertical, como antes. Con una sola sección no hace falta elegir, así que el
+selector no se renderiza.
+
+Cada obra de la fila pasó de una caja frontal (`vhs-cassette-frame-v1.png`) a un lomo
+angosto (`.vhs-spine`, texto vertical real vía `writing-mode`, sin imagen): el marco
+auditado se movió a la previsualización (`.home-shelf-preview-frame`), que ahora sí es
+"una previsualización basada en `vhs-cassette-frame-v1.png`, caja frontal/portada" tal
+como pedía el brief maestro. El botón de detalle se renombró a `Ver más`; se sumó
+`Editar mi ficha` sólo para entradas de origen `catalog` (reutiliza
+`openDetail()`+`editPersonalRecord()` vía la nueva `openDetailForPersonalEdit()` en
+`detail.js`, sin editor nuevo), ausente para recomendaciones de Club sin agregar
+(`origin.kind === "collection"`) — el endurecimiento completo de permisos queda para
+[U2.4].
+
+Verificado con dos pruebas de navegador nuevas (categorías con teclado/mobile,
+`Editar mi ficha` sólo en entradas propias y foco en el campo de fecha al abrir) más la
+prueba de estanterías existente actualizada para el nuevo marco/spines; también en un
+servidor descartable con siete obras en 1345px y 375px. 560 pruebas unitarias, 24 de
+navegador, Ruff, formato, mypy estricto, `compileall` y `git diff --check` en verde.
 
 #### [U2.1] Fijar y prototipar la cartelera-lista
 **Cerrado 2026-09-02.** `docs/briefs/home-cartelera-winamp-v1.md` documenta la

@@ -331,6 +331,13 @@
         min-width: 0;
         padding-top: 24px;
       }
+      /* En escritorio, el selector de categorías gobierna una sola estantería
+         activa: no se apilan todas las filas. En móvil (<=860px, ver el
+         breakpoint que ya define .spotlight-selector-options) todas quedan
+         visibles y apiladas, como antes de esta entrega. */
+      @media (min-width: 861px) {
+        .home-program[data-active="false"] { display: none; }
+      }
       .home-program-heading {
         align-items: end;
         display: flex;
@@ -363,6 +370,24 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .home-shelf-categories { margin-bottom: 4px; }
+      .home-shelf-category-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .home-shelf-category {
+        background: var(--surface-control);
+        border: 1px solid var(--control-border);
+        font-size: var(--text-small);
+        padding: 8px 14px;
+        width: auto;
+      }
+      .home-shelf-category[aria-pressed="true"] {
+        background: color-mix(in srgb, var(--teal) 14%, var(--surface-control));
+        border-color: var(--teal);
+        color: var(--teal);
+      }
       .home-section-action { flex: 0 0 auto; width: auto; }
       .home-shelf-rail {
         display: flex;
@@ -377,61 +402,16 @@
         scroll-snap-type: inline proximity;
       }
       .home-shelf-tape {
-        aspect-ratio: 1.78 / 1;
-        flex: 0 0 clamp(244px, 24vw, 330px);
+        flex: 0 0 clamp(64px, 7vw, 92px);
+        height: clamp(190px, 22vw, 250px);
         min-height: 0;
         scroll-snap-align: start;
-        text-align: left;
-      }
-      .home-shelf-tape-copy {
-        align-content: center;
-        background: color-mix(in srgb, var(--surface-deep) 78%, transparent);
-        border-block: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
-        display: grid;
-        gap: 5px;
-        inset: 30% 28% 25%;
-        min-width: 0;
-        padding: 7px 10px;
-        position: absolute;
-        text-align: center;
-        transition: background 180ms var(--ease-out), border-color 180ms var(--ease-out);
-        z-index: 1;
-      }
-      .home-shelf-tape strong {
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        color: var(--ink);
-        display: -webkit-box;
-        font-family: var(--font-display);
-        font-size: var(--text-caption);
-        font-style: italic;
-        letter-spacing: 0.015em;
-        line-height: 1;
-        overflow: hidden;
-        text-transform: uppercase;
-      }
-      .home-shelf-tape small {
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 1;
-        color: var(--muted);
-        display: -webkit-box;
-        font-size: var(--text-label);
-        line-height: 1.25;
-        overflow: hidden;
-      }
-      .home-shelf-tape:hover .home-shelf-tape-copy {
-        background: color-mix(in srgb, var(--teal) 13%, var(--surface-deep));
-        border-color: color-mix(in srgb, var(--teal) 62%, transparent);
-      }
-      .home-shelf-tape[data-vhs-state="selected"] .home-shelf-tape-copy {
-        background: color-mix(in srgb, var(--red) 18%, var(--surface-deep));
-        border-color: var(--gold);
       }
       .home-shelf-preview {
         align-items: stretch;
         display: grid;
         gap: clamp(14px, 2vw, 26px);
-        grid-template-columns: minmax(86px, 116px) minmax(0, 1fr);
+        grid-template-columns: minmax(128px, 168px) minmax(0, 1fr);
         margin-top: 8px;
         min-width: 0;
         padding: 16px;
@@ -517,9 +497,13 @@
         max-width: 72ch;
         overflow: hidden;
       }
-      .home-shelf-preview-action {
-        justify-self: start;
+      .home-shelf-preview-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
         margin-top: 10px;
+      }
+      .home-shelf-preview-action {
         min-height: 36px;
         width: auto;
       }
@@ -600,8 +584,8 @@
         min-height: 18px;
       }
 
-@media (max-width: 1100px) {
-        .home-shelf-tape { flex-basis: 290px; }
+@media (max-width: 860px) {
+        .home-shelf-categories { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -617,9 +601,9 @@
 
         .home-shelf-rail { gap: 9px; scroll-snap-type: inline mandatory; }
 
-        .home-shelf-tape { flex-basis: min(84vw, 330px); }
+        .home-shelf-tape { flex-basis: clamp(56px, 18vw, 80px); height: clamp(160px, 44vw, 210px); }
 
-        .home-shelf-preview { grid-template-columns: 82px minmax(0, 1fr); padding: 12px; }
+        .home-shelf-preview { grid-template-columns: 100px minmax(0, 1fr); padding: 12px; }
 
         .home-shelf-preview-art { min-height: 124px; }
 

@@ -38,6 +38,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         randomCatalogOnly: document.querySelector("#randomCatalogOnly"),
         randomScopeLabel: document.querySelector("#randomScopeLabel"),
         homeView: document.querySelector("#homeView"),
+        homeShelfCategories: document.querySelector("#homeShelfCategories"),
         clubView: document.querySelector("#clubView"),
         inboxView: document.querySelector("#inboxView"),
         inboxModeTabs: document.querySelector("#inboxModeTabs"),

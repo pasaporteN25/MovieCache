@@ -18,9 +18,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
 
       export let spotlightIndex = 0;
 
+      export let activeHomeSectionId = "";
+
       export function setEditorialHome(value) {
         editorialHome = value;
         homeShelfSelections.clear();
+        activeHomeSectionId = "";
       }
 
       export async function goToHomeCollection(collectionId) {
@@ -277,23 +280,76 @@ import { closeSharedDetail, openCollection } from "./club.js";
         selectHomeShelfEntry(sectionId, entries[nextIndex].key || "", true);
       }
 
+      export function nonEmptyHomeSections() {
+        return editorialHome.sections.filter((section) => Array.isArray(section.items) && section.items.length);
+      }
+
+      export function homeSectionId(section, sectionIndex) {
+        return String(section.id || `editorial-${sectionIndex}`);
+      }
+
       export function renderEditorialSections() {
-        fields.homeSections.innerHTML = editorialHome.sections
-          .filter((section) => Array.isArray(section.items) && section.items.length)
-          .map((section, sectionIndex) => editorialSection(section, sectionIndex))
+        const sections = nonEmptyHomeSections();
+        const ids = sections.map((section, index) => homeSectionId(section, index));
+        if (!ids.includes(activeHomeSectionId)) activeHomeSectionId = ids[0] || "";
+        fields.homeShelfCategories.innerHTML = ids.length > 1 ? homeCategorySelector(sections, ids) : "";
+        fields.homeShelfCategories.hidden = ids.length <= 1;
+        fields.homeSections.innerHTML = sections
+          .map((section, sectionIndex) => editorialSection(section, sectionIndex, ids[sectionIndex] === activeHomeSectionId))
           .join("");
       }
 
-      export function editorialSection(section, sectionIndex) {
+      export function homeCategorySelector(sections, ids) {
+        return `<div class="home-shelf-category-options" role="group" aria-label="Categorías de estanterías">
+          ${sections.map((section, index) => {
+            const id = ids[index];
+            const active = id === activeHomeSectionId;
+            return `<button class="home-shelf-category" type="button" aria-pressed="${active}" tabindex="${active ? "0" : "-1"}" data-click="home-category-select" data-section-id="${escapeAttr(id)}">${escapeHtml(section.title || "Selección")}</button>`;
+          }).join("")}
+        </div>`;
+      }
+
+      export function selectHomeCategory(sectionId, restoreFocus = false) {
+        const ids = nonEmptyHomeSections().map((section, index) => homeSectionId(section, index));
+        if (!ids.includes(sectionId)) return;
+        activeHomeSectionId = sectionId;
+        renderEditorialSections();
+        if (restoreFocus) {
+          fields.homeShelfCategories.querySelector(`[data-click="home-category-select"][data-section-id="${CSS.escape(sectionId)}"]`)?.focus();
+        }
+      }
+
+      export function moveHomeCategorySelector(event) {
+        if (!event.target.closest("[data-click='home-category-select']")) return;
+        const ids = nonEmptyHomeSections().map((section, index) => homeSectionId(section, index));
+        if (!ids.length) return;
+        const offsets = { ArrowRight: 1, ArrowLeft: -1 };
+        const currentIndex = Math.max(0, ids.indexOf(activeHomeSectionId));
+        if (event.key === "Home") {
+          event.preventDefault();
+          selectHomeCategory(ids[0], true);
+          return;
+        }
+        if (event.key === "End") {
+          event.preventDefault();
+          selectHomeCategory(ids[ids.length - 1], true);
+          return;
+        }
+        if (!(event.key in offsets)) return;
+        event.preventDefault();
+        selectHomeCategory(ids[(currentIndex + offsets[event.key] + ids.length) % ids.length], true);
+      }
+
+      export function editorialSection(section, sectionIndex, active) {
         const action = section.action || {};
         const entries = Array.isArray(section.items) ? section.items : [];
-        const sectionId = String(section.id || `editorial-${sectionIndex}`);
+        const sectionId = homeSectionId(section, sectionIndex);
         const selectedIndex = Math.max(0, Math.min(entries.length - 1, homeShelfSelections.get(sectionId) || 0));
         const selectedEntry = entries[selectedIndex];
         const actionButton = action.kind
           ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(action.label || "Explorar")}</button>`
           : "";
-        return `<section class="home-program" data-home-section="${escapeAttr(sectionId)}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
+        return `<section class="home-program" data-home-section="${escapeAttr(sectionId)}" data-active="${active}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
           <header class="home-program-heading">
             <div>
               <span class="section-kicker">${escapeHtml(section.eyebrow || "Programación personal")}</span>
@@ -314,12 +370,10 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const title = displayTitle(item) || `Obra ${index + 1}`;
         const meta = [item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Ficha por completar";
         const reason = entry?.reason?.label || "Selección del archivo";
-        return `<button class="home-shelf-tape vhs-cassette" type="button" data-vhs-state="${selected ? "selected" : "closed"}" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entry?.key || "")}" aria-label="${escapeAttr(`${title}. ${reason}. Opción ${index + 1}`)}">
-          <span class="vhs-cassette-shell" aria-hidden="true"></span>
-          <span class="home-shelf-tape-copy">
-            <strong>${escapeHtml(title)}</strong>
-            <small>${escapeHtml(meta)}</small>
-          </span>
+        return `<button class="home-shelf-tape vhs-spine" type="button" data-vhs-state="${selected ? "selected" : "closed"}" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entry?.key || "")}" aria-label="${escapeAttr(`${title}. ${reason}. Opción ${index + 1}`)}">
+          <span class="vhs-spine-sticker" aria-hidden="true"></span>
+          <span class="vhs-spine-title">${escapeHtml(title)}</span>
+          <span class="vhs-spine-meta">${escapeHtml(meta)}</span>
         </button>`;
       }
 
@@ -332,20 +386,23 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const metadata = [item.year, firstListValue(item.directors), firstListValue(item.genres)].filter(Boolean);
         const summary = String(reason.detail || item.wikipedia_extract || item.description || "").trim();
         const isCollection = origin.kind === "collection";
-        const detailAction = isCollection
+        const viewMoreAction = isCollection
           ? `<button type="button" class="home-shelf-preview-action" data-click="open-home-collection-detail" data-key="${escapeAttr(entry?.key || "")}">Ver ficha del Club</button>`
-          : `<button type="button" class="home-shelf-preview-action" data-click="open-detail" data-id="${escapeAttr(item.id || "")}">Abrir ficha</button>`;
+          : `<button type="button" class="home-shelf-preview-action" data-click="open-detail" data-id="${escapeAttr(item.id || "")}">Ver más</button>`;
+        const editAction = isCollection
+          ? ""
+          : `<button type="button" class="quiet-action home-shelf-preview-action" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>`;
         const artwork = poster
           ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">`
           : `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
         return `<aside class="home-shelf-preview vhs-case" data-vhs-state="open" data-home-shelf-preview="${escapeAttr(sectionId)}" aria-labelledby="home-shelf-preview-${escapeAttr(sectionId)}">
-          <div class="home-shelf-preview-art">${artwork}</div>
+          <div class="home-shelf-preview-art"><span class="home-shelf-preview-frame" aria-hidden="true"></span>${artwork}</div>
           <div class="home-shelf-preview-copy">
             <span>${escapeHtml(isCollection ? `En ${origin.collection_title || "una colección seguida"}` : reason.label || "Selección del archivo")}</span>
             <h3 id="home-shelf-preview-${escapeAttr(sectionId)}">${escapeHtml(title)}</h3>
             ${metadata.length ? `<p class="home-shelf-preview-meta">${metadata.map(escapeHtml).join(" · ")}</p>` : ""}
             <p class="home-shelf-preview-summary">${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
-            ${detailAction}
+            <div class="home-shelf-preview-actions">${viewMoreAction}${editAction}</div>
           </div>
         </aside>`;
       }

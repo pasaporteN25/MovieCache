@@ -381,6 +381,22 @@ class BrowserInterfaceTests(unittest.TestCase):
                                     "detail": "El inventario confirma que está disponible.",
                                 },
                             },
+                            # Padding entries: real spines are narrow, so a couple
+                            # of them may not overflow a mobile viewport on their
+                            # own. More entries make the horizontal-scroll
+                            # assertion below meaningful regardless of width.
+                            *(
+                                {
+                                    "key": f"available-padding-{padding_index}",
+                                    "origin": {"kind": "catalog"},
+                                    "item": items[padding_index % 2],
+                                    "reason": {
+                                        "label": "Lista para ver",
+                                        "detail": "El inventario confirma que está disponible.",
+                                    },
+                                }
+                                for padding_index in range(6)
+                            ),
                         ],
                     }
                 ]
@@ -390,16 +406,19 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.route("**/api/items?*", add_home_shelves)
         self._open_and_wait_for_catalog(page)
         shelf = page.locator('[data-home-section="available"] .home-shelf-tape')
-        self.assertEqual(shelf.count(), 2)
+        self.assertEqual(shelf.count(), 8)
         self.assertEqual(shelf.nth(0).get_attribute("tabindex"), "0")
         self.assertEqual(shelf.nth(1).get_attribute("tabindex"), "-1")
         self.assertEqual(shelf.nth(0).get_attribute("data-vhs-state"), "selected")
         self.assertEqual(shelf.nth(1).get_attribute("data-vhs-state"), "closed")
+        # The row shows each work as a spine (title/meta only, no raster asset);
+        # the audited PNG frame now belongs to the opened preview instead.
+        preview_frame = page.locator(
+            '[data-home-shelf-preview="available"] .home-shelf-preview-frame'
+        )
         self.assertIn(
             "vhs-cassette-frame-v1.png",
-            shelf.nth(0)
-            .locator(".vhs-cassette-shell")
-            .evaluate("element => getComputedStyle(element).backgroundImage"),
+            preview_frame.evaluate("element => getComputedStyle(element).backgroundImage"),
         )
 
         shelf.nth(0).focus()
@@ -441,10 +460,130 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         page.emulate_media(reduced_motion="reduce")
         self.assertEqual(
-            shelf.nth(0)
-            .locator(".vhs-cassette-shell")
-            .evaluate("element => getComputedStyle(element).transitionDuration"),
+            shelf.nth(0).evaluate("element => getComputedStyle(element).transitionDuration"),
             "0s",
+        )
+
+    def test_home_shelf_categories_show_one_active_shelf_on_desktop_and_all_on_mobile(
+        self,
+    ) -> None:
+        page = self.page
+
+        def add_two_home_sections(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 2:
+                home["sections"] = [
+                    {
+                        "id": "available",
+                        "eyebrow": "Para ver ahora",
+                        "title": "Disponible esta noche",
+                        "description": "Pendientes que confirma tu biblioteca física.",
+                        "items": [
+                            {
+                                "key": "available-heat",
+                                "origin": {"kind": "catalog"},
+                                "item": items[0],
+                                "reason": {"label": "Lista para ver", "detail": "Disponible."},
+                            }
+                        ],
+                    },
+                    {
+                        "id": "memory",
+                        "eyebrow": "Tu archivo pide memoria",
+                        "title": "Volvé a esto",
+                        "description": "Obras que ya viste y podrían volver a la cartelera.",
+                        "items": [
+                            {
+                                "key": "memory-akira",
+                                "origin": {"kind": "catalog"},
+                                "item": items[1],
+                                "reason": {"label": "Ya la viste", "detail": "Hace tiempo."},
+                            }
+                        ],
+                    },
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_two_home_sections)
+        self._open_and_wait_for_catalog(page)
+
+        categories = page.locator(".home-shelf-category")
+        self.assertEqual(categories.count(), 2)
+        self.assertEqual(categories.nth(0).get_attribute("aria-pressed"), "true")
+        self.assertEqual(categories.nth(1).get_attribute("aria-pressed"), "false")
+        self.assertEqual(
+            page.locator('.home-program[data-home-section="available"]').get_attribute(
+                "data-active"
+            ),
+            "true",
+        )
+        self.assertEqual(
+            page.locator('.home-program[data-home-section="memory"]').get_attribute("data-active"),
+            "false",
+        )
+        self.assertFalse(page.locator('.home-program[data-home-section="memory"]').is_visible())
+
+        categories.nth(0).focus()
+        page.keyboard.press("ArrowRight")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.sectionId"), "memory")
+        self.assertEqual(categories.nth(1).get_attribute("aria-pressed"), "true")
+        self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
+        self.assertFalse(page.locator('.home-program[data-home-section="available"]').is_visible())
+
+        page.set_viewport_size({"width": 390, "height": 844})
+        self.assertFalse(page.locator("#homeShelfCategories").is_visible())
+        self.assertTrue(page.locator('.home-program[data-home-section="available"]').is_visible())
+        self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
+        self.assertFalse(
+            page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+
+    def test_home_shelf_preview_shows_edit_action_only_for_personal_entries(self) -> None:
+        page = self.page
+
+        def add_mixed_origin_section(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 1:
+                home["sections"] = [
+                    {
+                        "id": "available",
+                        "eyebrow": "Para ver ahora",
+                        "title": "Disponible esta noche",
+                        "description": "Pendientes que confirma tu biblioteca física.",
+                        "items": [
+                            {
+                                "key": "available-heat",
+                                "origin": {"kind": "catalog"},
+                                "item": items[0],
+                                "reason": {"label": "Lista para ver", "detail": "Disponible."},
+                            }
+                        ],
+                    }
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_mixed_origin_section)
+        self._open_and_wait_for_catalog(page)
+
+        preview = page.locator('[data-home-shelf-preview="available"]')
+        self.assertEqual(preview.get_by_text("Ver más").count(), 1)
+        edit_button = preview.get_by_text("Editar mi ficha")
+        self.assertEqual(edit_button.count(), 1)
+
+        edit_button.click()
+        page.wait_for_selector("#detailDrawer[open]")
+        page.wait_for_selector("[data-detail-form='personal']")
+        self.assertEqual(
+            page.evaluate("document.activeElement.hasAttribute('data-personal-watched-at')"),
+            True,
         )
 
     def test_ficha_description_dialog_focus_and_naming(self) -> None:

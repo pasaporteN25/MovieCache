@@ -76,6 +76,11 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         openDetail(id, { context: detailContextForTrigger(target) });
       }
 
+      export function openDetailForPersonalEdit(target, id) {
+        openDetail(id, { context: detailContextForTrigger(target) });
+        editPersonalRecord();
+      }
+
       export function personalRecordPanel(item) {
         if (detailPersonalEditing) return personalRecordEditor(item);
         const rating = normalizeRating(item.rating);
