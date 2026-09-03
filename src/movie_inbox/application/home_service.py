@@ -16,7 +16,10 @@ from movie_inbox.domain.releases import normalize_release_dates
 
 HOME_SECTION_LIMIT = 6
 HOME_SECTION_COUNT = 5
-HOME_FEATURED_LIMIT = 4
+# The desktop home billboard has room for six daily recommendations. Keep the
+# limit in one server-side constant so API payloads, saved snapshots, and
+# clients can agree on the same bounded contract.
+HOME_FEATURED_LIMIT = 6
 _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 

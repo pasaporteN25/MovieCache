@@ -265,7 +265,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
 
         self.assertEqual(
-            page.locator("#spotlight .eyebrow").inner_text().strip().casefold(),
+            page.locator("#spotlightTitle").inner_text().strip().casefold(),
             "cartelera disponible",
         )
 
@@ -351,10 +351,22 @@ class BrowserInterfaceTests(unittest.TestCase):
             items = payload.get("items") or []
             home = payload.get("home") or {}
             if len(items) >= 2:
+                titles = ("Heat", "Akira", "Videodrome", "Paris, Texas", "Possession", "Cure")
                 home["featured"] = [
-                    {"key": "playlist-heat", "origin": {"kind": "catalog"}, "item": items[0]},
-                    {"key": "playlist-akira", "origin": {"kind": "catalog"}, "item": items[1]},
+                    {
+                        "key": f"playlist-{index}",
+                        "origin": {"kind": "catalog"},
+                        "item": {
+                            **items[index % 2],
+                            "id": f"playlist-item-{index}",
+                            "title": title,
+                            "year": str(1981 + index),
+                            "duration_minutes": 96 + index,
+                        },
+                    }
+                    for index, title in enumerate(titles)
                 ]
+                home["limits"] = {**(home.get("limits") or {}), "featured_items": 6}
             payload["home"] = home
             route.fulfill(response=response, json=payload)
 
@@ -366,7 +378,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             ["#", "título", "año", "tipo", "géneros", "duración"],
         )
         rows = page.locator("[data-playlist-entry]")
-        self.assertEqual(rows.count(), 2)
+        self.assertEqual(rows.count(), 6)
         rows.nth(1).click()
         selected_key = rows.nth(1).get_attribute("data-entry-key")
         rows.nth(1).focus()
@@ -380,11 +392,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator("[data-playlist-entry].is-on-air").count(), 1)
 
         page.keyboard.press("Enter")
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "open-detail")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.click"),
+            "open-detail-with-case-transition",
+        )
 
         page.locator('[data-click="spotlight-air-select"][data-index="0"]').click()
         page.locator('[data-click="spotlight-prev"]').click()
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 1)
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 5)
         self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-prev")
         self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_key)
 

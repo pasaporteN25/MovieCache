@@ -27,7 +27,8 @@ class EditorialHomeServiceTests(unittest.TestCase):
         second = self.service.build("lucas", "2026-08-10", list(reversed(catalog)))
 
         self.assertEqual(first, second)
-        self.assertEqual(len(first["featured"]), 4)
+        self.assertEqual(len(first["featured"]), 6)
+        self.assertEqual(first["limits"]["featured_items"], 6)
         self.assertEqual(first["hero"], first["featured"][0])
         self.assertEqual(first["hero"]["reason"]["code"], "available_pending")
         self.assertTrue(all(entry["item"]["en_catalogo"] for entry in first["featured"]))

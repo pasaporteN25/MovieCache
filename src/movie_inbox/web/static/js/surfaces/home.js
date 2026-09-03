@@ -2,7 +2,7 @@ import { cachedImageSrc, posterVariant } from "../core/card.js";
 import { editorialRevision, loadCatalog, setEditorialRevision } from "../core/catalog-data.js";
 import { detailLinks, drawerPoster, factsPanel } from "../core/detail.js";
 import { fields } from "../core/fields.js";
-import { displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localDateOffset, todayLocalDate } from "../core/format.js";
+import { availabilityState, displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localDateOffset, todayLocalDate } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
 import { goToClub, routeValuesForView, showView, syncRoute } from "../core/router.js";
 import { clubMode, setClubMode } from "../core/state.js";
@@ -11,6 +11,11 @@ import { clearManualSearch } from "./catalog-search.js";
 import { closeSharedDetail, openCollection } from "./club.js";
 
       export let editorialHome = { generated_for: "", featured: [], hero: null, sections: [], warnings: [] };
+
+      // Keep a bounded fallback for payloads produced by older servers that do
+      // not yet expose the limits object. Current API responses carry the
+      // authoritative value in payload.limits.featured_items.
+      const HOME_FEATURED_FALLBACK_LIMIT = 6;
 
       export const editorialFeaturedCache = new Map();
 
@@ -48,6 +53,13 @@ import { closeSharedDetail, openCollection } from "./club.js";
 
       function entryItemId(entry) {
         return String(entry?.item?.id || "");
+      }
+
+      function homeDurationLabel(item) {
+        const value = item?.duration_minutes ?? item?.duration ?? item?.runtime ?? "";
+        const text = String(value).trim();
+        if (!text) return "—";
+        return /\bmin(?:uto)?s?\b/i.test(text) ? text : `${text} min`;
       }
 
       function playlistEntries(source = playlistSource) {
@@ -234,8 +246,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
             featured_source: ""
           };
         }
+        const configuredLimit = Number(payload.limits?.featured_items);
+        const featuredLimit = Number.isInteger(configuredLimit) && configuredLimit > 0
+          ? configuredLimit
+          : HOME_FEATURED_FALLBACK_LIMIT;
         const featured = Array.isArray(payload.featured)
-          ? payload.featured.filter((entry) => entry && typeof entry === "object").slice(0, 4)
+          ? payload.featured.filter((entry) => entry && typeof entry === "object").slice(0, featuredLimit)
           : payload.hero && typeof payload.hero === "object" ? [payload.hero] : [];
         return {
           generated_for: String(payload.generated_for || todayLocalDate()),
@@ -243,6 +259,9 @@ import { closeSharedDetail, openCollection } from "./club.js";
           hero: featured[0] || null,
           sections: Array.isArray(payload.sections) ? payload.sections : [],
           warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+          limits: payload.limits && typeof payload.limits === "object"
+            ? payload.limits
+            : { featured_items: HOME_FEATURED_FALLBACK_LIMIT },
           featured_source: String(payload.featured_source || "")
         };
       }
@@ -301,7 +320,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
           : `<div class="spotlight-poster-fallback poster-${posterVariant(carouselItem.id || carouselTitle)}" aria-hidden="true"><span>Cartelera</span><strong>${escapeHtml(carouselTitle)}</strong></div>`;
         const selector = `<aside class="spotlight-selector" aria-label="Cartelera automática">
           <div class="spotlight-selector-heading">
-            <span>Al aire</span>
+            <span>Cartelera disponible</span>
             <strong>${String(spotlightIndex + 1).padStart(2, "0")} / ${String(featured.length).padStart(2, "0")}</strong>
           </div>
           <div class="spotlight-poster-card">
@@ -334,11 +353,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
           const selected = key === selectedEntryKey;
           const onAir = key === carouselItemId && playlistSource === "daily";
           const genres = listText(item.genres, 2) || "—";
-          const durationValue = item.duration_minutes ?? item.duration ?? item.runtime ?? "";
-          const durationText = String(durationValue).trim();
-          const duration = !durationText
-            ? "—"
-            : /\bmin(?:uto)?s?\b/i.test(durationText) ? durationText : `${durationText} min`;
+          const duration = homeDurationLabel(item);
           return `<tr role="row" class="playlist-entry${selected ? " is-selected" : ""}${onAir ? " is-on-air" : ""}" data-playlist-entry="${escapeAttr(key)}" data-entry-key="${escapeAttr(key)}" data-item-id="${escapeAttr(itemId)}" data-entry-index="${index}" data-click="playlist-select" tabindex="${selected ? "0" : "-1"}" aria-selected="${selected}" aria-label="${escapeAttr(`${displayTitle(item) || "Sin título"}. ${item.year || "Año desconocido"}. ${item.kind || "Película"}. ${genres}. ${duration}`)}">
             <td class="playlist-index">${String(index + 1).padStart(2, "0")}</td>
             <td class="playlist-title">${escapeHtml(displayTitle(item) || "Sin título")}</td>
@@ -348,6 +363,16 @@ import { closeSharedDetail, openCollection } from "./club.js";
             <td>${escapeHtml(duration)}</td>
           </tr>`;
         }).join("");
+        const selectedOrigin = selectedEntry?.origin || {};
+        const selectedAvailability = availabilityState(selectedItem);
+        const selectedDuration = homeDurationLabel(selectedItem);
+        const selectedStatus = selectedItem.status === "watched" ? "Vista" : "Pendiente";
+        const previewViewAction = selectedOrigin.kind === "collection"
+          ? `<button class="spotlight-preview-action" type="button" data-click="open-home-collection-detail" data-key="${escapeAttr(selectedEntry?.key || "")}">Ver ficha del Club</button>`
+          : `<button class="spotlight-preview-action" type="button" data-click="open-detail-with-case-transition" data-id="${escapeAttr(selectedItem.id || "")}">Ver más</button>`;
+        const previewEditAction = selectedOrigin.kind === "catalog"
+          ? `<button class="spotlight-preview-action is-secondary" type="button" data-click="edit-home-shelf-entry" data-id="${escapeAttr(selectedItem.id || "")}">Editar mi ficha</button>`
+          : "";
         fields.spotlightStage.innerHTML = `<div class="spotlight-layout">
           ${selector}
           <div class="spotlight-viewport">
@@ -359,14 +384,19 @@ import { closeSharedDetail, openCollection } from "./club.js";
               </table>
             </div>
             <aside class="spotlight-preview" aria-labelledby="spotlight-selected-title">
+              <div class="spotlight-preview-actions">${previewViewAction}${previewEditAction}</div>
               <div class="spotlight-preview-art">${selectedItem.page_image ? `<img src="${escapeAttr(cachedImageSrc(String(selectedItem.page_image)))}" alt="" loading="lazy" decoding="async">` : `<span class="poster-${posterVariant(selectedItem.id || selectedTitle)}" aria-hidden="true"></span>`}</div>
               <div class="spotlight-copy">
                 <span class="spotlight-reason">${escapeHtml(selectedReason.label || sourceLabel)}</span>
                 <h3 id="spotlight-selected-title">${escapeHtml(selectedTitle)}</h3>
                 <span class="spotlight-metadata">${escapeHtml([selectedItem.year, selectedItem.kind, firstListValue(selectedItem.genres)].filter(Boolean).join(" · ") || "Ficha por completar")}</span>
                 <p>${escapeHtml(selectedSummary || "Una obra disponible de tu archivo personal para considerar esta noche.")}</p>
-                <button class="spotlight-cta" type="button" data-click="open-detail" data-id="${escapeAttr(selectedItem.id || "")}">Ver ficha</button>
               </div>
+              <dl class="spotlight-preview-facts">
+                <div><dt>Disponibilidad</dt><dd>${selectedAvailability.effective ? "Disponible" : "No disponible"}</dd></div>
+                <div><dt>Estado</dt><dd>${escapeHtml(selectedStatus)}</dd></div>
+                <div><dt>Duración</dt><dd>${escapeHtml(selectedDuration)}</dd></div>
+              </dl>
             </aside>
           </div>
         </div>`;
@@ -479,7 +509,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         }
         renderEditorialHero();
         if (restoreFocus) {
-          if (focusPreview) fields.spotlightStage.querySelector(".spotlight-cta")?.focus({ preventScroll: true });
+          if (focusPreview) fields.spotlightStage.querySelector(".spotlight-preview-action")?.focus({ preventScroll: true });
           else fields.spotlightStage.querySelector(`[data-playlist-entry][data-entry-key="${CSS.escape(selectedEntryKey)}"]`)?.focus({ preventScroll: true });
         }
       }

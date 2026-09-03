@@ -1097,3 +1097,369 @@
   .spotlight-poster-trigger .spotlight-poster,
   .spotlight-poster-fallback { transform: none; }
 }
+
+/* U2-R.2 visual acceptance recovery. The marquee asset keeps its native
+   portrait ratio; the playlist and preview read as one late-night player. */
+@media (min-width: 861px) {
+  .spotlight { overflow: visible; position: relative; }
+
+  .spotlight-bar {
+    background: none;
+    border: 0;
+    display: contents;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .spotlight-bar > div:first-child {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  .spotlight:has(#spotlightTitle:focus) {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
+  }
+
+  .spotlight-date-control {
+    align-items: center;
+    background: linear-gradient(180deg, #251c12, #0d0b09);
+    border: 1px solid rgba(var(--gold-rgb), .68);
+    box-shadow: 0 3px 9px rgba(0, 0, 0, .58), inset 0 1px rgba(255, 236, 189, .14);
+    flex-direction: row;
+    gap: 0;
+    padding: 2px;
+    position: absolute;
+    right: 10px;
+    top: 5px;
+    z-index: 5;
+  }
+
+  .spotlight-date-tabs { gap: 2px; }
+
+  .spotlight-date-tabs button {
+    background: #11131a;
+    border: 1px solid #453824;
+    color: #b9b3a7;
+    font-family: var(--font-label);
+    font-size: 9px;
+    min-height: 20px;
+    padding: 2px 8px;
+    text-transform: uppercase;
+  }
+
+  .spotlight-date-tabs button[aria-pressed="true"] {
+    background: linear-gradient(180deg, #db9f3f, #6f4515);
+    border-color: var(--gold);
+    box-shadow: inset 0 2px 4px rgba(255, 240, 196, .32), 0 0 8px rgba(var(--gold-rgb), .2);
+    color: #090804;
+    transform: translateY(1px);
+  }
+
+  .spotlight-date { display: none; }
+
+  .spotlight-layout { grid-template-columns: minmax(245px, 28%) minmax(0, 1fr); }
+
+  .spotlight-selector {
+    background:
+      radial-gradient(circle at 50% 45%, rgba(var(--gold-rgb), .08), transparent 48%),
+      rgba(3, 5, 10, .84);
+    border-right: 1px solid rgba(var(--gold-rgb), .46);
+    display: block;
+    isolation: isolate;
+    overflow: hidden;
+    padding: 0;
+    position: relative;
+  }
+
+  .spotlight-selector::before {
+    background: url("../img/poster-marquee-frame-v1.png") center / auto calc(100% - 8px) no-repeat;
+    content: "";
+    inset: 4px 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+  }
+
+  .spotlight-selector-heading {
+    align-items: center;
+    border: 0;
+    display: flex;
+    gap: 5px;
+    justify-content: space-between;
+    left: 50%;
+    margin: 0;
+    padding: 0 3px;
+    position: absolute;
+    top: 6.3%;
+    transform: translateX(-50%);
+    width: clamp(116px, 14vh, 162px);
+    z-index: 3;
+  }
+
+  .spotlight-selector-heading span,
+  .spotlight-selector-heading strong {
+    color: #2b1a08;
+    font-family: var(--font-label);
+    font-size: 8px;
+    letter-spacing: .04em;
+    text-shadow: 0 1px rgba(255, 242, 201, .36);
+  }
+
+  .spotlight-poster-card {
+    bottom: 8%;
+    display: block;
+    left: 50%;
+    padding: 0;
+    position: absolute;
+    top: 15.5%;
+    transform: translateX(-50%);
+    width: clamp(92px, 11vh, 130px);
+    z-index: 2;
+  }
+
+  .spotlight-poster-trigger {
+    align-content: start;
+    gap: 4px;
+    height: 100%;
+    padding: 4px;
+  }
+
+  .spotlight-poster-trigger .spotlight-poster,
+  .spotlight-poster-fallback {
+    aspect-ratio: 2 / 3;
+    border: 2px solid #0a0907;
+    box-shadow: 0 7px 14px rgba(0, 0, 0, .72);
+    height: auto;
+    max-height: calc(100% - 38px);
+    object-fit: cover;
+    transform: none;
+    width: 100%;
+  }
+
+  .spotlight-poster-caption {
+    gap: 1px;
+    width: 150%;
+  }
+
+  .spotlight-poster-caption strong {
+    color: #f5e6c2;
+    font-family: var(--font-label);
+    font-size: 9px;
+    letter-spacing: .03em;
+  }
+
+  .spotlight-poster-caption small { color: #8ecbd0; font-family: var(--font-label); font-size: 8px; }
+
+  .spotlight-carousel-controls {
+    justify-content: space-between;
+    left: -35px;
+    pointer-events: none;
+    position: absolute;
+    right: -35px;
+    top: 43%;
+  }
+
+  .spotlight-carousel-controls button {
+    background: rgba(6, 7, 9, .88);
+    border: 1px solid rgba(var(--gold-rgb), .68);
+    color: var(--gold);
+    min-height: 28px;
+    padding: 2px 7px;
+    pointer-events: auto;
+  }
+
+  .spotlight-selector-options {
+    bottom: 2.7%;
+    left: 50%;
+    margin: 0;
+    max-width: 78%;
+    position: absolute;
+    transform: translateX(-50%);
+    z-index: 3;
+  }
+
+  .spotlight-viewport {
+    background:
+      repeating-linear-gradient(0deg, rgba(3, 16, 21, .12) 0, rgba(3, 16, 21, .12) 1px, transparent 1px, transparent 3px),
+      linear-gradient(180deg, #02080d, #04070d 72%, #090710);
+    border: 3px solid #161719;
+    box-shadow: inset 0 0 0 1px rgba(var(--teal-rgb), .25), inset 0 0 28px rgba(0, 0, 0, .78);
+    display: grid;
+    grid-template-rows: 27px minmax(0, 1fr) 78px;
+  }
+
+  .spotlight-playlist-head {
+    background: linear-gradient(180deg, #10181c, #050b0f);
+    border-bottom-color: rgba(var(--teal-rgb), .55);
+    padding: 5px 138px 4px 10px;
+  }
+
+  .spotlight-playlist-head span,
+  .spotlight-playlist-head strong { font-size: 9px; }
+  .spotlight-playlist-head strong { color: var(--teal); }
+
+  .spotlight-table-wrap {
+    background: rgba(0, 10, 14, .48);
+    flex: none;
+    min-height: 0;
+  }
+
+  .spotlight-playlist {
+    color: #75e7ef;
+    font-family: var(--font-label);
+    font-size: 10px;
+  }
+
+  .spotlight-playlist th {
+    background: rgba(6, 23, 28, .82);
+    border-bottom-color: rgba(var(--teal-rgb), .65);
+    color: #62dbe5;
+    font-size: 8px;
+    letter-spacing: .035em;
+    padding: 4px 7px;
+  }
+
+  .spotlight-playlist td {
+    border-bottom-color: rgba(var(--teal-rgb), .15);
+    color: #83d7dd;
+    font-family: var(--font-label);
+    line-height: 1.05;
+    padding: 4px 7px;
+  }
+
+  .spotlight-playlist .playlist-index { color: #5dbcc4; }
+
+  .spotlight-playlist .playlist-title {
+    color: #a5edf2;
+    font-family: var(--font-label);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 700;
+    text-transform: none;
+  }
+
+  .spotlight-playlist tr[data-click]:hover { background: rgba(var(--teal-rgb), .11); }
+
+  .spotlight-playlist tr.is-selected {
+    background: linear-gradient(90deg, rgba(var(--red-rgb), .32), rgba(var(--red-rgb), .1));
+    box-shadow: inset 2px 0 var(--red), inset 0 1px rgba(var(--red-rgb), .42), inset 0 -1px rgba(var(--red-rgb), .28);
+  }
+
+  .spotlight-playlist tr.is-selected .playlist-index::before {
+    color: var(--red);
+    content: "▶ ";
+  }
+
+  .spotlight-playlist tr.is-on-air:not(.is-selected) {
+    background: rgba(var(--gold-rgb), .06);
+    text-shadow: 0 0 5px rgba(var(--gold-rgb), .3);
+  }
+
+  .spotlight-preview {
+    align-items: stretch;
+    background: linear-gradient(180deg, rgba(5, 17, 22, .96), rgba(4, 7, 13, .98));
+    border: 1px solid rgba(var(--teal-rgb), .32);
+    border-top-color: rgba(var(--teal-rgb), .58);
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 96px 58px minmax(0, 1fr) minmax(145px, 18%);
+    margin: 0 5px 5px;
+    min-height: 72px;
+    padding: 6px;
+  }
+
+  .spotlight-preview-actions {
+    align-content: center;
+    display: grid;
+    gap: 4px;
+  }
+
+  .spotlight-preview-action {
+    background: linear-gradient(180deg, #2c2113, #110e09);
+    border: 1px solid rgba(var(--gold-rgb), .76);
+    box-shadow: inset 0 1px rgba(255, 235, 180, .14);
+    color: var(--gold);
+    font-family: var(--font-label);
+    font-size: 9px;
+    min-height: 27px;
+    padding: 3px 6px;
+    text-align: left;
+  }
+
+  .spotlight-preview-action.is-secondary { background: #090c0e; color: #dfc28b; }
+  .spotlight-preview-action:hover { background: #493418; }
+
+  .spotlight-preview-art { min-height: 58px; }
+  .spotlight-preview-art img,
+  .spotlight-preview-art > span { min-height: 58px; }
+
+  .spotlight-preview .spotlight-copy { gap: 1px; }
+  .spotlight-preview .spotlight-copy .spotlight-reason { font-size: 8px; }
+  .spotlight-preview .spotlight-copy h3 {
+    color: #f0d8a1;
+    font-family: var(--font-label);
+    font-size: 15px;
+    font-style: normal;
+    letter-spacing: .02em;
+  }
+  .spotlight-preview .spotlight-copy .spotlight-metadata,
+  .spotlight-preview .spotlight-copy p { color: #83d7dd; font-family: var(--font-label); font-size: 9px; }
+
+  .spotlight-preview-facts {
+    align-content: center;
+    border-left: 1px solid rgba(var(--teal-rgb), .34);
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding-left: 9px;
+  }
+
+  .spotlight-preview-facts div { display: grid; grid-template-columns: 1fr auto; gap: 5px; }
+  .spotlight-preview-facts dt,
+  .spotlight-preview-facts dd {
+    color: #70aeb3;
+    font-family: var(--font-label);
+    font-size: 8px;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .spotlight-preview-facts dd { color: #b6e6e8; text-align: right; }
+}
+
+@media (min-width: 861px) and (max-height: 800px) {
+  .spotlight-layout { height: 260px; min-height: 260px; }
+  .spotlight-poster-caption small { display: block; }
+}
+
+@media (max-width: 860px) {
+  .spotlight-preview {
+    grid-template-columns: 82px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+  .spotlight-preview-art { grid-column: 1; grid-row: 1 / span 2; }
+  .spotlight-preview .spotlight-copy { grid-column: 2; grid-row: 1; }
+  .spotlight-preview-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+  }
+  .spotlight-preview-facts div { display: flex; gap: 4px; }
+  .spotlight-preview-facts dt,
+  .spotlight-preview-facts dd { font-size: var(--text-caption); margin: 0; }
+  .spotlight-preview-actions {
+    display: flex;
+    gap: 8px;
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .spotlight-preview-action { min-height: 44px; }
+}

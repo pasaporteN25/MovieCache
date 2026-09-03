@@ -119,10 +119,20 @@ de [U3] y [A2]. La referencia vinculante es
       selección roving y preview sincronizado para cartelera o estantería.
     - [x] **[U2-R.2c] Autoplay y navegación de borde.** Cerrar wrap de anterior/siguiente,
       pausa efectiva fuera de Inicio, preservación de foco/preview y sus regresiones.
+    - [x] **[U2-R.2d] Ampliar la programación visible.** Elevar a seis el contrato acotado
+      de funciones destacadas en servidor, snapshots y cliente, manteniendo el límite
+      explícito en `home.limits.featured_items` y su fallback compatible.
+    - [x] **[U2-R.2e] Recuperar la cartelera física y el selector temporal.** Renderizar el
+      marco vertical sin deformar su relación 2:3, retirar la barra superior redundante y
+      reubicar Hoy/Ayer como interruptor físico compacto dentro del reproductor.
+    - [x] **[U2-R.2f] Cerrar el gate visual de playlist y preview.** Dar a la tabla el
+      lenguaje CRT/Winamp de la referencia, diferenciar al aire de selección y componer
+      una preview compacta con datos útiles y las acciones doradas a la izquierda.
     - **Cierre**: `carouselItemId`, `playlistSource`, `selectedItemId` y la selección de
       fila son estados independientes. La cartelera gira sin alterar preview/foco; la
-      playlist usa tabla HTML y navegación roving; anterior/siguiente envuelven y el
-      timer se detiene fuera de Inicio o con movimiento reducido.
+      playlist usa tabla HTML CRT de seis funciones y navegación roving;
+      anterior/siguiente envuelven, el timer se detiene fuera de Inicio o con movimiento
+      reducido y el marco/selector temporal/preview respetan el north star a 1280×720.
   - [ ] **[U2-R.3] Convertir las categorías en mueble horizontal continuo.** Sustituir el
     selector de una sola fila por cuatro bays contiguos, con placa por categoría, un bay
     dominante y el siguiente cortado; rueda/trackpad/Shift+rueda/flechas desplazan con

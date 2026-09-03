@@ -41,9 +41,11 @@ composición previa a U2 y se rediseñará en una entrega separada.
 La zona superior tiene dos piezas coordinadas pero no acopladas de forma destructiva:
 
 1. Una cartelera vertical pequeña a la izquierda, con poster dinámico, indicadores y
-   controles anterior/siguiente. Rota automáticamente cada intervalo configurado.
+  controles anterior/siguiente. El asset conserva su relación vertical 2:3 y nunca se
+  estira para llenar el ancho. Rota automáticamente cada intervalo configurado.
 2. Una lista tabular densa tipo Winamp con título, año, tipo, géneros y duración, más un
-   panel compacto de preview debajo.
+  panel compacto de preview debajo. La programación diaria muestra hasta seis funciones
+  visibles en el encuadre desktop objetivo.
 
 La cartelera automática y la selección manual son estados distintos. El temporizador
 sólo cambia `carouselItemId`; jamás mueve foco, `selectedItemId`, scroll de la lista ni
@@ -56,6 +58,10 @@ estantería activa. Flechas arriba/abajo recorren filas, Home/End saltan a extre
 Enter confirma la selección. Puntero y touch producen el mismo estado sin ser el único
 camino. La fila seleccionada, el lomo seleccionado y el preview representan siempre la
 misma obra.
+
+No se reserva una barra horizontal independiente para repetir el título de la
+cartelera. Hoy/Ayer vive como un interruptor físico compacto dentro del encabezado del
+reproductor: debe ser claro y accesible sin competir con la lista ni con el marco.
 
 ### Mueble continuo y estanterías
 
