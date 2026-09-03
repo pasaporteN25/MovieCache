@@ -535,6 +535,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                             **items[index % 2],
                             "id": f"playlist-item-{index}",
                             "title": title,
+                            "directors": [f"Director {index + 1}"],
                             "year": str(1981 + index),
                             "duration_minutes": 96 + index,
                         },
@@ -550,10 +551,19 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         self.assertEqual(
             [value.casefold() for value in page.locator(".spotlight-playlist thead th").all_inner_texts()],
-            ["#", "título", "año", "tipo", "géneros", "duración"],
+            ["#", "título", "director", "año", "tipo", "géneros", "duración"],
         )
         rows = page.locator("[data-playlist-entry]")
         self.assertEqual(rows.count(), 6)
+        self.assertEqual(rows.nth(0).locator(".playlist-director").inner_text(), "Director 1")
+        self.assertEqual(rows.nth(0).locator(".playlist-index").inner_text(), "")
+        self.assertEqual(rows.nth(1).locator(".playlist-index").inner_text(), "02")
+        self.assertEqual(
+            rows.nth(0).locator(".playlist-index").evaluate(
+                "element => getComputedStyle(element, '::before').content"
+            ),
+            '"▶"',
+        )
         rows.nth(1).click()
         selected_key = rows.nth(1).get_attribute("data-entry-key")
         rows.nth(1).focus()

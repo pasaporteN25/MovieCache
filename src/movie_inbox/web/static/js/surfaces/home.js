@@ -388,10 +388,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
           const selected = key === selectedEntryKey;
           const onAir = key === carouselItemId && playlistSource === "daily";
           const genres = listText(item.genres, 2) || "—";
+          const directors = listText(item.directors, 2) || "—";
           const duration = homeDurationLabel(item);
-          return `<tr role="row" class="playlist-entry${selected ? " is-selected" : ""}${onAir ? " is-on-air" : ""}" data-playlist-entry="${escapeAttr(key)}" data-entry-key="${escapeAttr(key)}" data-item-id="${escapeAttr(itemId)}" data-entry-index="${index}" data-click="playlist-select" tabindex="${selected ? "0" : "-1"}" aria-selected="${selected}" aria-label="${escapeAttr(`${displayTitle(item) || "Sin título"}. ${item.year || "Año desconocido"}. ${item.kind || "Película"}. ${genres}. ${duration}`)}">
-            <td class="playlist-index">${String(index + 1).padStart(2, "0")}</td>
+          return `<tr role="row" class="playlist-entry${selected ? " is-selected" : ""}${onAir ? " is-on-air" : ""}" data-playlist-entry="${escapeAttr(key)}" data-entry-key="${escapeAttr(key)}" data-item-id="${escapeAttr(itemId)}" data-entry-index="${index}" data-click="playlist-select" tabindex="${selected ? "0" : "-1"}" aria-selected="${selected}" aria-label="${escapeAttr(`${displayTitle(item) || "Sin título"}. Dirección: ${directors}. ${item.year || "Año desconocido"}. ${item.kind || "Película"}. ${genres}. ${duration}`)}">
+            <td class="playlist-index"><span class="playlist-position">${String(index + 1).padStart(2, "0")}</span></td>
             <td class="playlist-title">${escapeHtml(displayTitle(item) || "Sin título")}</td>
+            <td class="playlist-director">${escapeHtml(directors)}</td>
             <td>${escapeHtml(item.year || "—")}</td>
             <td>${escapeHtml(item.kind || "película")}</td>
             <td>${escapeHtml(genres)}</td>
@@ -417,8 +419,8 @@ import { closeSharedDetail, openCollection } from "./club.js";
             </div>
             <div class="spotlight-table-wrap">
               <table class="spotlight-playlist" data-row-count="${Math.min(sourceEntries.length, 6)}" role="grid" aria-label="Playlist de ${escapeAttr(sourceLabel)}">
-                <thead><tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Año</th><th scope="col">Tipo</th><th scope="col">Géneros</th><th scope="col">Duración</th></tr></thead>
-                <tbody>${tableRows || `<tr><td colspan="6" class="playlist-empty">No hay obras en esta fuente.</td></tr>`}</tbody>
+                <thead><tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Director</th><th scope="col">Año</th><th scope="col">Tipo</th><th scope="col">Géneros</th><th scope="col">Duración</th></tr></thead>
+                <tbody>${tableRows || `<tr><td colspan="7" class="playlist-empty">No hay obras en esta fuente.</td></tr>`}</tbody>
               </table>
             </div>
             <aside class="spotlight-preview" aria-labelledby="spotlight-selected-title">

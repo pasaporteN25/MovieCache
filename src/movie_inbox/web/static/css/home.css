@@ -1080,13 +1080,14 @@
 .spotlight-playlist-head span { color: var(--muted); font-family: var(--font-label); font-size: var(--text-label); letter-spacing: .12em; text-transform: uppercase; }
 .spotlight-playlist-head strong { color: var(--gold); font-family: var(--font-label); font-size: var(--text-label); letter-spacing: .07em; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .spotlight-table-wrap { min-width: 0; overflow: auto; }
-.spotlight-playlist { border-collapse: collapse; font-size: var(--text-caption); min-width: 620px; table-layout: fixed; width: 100%; }
+.spotlight-playlist { border-collapse: collapse; font-size: var(--text-caption); min-width: 760px; table-layout: fixed; width: 100%; }
 .spotlight-playlist th { border-bottom: 1px solid rgba(var(--teal-rgb), 0.42); color: var(--teal); font-family: var(--font-label); font-size: var(--text-label); font-weight: 800; letter-spacing: .08em; padding: 7px 8px; text-align: left; text-transform: uppercase; }
-.spotlight-playlist th:first-child, .spotlight-playlist td:first-child { width: 40px; }
-.spotlight-playlist th:nth-child(2) { width: 28%; }
-.spotlight-playlist th:nth-child(3) { width: 58px; }
-.spotlight-playlist th:nth-child(4) { width: 96px; }
-.spotlight-playlist th:nth-child(6) { width: 84px; }
+.spotlight-playlist th:first-child, .spotlight-playlist td:first-child { width: 36px; }
+.spotlight-playlist th:nth-child(2) { width: 26%; }
+.spotlight-playlist th:nth-child(3) { width: 20%; }
+.spotlight-playlist th:nth-child(4) { width: 54px; }
+.spotlight-playlist th:nth-child(5) { width: 82px; }
+.spotlight-playlist th:nth-child(7) { width: 76px; }
 .spotlight-playlist td { border-bottom: 1px solid rgba(var(--violet-rgb), 0.24); color: var(--ink); overflow: hidden; padding: 7px 8px; text-overflow: ellipsis; white-space: nowrap; }
 .spotlight-playlist .playlist-index { color: var(--muted); font-family: var(--font-label); }
 .spotlight-playlist .playlist-title { color: var(--ink); font-family: var(--font-display); font-size: var(--text-small); font-style: italic; text-transform: uppercase; }
@@ -1114,7 +1115,7 @@
   .spotlight-selector-options {
     align-items: center;
     display: flex;
-    gap: 7px;
+    gap: 8px;
     justify-content: center;
     margin: 3px 9px 0;
     max-height: none;
@@ -1125,13 +1126,13 @@
     border: 1px solid rgba(var(--gold-rgb), .62);
     border-radius: 50%;
     display: block;
-    flex: 0 0 10px;
-    height: 10px;
-    min-height: 10px;
+    flex: 0 0 11px;
+    height: 11px;
+    min-height: 11px;
     overflow: hidden;
     padding: 0;
     position: relative;
-    width: 10px;
+    width: 11px;
   }
   .spotlight-selector-option > * {
     clip: rect(0 0 0 0);
@@ -1329,16 +1330,20 @@
   .spotlight-selector-heading span,
   .spotlight-selector-heading strong {
     color: #2b1a08;
-    font-family: var(--font-label);
+    font-family: var(--font-display);
     font-size: 8px;
     letter-spacing: .04em;
     text-shadow: 0 1px rgba(255, 242, 201, .36);
   }
 
   .spotlight-selector-heading span {
-    font-size: 10px;
-    letter-spacing: .12em;
+    font-size: clamp(13px, 1.05vw, 16px);
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: .04em;
+    line-height: 1;
     text-align: center;
+    text-transform: uppercase;
     width: 100%;
   }
 
@@ -1475,8 +1480,11 @@
 
   .spotlight-playlist tr.is-selected .playlist-index::before {
     color: var(--red);
-    content: "▶ ";
+    content: "▶";
+    font-size: 10px;
   }
+
+  .spotlight-playlist tr.is-selected .playlist-position { display: none; }
 
   .spotlight-playlist tr.is-on-air:not(.is-selected) {
     background: rgba(var(--gold-rgb), .06);
@@ -1490,7 +1498,7 @@
     border-top-color: rgba(var(--teal-rgb), .58);
     display: grid;
     gap: 8px;
-    grid-template-columns: 96px 58px minmax(185px, 30%) minmax(150px, 1fr) minmax(145px, 18%);
+    grid-template-columns: 96px 58px minmax(205px, 23%) minmax(190px, 1fr) minmax(140px, 16%);
     margin: 0 5px 5px;
     min-height: 72px;
     padding: 6px;
@@ -1525,12 +1533,12 @@
   .spotlight-preview .spotlight-copy h3 {
     color: #f0d8a1;
     font-family: var(--font-label);
-    font-size: 15px;
+    font-size: 17px;
     font-style: normal;
     letter-spacing: .02em;
   }
   .spotlight-preview .spotlight-copy .spotlight-metadata,
-  .spotlight-preview .spotlight-copy p { color: #83d7dd; font-family: var(--font-label); font-size: 9px; }
+  .spotlight-preview .spotlight-copy p { color: #83d7dd; font-family: var(--font-label); font-size: 10px; }
 
   .spotlight-preview .spotlight-copy p {
     -webkit-box-orient: vertical;

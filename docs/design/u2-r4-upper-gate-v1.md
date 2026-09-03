@@ -24,12 +24,15 @@ segunda línea.
 - La cartelera ya no tiene panel exterior, crece dentro de una columna más contenida y
   conserva el poster completo con `object-fit: contain`.
 - La placa muestra sólo `Hoy` o `Ayer`, centrado, sin contador ni caption redundante.
+- El rótulo temporal usa la tipografía display de la marquesina y un cuerpo mayor; los
+  indicadores del zócalo ganan tamaño sin abandonar el marco.
 - El reproductor muestra hasta seis filas ocupando la altura disponible. La regla de
   expansión se activa sólo con 4–6 filas; con 1–3 se conserva una altura de fila
-  compacta.
+  compacta. La tabla incluye `Director` cuando existe el dato y usa un guion largo como
+  ausencia explícita; la fila activa reemplaza su número por un único `▶` limpio.
 - La preview mantiene las acciones a la izquierda, elimina `Disponible y pendiente` y
-  aloja una señal SVG decorativa. La señal es `aria-hidden`, varía con el ID de obra y
-  no cambia al rerenderizar la misma obra.
+  aloja una señal SVG decorativa más ancha. La identidad gana tamaño, la señal es
+  `aria-hidden`, varía con el ID de obra y no cambia al rerenderizar la misma obra.
 - La mitad inferior conserva la implementación de U2-R.3/R.4; sólo reduce altura entre
   801 y 960 px para mantener el encuadre completo.
 

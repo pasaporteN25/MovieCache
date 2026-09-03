@@ -208,6 +208,10 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
       funciones, poster roto, textos extensos, teclado, autoplay, zoom y ausencia de
       scroll vertical. Documentar capturas y no cerrar R.4 sólo por tests verdes.
       **Modelo: Medio. Depende de U2-R.4f–U2-R.4j.**
+    - [x] **[U2-R.4l] Segunda pasada de legibilidad del reproductor.** Dar mayor presencia
+      al rótulo `Hoy`/`Ayer` y a los indicadores del zócalo, ampliar identidad y señal de
+      preview, incorporar `Director` con ausencia explícita y limpiar el indicador de la
+      fila activa. **Modelo: Medio. Depende de U2-R.4k.**
     - **Cierre 2026-09-03**: se eligió una marquesina abierta y continua, con marca y
       estadísticas en una línea y `Colección`/`Menú` como placas contiguas. La cartelera
       queda libre de caja y contador; seis filas llenan el reproductor sin inflar listas
