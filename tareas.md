@@ -24,14 +24,14 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U2] | Inicio videoclub material: cartelera + estanterias de lomos | U1 |
-| 2 | [A2] | Cliente Android basico | A1 + entorno Android |
-| 3 | [I1] | Evaluacion de integraciones | A1 |
-| 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 1 | [A2] | Cliente Android basico | A1 + entorno Android |
+| 2 | [I1] | Evaluacion de integraciones | A1 |
+| 3 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea; [D1], [W3] y [U1] ya tienen validacion y cierre verificables.
-- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3] y [U1]. El detalle verificable
-  permanece en `Hecho`.
+- **En curso:** ninguna tarea; [D1], [W3], [U1] y [U2] ya tienen validacion y cierre
+  verificables.
+- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y [U2]. El detalle
+  verificable permanece en `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
@@ -96,12 +96,8 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
   - [x] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Ver
     detalle en `Hecho`.
   - [x] **[U2.3] Abrir la caja para el detalle extendido.** Ver detalle en `Hecho`.
-  - [ ] **[U2.4] Conectar edición explícita desde la previsualización y la ficha.**
-    Implementar la acción secundaria `Editar mi ficha` hacia el editor actual o un modo
-    de edición del dossier según permisos. Seleccionar una obra, abrir su caja o leer su
-    información nunca muta datos; obra de Club y superficies de sólo lectura muestran
-    solamente las acciones permitidas. Cierre: flujos de obra propia/obra de Club/solo
-    lectura y pruebas de que no aparecen controles de escritura donde no corresponden.
+  - [x] **[U2.4] Conectar edición explícita desde la previsualización y la ficha.**
+    Ver detalle en `Hecho`. Cierra [U2] completo.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
@@ -178,6 +174,28 @@ Sin tareas activas.
 ## Hecho
 
 ### Frente: Inicio videoclub
+
+#### [U2.4] Conectar edición explícita desde la previsualización y la ficha
+**Cerrado 2026-09-03, cierra [U2] completo.**
+`docs/briefs/home-edit-permissions-v1.md` documenta la auditoría: antes de escribir
+código, se revisaron las tres superficies que Inicio puede abrir para confirmar si
+faltaba alguna gate real. `#detailDrawer` sólo puede mostrar un `id` del catálogo del
+usuario autenticado (estructuralmente imposible que muestre una obra ajena);
+`EditorialHomeService` sólo produce `origin.kind` `catalog` o `collection` (ya cubiertos
+por la gate de [U2.2]); y `#sharedDetailDialog` — reusado por la recomendación de Club
+en Inicio y por el catálogo compartido de otro miembro en Club — nunca arma un botón de
+edición en ninguno de sus dos usos. El modelo de permisos ya estaba bien conectado; lo
+que faltaba era verificarlo con pruebas, no agregar gates nuevas.
+
+Dos pruebas de navegador nuevas cierran ese verificación:
+`test_home_shelf_collection_entries_never_show_an_edit_action` (una recomendación de
+colección nunca ofrece `Editar mi ficha`, ni en la previsualización ni en el diálogo
+compartido) y
+`test_selecting_and_previewing_a_shelf_entry_never_mutates_the_catalog` (navegar,
+seleccionar, previsualizar y abrir/cerrar el dossier no dispara ningún
+`POST`/`PATCH`/`PUT`/`DELETE` contra `/api/*`, registrado en vivo durante la secuencia).
+560 pruebas unitarias, 27 de navegador, Ruff, formato, mypy estricto, `compileall` y
+`git diff --check` en verde.
 
 #### [U2.3] Abrir la caja para el detalle extendido
 **Cerrado 2026-09-03.** `docs/briefs/home-dossier-case-open-v1.md` documenta la

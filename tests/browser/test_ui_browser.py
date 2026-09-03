@@ -589,6 +589,120 @@ class BrowserInterfaceTests(unittest.TestCase):
             True,
         )
 
+    def test_home_shelf_collection_entries_never_show_an_edit_action(self) -> None:
+        page = self.page
+
+        def add_collection_origin_section(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 1:
+                club_item = dict(items[0])
+                club_item["id"] = "club-heat"
+                home["sections"] = [
+                    {
+                        "id": "followed",
+                        "eyebrow": "Seguís esto",
+                        "title": "De tus colecciones",
+                        "description": "Recomendaciones de colecciones que seguís.",
+                        "items": [
+                            {
+                                "key": "followed-heat",
+                                "origin": {
+                                    "kind": "collection",
+                                    "collection_id": "collection-1",
+                                    "collection_title": "Noir esencial",
+                                    "collection_item_id": "club-heat",
+                                },
+                                "item": club_item,
+                                "reason": {
+                                    "label": "En una colección seguida",
+                                    "detail": "Todavía no está en tu catálogo.",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_collection_origin_section)
+        self._open_and_wait_for_catalog(page)
+
+        preview = page.locator('[data-home-shelf-preview="followed"]')
+        self.assertEqual(preview.get_by_text("Ver ficha del Club").count(), 1)
+        # The whole point: a not-yet-personal recommendation never offers to
+        # "edit my record" for a record that doesn't exist yet.
+        self.assertEqual(preview.get_by_text("Editar mi ficha").count(), 0)
+
+        preview.get_by_text("Ver ficha del Club").click()
+        shared_dialog = page.locator("#sharedDetailDialog")
+        shared_dialog.wait_for(state="visible")
+        self.assertEqual(shared_dialog.get_by_text("Editar mi ficha").count(), 0)
+        self.assertEqual(shared_dialog.get_by_text("Agregar a mi catálogo").count(), 1)
+
+    def test_selecting_and_previewing_a_shelf_entry_never_mutates_the_catalog(
+        self,
+    ) -> None:
+        page = self.page
+
+        def add_home_section(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 2:
+                home["sections"] = [
+                    {
+                        "id": "available",
+                        "eyebrow": "Para ver ahora",
+                        "title": "Disponible esta noche",
+                        "description": "Pendientes que confirma tu biblioteca física.",
+                        "items": [
+                            {
+                                "key": "available-heat",
+                                "origin": {"kind": "catalog"},
+                                "item": items[0],
+                                "reason": {"label": "Lista para ver", "detail": "Disponible."},
+                            },
+                            {
+                                "key": "available-akira",
+                                "origin": {"kind": "catalog"},
+                                "item": items[1],
+                                "reason": {"label": "Lista para ver", "detail": "Disponible."},
+                            },
+                        ],
+                    }
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_home_section)
+        self._open_and_wait_for_catalog(page)
+
+        write_requests: list[str] = []
+
+        def record_write(request) -> None:
+            if request.method in ("POST", "PATCH", "PUT", "DELETE") and "/api/" in request.url:
+                write_requests.append(f"{request.method} {request.url}")
+
+        page.on("request", record_write)
+        try:
+            shelf = page.locator('[data-home-section="available"] .home-shelf-tape')
+            shelf.nth(0).focus()
+            page.keyboard.press("ArrowRight")
+            page.keyboard.press("Home")
+            page.keyboard.press("End")
+            shelf.nth(0).click()
+            page.locator('[data-home-shelf-preview="available"]').get_by_text("Ver más").click()
+            page.wait_for_selector("#detailDrawer[open]")
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
+        finally:
+            page.remove_listener("request", record_write)
+        self.assertEqual(write_requests, [])
+
     def test_home_shelf_view_more_opens_dossier_with_reversible_case_transition(
         self,
     ) -> None:
