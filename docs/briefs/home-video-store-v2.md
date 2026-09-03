@@ -1,5 +1,11 @@
 # Inicio: videoclub material v2
 
+> **Referencia histórica.** U2 implementó este brief, pero su resultado visual no fue
+> aceptado el 2026-09-03. La dirección vigente para la recuperación de Inicio es
+> `docs/briefs/home-videotheque-recovery-v1.md`, acompañada por la lámina versionada
+> `docs/design/u2-recovery-north-star-v1.png`. Este archivo se conserva para explicar
+> las decisiones y contratos técnicos que sí pueden reutilizarse.
+
 ## Referencia durable
 
 La dirección proviene de la «lámina generada 1» mencionada durante la definición de
