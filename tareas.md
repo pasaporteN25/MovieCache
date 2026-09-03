@@ -30,8 +30,10 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea. [U2-R.0–U2-R.4] ya fijaron referencia, escenario, estados,
-  mueble continuo y sincronización; la siguiente tarea accionable es [U2-R.5].
+- **En curso:** ninguna tarea. [U2-R.0–U2-R.3] ya fijaron referencia, escenario, estados
+  y mueble continuo. [U2-R.4] conserva su núcleo funcional pero reabre su aceptación
+  visual por la revisión anotada del 2026-09-03; la siguiente tarea accionable es
+  [U2-R.4e], antes de [U2-R.5].
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -73,7 +75,8 @@ el videoclub continuo aprobado. No se reabre ni borra su historia. [U2-R] conser
 contratos útiles de permisos, teclado y datos, y reemplaza la arquitectura visual antes
 de [U3] y [A2]. La referencia vinculante es
 `docs/design/u2-recovery-north-star-v1.png`; el contrato autosuficiente está en
-`docs/briefs/home-videotheque-recovery-v1.md`.
+`docs/briefs/home-videotheque-recovery-v1.md`. Para la franja superior, la corrección
+vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
 
 #### [U2-R] Recuperar Inicio según el north star aceptado
 - **Alcance**: reconstruir Inicio de escritorio como una escena física compacta: una
@@ -86,9 +89,9 @@ de [U3] y [A2]. La referencia vinculante es
   motion son equivalentes; móvil no queda peor que antes de U2.
 - **Depende de**: base técnica de [U2]. **Precede a**: [U3] y [A2]. No cambia `/api/home`,
   A1, permisos ni rutas públicas.
-- **Modelo sugerido**: Medio por subtask; Grande sólo para el gate [U2-R.7]. Las partes
-  están ordenadas y acotadas para poder delegarlas sin pedir a un modelo menor que
-  redescubra la arquitectura.
+- **Modelo sugerido**: Medio por subtask de implementación; Grande para la exploración
+  de diseño [U2-R.4e] y el gate [U2-R.7]. Las partes están ordenadas y acotadas para
+  poder delegarlas sin pedir a un modelo menor que redescubra la arquitectura.
 
   - [x] **[U2-R.1] Construir el escenario desktop y el mostrador mínimo.** Aplicar pared,
     marco y grilla física; dejar `Colección` + `Menú` juntos, marca → Inicio y el resto
@@ -151,13 +154,14 @@ de [U3] y [A2]. La referencia vinculante es
     - **Cierre**: las categorías dejan de reemplazarse mediante pestañas y conviven en un
       único mueble con scroll real. En desktop se ve el siguiente bay cortado; teclado,
       touch y rueda disponen de caminos equivalentes, y móvil conserva su presentación.
-  - [x] **[U2-R.4] Sincronizar playlist, lomo y preview.** Click/Enter en un bay cambia la
-    fuente; click/Enter en un lomo selecciona/alinea su fila; flechas en la lista
-    seleccionan y llevan a vista el lomo correspondiente. Preview, fila y lomo deben
-    compartir ID tras cada camino. Poner **a la izquierda** `Ver más` y `Editar mi ficha`,
-    ambos con el mismo estilo físico dorado y diferente intensidad; conservar el gate
-    real de permisos. Archivos: `home.js`, `home.css`, `test_ui_browser.py`. **Modelo:
-    Medio. Depende de U2-R.2 y U2-R.3.**
+  - [ ] **[U2-R.4] Sincronizar playlist, lomo y preview y cerrar la composición
+    superior.** Click/Enter en un bay cambia la fuente; click/Enter en un lomo
+    selecciona/alinea su fila; flechas en la lista seleccionan y llevan a vista el lomo
+    correspondiente. Preview, fila y lomo deben compartir ID tras cada camino. Poner
+    **a la izquierda** `Ver más` y `Editar mi ficha`, ambos con el mismo estilo físico
+    dorado y diferente intensidad; conservar el gate real de permisos. Archivos:
+    `home.js`, `home.css`, `test_ui_browser.py`. **Modelo: Medio. Depende de U2-R.2 y
+    U2-R.3.**
     - [x] **[U2-R.4a] Unificar selección y alineación.** Converger click/Enter de bay o
       lomo y flechas/Home/End de playlist en el mismo entry/item; conservar selección
       recordada, foco y scroll visible en ambos sentidos.
@@ -170,17 +174,52 @@ de [U3] y [A2]. La referencia vinculante es
     - [x] **[U2-R.4d] Corregir encastre y programa temporal.** Respetar la abertura real
       del marco sin recortar el poster, usar la placa como rótulo dinámico `Hoy`/`Ayer`
       e integrar el selector temporal al flujo del encabezado Winamp sin superposición.
-    - **Cierre**: fila, lomo y preview activa comparten entry/item después de todos los
-      caminos de interacción; el carrusel permanece independiente. El mueble tiene una
-      sola preview física y la cartelera elimina controles e información redundantes sin
-      perder acceso por playlist, teclado o indicadores.
+    - [ ] **[U2-R.4e] Explorar el mostrador superior con dirección de diseño.** Encargar a
+      un subagente de diseño 2–3 composiciones acotadas para la barra, usando como entrada
+      el north star y la revisión anotada. Debe mantener marca → Inicio y
+      `Colección` + `Menú`, resolver marca/estadísticas en una única línea y evitar una
+      barra genérica o más alta. Entregar comparación visual y una recomendación antes
+      de tocar código. **Modelo: Grande. Sin dependencia técnica; primera prioridad.**
+    - [ ] **[U2-R.4f] Implementar el mostrador elegido.** Llevar la variante confirmada a
+      `index.shell-open.html` y `css/core.css`; conservar handlers, permisos, foco,
+      contadores y ancho sin wrap en desktop, con fallback de altura/zoom y sin modificar
+      la navegación móvil. **Modelo: Medio. Depende de U2-R.4e.**
+    - [ ] **[U2-R.4g] Liberar y jerarquizar la cartelera.** Eliminar el rectángulo exterior
+      que encajona la marquesina, agrandar y centrar el marco dentro de su columna,
+      centrar `Hoy`/`Ayer` en la placa y retirar el contador `01 / 06`. Preservar encastre
+      completo del poster, autoplay independiente, click/Enter y puntos en el zócalo.
+      **Modelo: Medio. Depende de U2-R.4f.**
+    - [ ] **[U2-R.4h] Rebalancear la playlist de hasta seis funciones.** Distribuir las
+      filas para aprovechar la altura disponible sin scroll ni enormes huecos laterales;
+      mantener tabla real, columnas, selección/al aire y legibilidad en 1–6 resultados.
+      Probar títulos/géneros largos y que una lista corta no produzca filas absurdamente
+      altas. **Modelo: Medio. Depende de U2-R.4g.**
+    - [ ] **[U2-R.4i] Destilar la preview del reproductor.** Retirar el motivo redundante
+      `Disponible y pendiente` sobre el título, conservar identidad, metadatos y hechos
+      útiles una sola vez, y redistribuir acciones, miniatura y ficha sin romper el gate
+      de edición para obras propias/Club. **Modelo: Medio. Depende de U2-R.4h.**
+    - [ ] **[U2-R.4j] Incorporar una señal temporal decorativa y determinista.** Ocupar el
+      centro libre de la preview con una visualización SVG/CSS estable derivada del ID:
+      aspecto de forma de onda/espectro sobre una línea de tiempo, claramente decorativa,
+      `aria-hidden`, sin afirmar que proviene del audio real. Debe variar entre obras sin
+      cambiar al rerenderizar y degradar a un trazo estático con reduced motion.
+      **Modelo: Medio. Depende de U2-R.4i.**
+    - [ ] **[U2-R.4k] Gate visual de la franja superior.** Comparar implementación con
+      `u2-r4-annotated-review-v1.png` en 1280×720, 1440×900 y 1920×1080; verificar 1/6
+      funciones, poster roto, textos extensos, teclado, autoplay, zoom y ausencia de
+      scroll vertical. Documentar capturas y no cerrar R.4 sólo por tests verdes.
+      **Modelo: Medio. Depende de U2-R.4f–U2-R.4j.**
+    - **Estado parcial**: fila, lomo y preview activa ya comparten entry/item después de
+      todos los caminos de interacción; el carrusel permanece independiente y el mueble
+      tiene una sola preview física. La aceptación visual superior queda reabierta hasta
+      cerrar [U2-R.4e–U2-R.4k].
   - [ ] **[U2-R.5] Implementar la contratapa determinista.** Extraer un mapper puro de ID
     opaco → una de 4–5 plantillas estables; componer sobre
     `vhs-back-cover-shell-v1.png` sinopsis, créditos, año, duración, géneros,
     disponibilidad/memoria y dos placeholders de imagen. `Ver más` abre con transición
     breve, Escape/reduced motion y retorno de foco; `Editar` sigue abriendo la ficha
     actual. Acotar a un módulo JS nuevo, integración mínima en `home.js`, CSS de
-    contratapa y tests del mapper/foco. **Modelo: Medio. Depende de U2-R.4.**
+    contratapa y tests del mapper/foco. **Modelo: Medio. Depende de U2-R.4k.**
   - [ ] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
     U2 contra la composición previa; fuera del breakpoint desktop conservar/restaurar
     la navegación y flujo móvil anterior, sin intentar este rediseño material. Probar
@@ -196,6 +235,10 @@ de [U3] y [A2]. La referencia vinculante es
     no bloqueante para U2-R: conservar poster saliente/entrante como una tira que avanza
     verticalmente detrás del marco, medir fluidez con imágenes reales y definir fallback
     directo para reduced motion antes de decidir si se incorpora.
+  - [ ] **[U2-X.2] Evaluar señal temporal basada en medios reales.** Después de U2-R,
+    investigar si archivos locales autorizados o una fuente con licencia permiten
+    derivar waveform/espectro y marcas temporales reales. No bloquear la preview ni
+    representar datos inventados como análisis de la película.
 
 ### Frente: Colección, búsqueda y alta
 

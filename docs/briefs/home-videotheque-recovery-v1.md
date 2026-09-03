@@ -8,10 +8,17 @@ del 2026-09-03: conservó varias interacciones útiles, pero convirtió la porta
 hero convencional, separó demasiado los lomos y perdió la sensación de mueble continuo.
 
 La referencia visual aceptada es
-`docs/design/u2-recovery-north-star-v1.png`. Es una composición de producto, no un asset
-que se envía al navegador. Cuando una interpretación del texto compita con esa lámina,
-prevalecen la composición y densidad de la lámina, con las correcciones explícitas de
-este documento.
+`docs/design/u2-recovery-north-star-v1.png`. La revisión anotada posterior
+`docs/design/u2-r4-annotated-review-v1.png` tiene precedencia para la cabecera,
+cartelera, playlist y preview superiores. Ambas son composiciones de producto, no assets
+que se envían al navegador. Cuando una interpretación del texto compita con esas
+láminas, prevalecen su composición y densidad, con las correcciones explícitas de este
+documento.
+
+La revisión anotada reabre sólo la franja superior. El mueble inferior conserva la base
+estructural y la sincronización cerradas en U2-R.3/R.4; aún debe superar el gate final
+U2-R.7. U2-R.5 completa la contratapa que se abre desde sus acciones, no un rediseño
+automático de las estanterías.
 
 ## Contrato de dirección
 
@@ -30,6 +37,9 @@ composición previa a U2 y se rediseñará en una entrega separada.
 ### Cabecera y navegación
 
 - La marca lleva a `Inicio`.
+- Marca y estadísticas forman una sola línea estable en desktop. Antes de implementar
+  su nueva materialidad se comparan 2–3 variantes preparadas por un subagente de diseño;
+  ninguna puede convertir el mostrador en una barra genérica ni aumentar su altura.
 - `Colección` y `Menú` permanecen visibles juntos, arriba a la derecha.
 - `Colección` engloba examinar, buscar, filtrar y agregar. U2-R sólo la enlaza; el
   rediseño de esa superficie pertenece a U3.
@@ -46,10 +56,13 @@ La zona superior tiene dos piezas coordinadas pero no acopladas de forma destruc
   muestra `Hoy` o `Ayer` según la programación cargada, pero no repite título, estado ni
   disponibilidad. No lleva flechas propias: rota automáticamente y la exploración manual
   vive en la playlist. Los puntos se apoyan en el zócalo inferior del marco, no en una
-  caja exterior.
+  caja exterior. La placa centra el día y no muestra contador; tampoco existe un panel
+  rectangular adicional alrededor del marco. La marquesina puede crecer dentro de su
+  columna mientras conserve encastre y no quite superficie operativa a la playlist.
 2. Una lista tabular densa tipo Winamp con título, año, tipo, géneros y duración, más un
-  panel compacto de preview debajo. La programación diaria muestra hasta seis funciones
-  visibles en el encuadre desktop objetivo.
+  panel compacto de preview debajo. La programación diaria muestra como máximo seis
+  funciones y sus filas aprovechan la altura disponible; con 1–5 resultados el ritmo
+  puede crecer moderadamente, pero no producir filas gigantes ni una tabla falsa.
 
 La cartelera automática y la selección manual son estados distintos. El temporizador
 sólo cambia `carouselItemId`; jamás mueve foco, `selectedItemId`, scroll de la lista ni
@@ -100,6 +113,13 @@ identidad, metadatos suficientes y dos acciones. `Ver más` y `Editar mi ficha` 
 agrupan **a la izquierda** y usan el mismo lenguaje de botón físico dorado de la
 referencia; la acción primaria puede tener mayor intensidad, pero no una forma o paleta
 ajena. `Editar mi ficha` sólo aparece con permiso real y abre el editor existente.
+
+La preview no repite el motivo `Disponible y pendiente` cuando disponibilidad y estado
+ya están expresados por datos propios. El centro libre puede alojar una señal temporal
+de aspecto waveform/espectro: durante U2-R es SVG/CSS decorativo, estable por ID y
+oculto a tecnologías asistivas. No se presenta como Fourier, audio ni análisis real de
+la película. Obtener una señal derivada de medios locales autorizados queda como
+investigación posterior y no bloquea la composición.
 
 ### Contratapa de `Ver más`
 
@@ -168,6 +188,10 @@ Ningún texto se rasteriza y ninguna película real se representa en estos asset
 - Lista/lomo/preview coherentes tras click, Enter, flechas y cambio de estantería.
 - Mueble con indicio lateral de continuidad, sin scrollbar visible y sin callejón para
   teclado o touch.
+- Cabecera en una línea, cartelera libre de caja exterior y placa de día centrada sin
+  contador; playlist de hasta seis filas sin vacío accidental dominante.
+- Preview sin razones repetidas y señal decorativa estable que no se anuncia como dato
+  factual de la obra.
 - Acciones doradas a la izquierda; edición ausente cuando no hay permiso.
 - Contratapa determinista, dos placeholders y retorno de foco correcto.
 - Móvil sin regresiones respecto de la composición anterior a U2.
