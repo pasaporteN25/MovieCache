@@ -30,11 +30,12 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea. [U2-R.0] ya fijó la referencia, el contrato y los assets;
-  la primera tarea de código accionable es [U2-R.1].
+- **En curso:** ninguna tarea. [U2-R.0–U2-R.2] ya fijaron referencia, assets, escenario
+  desktop y estados independientes; la siguiente tarea accionable es [U2-R.3].
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
-  y el trabajo correctivo pendiente vive solamente en [U2-R].
+  y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
+  quedaron cerradas el 2026-09-03.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
@@ -89,17 +90,39 @@ de [U3] y [A2]. La referencia vinculante es
   están ordenadas y acotadas para poder delegarlas sin pedir a un modelo menor que
   redescubra la arquitectura.
 
-  - [ ] **[U2-R.1] Construir el escenario desktop y el mostrador mínimo.** Aplicar pared,
+  - [x] **[U2-R.1] Construir el escenario desktop y el mostrador mínimo.** Aplicar pared,
     marco y grilla física; dejar `Colección` + `Menú` juntos, marca → Inicio y el resto
     de comandos dentro del menú; encuadrar cartelera/lista/mueble dentro de 1280×720 sin
     tocar comportamiento. Acotar a `index.shell-open.html`, `index.home.html`,
     `css/core.css`, `css/home.css` y tests estructurales. Los selectores nuevos se
     prefijan `home-videotheque-*`. **Modelo: Medio. Depende de U2-R.0.**
-  - [ ] **[U2-R.2] Separar cartelera automática, fuente de playlist y selección.** En
+    - [x] **[U2-R.1a] Mostrador y arquitectura de navegación.** Marca enlazada a Inicio,
+      `Colección` y `Menú` como únicos destinos visibles del mostrador desktop; Bandeja,
+      Club, azar, buscar y agregar conservan sus handlers dentro del menú.
+    - [x] **[U2-R.1b] Escenario material y aislamiento responsive.** Aplicar los assets
+      originales de pared, marco, shelf bay y lomo sólo en desktop, preservando el DOM y
+      la navegación móvil previos.
+    - [x] **[U2-R.1c] Gate de encuadre.** Verificar 1280×720 sin scroll vertical tanto con
+      cartelera poblada como vacía y conservar el indicio de continuidad inferior.
+    - **Cierre**: escenario desktop material aplicado sobre los assets de U2-R.0;
+      `Colección` + `Menú` forman el mostrador, la marca vuelve a Inicio y los comandos
+      reubicados conservan navegación, foco y contadores. El modo compacto de altura
+      mantiene la composición poblada dentro de 1280×720 y móvil conserva su shell.
+  - [x] **[U2-R.2] Separar cartelera automática, fuente de playlist y selección.** En
     `js/surfaces/home.js`, modelar `carouselItemId`, `playlistSource` y `selectedItemId`;
     renderizar la lista tabular con fuente visible y autoplay que sólo cambia el item al
     aire. Probar click/Enter en cartelera, flechas/Home/End, brillo no seleccionado y que
     el timer no roba foco/preview. **Modelo: Medio. Depende de U2-R.1.**
+    - [x] **[U2-R.2a] Estado independiente.** Separar item al aire, fuente activa y obra
+      seleccionada sin cambiar `/api/home`.
+    - [x] **[U2-R.2b] Playlist Winamp accesible.** Tabla HTML real con fuente, columnas,
+      selección roving y preview sincronizado para cartelera o estantería.
+    - [x] **[U2-R.2c] Autoplay y navegación de borde.** Cerrar wrap de anterior/siguiente,
+      pausa efectiva fuera de Inicio, preservación de foco/preview y sus regresiones.
+    - **Cierre**: `carouselItemId`, `playlistSource`, `selectedItemId` y la selección de
+      fila son estados independientes. La cartelera gira sin alterar preview/foco; la
+      playlist usa tabla HTML y navegación roving; anterior/siguiente envuelven y el
+      timer se detiene fuera de Inicio o con movimiento reducido.
   - [ ] **[U2-R.3] Convertir las categorías en mueble horizontal continuo.** Sustituir el
     selector de una sola fila por cuatro bays contiguos, con placa por categoría, un bay
     dominante y el siguiente cortado; rueda/trackpad/Shift+rueda/flechas desplazan con

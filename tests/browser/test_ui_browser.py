@@ -64,6 +64,11 @@ def run_library_scan(page, base_url: str, headers: dict[str, str], library_id: s
             raise RuntimeError(f"Library {mode} run did not finish in time")
 
 
+def click_desktop_menu_action(page, action: str) -> None:
+    page.locator("#systemMenu > summary").click()
+    page.locator(f'[data-click="menu-{action}"]').click()
+
+
 class BrowserInterfaceTests(unittest.TestCase):
     """Colección, Ficha and structural-markup coverage on a shared, read-only
     catalog. No test here writes to the catalog, so they can safely share one
@@ -210,17 +215,15 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
 
-        page.locator("#homeButton").focus()
+        page.locator(".brand-home").focus()
         page.keyboard.press("Tab")
         self.assertEqual(page.evaluate("document.activeElement.id"), "catalogButton")
 
-        page.locator("#clubButton").focus()
+        page.locator("#catalogButton").focus()
         page.keyboard.press("Tab")
-        self.assertEqual(page.evaluate("document.activeElement.id"), "headerSearchButton")
-        page.keyboard.press("Tab")
-        self.assertEqual(page.evaluate("document.activeElement.id"), "headerAddButton")
-        page.keyboard.press("Tab")
-        self.assertEqual(page.evaluate("document.activeElement.id"), "randomButton")
+        self.assertEqual(
+            page.evaluate("document.activeElement.closest('#systemMenu')?.id"), "systemMenu"
+        )
 
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertFalse(
@@ -244,14 +247,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         page = self.page
         self._open_and_wait_for_catalog(page)
 
-        page.locator("#headerSearchButton").click()
+        click_desktop_menu_action(page, "search")
         page.wait_for_selector("#collectionView:not([hidden])")
         page.wait_for_function("document.activeElement.id === 'query'")
 
-        page.locator("#homeButton").click()
+        page.locator(".brand-home").click()
         page.wait_for_selector("#homeView:not([hidden])")
 
-        page.locator("#headerAddButton").click()
+        click_desktop_menu_action(page, "add")
         page.wait_for_selector("#collectionView:not([hidden])")
         page.wait_for_function("document.activeElement.id === 'catalogTitle'")
 
@@ -320,20 +323,131 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(selector.nth(1).get_attribute("tabindex"), "-1")
 
         selector.nth(0).focus()
+        selected_before = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
         page.keyboard.press("ArrowDown")
 
         self.assertEqual(page.evaluate("document.activeElement.dataset.index"), "1")
         self.assertEqual(selector.nth(1).get_attribute("aria-pressed"), "true")
-        self.assertEqual(page.locator("#spotlight-selected-title").inner_text(), "AKIRA")
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before)
         page.keyboard.press("Enter")
-        self.assertEqual(page.locator("#spotlight-selected-title").inner_text(), "AKIRA")
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before)
 
         page.keyboard.press("Tab")
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "open-detail")
+        self.assertIn(
+            page.evaluate("document.activeElement.dataset.click"),
+            {"spotlight-select", "spotlight-prev", "spotlight-next", "playlist-select"},
+        )
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertFalse(
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
+
+    def test_home_playlist_columns_and_autoplay_keep_manual_selection_and_focus(self) -> None:
+        page = self.page
+
+        def add_playlist_features(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 2:
+                home["featured"] = [
+                    {"key": "playlist-heat", "origin": {"kind": "catalog"}, "item": items[0]},
+                    {"key": "playlist-akira", "origin": {"kind": "catalog"}, "item": items[1]},
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_playlist_features)
+        self._open_and_wait_for_catalog(page)
+
+        self.assertEqual(
+            [value.casefold() for value in page.locator(".spotlight-playlist thead th").all_inner_texts()],
+            ["#", "título", "año", "tipo", "géneros", "duración"],
+        )
+        rows = page.locator("[data-playlist-entry]")
+        self.assertEqual(rows.count(), 2)
+        rows.nth(1).click()
+        selected_key = rows.nth(1).get_attribute("data-entry-key")
+        rows.nth(1).focus()
+        before = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(before["selectedEntryKey"], selected_key)
+        page.evaluate("window.tickHomeAutoplay()")
+        after = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(after["selectedEntryKey"], selected_key)
+        self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), selected_key)
+        self.assertEqual(page.locator("[data-playlist-entry].is-selected").get_attribute("data-entry-key"), selected_key)
+        self.assertEqual(page.locator("[data-playlist-entry].is-on-air").count(), 1)
+
+        page.keyboard.press("Enter")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "open-detail")
+
+        page.locator('[data-click="spotlight-air-select"][data-index="0"]').click()
+        page.locator('[data-click="spotlight-prev"]').click()
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 1)
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-prev")
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_key)
+
+        page.locator("#catalogButton").click()
+        page.wait_for_selector("#collectionView:not([hidden])")
+        hidden_before = page.evaluate("window.getHomePlaybackState().carouselItemId")
+        self.assertFalse(page.evaluate("window.tickHomeAutoplay()"))
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().carouselItemId"), hidden_before
+        )
+
+        page.goto(BrowserInterfaceTests.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+        page.set_viewport_size({"width": 1280, "height": 720})
+        viewport_metrics = page.evaluate(
+            """() => ({
+                viewport: window.innerHeight,
+                page: document.documentElement.scrollHeight,
+                header: document.querySelector('.app-header')?.getBoundingClientRect().height || 0,
+                spotlight: document.querySelector('#spotlight')?.getBoundingClientRect().height || 0,
+                categories: document.querySelector('#homeShelfCategories')?.getBoundingClientRect().height || 0,
+                sections: document.querySelector('#homeSections')?.getBoundingClientRect().height || 0
+            })"""
+        )
+        self.assertLessEqual(
+            viewport_metrics["page"],
+            viewport_metrics["viewport"] + 1,
+            viewport_metrics,
+        )
+
+    def test_desktop_menu_duplicate_commands_close_details_and_navigate(self) -> None:
+        page = self.page
+
+        def open_menu() -> None:
+            page.locator("#systemMenu > summary").click()
+            self.assertTrue(page.locator("#systemMenu").get_attribute("open") is not None)
+
+        self._open_and_wait_for_catalog(page)
+        open_menu()
+        page.locator('[data-click="menu-inbox"]').click()
+        page.wait_for_selector("#inboxView:not([hidden])")
+        self.assertIsNone(page.locator("#systemMenu").get_attribute("open"))
+
+        page.goto(BrowserInterfaceTests.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+        open_menu()
+        page.locator('[data-click="menu-club"]').click()
+        page.wait_for_selector("#clubView:not([hidden])")
+        self.assertIsNone(page.locator("#systemMenu").get_attribute("open"))
+
+        page.goto(BrowserInterfaceTests.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+        open_menu()
+        page.locator('[data-click="menu-search"]').click()
+        page.wait_for_selector("#collectionView:not([hidden])")
+        self.assertIsNone(page.locator("#systemMenu").get_attribute("open"))
+
+        page.goto(BrowserInterfaceTests.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+        open_menu()
+        page.locator('[data-click="menu-add"]').click()
+        page.wait_for_selector("#collectionView:not([hidden])")
+        self.assertIsNone(page.locator("#systemMenu").get_attribute("open"))
 
     def test_home_shelves_use_existing_sections_with_keyboard_preview_and_touch_scroll(
         self,
@@ -774,7 +888,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         page = self.page
         self._open_and_wait_for_catalog(page)
 
-        page.locator("#randomButton").focus()
+        page.locator("#systemMenu > summary").click()
+        page.locator('[data-click="menu-random"]').focus()
         # openSearchDescription(collection, itemId): "" looks the id up in the
         # loaded catalog items rather than in an external-search results list.
         page.evaluate("openSearchDescription('', 'heat')")
@@ -789,8 +904,8 @@ class BrowserInterfaceTests(unittest.TestCase):
             "Un detective y un ladrón profesional se enfrentan en Los Ángeles.",
         )
 
-        page.get_by_role("button", name="Cerrar").click()
-        self.assertEqual(page.evaluate("document.activeElement.id"), "randomButton")
+        page.get_by_role("button", name="Cerrar", exact=True).click()
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "menu-random")
 
     def test_structural_regions_are_not_live_announcements(self) -> None:
         page = self.page
@@ -847,11 +962,12 @@ class BrowserInterfaceTests(unittest.TestCase):
         # Both fixture items are pending Curaduria cases; the shared library
         # scan in setUpClass gives Akira server availability but leaves no
         # Scanner queue item, so the scanner badge must stay hidden.
-        page.locator("#inboxBadge").wait_for(state="visible")
-        self.assertEqual(page.locator("#inboxBadge").inner_text(), "2")
-        self.assertFalse(page.locator("#inboxScannerBadge").is_visible())
+        page.locator("#systemMenu > summary").click()
+        page.locator("[data-menu-inbox-badge]").wait_for(state="visible")
+        self.assertEqual(page.locator("[data-menu-inbox-badge]").inner_text(), "2")
+        self.assertFalse(page.locator("[data-menu-scanner-badge]").is_visible())
 
-        page.locator("#inboxButton").click()
+        page.locator('[data-click="menu-inbox"]').click()
         self.assertEqual(page.locator("#inboxCurationMode").inner_text(), "Tu catálogo")
         self.assertIn(
             "Inventario de la instancia",
@@ -1080,7 +1196,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
 
         self._open_and_wait_for_catalog(page)
-        page.locator("#inboxButton").click()
+        click_desktop_menu_action(page, "inbox")
         page.wait_for_selector("#inboxView:not([hidden])")
 
         search = page.locator("#curationQueueSearch")
@@ -1517,7 +1633,7 @@ class ScannerBrowserTests(unittest.TestCase):
         page.goto(self.base_url)
         page.wait_for_selector("#homeView:not([hidden])")
 
-        page.locator("#inboxButton").click()
+        click_desktop_menu_action(page, "inbox")
         page.locator("#inboxScannerMode").click()
         page.locator(f'[data-scanner-item="{self.queue_item_id}"]').click()
 
@@ -1571,11 +1687,12 @@ class ScannerBrowserTests(unittest.TestCase):
         # loadCatalog() populates both counts asynchronously after the home
         # view is already visible, so wait for the scanner badge specifically
         # rather than reading a snapshot right after page load.
-        page.locator("#inboxScannerBadge").wait_for(state="visible")
-        self.assertFalse(page.locator("#inboxBadge").is_visible())
-        self.assertEqual(page.locator("#inboxScannerBadge").inner_text(), "1")
+        page.locator("#systemMenu > summary").click()
+        page.locator("[data-menu-scanner-badge]").wait_for(state="visible")
+        self.assertFalse(page.locator("[data-menu-inbox-badge]").is_visible())
+        self.assertEqual(page.locator("[data-menu-scanner-badge]").inner_text(), "1")
 
-        page.locator("#inboxButton").click()
+        page.locator('[data-click="menu-inbox"]').click()
         self.assertEqual(page.locator("#inboxCurationMode").inner_text(), "Tu catálogo")
         self.assertIn(
             "Inventario de la instancia",
@@ -1599,7 +1716,7 @@ class ScannerBrowserTests(unittest.TestCase):
         page.goto(self.base_url)
         page.wait_for_selector("#homeView:not([hidden])")
 
-        page.locator("#inboxButton").click()
+        click_desktop_menu_action(page, "inbox")
         page.locator("#inboxScannerMode").click()
         page.locator(f'[data-scanner-item="{self.queue_item_id}"]').click()
 
@@ -1618,7 +1735,7 @@ class ScannerBrowserTests(unittest.TestCase):
         page.goto(self.base_url)
         page.wait_for_selector("#homeView:not([hidden])")
 
-        page.locator("#inboxButton").click()
+        click_desktop_menu_action(page, "inbox")
         page.locator("#inboxScannerMode").click()
         page.wait_for_selector(f'[data-scanner-item="{self.queue_item_id}"]')
 
@@ -1726,7 +1843,7 @@ class ScannerBrowserTests(unittest.TestCase):
             )
         )
 
-        page.locator("#inboxButton").click()
+        click_desktop_menu_action(page, "inbox")
         page.locator("#inboxScannerMode").click()
         page.locator(f'[data-scanner-item="{queue_item_id}"]').click()
         page.wait_for_selector(".scanner-candidate-card")

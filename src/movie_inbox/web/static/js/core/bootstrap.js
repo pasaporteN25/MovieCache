@@ -12,7 +12,7 @@ import { createPublicPresentation, handlePublicPresentationAction, previewPublic
 import { applyCollectionYearRange, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
-import { activateHomeSection, addHomeCollectionItem, goToHomeCollection, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeShelf, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, selectHomeCategory, selectHomeShelfEntry, selectSpotlight } from "../surfaces/home.js";
+import { activateHomeSection, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeShelf, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, setCarouselItem, tickHomeAutoplay } from "../surfaces/home.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
@@ -35,6 +35,10 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "open-home-collection": () => goToHomeCollection(target.dataset.collectionId || id),
           "home-section-action": () => activateHomeSection(target.dataset.sectionId || ""),
           "spotlight-select": () => selectSpotlight(Number(target.dataset.index || 0), true),
+          "spotlight-air-select": () => setCarouselItem(Number(target.dataset.index || 0), true),
+          "spotlight-prev": () => setCarouselItem((Number.isFinite(Number(target.dataset.index)) ? Number(target.dataset.index) : 0) - 1, true, "spotlight-prev"),
+          "spotlight-next": () => setCarouselItem((Number.isFinite(Number(target.dataset.index)) ? Number(target.dataset.index) : 0) + 1, true, "spotlight-next"),
+          "playlist-select": () => selectPlaylistEntry(target.dataset.entryKey || "", false),
           "home-shelf-select": () => selectHomeShelfEntry(target.dataset.sectionId || "", target.dataset.entryKey || "", true),
           "home-category-select": () => selectHomeCategory(target.dataset.sectionId || "", true),
           "edit-home-shelf-entry": () => openDetailForPersonalEdit(target, id),
@@ -45,6 +49,11 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "home-empty-import": goToImports,
           "home-empty-club": goToClub,
           "refresh-home": refreshEditorialHome,
+          "menu-inbox": () => { target.closest("details")?.removeAttribute("open"); goToInbox(); },
+          "menu-club": () => { target.closest("details")?.removeAttribute("open"); goToClub(); },
+          "menu-random": () => { target.closest("details")?.removeAttribute("open"); openRandomDetail(); },
+          "menu-search": () => { target.closest("details")?.removeAttribute("open"); goToCollectionSearch(); },
+          "menu-add": () => { target.closest("details")?.removeAttribute("open"); goToCollectionRoot(); },
           "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
           "focus-personal": editPersonalRecord,
           "edit-personal": editPersonalRecord,
@@ -93,6 +102,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       document.querySelector("#refresh").addEventListener("click", refreshAdminData);
       fields.searchButton.addEventListener("click", () => runSearch());
       fields.spotlightStage.addEventListener("keydown", moveSpotlightSelector);
+      fields.spotlightStage.addEventListener("keydown", movePlaylistSelection);
       fields.homeShelfCategories.addEventListener("keydown", moveHomeCategorySelector);
       fields.homeSections.addEventListener("keydown", moveHomeShelf);
       fields.homeButton.addEventListener("click", goHome);
@@ -296,6 +306,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         if (event.key === "Escape") clearManualSearch();
       });
       document.addEventListener("visibilitychange", handleVisibilityChange);
+      document.addEventListener("visibilitychange", handleHomeVisibilityChange);
       document.addEventListener("keydown", handleKeyboardModality, true);
       document.addEventListener("pointerdown", handlePointerModality, true);
       window.addEventListener("beforeunload", handleBeforeUnload);
@@ -320,3 +331,5 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       window.openDetail = openDetail;
       window.closeDetail = closeDetail;
       window.openSearchDescription = openSearchDescription;
+      window.tickHomeAutoplay = tickHomeAutoplay;
+      window.getHomePlaybackState = getHomePlaybackState;

@@ -201,7 +201,17 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         fields.inboxBadge.hidden = !(personal > 0);
         fields.inboxScannerBadge.textContent = scanner;
         fields.inboxScannerBadge.hidden = !(scanner > 0);
-        fields.inboxButton.setAttribute("aria-label", inboxBadgeAriaLabel(personal, scanner));
+        if (fields.menuInboxBadge) {
+          fields.menuInboxBadge.textContent = personal;
+          fields.menuInboxBadge.hidden = !(personal > 0);
+        }
+        if (fields.menuScannerBadge) {
+          fields.menuScannerBadge.textContent = scanner;
+          fields.menuScannerBadge.hidden = !(scanner > 0);
+        }
+        const badgeLabel = inboxBadgeAriaLabel(personal, scanner);
+        fields.inboxButton.setAttribute("aria-label", badgeLabel);
+        fields.menuInboxBadge?.closest("[data-click='menu-inbox']")?.setAttribute("aria-label", badgeLabel);
       }
 
       export function inboxBadgeAriaLabel(personal, scanner) {
