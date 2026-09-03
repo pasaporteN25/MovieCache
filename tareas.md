@@ -24,14 +24,17 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [A2] | Cliente Android basico | A1 + entorno Android |
-| 2 | [I1] | Evaluacion de integraciones | A1 |
-| 3 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 1 | [U2-R] | Recuperar Inicio según el north star aceptado | base técnica de U2 |
+| 2 | [U3] | Replantear Colección, búsqueda, filtros y alta | U2-R |
+| 3 | [A2] | Cliente Android basico | A1 + entorno Android |
+| 4 | [I1] | Evaluacion de integraciones | A1 |
+| 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea; [D1], [W3], [U1] y [U2] ya tienen validacion y cierre
-  verificables.
-- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y [U2]. El detalle
-  verificable permanece en `Hecho`.
+- **En curso:** ninguna tarea. [U2-R.0] ya fijó la referencia, el contrato y los assets;
+  la primera tarea de código accionable es [U2-R.1].
+- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
+  U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
+  y el trabajo correctivo pendiente vive solamente en [U2-R].
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
@@ -61,43 +64,100 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 
 ### Frente: Superficie publica y despliegue
 
-### Frente: Inicio videoclub (siguiente entrega de interfaz)
+### Frente: Inicio videoclub (recuperación visual prioritaria)
 
-**Decisión 2026-09-02.** La lámina generada 1 es una referencia de dirección, no un
-asset ni contenido de la aplicación. [U1] resolvió una primera versión navegable; [U2]
-la reemplaza visualmente antes de iniciar [A2]. El objetivo no es sumar un tema
-decorativo: Inicio debe sentirse como el videoclub material de la referencia, con una
-cartelera de lista y estanterías de lomos. La cartelera pública puede adoptar el sistema
-más adelante, pero conserva el contrato aislado de [W1]/[W2] y nunca gana acciones
-privadas. El brief durable, que permite trabajar aun si la lámina no está adjunta a una
-siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
+**Decisión 2026-09-03.** [U2] quedó técnicamente cerrada, pero la revisión visual
+rechazó su composición: hero convencional, lomos aislados y exceso de vacío no expresan
+el videoclub continuo aprobado. No se reabre ni borra su historia. [U2-R] conserva sus
+contratos útiles de permisos, teclado y datos, y reemplaza la arquitectura visual antes
+de [U3] y [A2]. La referencia vinculante es
+`docs/design/u2-recovery-north-star-v1.png`; el contrato autosuficiente está en
+`docs/briefs/home-videotheque-recovery-v1.md`.
 
-#### [U2] Reconstruir Inicio como videoclub material
-- **Alcance**: sustituir la composición visual de [U1] sin cambiar el contrato
-  editorial ni las rutas existentes. Arriba, una cartelera disponible de estética
-  nocturna con una lista navegable tipo Winamp; abajo, estanterías físicas cuyas obras
-  se ven de perfil. La selección revela una previsualización con el VHS existente, caja
-  frontal, lectura suficiente y una acción explícita de edición cuando corresponde.
-- **Criterio de cierre**: teclado, puntero, touch, foco, lector de pantalla y reducción
-  de movimiento permiten hacer el mismo recorrido; las portadas y textos siguen siendo
-  HTML/datos vivos; no se filtran rutas, fuentes privadas ni estado de otra persona; la
-  página funciona con una, cuatro o ninguna recomendación y se verifica en desktop y
-  móvil.
-- **Depende de**: [U1]. **Precede a**: [A2] por decisión de producto; no necesita
-  modificar su API ni bloquear una futura configuración del entorno Android.
-- **Modelo sugerido**: Grande. Cambia composición, objetos reutilizables, navegación y
-  detalle sobre varias superficies, con requisitos de accesibilidad y de assets.
+#### [U2-R] Recuperar Inicio según el north star aceptado
+- **Alcance**: reconstruir Inicio de escritorio como una escena física compacta: una
+  cartelera vertical autónoma, una lista tipo Winamp cuya fuente puede ser la
+  programación diaria o una estantería, y cuatro módulos dentro de un mueble horizontal
+  continuo. `Ver más` abre una contratapa VHS y `Editar mi ficha` reutiliza el editor.
+- **Criterio de cierre**: en desktop objetivo no hay scroll vertical; el mueble muestra
+  continuidad lateral sin scrollbar visible; cartelera automática y selección manual
+  no se pisan; fila, lomo y preview siempre coinciden; teclado/touch/lector/reduced
+  motion son equivalentes; móvil no queda peor que antes de U2.
+- **Depende de**: base técnica de [U2]. **Precede a**: [U3] y [A2]. No cambia `/api/home`,
+  A1, permisos ni rutas públicas.
+- **Modelo sugerido**: Medio por subtask; Grande sólo para el gate [U2-R.7]. Las partes
+  están ordenadas y acotadas para poder delegarlas sin pedir a un modelo menor que
+  redescubra la arquitectura.
 
-  - [x] **[U2.0] Integrar navegación y utilidades en el escenario.** Ver detalle en
-    `Hecho`.
-  - [x] **[U2.1] Fijar y prototipar la cartelera-lista.** Ver detalle en `Hecho`. El
-    asset auditado `night-cinema-ambient-v1.png` ya está integrado como fondo real de
-    `.spotlight-ambience`.
-  - [x] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Ver
-    detalle en `Hecho`.
-  - [x] **[U2.3] Abrir la caja para el detalle extendido.** Ver detalle en `Hecho`.
-  - [x] **[U2.4] Conectar edición explícita desde la previsualización y la ficha.**
-    Ver detalle en `Hecho`. Cierra [U2] completo.
+  - [ ] **[U2-R.1] Construir el escenario desktop y el mostrador mínimo.** Aplicar pared,
+    marco y grilla física; dejar `Colección` + `Menú` juntos, marca → Inicio y el resto
+    de comandos dentro del menú; encuadrar cartelera/lista/mueble dentro de 1280×720 sin
+    tocar comportamiento. Acotar a `index.shell-open.html`, `index.home.html`,
+    `css/core.css`, `css/home.css` y tests estructurales. Los selectores nuevos se
+    prefijan `home-videotheque-*`. **Modelo: Medio. Depende de U2-R.0.**
+  - [ ] **[U2-R.2] Separar cartelera automática, fuente de playlist y selección.** En
+    `js/surfaces/home.js`, modelar `carouselItemId`, `playlistSource` y `selectedItemId`;
+    renderizar la lista tabular con fuente visible y autoplay que sólo cambia el item al
+    aire. Probar click/Enter en cartelera, flechas/Home/End, brillo no seleccionado y que
+    el timer no roba foco/preview. **Modelo: Medio. Depende de U2-R.1.**
+  - [ ] **[U2-R.3] Convertir las categorías en mueble horizontal continuo.** Sustituir el
+    selector de una sola fila por cuatro bays contiguos, con placa por categoría, un bay
+    dominante y el siguiente cortado; rueda/trackpad/Shift+rueda/flechas desplazan con
+    límites y equivalente enfocable sin barra visible. Usar `vhs-shelf-bay-v1.png` y
+    `vhs-spine-shell-v1.png`; mantener texto/estado en DOM. Archivos: `home.js`,
+    `home.css`, pruebas de 0/1/4 categorías y overflow. **Modelo: Medio. Depende de
+    U2-R.1.**
+  - [ ] **[U2-R.4] Sincronizar playlist, lomo y preview.** Click/Enter en un bay cambia la
+    fuente; click/Enter en un lomo selecciona/alinea su fila; flechas en la lista
+    seleccionan y llevan a vista el lomo correspondiente. Preview, fila y lomo deben
+    compartir ID tras cada camino. Poner **a la izquierda** `Ver más` y `Editar mi ficha`,
+    ambos con el mismo estilo físico dorado y diferente intensidad; conservar el gate
+    real de permisos. Archivos: `home.js`, `home.css`, `test_ui_browser.py`. **Modelo:
+    Medio. Depende de U2-R.2 y U2-R.3.**
+  - [ ] **[U2-R.5] Implementar la contratapa determinista.** Extraer un mapper puro de ID
+    opaco → una de 4–5 plantillas estables; componer sobre
+    `vhs-back-cover-shell-v1.png` sinopsis, créditos, año, duración, géneros,
+    disponibilidad/memoria y dos placeholders de imagen. `Ver más` abre con transición
+    breve, Escape/reduced motion y retorno de foco; `Editar` sigue abriendo la ficha
+    actual. Acotar a un módulo JS nuevo, integración mínima en `home.js`, CSS de
+    contratapa y tests del mapper/foco. **Modelo: Medio. Depende de U2-R.4.**
+  - [ ] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
+    U2 contra la composición previa; fuera del breakpoint desktop conservar/restaurar
+    la navegación y flujo móvil anterior, sin intentar este rediseño material. Probar
+    390×844, zoom alto, poster roto, título largo y acciones por permiso. **Modelo:
+    Medio. Depende de U2-R.1–U2-R.5.**
+  - [ ] **[U2-R.7] Ejecutar gate visual y de regresión.** Comparar con el north star en
+    1280×720, 1440×900 y 1920×1080; revisar coherencia de estado, ausencia de scroll
+    vertical, indicio lateral, teclado, touch, lector, reduced motion y suites completas.
+    Corregir sólo defectos del gate, documentar capturas y no declarar cierre por tests
+    verdes si la composición vuelve a divergir. **Modelo: Grande. Depende de todo
+    U2-R.**
+
+### Frente: Colección, búsqueda y alta
+
+#### [U3] Replantear Colección como destino único de descubrimiento
+- **Alcance**: hacer que `Colección` reúna de manera comprensible examinar el catálogo,
+  buscar local/externo, comparar, filtrar y agregar, sin reproducir una barra de
+  utilidades separada en Inicio. Este frente rediseña flujo y presentación; no sustituye
+  los algoritmos multilingües, matching o fuentes ya entregados por Q/F.
+- **Criterio de cierre**: una persona distingue explorar, buscar y agregar sin perder
+  query, modo `Comparar`, filtros ni posición al volver; los filtros cotidianos son
+  visibles y los avanzados usan divulgación progresiva; URL/historial preservan estado.
+- **Depende de**: [U2-R], para que navegación y vocabulario queden estables.
+- **Modelo sugerido**: Grande para U3.1; Medio para las implementaciones posteriores.
+
+  - [ ] **[U3.1] Auditar y congelar la arquitectura de Colección.** Inventariar buscador,
+    alta, comparación, filtros, URL, estados vacíos y permisos; producir wireflow y
+    contrato de estados antes de tocar código. Incluir explícitamente los casos donde
+    editar la query no puede degradar `Comparar` a búsqueda común. **Modelo: Grande.**
+  - [ ] **[U3.2] Rediseñar entrada de búsqueda/alta y filtros.** Implementar cabecera de
+    tarea unificada, intención clara de agregar, filtros cotidianos visibles, `Más
+    filtros` y chips activos; mantener endpoints y resultados existentes. Acotar a
+    `index.collection.html`, `css/catalog.css` y componentes de búsqueda necesarios.
+    **Modelo: Medio. Depende de U3.1.**
+  - [ ] **[U3.3] Preservar modos, URL e historial.** Alinear browse/search/compare con la
+    nueva UI, restaurar foco/scroll al volver y cubrir query, filtros y modo con pruebas
+    de navegador. **Modelo: Medio. Depende de U3.2.**
 
 ### Frente: Clientes, integraciones y nuevos medios
 
@@ -172,6 +232,22 @@ APK o una prueba de emulador reproducible.
 Sin tareas activas.
 
 ## Hecho
+
+#### [U2-R.0] Congelar dirección y kit material
+**Cerrado 2026-09-03 — commit `9406887`.**
+
+Se versionó la composición aprobada en
+`docs/design/u2-recovery-north-star-v1.png` y se convirtió la conversación en un
+contrato durable de layout, estado, interacción, accesibilidad y aceptación dentro de
+`docs/briefs/home-videotheque-recovery-v1.md`. El brief fija, entre otras decisiones,
+`Colección` junto a `Menú`, autoplay independiente de selección, correlación
+lista-lomo-preview, cuatro bays continuos y `Ver más`/`Editar mi ficha` agrupados a la
+izquierda con el mismo lenguaje físico dorado.
+
+El kit original y auditado suma pared, marco de cartelera con hueco alfa, módulo vacío
+de estantería, shell de lomo y shell de contratapa. Ningún asset contiene texto, marca,
+obra o datos rasterizados; `docs/assets/home-videotheque-kit-v1.md` registra dimensiones,
+hashes, prompts, procedencia y reglas de integración. No se tocó código de interfaz.
 
 ### Frente: Inicio videoclub
 
