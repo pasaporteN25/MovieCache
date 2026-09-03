@@ -32,6 +32,22 @@ import { editorialPersonalIds } from "../surfaces/home.js";
 
       export let pendingDetailTransition = null;
 
+      export let detailOpenedWithCaseTransition = false;
+
+      export function runWithCaseTransition(update) {
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (reducedMotion || !document.startViewTransition) {
+          update();
+          return;
+        }
+        document.startViewTransition(update);
+      }
+
+      export function openDetailWithCaseTransition(target, id) {
+        detailOpenedWithCaseTransition = true;
+        runWithCaseTransition(() => openDetailFromTrigger(target, id));
+      }
+
       export function openRandomDetail() {
         const candidates = randomCandidates();
         if (!candidates.length) return;
@@ -257,7 +273,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           return;
         }
         const activeElement = document.activeElement;
-        detailReturnFocus = activeElement?.matches?.("[data-click='open-detail']")
+        detailReturnFocus = activeElement?.dataset?.click?.startsWith("open-detail")
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
@@ -280,24 +296,30 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           requestDetailTransition(() => closeDetail({ restoreFocus, updateHistory, skipGuard: true }));
           return;
         }
-        selectedDetailId = "";
-        if (fields.detailDrawer.open) fields.detailDrawer.close();
-        fields.detailBody.innerHTML = "";
-        fields.detailNavigation.innerHTML = "";
-        document.body.classList.remove("drawer-open");
-        detailPersonalEditing = false;
-        detailDirtyScopes.clear();
-        pendingDetailTransition = null;
-        clearDetailFeedback();
-        if (updateHistory) syncRoute({ movie: "" }, "replace");
-        const currentCard = [...document.querySelectorAll(".dvd-card")]
-          .find((card) => card.dataset.id === detailReturnCardId);
-        const returnTarget = detailReturnFocus?.isConnected
-          ? detailReturnFocus
-          : currentCard?.querySelector(".dvd-open-surface");
-        if (restoreFocus) returnTarget?.focus();
-        detailReturnFocus = null;
-        detailReturnCardId = "";
+        const useCaseTransition = detailOpenedWithCaseTransition;
+        detailOpenedWithCaseTransition = false;
+        const performClose = () => {
+          selectedDetailId = "";
+          if (fields.detailDrawer.open) fields.detailDrawer.close();
+          fields.detailBody.innerHTML = "";
+          fields.detailNavigation.innerHTML = "";
+          document.body.classList.remove("drawer-open");
+          detailPersonalEditing = false;
+          detailDirtyScopes.clear();
+          pendingDetailTransition = null;
+          clearDetailFeedback();
+          if (updateHistory) syncRoute({ movie: "" }, "replace");
+          const currentCard = [...document.querySelectorAll(".dvd-card")]
+            .find((card) => card.dataset.id === detailReturnCardId);
+          const returnTarget = detailReturnFocus?.isConnected
+            ? detailReturnFocus
+            : currentCard?.querySelector(".dvd-open-surface");
+          if (restoreFocus) returnTarget?.focus();
+          detailReturnFocus = null;
+          detailReturnCardId = "";
+        };
+        if (useCaseTransition) runWithCaseTransition(performClose);
+        else performClose();
       }
 
       export function setDetailContext(context, selectedId) {
@@ -453,7 +475,13 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const image = item.page_image
           ? `<img class="drawer-poster" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" loading="eager" fetchpriority="high" decoding="async">`
           : "";
-        return `<div class="drawer-poster-frame">${image}${placeholder}</div>`;
+        return `<div class="drawer-poster-frame">
+          <span class="drawer-vhs-case" aria-hidden="true">
+            <span class="drawer-vhs-reel"></span>
+            <span class="drawer-vhs-reel"></span>
+          </span>
+          ${image}${placeholder}
+        </div>`;
       }
 
       export function editPersonalRecord() {

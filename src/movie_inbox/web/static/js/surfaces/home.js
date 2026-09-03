@@ -388,7 +388,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const isCollection = origin.kind === "collection";
         const viewMoreAction = isCollection
           ? `<button type="button" class="home-shelf-preview-action" data-click="open-home-collection-detail" data-key="${escapeAttr(entry?.key || "")}">Ver ficha del Club</button>`
-          : `<button type="button" class="home-shelf-preview-action" data-click="open-detail" data-id="${escapeAttr(item.id || "")}">Ver más</button>`;
+          : `<button type="button" class="home-shelf-preview-action" data-click="open-detail-with-case-transition" data-id="${escapeAttr(item.id || "")}">Ver más</button>`;
         const editAction = isCollection
           ? ""
           : `<button type="button" class="quiet-action home-shelf-preview-action" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>`;

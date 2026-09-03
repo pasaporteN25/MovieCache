@@ -437,7 +437,10 @@ class BrowserInterfaceTests(unittest.TestCase):
             "open",
         )
         page.keyboard.press("Tab")
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "open-detail")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.click"),
+            "open-detail-with-case-transition",
+        )
 
         shelf.nth(0).click()
         self.assertEqual(
@@ -585,6 +588,73 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("document.activeElement.hasAttribute('data-personal-watched-at')"),
             True,
         )
+
+    def test_home_shelf_view_more_opens_dossier_with_reversible_case_transition(
+        self,
+    ) -> None:
+        page = self.page
+
+        def add_home_section(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 1:
+                home["sections"] = [
+                    {
+                        "id": "available",
+                        "eyebrow": "Para ver ahora",
+                        "title": "Disponible esta noche",
+                        "description": "Pendientes que confirma tu biblioteca física.",
+                        "items": [
+                            {
+                                "key": "available-heat",
+                                "origin": {"kind": "catalog"},
+                                "item": items[0],
+                                "reason": {"label": "Lista para ver", "detail": "Disponible."},
+                            }
+                        ],
+                    }
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_home_section)
+        self._open_and_wait_for_catalog(page)
+
+        # document.startViewTransition support is exercised for real here (this
+        # Playwright build ships a Chromium new enough to have it); we assert on
+        # end-to-end behavior rather than instrumenting the API itself, since
+        # wrapping it changes timing enough to throw off focus restoration.
+        view_more = page.locator('[data-home-shelf-preview="available"]').get_by_text("Ver más")
+        view_more.click()
+        page.wait_for_selector("#detailDrawer[open]")
+
+        case = page.locator("#detailDrawer .drawer-vhs-case")
+        self.assertEqual(case.get_attribute("aria-hidden"), "true")
+        self.assertEqual(
+            case.evaluate("element => getComputedStyle(element).pointerEvents"), "none"
+        )
+
+        # Reversible + doesn't block Escape/focus.
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
+        # The view transition's callback runs synchronously, but Chromium settles
+        # the actual focus move a tick later while the transition is captured, so
+        # poll instead of asserting on a single synchronous read.
+        page.wait_for_function("document.activeElement.textContent === 'Ver más'")
+
+        # prefers-reduced-motion: the same open/close still works (the JS gate
+        # skips document.startViewTransition before CSS ever enters the picture).
+        page.emulate_media(reduced_motion="reduce")
+        view_more.click()
+        page.wait_for_selector("#detailDrawer[open]")
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
+        # The view transition's callback runs synchronously, but Chromium settles
+        # the actual focus move a tick later while the transition is captured, so
+        # poll instead of asserting on a single synchronous read.
+        page.wait_for_function("document.activeElement.textContent === 'Ver más'")
 
     def test_ficha_description_dialog_focus_and_naming(self) -> None:
         page = self.page

@@ -95,12 +95,7 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
     `.spotlight-ambience`.
   - [x] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Ver
     detalle en `Hecho`.
-  - [ ] **[U2.3] Abrir la caja para el detalle extendido.** `Ver más` parte de la caja
-    frontal y abre una transición reversible hacia un dossier donde el cassette VHS
-    negro acompaña sinopsis, ficha y acciones existentes. La animación es decorativa,
-    se omite con `prefers-reduced-motion`, no bloquea Escape/foco y no duplica rutas ni
-    datos. Cierre: componente reutilizable, estados de carga/fallo de portada y pruebas
-    de navegación, diálogo y movimiento reducido.
+  - [x] **[U2.3] Abrir la caja para el detalle extendido.** Ver detalle en `Hecho`.
   - [ ] **[U2.4] Conectar edición explícita desde la previsualización y la ficha.**
     Implementar la acción secundaria `Editar mi ficha` hacia el editor actual o un modo
     de edición del dossier según permisos. Seleccionar una obra, abrir su caja o leer su
@@ -183,6 +178,47 @@ Sin tareas activas.
 ## Hecho
 
 ### Frente: Inicio videoclub
+
+#### [U2.3] Abrir la caja para el detalle extendido
+**Cerrado 2026-09-03.** `docs/briefs/home-dossier-case-open-v1.md` documenta la
+entrega. `Ver más` en la previsualización de una estantería abre el mismo
+`#detailDrawer` compartido de siempre (sin cambios de ruta/API); esta entrega suma una
+transición decorativa reversible y un cassette VHS negro permanente en el dossier
+compartido (decisión del owner: aplica sin importar el punto de entrada — Inicio,
+Colección o Club — no sólo cuando se abre desde una estantería).
+
+`openDetailWithCaseTransition()` (`detail.js`) envuelve la apertura en
+`document.startViewTransition()` cuando el navegador lo soporta y no hay
+`prefers-reduced-motion`, y `closeDetail()` recuerda si el dossier actual se abrió así
+para envolver el cierre de la misma manera — reversible de verdad, no sólo una entrada
+animada. Sólo el botón `Ver más` de la previsualización usa este camino; el resto de
+los puntos de entrada al dossier (`Editar mi ficha`, Colección, Club, Al azar) siguen
+abriendo directo. Un fix necesario en el camino: el foco de retorno comparaba
+`data-click` contra el literal `"open-detail"`, que dejó de coincidir con el nuevo
+valor; ahora usa `dataset.click?.startsWith("open-detail")`.
+
+El cassette negro (`.drawer-vhs-case` + dos `.drawer-vhs-reel`, 100% CSS, sin librería
+ni asset nuevo) vive en `drawerPoster()`, la única función que arma la portada del
+dossier personal, la ficha compartida de Club y el detalle de una recomendación de
+colección en Inicio — un solo lugar, tres superficies. Es decorativo
+(`aria-hidden`/`pointer-events: none`) y nunca compite con los estados de carga/error
+de la portada real, que siguen intactos.
+
+Verificado con una prueba de navegador nueva
+(`test_home_shelf_view_more_opens_dossier_with_reversible_case_transition`: cassette
+inerte, Escape no bloquea foco, `prefers-reduced-motion` sigue funcionando) más toda la
+suite existente actualizada donde hacía falta (el foco esperado tras Tab desde la
+estantería cambió de `open-detail` a `open-detail-with-case-transition`). En el camino
+se corrigieron dos cosas de la prueba en sí, no de la app: `wait_for_selector` para un
+diálogo cerrado necesita `state="hidden"` (el default es `"visible"`, que nunca se
+cumple ahí) y el foco tras cerrar hay que sondearlo con `wait_for_function` en vez de
+leerlo una sola vez, porque Chromium lo asienta un tick después de cerrar el `<dialog>`
+mientras la transición todavía se captura — instrumentar
+`document.startViewTransition` para contar invocaciones introducía esa misma carrera,
+así que la prueba verifica comportamiento end-to-end en su lugar. 560 pruebas
+unitarias, 25 de navegador, Ruff, formato, mypy estricto, `compileall` y
+`git diff --check` en verde. Verificado también visualmente en un servidor
+descartable en 1345px y 375px.
 
 #### [U2.2] Convertir cada fila editorial en una estantería de lomos
 **Cerrado 2026-09-03.** `docs/briefs/home-shelves-v2.md` documenta la entrega, que

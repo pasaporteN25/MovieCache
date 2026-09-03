@@ -191,6 +191,21 @@
         from { opacity: 0; transform: translateY(18px) scale(0.975); }
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
+      /* "Abrir la caja": transición reversible desde `Ver más` en una previsualización
+         de estantería (ver openDetailWithCaseTransition en detail.js). Sólo corre
+         cuando el navegador soporta la View Transitions API y no hay
+         prefers-reduced-motion; en cualquier otro caso el dossier abre/cierra sin
+         animación, sin bloquear Escape ni el foco. */
+      ::view-transition-old(root) { animation: vhs-case-close 320ms var(--ease-out) both; }
+      ::view-transition-new(root) { animation: vhs-case-open 380ms var(--ease-out) both; }
+      @keyframes vhs-case-open {
+        from { clip-path: inset(32% 24% round 10px); opacity: 0; transform: scale(0.92); }
+        to { clip-path: inset(0 round 0); opacity: 1; transform: scale(1); }
+      }
+      @keyframes vhs-case-close {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
       .drawer-top {
         align-items: center;
         background: rgba(var(--paper-rgb), 0.97);

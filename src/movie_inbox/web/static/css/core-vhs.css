@@ -82,3 +82,32 @@
         transition: filter 180ms var(--ease-out);
         z-index: 2;
       }
+      /* Cassette VHS negro del dossier: 100% CSS, sin ventana de etiqueta (a
+         diferencia del marco frontal de arriba). Decorativo, siempre detrás de
+         la portada real o su placeholder — nunca los sustituye ni les quita
+         los estados de carga/error ya existentes. */
+      .drawer-vhs-case {
+        background: linear-gradient(160deg, #0b0c16, var(--case) 78%);
+        border: 1px solid color-mix(in srgb, var(--violet) 30%, var(--line));
+        border-radius: var(--radius-case);
+        bottom: -38px;
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.4);
+        left: -14px;
+        pointer-events: none;
+        position: absolute;
+        right: -14px;
+        top: -14px;
+        z-index: 0;
+      }
+      /* Alineados con el borde inferior de la carcasa (no el de la portada), para
+         que asomen debajo de ella en vez de quedar tapados. */
+      .drawer-vhs-reel {
+        background: radial-gradient(circle, var(--case) 0 38%, color-mix(in srgb, var(--violet) 38%, var(--case)) 40% 46%, transparent 48%);
+        border-radius: 50%;
+        bottom: 8px;
+        height: 26px;
+        position: absolute;
+        width: 26px;
+      }
+      .drawer-vhs-reel:first-of-type { left: 18px; }
+      .drawer-vhs-reel:last-of-type { right: 18px; }
