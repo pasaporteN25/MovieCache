@@ -117,8 +117,9 @@ SECURITY_HEADERS = {
 
 # Static JS/CSS carry no user data and are identical for every request, unlike the
 # no-store default the security middleware applies elsewhere for privacy. Filenames
-# aren't content-hashed, so this revalidates via ETag rather than going immutable.
-STATIC_CACHE_CONTROL = "public, max-age=3600, must-revalidate"
+# aren't content-hashed, so every navigation revalidates via ETag; a positive freshness
+# window can otherwise leave an old interface visible after deployment.
+STATIC_CACHE_CONTROL = "public, max-age=0, must-revalidate"
 
 
 def create_app(config: ViewerConfig) -> FastAPI:

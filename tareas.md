@@ -212,6 +212,10 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
       al rótulo `Hoy`/`Ayer` y a los indicadores del zócalo, ampliar identidad y señal de
       preview, incorporar `Director` con ausencia explícita y limpiar el indicador de la
       fila activa. **Modelo: Medio. Depende de U2-R.4k.**
+    - [x] **[U2-R.4m] Fijar geometría y eliminar frontend obsoleto.** Anclar placa e
+      indicadores a bandas verificables del asset, reservar al menos 38 % de la preview
+      para la señal y forzar revalidación ETag de assets no versionados. **Modelo: Medio.
+      Depende de U2-R.4l.**
     - **Cierre 2026-09-03**: se eligió una marquesina abierta y continua, con marca y
       estadísticas en una línea y `Colección`/`Menú` como placas contiguas. La cartelera
       queda libre de caja y contador; seis filas llenan el reproductor sin inflar listas

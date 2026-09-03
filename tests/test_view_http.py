@@ -1674,7 +1674,7 @@ class ViewerHttpTests(unittest.TestCase):
     def test_static_assets_are_cached_with_etag_revalidation(self) -> None:
         first = self.client.get("/static/js/core/bootstrap.js")
         self.assertEqual(first.status_code, 200)
-        self.assertEqual(first.headers["cache-control"], "public, max-age=3600, must-revalidate")
+        self.assertEqual(first.headers["cache-control"], "public, max-age=0, must-revalidate")
         etag = first.headers["etag"]
         self.assertTrue(etag)
 
@@ -1683,7 +1683,7 @@ class ViewerHttpTests(unittest.TestCase):
         )
         self.assertEqual(revalidated.status_code, 304)
         self.assertEqual(
-            revalidated.headers["cache-control"], "public, max-age=3600, must-revalidate"
+            revalidated.headers["cache-control"], "public, max-age=0, must-revalidate"
         )
         self.assertFalse(revalidated.content)
 

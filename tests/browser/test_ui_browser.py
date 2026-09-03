@@ -367,6 +367,25 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator(".spotlight-reason").count(), 0)
         self.assertEqual(page.locator(".spotlight-preview-signal[aria-hidden='true']").count(), 1)
         signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
+        marquee_geometry = page.evaluate(
+            """() => {
+                const selector = document.querySelector('.spotlight-selector').getBoundingClientRect();
+                const heading = document.querySelector('.spotlight-selector-heading').getBoundingClientRect();
+                const indicators = document.querySelector('.spotlight-selector-options').getBoundingClientRect();
+                const preview = document.querySelector('.spotlight-preview').getBoundingClientRect();
+                const signal = document.querySelector('.spotlight-preview-signal').getBoundingClientRect();
+                return {
+                    headingCenterRatio: ((heading.top + heading.height / 2) - selector.top) / selector.height,
+                    indicatorCenterRatio: ((indicators.top + indicators.height / 2) - selector.top) / selector.height,
+                    signalWidthRatio: signal.width / preview.width
+                };
+            }"""
+        )
+        self.assertGreaterEqual(marquee_geometry["headingCenterRatio"], 0.085)
+        self.assertLessEqual(marquee_geometry["headingCenterRatio"], 0.115)
+        self.assertGreaterEqual(marquee_geometry["indicatorCenterRatio"], 0.87)
+        self.assertLessEqual(marquee_geometry["indicatorCenterRatio"], 0.915)
+        self.assertGreaterEqual(marquee_geometry["signalWidthRatio"], 0.38)
         self.assertEqual(
             page.locator("#spotlight").evaluate(
                 "element => getComputedStyle(element).borderTopWidth"

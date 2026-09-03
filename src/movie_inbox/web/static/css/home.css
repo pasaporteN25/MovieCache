@@ -1321,8 +1321,8 @@
     margin: 0;
     padding: 0 3px;
     position: absolute;
-    top: 6.3%;
-    transform: translateX(-50%);
+    top: 9.8%;
+    transform: translate(-50%, -50%);
     width: clamp(116px, 14vh, 162px);
     z-index: 3;
   }
@@ -1383,7 +1383,7 @@
   }
 
   .spotlight-selector-options {
-    bottom: 4%;
+    bottom: 9.2%;
     left: 50%;
     margin: 0;
     max-width: 78%;
@@ -1498,7 +1498,7 @@
     border-top-color: rgba(var(--teal-rgb), .58);
     display: grid;
     gap: 8px;
-    grid-template-columns: 96px 58px minmax(205px, 23%) minmax(190px, 1fr) minmax(140px, 16%);
+    grid-template-columns: 96px 58px minmax(190px, 20%) minmax(260px, 1fr) minmax(132px, 14%);
     margin: 0 5px 5px;
     min-height: 72px;
     padding: 6px;

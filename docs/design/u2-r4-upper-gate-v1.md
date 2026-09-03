@@ -25,7 +25,9 @@ segunda línea.
   conserva el poster completo con `object-fit: contain`.
 - La placa muestra sólo `Hoy` o `Ayer`, centrado, sin contador ni caption redundante.
 - El rótulo temporal usa la tipografía display de la marquesina y un cuerpo mayor; los
-  indicadores del zócalo ganan tamaño sin abandonar el marco.
+  indicadores del zócalo ganan tamaño y se anclan al travesaño de madera. El centro del
+  rótulo queda entre 8,5 % y 11,5 % de la altura del marco, y el de los indicadores
+  entre 87 % y 91,5 %, para evitar nuevas correcciones puramente ópticas.
 - El reproductor muestra hasta seis filas ocupando la altura disponible. La regla de
   expansión se activa sólo con 4–6 filas; con 1–3 se conserva una altura de fila
   compacta. La tabla incluye `Director` cuando existe el dato y usa un guion largo como
@@ -35,6 +37,9 @@ segunda línea.
   `aria-hidden`, varía con el ID de obra y no cambia al rerenderizar la misma obra.
 - La mitad inferior conserva la implementación de U2-R.3/R.4; sólo reduce altura entre
   801 y 960 px para mantener el encuadre completo.
+- Como los archivos estáticos todavía no tienen nombres versionados, CSS y JavaScript
+  revalidan su ETag en cada navegación. Esto evita conservar durante una hora una
+  interfaz anterior después de actualizar el servidor.
 
 ## Capturas y matriz de aceptación
 
