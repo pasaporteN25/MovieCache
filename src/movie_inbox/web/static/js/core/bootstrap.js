@@ -12,7 +12,7 @@ import { createPublicPresentation, handlePublicPresentationAction, previewPublic
 import { applyCollectionYearRange, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
-import { activateHomeSection, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeShelf, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, setCarouselItem, tickHomeAutoplay } from "../surfaces/home.js";
+import { activateHomeSection, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, setCarouselItem, tickHomeAutoplay } from "../surfaces/home.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
@@ -41,6 +41,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "playlist-select": () => selectPlaylistEntry(target.dataset.entryKey || "", false),
           "home-shelf-select": () => selectHomeShelfEntry(target.dataset.sectionId || "", target.dataset.entryKey || "", true),
           "home-category-select": () => selectHomeCategory(target.dataset.sectionId || "", true),
+          "home-shelf-scroll": () => scrollHomeFurniture(target.dataset.direction || "next"),
           "edit-home-shelf-entry": () => openDetailForPersonalEdit(target, id),
           "open-detail-with-case-transition": () => openDetailWithCaseTransition(target, id),
           "home-date-today": () => loadEditorialFeaturedDate(todayLocalDate()),
@@ -105,6 +106,8 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.spotlightStage.addEventListener("keydown", movePlaylistSelection);
       fields.homeShelfCategories.addEventListener("keydown", moveHomeCategorySelector);
       fields.homeSections.addEventListener("keydown", moveHomeShelf);
+      fields.homeSections.addEventListener("keydown", moveHomeFurniture);
+      fields.homeSections.addEventListener("wheel", handleHomeFurnitureWheel, { passive: false });
       fields.homeButton.addEventListener("click", goHome);
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
       fields.inboxButton.addEventListener("click", () => goToInbox());

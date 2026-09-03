@@ -584,10 +584,6 @@
         min-height: 18px;
       }
 
-@media (max-width: 860px) {
-        .home-shelf-categories { display: none; }
-}
-
 @media (max-width: 640px) {
 .home-program-heading { align-items: stretch; display: grid;
         }
@@ -676,6 +672,111 @@
 
 @media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
         .spotlight-date-tabs button { min-height: 44px; }
+}
+
+/* U2-R.3 furniture navigation. The shelf is one physical horizontal object:
+   each editorial section is a bay in the same scroll port, while its copy and
+   spine labels remain live DOM. The explicit controls keep the hidden scrollbar
+   discoverable for keyboard and touch users. */
+.home-shelf-navigation {
+        align-items: center;
+        display: flex;
+        gap: 6px;
+        justify-content: flex-end;
+        min-height: 32px;
+        padding: 3px 2px;
+}
+
+.home-shelf-navigation-label {
+        color: var(--muted);
+        font-family: var(--font-label);
+        font-size: var(--text-label);
+        letter-spacing: .08em;
+        margin-right: auto;
+        text-transform: uppercase;
+}
+
+.home-editorial-sections,
+.home-shelf-rail { scroll-behavior: smooth; }
+
+.home-shelf-scroll-control {
+        background: rgba(var(--gold-rgb), .1);
+        border: 1px solid rgba(var(--gold-rgb), .65);
+        color: var(--gold);
+        min-height: 30px;
+        padding: 3px 12px;
+        width: auto;
+}
+
+.home-shelf-scroll-control:hover { background: rgba(var(--gold-rgb), .2); }
+.home-shelf-scroll-control:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+
+@media (min-width: 861px) {
+        .home-shelf-categories {
+          background: rgba(8, 10, 18, .76);
+          border-block: 1px solid rgba(var(--gold-rgb), .38);
+          margin: 0;
+          padding: 3px 10px;
+        }
+
+        .home-editorial-sections,
+        .home-editorial-sections.home-editorial-sections {
+          display: grid;
+          gap: 12px;
+          grid-auto-columns: clamp(520px, 68%, 900px);
+          grid-auto-flow: column;
+          grid-template-rows: minmax(0, 1fr);
+          overflow-x: auto;
+          overflow-y: hidden;
+          overscroll-behavior-inline: contain;
+          padding: 24px 0 10px;
+          scroll-padding-inline: 0;
+          scroll-snap-type: inline proximity;
+          scrollbar-width: none;
+          touch-action: pan-x;
+        }
+
+        .home-editorial-sections::-webkit-scrollbar { display: none; }
+
+        .home-program.home-shelf-bay,
+        .home-program.home-shelf-bay[data-active="false"] {
+          background:
+            linear-gradient(180deg, rgba(5, 7, 13, .04), rgba(5, 7, 13, .32)),
+            url("../img/vhs-shelf-bay-v1.png") center / 100% 100% no-repeat;
+          border: 0;
+          display: grid !important;
+          grid-template-rows: auto auto minmax(0, 1fr);
+          min-width: 0;
+          overflow: hidden;
+          padding: 14px 18px 11px;
+          scroll-snap-align: start;
+        }
+
+        .home-program.home-shelf-bay[data-active="true"] {
+          filter: saturate(1.08);
+        }
+
+        .home-program.home-shelf-bay + .home-program.home-shelf-bay {
+          border-left: 1px solid rgba(var(--violet-rgb), .36);
+        }
+
+        .home-shelf-bay .home-shelf-rail {
+          min-width: 0;
+          overflow-x: auto;
+          scrollbar-width: none;
+          touch-action: pan-x;
+        }
+
+        .home-shelf-bay .home-shelf-rail::-webkit-scrollbar { display: none; }
+}
+
+@media (max-width: 860px) {
+        .home-shelf-categories { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+        .home-editorial-sections,
+        .home-shelf-rail { scroll-behavior: auto; }
 }
 
 /* U2-R.1 material home staging. The HTML remains live and the existing home

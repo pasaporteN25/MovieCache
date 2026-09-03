@@ -30,8 +30,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea. [U2-R.0–U2-R.2] ya fijaron referencia, assets, escenario
-  desktop y estados independientes; la siguiente tarea accionable es [U2-R.3].
+- **En curso:** ninguna tarea. [U2-R.0–U2-R.3] ya fijaron referencia, assets, escenario,
+  estados independientes y mueble continuo; la siguiente tarea accionable es [U2-R.4].
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -133,13 +133,24 @@ de [U3] y [A2]. La referencia vinculante es
       playlist usa tabla HTML CRT de seis funciones y navegación roving;
       anterior/siguiente envuelven, el timer se detiene fuera de Inicio o con movimiento
       reducido y el marco/selector temporal/preview respetan el north star a 1280×720.
-  - [ ] **[U2-R.3] Convertir las categorías en mueble horizontal continuo.** Sustituir el
+  - [x] **[U2-R.3] Convertir las categorías en mueble horizontal continuo.** Sustituir el
     selector de una sola fila por cuatro bays contiguos, con placa por categoría, un bay
     dominante y el siguiente cortado; rueda/trackpad/Shift+rueda/flechas desplazan con
     límites y equivalente enfocable sin barra visible. Usar `vhs-shelf-bay-v1.png` y
     `vhs-spine-shell-v1.png`; mantener texto/estado en DOM. Archivos: `home.js`,
     `home.css`, pruebas de 0/1/4 categorías y overflow. **Modelo: Medio. Depende de
     U2-R.1.**
+    - [x] **[U2-R.3a] Mueble y bays.** Renderizar hasta cuatro secciones simultáneas como
+      módulos contiguos sobre el asset de estantería, con uno dominante y continuidad
+      parcial visible.
+    - [x] **[U2-R.3b] Recorrido multimodal.** Implementar rueda vertical/horizontal,
+      trackpad, Shift+rueda, flechas y controles enfocables sobre un scroll lateral
+      acotado, sin scrollbar y con reduced motion.
+    - [x] **[U2-R.3c] Casos de borde y aislamiento.** Probar 0/1/2/4 módulos, overflow y
+      límites; conservar la composición móvil anterior sin mostrar los controles nuevos.
+    - **Cierre**: las categorías dejan de reemplazarse mediante pestañas y conviven en un
+      único mueble con scroll real. En desktop se ve el siguiente bay cortado; teclado,
+      touch y rueda disponen de caminos equivalentes, y móvil conserva su presentación.
   - [ ] **[U2-R.4] Sincronizar playlist, lomo y preview.** Click/Enter en un bay cambia la
     fuente; click/Enter en un lomo selecciona/alinea su fila; flechas en la lista
     seleccionan y llevan a vista el lomo correspondiente. Preview, fila y lomo deben

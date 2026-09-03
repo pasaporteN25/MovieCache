@@ -534,6 +534,8 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/items?*", add_home_shelves)
         self._open_and_wait_for_catalog(page)
+        self.assertEqual(page.locator(".home-shelf-bay").count(), 1)
+        self.assertEqual(page.locator(".home-shelf-scroll-control").count(), 0)
         shelf = page.locator('[data-home-section="available"] .home-shelf-tape')
         self.assertEqual(shelf.count(), 8)
         self.assertEqual(shelf.nth(0).get_attribute("tabindex"), "0")
@@ -596,7 +598,88 @@ class BrowserInterfaceTests(unittest.TestCase):
             "0s",
         )
 
-    def test_home_shelf_categories_show_one_active_shelf_on_desktop_and_all_on_mobile(
+    def test_home_shelf_furniture_has_four_bays_real_overflow_and_wheel_limits(self) -> None:
+        page = self.page
+
+        def add_four_home_sections(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if items:
+                home["sections"] = [
+                    {
+                        "id": f"bay-{index}",
+                        "title": f"Módulo {index + 1}",
+                        "description": "Una selección continua del archivo.",
+                        "items": [
+                            {
+                                "key": f"bay-{index}-item",
+                                "origin": {"kind": "catalog"},
+                                "item": items[index % len(items)],
+                                "reason": {"label": "Selección", "detail": "Disponible."},
+                            }
+                        ],
+                    }
+                    for index in range(4)
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_four_home_sections)
+        self._open_and_wait_for_catalog(page)
+        page.set_viewport_size({"width": 1280, "height": 720})
+
+        bays = page.locator(".home-shelf-bay")
+        self.assertEqual(bays.count(), 4)
+        self.assertTrue(all(bays.nth(index).is_visible() for index in range(4)))
+        furniture = page.locator("#homeSections")
+        self.assertTrue(
+            furniture.evaluate("element => element.scrollWidth > element.clientWidth")
+        )
+        self.assertEqual(
+            furniture.evaluate("element => getComputedStyle(element).scrollbarWidth"), "none"
+        )
+
+        start = furniture.evaluate("element => element.scrollLeft")
+        page.locator('[data-click="home-shelf-scroll"][data-direction="next"]').click()
+        page.wait_for_timeout(350)
+        moved = furniture.evaluate("element => element.scrollLeft")
+        self.assertGreater(moved, start)
+
+        page.locator('[data-click="home-shelf-scroll"][data-direction="prev"]').click()
+        page.wait_for_timeout(350)
+        self.assertLessEqual(furniture.evaluate("element => element.scrollLeft"), moved)
+
+        furniture.evaluate(
+            "element => element.dispatchEvent(new WheelEvent('wheel', {deltaY: 240, bubbles: true, cancelable: true}))"
+        )
+        self.assertGreater(furniture.evaluate("element => element.scrollLeft"), start)
+
+        page.emulate_media(reduced_motion="reduce")
+        self.assertEqual(
+            furniture.evaluate("element => getComputedStyle(element).scrollBehavior"), "auto"
+        )
+
+    def test_home_shelf_furniture_handles_zero_categories_without_empty_controls(self) -> None:
+        page = self.page
+
+        def remove_home_sections(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            home = payload.get("home") or {}
+            home["sections"] = []
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", remove_home_sections)
+        self._open_and_wait_for_catalog(page)
+        self.assertEqual(page.locator(".home-shelf-bay").count(), 0)
+        self.assertEqual(page.locator(".home-shelf-scroll-control").count(), 0)
+        self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "0")
+        self.assertEqual(page.locator("#homeSections").get_attribute("tabindex"), "-1")
+
+    def test_home_shelf_furniture_keeps_all_bays_visible_and_scroll_controls_accessible(
         self,
     ) -> None:
         page = self.page
@@ -644,9 +727,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
 
         categories = page.locator(".home-shelf-category")
-        self.assertEqual(categories.count(), 2)
-        self.assertEqual(categories.nth(0).get_attribute("aria-pressed"), "true")
-        self.assertEqual(categories.nth(1).get_attribute("aria-pressed"), "false")
+        self.assertEqual(categories.count(), 0)
+        controls = page.locator(".home-shelf-scroll-control")
+        self.assertEqual(controls.count(), 2)
         self.assertEqual(
             page.locator('.home-program[data-home-section="available"]').get_attribute(
                 "data-active"
@@ -657,14 +740,13 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.locator('.home-program[data-home-section="memory"]').get_attribute("data-active"),
             "false",
         )
-        self.assertFalse(page.locator('.home-program[data-home-section="memory"]').is_visible())
-
-        categories.nth(0).focus()
-        page.keyboard.press("ArrowRight")
-        self.assertEqual(page.evaluate("document.activeElement.dataset.sectionId"), "memory")
-        self.assertEqual(categories.nth(1).get_attribute("aria-pressed"), "true")
         self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
-        self.assertFalse(page.locator('.home-program[data-home-section="available"]').is_visible())
+
+        page.locator("#homeSections").focus()
+        page.keyboard.press("ArrowRight")
+        page.wait_for_timeout(350)
+        self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
+        self.assertGreater(page.locator("#homeSections").evaluate("element => element.scrollLeft"), 0)
 
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertFalse(page.locator("#homeShelfCategories").is_visible())

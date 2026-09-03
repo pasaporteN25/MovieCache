@@ -31,6 +31,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
       export let selectedEntryKey = "";
       let homeAutoplayTimer = 0;
       const HOME_AUTOPLAY_INTERVAL_MS = 6500;
+      const HOME_SHELF_BAY_LIMIT = 4;
 
       export let activeHomeSectionId = "";
       export let activeShelfId = "";
@@ -155,7 +156,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
       }
 
       export function activateHomeSection(sectionId) {
-        const section = editorialHome.sections.find((entry) => entry.id === sectionId);
+        const section = editorialHome.sections.find((entry, index) => homeSectionId(entry, index) === sectionId);
         const action = section?.action || {};
         if (action.kind === "club") {
           goToClub();
@@ -558,17 +559,29 @@ import { closeSharedDetail, openCollection } from "./club.js";
       }
 
       export function renderEditorialSections() {
-        const sections = nonEmptyHomeSections();
+        const sections = nonEmptyHomeSections().slice(0, HOME_SHELF_BAY_LIMIT);
         const ids = sections.map((section, index) => homeSectionId(section, index));
         if (!ids.includes(activeHomeSectionId)) {
           activeHomeSectionId = ids[0] || "";
           activeShelfId = activeHomeSectionId;
         }
-        fields.homeShelfCategories.innerHTML = ids.length > 1 ? homeCategorySelector(sections, ids) : "";
+        fields.homeShelfCategories.innerHTML = ids.length > 1 ? homeFurnitureControls(ids.length) : "";
         fields.homeShelfCategories.hidden = ids.length <= 1;
+        fields.homeSections.setAttribute("role", "region");
+        fields.homeSections.setAttribute("aria-label", "Mueble horizontal de estanterías");
+        fields.homeSections.setAttribute("tabindex", ids.length ? "0" : "-1");
+        fields.homeSections.dataset.bayCount = String(ids.length);
         fields.homeSections.innerHTML = sections
           .map((section, sectionIndex) => editorialSection(section, sectionIndex, ids[sectionIndex] === activeHomeSectionId))
           .join("");
+      }
+
+      export function homeFurnitureControls(count) {
+        return `<div class="home-shelf-navigation" role="group" aria-label="Recorrido del mueble">
+          <span class="home-shelf-navigation-label">${count} módulos · recorrido lateral</span>
+          <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="prev" aria-label="Mostrar módulo anterior">←</button>
+          <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="next" aria-label="Mostrar módulo siguiente">→</button>
+        </div>`;
       }
 
       export function homeCategorySelector(sections, ids) {
@@ -631,7 +644,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const actionButton = action.kind
           ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(action.label || "Explorar")}</button>`
           : "";
-        return `<section class="home-program" data-home-section="${escapeAttr(sectionId)}" data-active="${active}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
+        return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
           <header class="home-program-heading">
             <div>
               <span class="section-kicker">${escapeHtml(section.eyebrow || "Programación personal")}</span>
@@ -645,6 +658,48 @@ import { closeSharedDetail, openCollection } from "./club.js";
           </div>
           ${homeShelfPreview(sectionId, selectedEntry)}
         </section>`;
+      }
+
+      function homeShelfRail() {
+        return fields.homeSections;
+      }
+
+      function homeFurnitureScrollBehavior() {
+        return typeof window !== "undefined"
+          && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth";
+      }
+
+      export function scrollHomeFurniture(direction = "next") {
+        const rail = homeShelfRail();
+        if (!rail || rail.scrollWidth <= rail.clientWidth) return false;
+        const amount = Math.max(240, Math.round(rail.clientWidth * 0.72));
+        rail.scrollBy({ left: direction === "prev" ? -amount : amount, behavior: homeFurnitureScrollBehavior() });
+        return true;
+      }
+
+      export function moveHomeFurniture(event) {
+        if (!event.target.closest("#homeSections") || event.target.closest("[data-click='home-shelf-select']")) return;
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const rail = homeShelfRail();
+        const amount = Math.max(240, Math.round(rail.clientWidth * 0.72));
+        const target = event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? rail.scrollWidth
+            : rail.scrollLeft + (event.key === "ArrowLeft" ? -amount : amount);
+        rail.scrollTo({ left: target, behavior: homeFurnitureScrollBehavior() });
+      }
+
+      export function handleHomeFurnitureWheel(event) {
+        const rail = homeShelfRail();
+        if (!rail || !event.target.closest("#homeSections") || rail.scrollWidth <= rail.clientWidth) return;
+        const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+        if (!delta) return;
+        event.preventDefault();
+        rail.scrollBy({ left: delta, behavior: "auto" });
       }
 
       export function homeShelfTape(entry, index, sectionId, selected) {
