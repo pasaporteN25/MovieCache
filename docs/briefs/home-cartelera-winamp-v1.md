@@ -27,25 +27,18 @@ ambientación de noche de cine detrás.
   tipo bokeh en violeta/dorado) — cero fotos, logos, actores o texto. No es el asset
   final.
 
-## Decisión sobre el asset real, 2026-09-02
+## Asset real disponible, 2026-09-02
 
-El brief maestro pide un archivo auditado como `vhs-cassette-frame-v1.png` (prompt,
-procedencia, hash, licencia). Esta sesión no tiene una herramienta de generación de
-imágenes disponible. El owner generará el PNG por su cuenta con el prompt que se le
-entregó en el chat (ambientación panorámica de videoclub/sala de cine nocturna, sin
-logos, actores reconocibles, texto ni datos de una instancia). Cuando llegue:
+El fondo original auditado está disponible como
+`src/movie_inbox/web/static/img/night-cinema-ambient-v1.png`; su prompt, procedencia,
+hash y licencia viven en `docs/assets/night-cinema-ambient-v1.md`. No contiene texto,
+logos, actores, obras, portadas, cajas ni datos de una instancia.
 
-1. Guardarlo como `src/movie_inbox/web/static/img/noche-de-cine-v1.png`.
-2. Documentar procedencia/hash/licencia en `docs/assets/noche-de-cine-v1.md`, igual
-   que `docs/assets/vhs-cassette-frame-v1.md`.
-3. Agregar una única línea `background-image: url("../img/noche-de-cine-v1.png"), ...`
-   a `.spotlight-ambience` en `home.css`, dejando los gradientes CSS actuales como
-   capas de relleno/blend por si el PNG tiene transparencia. No hace falta tocar el
-   HTML ni el JS.
-
-Hasta entonces, la ambientación CSS ya es original, auditable por lectura directa (no
-requiere ficha de procedencia porque no hay imagen involucrada) y coherente con la
-paleta de `DESIGN.md`.
+La próxima integración visual puede agregar una única capa
+`background-image: url("../img/night-cinema-ambient-v1.png"), ...` a
+`.spotlight-ambience` en `home.css`, manteniendo los gradientes CSS actuales como
+relleno/blend. No requiere tocar HTML ni JS. Hasta esa entrega, la ambientación CSS
+sigue siendo la alternativa visible y original.
 
 ## Estados heredados, sin cambios de comportamiento
 

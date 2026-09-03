@@ -49,7 +49,9 @@ nunca como contenido de una obra.
   no inicia el cliente Android.
 - `Noche de cine` necesita ser un asset nuevo, original o con licencia verificable:
   sin logotipos, actores reconocibles, textos, títulos de obras ni datos de una instancia.
-  Su prompt/procedencia/hash deben auditarse como `vhs-cassette-frame-v1.png`.
+  El fondo inicial existe en `static/img/night-cinema-ambient-v1.png`; su
+  prompt/procedencia/hash están auditados en `docs/assets/night-cinema-ambient-v1.md`.
+  Versiones posteriores siguen el mismo mecanismo que `vhs-cassette-frame-v1.png`.
 - La transformación visual no puede depender de hover. Debe mantener Tab sin trampas,
   foco visible, Enter, Escape en el dossier, `prefers-reduced-motion`, navegación táctil
   y equivalentes legibles para una a cuatro recomendaciones, filas vacías, imágenes que

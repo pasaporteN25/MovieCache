@@ -91,8 +91,8 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
   - [x] **[U2.0] Integrar navegación y utilidades en el escenario.** Ver detalle en
     `Hecho`.
   - [x] **[U2.1] Fijar y prototipar la cartelera-lista.** Ver detalle en `Hecho`. El
-    asset "Noche de cine" real queda pendiente de que el owner lo genere (prompt
-    entregado en la conversación); mientras tanto la ambientación es CSS original.
+    asset original auditado `night-cinema-ambient-v1.png` está listo para la siguiente
+    integración de CSS; la ambientación actual sigue siendo CSS hasta esa entrega.
   - [ ] **[U2.2] Convertir cada fila editorial en una estantería de lomos.** Mostrar las
     obras de perfil sobre una repisa real, con título legible, disponibilidad y foco
     inequívoco. En escritorio, un selector de categoría muestra una sola estantería
