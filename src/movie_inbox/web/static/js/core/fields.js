@@ -22,6 +22,8 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         inboxBadge: document.querySelector("#inboxBadge"),
         inboxScannerBadge: document.querySelector("#inboxScannerBadge"),
         adminButton: document.querySelector("#adminButton"),
+        headerSearchButton: document.querySelector("#headerSearchButton"),
+        headerAddButton: document.querySelector("#headerAddButton"),
         systemMenu: document.querySelector("#systemMenu"),
         currentUserInitial: document.querySelector("#currentUserInitial"),
         currentUserLabel: document.querySelector("#currentUserLabel"),

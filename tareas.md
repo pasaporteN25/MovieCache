@@ -88,13 +88,8 @@ siguiente sesión, vive en `docs/briefs/home-video-store-v2.md`.
 - **Modelo sugerido**: Grande. Cambia composición, objetos reutilizables, navegación y
   detalle sobre varias superficies, con requisitos de accesibilidad y de assets.
 
-  - [ ] **[U2.0] Integrar navegación y utilidades en el escenario.** Definir un
-    "mostrador de control" compacto que pertenezca al videoclub y ordene Inicio,
-    Colección, Bandeja y Club como destinos; Buscar, Agregar y Usuario como utilidades
-    distinguibles. Debe conservar las rutas, atajos, sesión, estado activo y navegación
-    móvil existentes, no esconderlas tras gestos ni duplicar la barra actual. Cierre:
-    arquitectura de información y prototipo navegable en escritorio/móvil, con foco y
-    accesos equivalentes antes de reemplazar la cabecera.
+  - [x] **[U2.0] Integrar navegación y utilidades en el escenario.** Ver detalle en
+    `Hecho`.
   - [ ] **[U2.1] Fijar y prototipar la cartelera-lista.** Reemplazar el panel actual por
     una lista compacta de reproducción tipo Winamp, operable con flechas, Home/End y
     Enter; sumar la ambientación original/licenciada `Noche de cine` y hacer visible
@@ -203,6 +198,27 @@ Sin tareas activas.
 ## Hecho
 
 ### Frente: Inicio videoclub
+
+#### [U2.0] Integrar navegación y utilidades en el escenario
+**Cerrado 2026-09-02.** `docs/briefs/home-control-desk-v1.md` fija la arquitectura de
+información de la cabecera compartida antes de que U2.1 la reemplace visualmente:
+`Inicio`/`Colección`/`Bandeja`/`Club` siguen siendo los destinos de `.primary-nav`, sin
+cambios de IDs, rutas ni estado activo; `.header-utilities` suma `Buscar` y `Agregar`
+junto a `Al azar` y `Usuario` ya existentes. `Buscar` navega a `Colección` y enfoca
+`#query` (`goToCollectionSearch()`); `Agregar`, por decisión del owner, navega a
+`Colección` igual que el botón de navegación (`goToCollectionRoot()`) como redirección
+interina, porque la intención real de "buscar para agregar" implica repensar
+`Colección`/su buscador — tarea futura, todavía sin numerar, que el brief deja
+documentada y fuera de alcance de U2.
+
+Ningún destino ni utilidad existente cambió de comportamiento; el orden de tabulación
+queda destinos → `Buscar` → `Agregar` → `Al azar` → `Usuario`, sin trampas de foco y con
+el tamaño táctil de 44px heredado en móvil. Verificado con Playwright real
+(`test_header_utilities_open_collection_search_and_add` nueva, más las aserciones de
+foco y de layout sin scroll horizontal en escritorio/390px ya existentes) y visualmente
+en un servidor descartable en 800px y 375px: sin overflow ni recorte de texto. 560
+pruebas unitarias y 21 de navegador, Ruff, formato, mypy estricto, `compileall` y
+`git diff --check` en verde.
 
 #### [U1.1] Definir el selector fijo de Inicio a partir de la variante A
 **Cerrado 2026-09-02, commit `f6a1c60`.** El carrusel inferior se reemplazó por un

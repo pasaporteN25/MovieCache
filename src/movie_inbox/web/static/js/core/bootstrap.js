@@ -4,7 +4,7 @@ import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChange
 import { fields } from "./fields.js";
 import { localDateOffset, todayLocalDate } from "./format.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
-import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionRoot, goToImports, goToInbox, restoreRoute, setInboxMode } from "./router.js";
+import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, setInboxMode } from "./router.js";
 import { CATALOG_PAGE_SIZE, inboxMode } from "./state.js";
 import { addLibraryExclusionRuleRow, browseManagedLibraryPath, checkManagedLibraryPath, closeLibraryDialog, handleLibraryAction, handleLibraryExclusionRuleRowClick, handleLibraryPathDirectory, openLibraryDialog, parentLibraryPath, saveManagedLibrary, toggleLibraryShareAvailabilityFields, useBrowsedLibraryPath } from "../surfaces/admin-libraries.js";
 import { archiveMemberAccount, closeArchiveMemberDialog, closeEditMemberDialog, closeMemberDialog, closePrivacyDialog, closeTemporaryPasswordDialog, copyTemporaryPassword, createMember, handleArchivedMemberAction, handleMemberAction, handleVisibilityChange, openMemberDialog, openPrivacyDialog, refreshAdminData, saveMemberProfile, savePrivacyPreferences, syncPrivacyControls } from "../surfaces/admin-members.js";
@@ -95,6 +95,8 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
       fields.inboxButton.addEventListener("click", () => goToInbox());
       fields.clubButton.addEventListener("click", goToClub);
+      fields.headerSearchButton.addEventListener("click", goToCollectionSearch);
+      fields.headerAddButton.addEventListener("click", goToCollectionRoot);
       fields.adminButton.addEventListener("click", goToAdmin);
       fields.privacyButton.addEventListener("click", openPrivacyDialog);
       fields.logoutButton.addEventListener("click", logout);

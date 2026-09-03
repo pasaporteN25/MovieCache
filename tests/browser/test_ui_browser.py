@@ -204,6 +204,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator(".primary-nav > .nav-action").count(), 4)
         self.assertEqual(page.locator(".primary-nav #randomButton").count(), 0)
         self.assertEqual(page.locator(".header-utilities #randomButton").count(), 1)
+        self.assertEqual(page.locator(".header-utilities #headerSearchButton").count(), 1)
+        self.assertEqual(page.locator(".header-utilities #headerAddButton").count(), 1)
         self.assertFalse(
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
@@ -211,6 +213,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator("#homeButton").focus()
         page.keyboard.press("Tab")
         self.assertEqual(page.evaluate("document.activeElement.id"), "catalogButton")
+
+        page.locator("#clubButton").focus()
+        page.keyboard.press("Tab")
+        self.assertEqual(page.evaluate("document.activeElement.id"), "headerSearchButton")
+        page.keyboard.press("Tab")
+        self.assertEqual(page.evaluate("document.activeElement.id"), "headerAddButton")
+        page.keyboard.press("Tab")
+        self.assertEqual(page.evaluate("document.activeElement.id"), "randomButton")
 
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertFalse(
@@ -222,11 +232,28 @@ class BrowserInterfaceTests(unittest.TestCase):
             "#catalogButton",
             "#inboxButton",
             "#clubButton",
+            "#headerSearchButton",
+            "#headerAddButton",
             "#randomButton",
         ):
             box = page.locator(selector).bounding_box()
             self.assertIsNotNone(box, selector)
             self.assertGreaterEqual(box["height"], 44, selector)
+
+    def test_header_utilities_open_collection_search_and_add(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        page.locator("#headerSearchButton").click()
+        page.wait_for_selector("#collectionView:not([hidden])")
+        page.wait_for_function("document.activeElement.id === 'query'")
+
+        page.locator("#homeButton").click()
+        page.wait_for_selector("#homeView:not([hidden])")
+
+        page.locator("#headerAddButton").click()
+        page.wait_for_selector("#collectionView:not([hidden])")
+        page.wait_for_function("document.activeElement.id === 'catalogTitle'")
 
     def test_home_selector_keeps_one_tab_stop_and_changes_preview_with_arrows(self) -> None:
         page = self.page

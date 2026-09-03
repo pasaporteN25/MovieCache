@@ -35,6 +35,14 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         syncRoute(routeValuesForView("catalog"), "push");
       }
 
+      export function goToCollectionSearch() {
+        resetCollectionFilters();
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
+        showView("catalog", { updateHistory: false, focus: false });
+        syncRoute(routeValuesForView("catalog"), "push");
+        requestAnimationFrame(() => fields.query.focus());
+      }
+
       export async function goToInbox(filter = "") {
         if (filter) {
           setCurationFilter(filter);

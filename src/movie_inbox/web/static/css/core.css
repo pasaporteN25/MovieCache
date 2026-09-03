@@ -97,6 +97,29 @@
       }
       .nav-count-scanner { background: var(--gold); }
       .header-utilities { align-items: stretch; display: flex; gap: 8px; justify-self: end; }
+      .header-utility-action {
+        align-items: center;
+        background: rgba(8, 10, 24, 0.74);
+        border: 1px solid rgba(120, 92, 255, 0.46);
+        color: var(--muted);
+        display: grid;
+        gap: 1px;
+        justify-items: start;
+        line-height: 1.05;
+        min-height: var(--touch-target);
+        padding-inline: 12px;
+        width: auto;
+      }
+      .header-utility-action:hover,
+      .header-utility-action:focus-visible { color: var(--teal); }
+      .header-utility-action > span { font-size: var(--text-meta); }
+      .header-utility-action > small {
+        color: var(--text-secondary);
+        font-family: var(--font-label);
+        font-size: var(--text-label);
+        font-weight: 800;
+        text-transform: uppercase;
+      }
       .header-command {
         align-items: center;
         background: rgba(255, 190, 85, 0.09);
@@ -367,7 +390,11 @@
 
         .header-utilities { gap: 6px; }
 
-        .nav-action, .header-command, .system-menu > summary { min-height: 44px; }
+        .nav-action, .header-command, .header-utility-action, .system-menu > summary { min-height: 44px; }
+
+        .header-utility-action { padding-inline: 8px; }
+
+        .header-utility-action > small { display: none; }
 
 input,
         select,
@@ -392,6 +419,8 @@ input,
 
         .header-command > small,
         #currentUserLabel { display: none; }
+
+        .header-utility-action { padding-inline: 6px; }
 }
 
 @media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
