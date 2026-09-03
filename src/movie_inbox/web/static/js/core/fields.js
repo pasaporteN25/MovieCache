@@ -74,6 +74,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         homeDateToday: document.querySelector("#homeDateToday"),
         homeDateYesterday: document.querySelector("#homeDateYesterday"),
         homeSections: document.querySelector("#homeSections"),
+        homeShelfPreview: document.querySelector("#homeShelfPreview"),
         homeFeedback: document.querySelector("#homeFeedback"),
         homeEmpty: document.querySelector("#homeEmpty"),
         refreshClub: document.querySelector("#refreshClub"),

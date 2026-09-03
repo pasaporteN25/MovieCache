@@ -40,9 +40,11 @@ composición previa a U2 y se rediseñará en una entrega separada.
 
 La zona superior tiene dos piezas coordinadas pero no acopladas de forma destructiva:
 
-1. Una cartelera vertical pequeña a la izquierda, con poster dinámico, indicadores y
-  controles anterior/siguiente. El asset conserva su relación vertical 2:3 y nunca se
-  estira para llenar el ancho. Rota automáticamente cada intervalo configurado.
+1. Una cartelera vertical pequeña a la izquierda, con poster dinámico e indicadores.
+  El marco conserva su relación vertical 2:3; el poster ocupa por completo el hueco
+  interior y no repite título, estado ni disponibilidad. No lleva flechas propias: rota
+  automáticamente y la exploración manual vive en la playlist. Los puntos se apoyan en
+  el zócalo inferior del marco, no en una caja exterior.
 2. Una lista tabular densa tipo Winamp con título, año, tipo, géneros y duración, más un
   panel compacto de preview debajo. La programación diaria muestra hasta seis funciones
   visibles en el encuadre desktop objetivo.
@@ -62,6 +64,12 @@ misma obra.
 No se reserva una barra horizontal independiente para repetir el título de la
 cartelera. Hoy/Ayer vive como un interruptor físico compacto dentro del encabezado del
 reproductor: debe ser claro y accesible sin competir con la lista ni con el marco.
+
+La posible transición futura entre posters como una tira vertical continua —un cuadro
+sale mientras el siguiente entra, como cinta detrás del marco— se prototipa fuera del
+cierre de recuperación. Requiere mantener dos imágenes simultáneas, medir rendimiento y
+ofrecer una equivalencia sin movimiento; hasta entonces el cambio automático directo es
+el comportamiento aceptado.
 
 ### Mueble continuo y estanterías
 

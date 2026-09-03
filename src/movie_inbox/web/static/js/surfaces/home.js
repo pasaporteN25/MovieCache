@@ -310,7 +310,6 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const carouselItem = carouselEntry?.item || {};
         const carouselTitle = displayTitle(carouselItem) || "Sin título";
         const carouselPoster = String(carouselItem.page_image || "").trim();
-        const carouselReason = carouselEntry?.reason || {};
         const selectedItem = selectedEntry?.item || carouselItem;
         const selectedTitle = displayTitle(selectedItem) || "Sin título";
         const selectedReason = selectedEntry?.reason || {};
@@ -318,7 +317,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const sourceLabel = playlistSourceLabel();
         const posterMarkup = carouselPoster
           ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(carouselPoster))}" alt="Portada de ${escapeAttr(carouselTitle)}" loading="eager" fetchpriority="high" decoding="async">`
-          : `<div class="spotlight-poster-fallback poster-${posterVariant(carouselItem.id || carouselTitle)}" aria-hidden="true"><span>Cartelera</span><strong>${escapeHtml(carouselTitle)}</strong></div>`;
+          : `<div class="spotlight-poster-fallback poster-${posterVariant(carouselItem.id || carouselTitle)}" aria-hidden="true"><span>Sin portada</span></div>`;
         const selector = `<aside class="spotlight-selector" aria-label="Cartelera automática">
           <div class="spotlight-selector-heading">
             <span>Cartelera disponible</span>
@@ -327,12 +326,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
           <div class="spotlight-poster-card">
             <button class="spotlight-poster-trigger" type="button" data-click="spotlight-select" data-index="${spotlightIndex}" aria-label="Seleccionar ${escapeAttr(carouselTitle)} de la cartelera">
               ${posterMarkup}
-              <span class="spotlight-poster-caption"><strong>${escapeHtml(carouselTitle)}</strong><small>${escapeHtml(carouselReason.label || "Selección del día")}</small></span>
             </button>
-            <div class="spotlight-carousel-controls" role="group" aria-label="Controles de cartelera">
-              <button type="button" data-click="spotlight-prev" data-index="${spotlightIndex}" aria-label="Obra anterior">←</button>
-              <button type="button" data-click="spotlight-next" data-index="${spotlightIndex}" aria-label="Obra siguiente">→</button>
-            </div>
           </div>
           <div class="spotlight-selector-options">
             ${featured.map((candidate, index) => {
@@ -431,7 +425,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         }
       }
 
-      export function setCarouselItem(index, restoreFocus = false, focusAction = "spotlight-air-select") {
+      export function setCarouselItem(index, restoreFocus = false) {
         const featured = editorialHome.featured || [];
         if (!featured.length) return;
         const requestedIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
@@ -439,28 +433,15 @@ import { closeSharedDetail, openCollection } from "./club.js";
         carouselItemId = entryKey(featured[spotlightIndex], spotlightIndex);
         renderEditorialHero();
         if (restoreFocus) {
-          const focusTarget = focusAction === "spotlight-prev" || focusAction === "spotlight-next"
-            ? fields.spotlightStage.querySelector(`[data-click="${focusAction}"]`)
-            : fields.spotlightStage.querySelector(`.spotlight-selector-option[data-index="${spotlightIndex}"]`);
-          focusTarget?.focus({ preventScroll: true });
+          fields.spotlightStage.querySelector(`.spotlight-selector-option[data-index="${spotlightIndex}"]`)?.focus({ preventScroll: true });
         }
       }
 
       export function moveSpotlightSelector(event) {
-        if (!event.target.closest("[data-click='spotlight-select'], [data-click='spotlight-air-select'], [data-click='spotlight-prev'], [data-click='spotlight-next']")) return;
+        if (!event.target.closest("[data-click='spotlight-select'], [data-click='spotlight-air-select']")) return;
         const count = editorialHome.featured.length;
         if (!count) return;
         const offsets = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
-        if (event.target.closest("[data-click='spotlight-prev']") && event.key === "Enter") {
-          event.preventDefault();
-          setCarouselItem(spotlightIndex - 1, true, "spotlight-prev");
-          return;
-        }
-        if (event.target.closest("[data-click='spotlight-next']") && event.key === "Enter") {
-          event.preventDefault();
-          setCarouselItem(spotlightIndex + 1, true, "spotlight-next");
-          return;
-        }
         if (event.key === "Home") {
           event.preventDefault();
           setCarouselItem(0, true);
@@ -506,9 +487,10 @@ import { closeSharedDetail, openCollection } from "./club.js";
         if (playlistSource.startsWith("shelf:")) {
           const shelfId = playlistSource.slice(6);
           homeShelfSelections.set(shelfId, index);
-          renderEditorialSections();
         }
+        renderEditorialSections();
         renderEditorialHero();
+        alignHomePlaylistAndShelf({ focusRow: restoreFocus && !focusPreview });
         if (restoreFocus) {
           if (focusPreview) fields.spotlightStage.querySelector(".spotlight-preview-action")?.focus({ preventScroll: true });
           else fields.spotlightStage.querySelector(`[data-playlist-entry][data-entry-key="${CSS.escape(selectedEntryKey)}"]`)?.focus({ preventScroll: true });
@@ -528,6 +510,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         homeShelfSelections.set(sectionId, index);
         renderEditorialSections();
         renderEditorialHero();
+        alignHomePlaylistAndShelf({ focusSpine: restoreFocus });
         if (restoreFocus) {
           fields.homeSections.querySelector(`[data-click="home-shelf-select"][data-section-id="${CSS.escape(sectionId)}"][data-entry-index="${index}"]`)?.focus();
         }
@@ -537,7 +520,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const control = event.target.closest("[data-click='home-shelf-select']");
         if (!control) return;
         const sectionId = control.dataset.sectionId || "";
-        const section = editorialHome.sections.find((entry) => entry.id === sectionId);
+        const section = editorialHome.sections.find((entry, index) => homeSectionId(entry, index) === sectionId);
         const entries = Array.isArray(section?.items) ? section.items : [];
         if (!entries.length) return;
         const offsets = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
@@ -574,6 +557,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         fields.homeSections.innerHTML = sections
           .map((section, sectionIndex) => editorialSection(section, sectionIndex, ids[sectionIndex] === activeHomeSectionId))
           .join("");
+        renderHomeShelfPreview();
       }
 
       export function homeFurnitureControls(count) {
@@ -582,6 +566,62 @@ import { closeSharedDetail, openCollection } from "./club.js";
           <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="prev" aria-label="Mostrar módulo anterior">←</button>
           <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="next" aria-label="Mostrar módulo siguiente">→</button>
         </div>`;
+      }
+
+      function homeSectionById(sectionId) {
+        return editorialHome.sections.find((section, index) => homeSectionId(section, index) === sectionId) || null;
+      }
+
+      function homeShelfEntryForSelection(sectionId = activeHomeSectionId) {
+        const section = homeSectionById(sectionId);
+        const entries = Array.isArray(section?.items) ? section.items : [];
+        const selected = entries.find((entry, index) => entryKey(entry, index) === selectedEntryKey
+          || (selectedItemId && entryItemId(entry) === selectedItemId));
+        if (selected) return selected;
+        const rememberedIndex = homeShelfSelections.get(sectionId);
+        return entries[Number.isInteger(rememberedIndex) ? Math.max(0, Math.min(entries.length - 1, rememberedIndex)) : 0] || null;
+      }
+
+      export function activateHomeShelf(sectionId, restoreFocus = false) {
+        const section = homeSectionById(sectionId);
+        const entries = Array.isArray(section?.items) ? section.items : [];
+        if (!section || !entries.length) return false;
+        const rememberedIndex = homeShelfSelections.get(sectionId);
+        const index = Number.isInteger(rememberedIndex)
+          ? Math.max(0, Math.min(entries.length - 1, rememberedIndex))
+          : 0;
+        const entry = entries[index];
+        activeHomeSectionId = sectionId;
+        activeShelfId = sectionId;
+        playlistSource = `shelf:${sectionId}`;
+        selectedEntryKey = entryKey(entry, index);
+        selectedItemId = entryItemId(entry);
+        homeShelfSelections.set(sectionId, index);
+        renderEditorialSections();
+        renderEditorialHero();
+        alignHomePlaylistAndShelf({ focusSpine: restoreFocus, focusBay: true });
+        return true;
+      }
+
+      export function moveHomeShelfBay(event) {
+        const bay = event.target.closest(".home-shelf-bay");
+        if (!bay || event.target !== bay || !["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+        activateHomeShelf(bay.dataset.homeSection || "", true);
+      }
+
+      function alignHomePlaylistAndShelf({ focusRow = false, focusSpine = false, focusBay = false } = {}) {
+        const key = selectedEntryKey;
+        if (!key) return;
+        const row = fields.spotlightStage?.querySelector(`[data-playlist-entry][data-entry-key="${CSS.escape(key)}"]`);
+        const spine = fields.homeSections?.querySelector(`[data-click="home-shelf-select"][data-entry-key="${CSS.escape(key)}"]`);
+        const bay = spine?.closest(".home-shelf-bay");
+        row?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        spine?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        bay?.scrollIntoView({ block: "nearest", inline: "start" });
+        if (focusRow) row?.focus({ preventScroll: true });
+        else if (focusSpine) spine?.focus({ preventScroll: true });
+        else if (focusBay) bay?.focus({ preventScroll: true });
       }
 
       export function homeCategorySelector(sections, ids) {
@@ -639,13 +679,17 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const action = section.action || {};
         const entries = Array.isArray(section.items) ? section.items : [];
         const sectionId = homeSectionId(section, sectionIndex);
-        const selectedIndex = Math.max(0, Math.min(entries.length - 1, homeShelfSelections.get(sectionId) || 0));
-        const selectedEntry = entries[selectedIndex];
+        const rememberedIndex = homeShelfSelections.get(sectionId);
+        const selectedIndex = playlistSource === `shelf:${sectionId}`
+          ? Math.max(0, Math.min(entries.length - 1, Number.isInteger(rememberedIndex) ? rememberedIndex : 0))
+          : Math.max(0, entries.findIndex((entry, index) => entryKey(entry, index) === selectedEntryKey
+            || (selectedItemId && entryItemId(entry) === selectedItemId)));
+        const selectedEntry = selectedIndex >= 0 ? entries[selectedIndex] : null;
         const actionButton = action.kind
           ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(action.label || "Explorar")}</button>`
           : "";
-        return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
-          <header class="home-program-heading">
+        return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}" tabindex="0" aria-labelledby="home-section-${escapeAttr(sectionId)}">
+          <header class="home-program-heading" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}">
             <div>
               <span class="section-kicker">${escapeHtml(section.eyebrow || "Programación personal")}</span>
               <h2 id="home-section-${escapeAttr(sectionId)}">${escapeHtml(section.title || "Selección")}</h2>
@@ -656,7 +700,6 @@ import { closeSharedDetail, openCollection } from "./club.js";
           <div class="home-shelf-rail" role="group" aria-label="Opciones de ${escapeAttr(section.title || "la estantería")}">
             ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, index === selectedIndex)).join("")}
           </div>
-          ${homeShelfPreview(sectionId, selectedEntry)}
         </section>`;
       }
 
@@ -732,7 +775,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const artwork = poster
           ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">`
           : `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
-        return `<aside class="home-shelf-preview vhs-case" data-vhs-state="open" data-home-shelf-preview="${escapeAttr(sectionId)}" aria-labelledby="home-shelf-preview-${escapeAttr(sectionId)}">
+        return `<aside class="home-shelf-preview vhs-case" data-vhs-state="open" data-home-shelf-preview="${escapeAttr(sectionId)}" data-selected-entry-key="${escapeAttr(entry?.key || "")}" data-selected-item-id="${escapeAttr(item.id || "")}" aria-labelledby="home-shelf-preview-${escapeAttr(sectionId)}">
           <div class="home-shelf-preview-art"><span class="home-shelf-preview-frame" aria-hidden="true"></span>${artwork}</div>
           <div class="home-shelf-preview-copy">
             <span>${escapeHtml(isCollection ? `En ${origin.collection_title || "una colección seguida"}` : reason.label || "Selección del archivo")}</span>
@@ -742,6 +785,16 @@ import { closeSharedDetail, openCollection } from "./club.js";
             <div class="home-shelf-preview-actions">${viewMoreAction}${editAction}</div>
           </div>
         </aside>`;
+      }
+
+      export function renderHomeShelfPreview() {
+        if (!fields.homeShelfPreview) return;
+        const sectionId = activeHomeSectionId || "active";
+        const entry = homeShelfEntryForSelection(sectionId);
+        fields.homeShelfPreview.innerHTML = entry
+          ? homeShelfPreview(sectionId, entry)
+          : "";
+        fields.homeShelfPreview.hidden = !entry;
       }
 
       export function editorialPersonalIds() {

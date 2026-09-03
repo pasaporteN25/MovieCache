@@ -262,6 +262,30 @@ class BrowserInterfaceTests(unittest.TestCase):
         self,
     ) -> None:
         page = self.page
+
+        def add_marquee_items(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if items:
+                home["featured"] = [
+                    {
+                        "key": f"marquee-{index}",
+                        "origin": {"kind": "catalog"},
+                        "item": {
+                            **items[index % len(items)],
+                            "id": f"marquee-item-{index}",
+                            "title": f"Cartelera {index + 1}",
+                        },
+                    }
+                    for index in range(6)
+                ]
+                home["limits"] = {**(home.get("limits") or {}), "featured_items": 6}
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_marquee_items)
         self._open_and_wait_for_catalog(page)
 
         self.assertEqual(
@@ -282,6 +306,43 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         ambience_z_index = ambience.evaluate("element => getComputedStyle(element).zIndex")
         self.assertGreater(int(stage_z_index or "0"), int(ambience_z_index or "0"))
+
+        self.assertEqual(page.locator(".spotlight-poster-caption").count(), 0)
+        self.assertEqual(page.locator(".spotlight-carousel-controls").count(), 0)
+        self.assertEqual(
+            page.locator(".spotlight-selector").evaluate(
+                "element => getComputedStyle(element).borderRightWidth"
+            ),
+            "0px",
+        )
+        poster_fill = page.locator(".spotlight-poster-trigger").evaluate(
+            """element => {
+                const trigger = element.getBoundingClientRect();
+                const art = element.firstElementChild.getBoundingClientRect();
+                return {
+                    width: Math.abs(trigger.width - art.width),
+                    height: Math.abs(trigger.height - art.height)
+                };
+            }"""
+        )
+        self.assertLessEqual(poster_fill["width"], 1)
+        self.assertLessEqual(poster_fill["height"], 1)
+
+        catalog_box = page.locator("#catalogButton").bounding_box()
+        menu_box = page.locator("#systemMenu > summary").bounding_box()
+        self.assertIsNotNone(catalog_box)
+        self.assertIsNotNone(menu_box)
+        self.assertLessEqual(abs(menu_box["x"] - (catalog_box["x"] + catalog_box["width"])), 1)
+
+        date_box = page.locator(".spotlight-date-control").bounding_box()
+        player_head_box = page.locator(".spotlight-playlist-head").bounding_box()
+        self.assertIsNotNone(date_box)
+        self.assertIsNotNone(player_head_box)
+        self.assertGreaterEqual(date_box["y"], player_head_box["y"] - 1)
+        self.assertLessEqual(
+            date_box["y"] + date_box["height"],
+            player_head_box["y"] + player_head_box["height"] + 1,
+        )
 
     def test_home_selector_keeps_one_tab_stop_and_changes_preview_with_arrows(self) -> None:
         page = self.page
@@ -335,7 +396,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.keyboard.press("Tab")
         self.assertIn(
             page.evaluate("document.activeElement.dataset.click"),
-            {"spotlight-select", "spotlight-prev", "spotlight-next", "playlist-select"},
+            {"spotlight-select", "spotlight-air-select", "playlist-select"},
         )
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertFalse(
@@ -397,10 +458,10 @@ class BrowserInterfaceTests(unittest.TestCase):
             "open-detail-with-case-transition",
         )
 
-        page.locator('[data-click="spotlight-air-select"][data-index="0"]').click()
-        page.locator('[data-click="spotlight-prev"]').click()
+        self.assertEqual(page.locator('[data-click="spotlight-prev"], [data-click="spotlight-next"]').count(), 0)
+        page.locator('[data-click="spotlight-air-select"][data-index="5"]').click()
         self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 5)
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-prev")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-air-select")
         self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_key)
 
         page.locator("#catalogButton").click()
@@ -623,6 +684,19 @@ class BrowserInterfaceTests(unittest.TestCase):
                     }
                     for index in range(4)
                 ]
+                home["featured"] = [
+                    {
+                        "key": f"four-bay-featured-{index}",
+                        "origin": {"kind": "catalog"},
+                        "item": {
+                            **items[index % len(items)],
+                            "id": f"four-bay-featured-item-{index}",
+                            "title": f"Función {index + 1}",
+                        },
+                    }
+                    for index in range(6)
+                ]
+                home["limits"] = {**(home.get("limits") or {}), "featured_items": 6}
             payload["home"] = home
             route.fulfill(response=response, json=payload)
 
@@ -639,6 +713,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         self.assertEqual(
             furniture.evaluate("element => getComputedStyle(element).scrollbarWidth"), "none"
+        )
+        self.assertLessEqual(
+            page.evaluate("document.documentElement.scrollHeight"),
+            page.evaluate("window.innerHeight") + 1,
         )
 
         start = furniture.evaluate("element => element.scrollLeft")
@@ -678,6 +756,131 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator(".home-shelf-scroll-control").count(), 0)
         self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "0")
         self.assertEqual(page.locator("#homeSections").get_attribute("tabindex"), "-1")
+
+    def test_home_shelf_bay_spine_playlist_and_preview_share_selection(self) -> None:
+        page = self.page
+
+        def add_sync_sections(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 2:
+                def entry(key: str, item_index: int, title: str) -> dict:
+                    item = {**items[item_index], "id": f"{key}-item", "title": title}
+                    return {
+                        "key": key,
+                        "origin": {"kind": "catalog"},
+                        "item": item,
+                        "reason": {"label": "Selección del archivo", "detail": "Disponible."},
+                    }
+
+                home["sections"] = [
+                    {
+                        "id": "available",
+                        "title": "Disponible esta noche",
+                        "items": [
+                            entry("available-heat", 0, "Heat en VHS"),
+                            entry("available-akira", 1, "Akira en VHS"),
+                        ],
+                    },
+                    {
+                        "id": "memory",
+                        "title": "Tu archivo pide memoria",
+                        "items": [
+                            entry("memory-akira", 1, "Akira recordada"),
+                            entry("memory-heat", 0, "Heat recordada"),
+                            *[
+                                entry(
+                                    f"memory-extra-{index}",
+                                    index % 2,
+                                    f"Recuerdo extra {index + 1}",
+                                )
+                                for index in range(12)
+                            ],
+                        ],
+                    },
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_sync_sections)
+        self._open_and_wait_for_catalog(page)
+        self.assertEqual(page.locator(".home-shelf-preview").count(), 1)
+
+        memory_bay = page.locator('[data-home-section="memory"].home-shelf-bay')
+        memory_bay.locator(".home-program-heading").click()
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().playlistSource"), "shelf:memory")
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-akira")
+        self.assertEqual(
+            page.locator(".home-shelf-preview").get_attribute("data-home-shelf-preview"), "memory"
+        )
+        self.assertEqual(
+            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"), "memory-akira"
+        )
+
+        memory_bay.focus()
+        page.keyboard.press("Enter")
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-akira")
+
+        memory_spines = page.locator('[data-home-section="memory"] .home-shelf-tape')
+        memory_spines.nth(1).click()
+        state = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(state["selectedEntryKey"], "memory-heat")
+        self.assertEqual(state["selectedItemId"], "memory-heat-item")
+        self.assertEqual(
+            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"), "memory-heat"
+        )
+        self.assertEqual(page.locator('[data-playlist-entry].is-selected').get_attribute("data-entry-key"), "memory-heat")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-heat")
+
+        # Clicking another bay and returning restores the last remembered spine.
+        page.locator('[data-home-section="available"] .home-program-heading').click()
+        page.locator('[data-home-section="memory"] .home-program-heading').click()
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-heat")
+
+        page_scroll_before = page.evaluate("window.scrollY")
+        selected_row = page.locator('[data-playlist-entry].is-selected')
+        selected_row.focus()
+        page.keyboard.press("Home")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-akira")
+        self.assertEqual(
+            page.locator('[data-home-section="memory"] .home-shelf-tape[data-vhs-state="selected"]').get_attribute("data-entry-key"),
+            "memory-akira",
+        )
+        page.keyboard.press("End")
+        page.wait_for_timeout(350)
+        self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-extra-11")
+        self.assertEqual(
+            page.locator('[data-playlist-entry].is-selected').get_attribute("data-entry-key"), "memory-extra-11"
+        )
+        selected_spine = page.locator(
+            '[data-home-section="memory"] .home-shelf-tape[data-vhs-state="selected"]'
+        )
+        self.assertEqual(selected_spine.get_attribute("data-entry-key"), "memory-extra-11")
+        self.assertTrue(
+            selected_spine.evaluate(
+                """element => {
+                    const spine = element.getBoundingClientRect();
+                    const rail = element.closest('.home-shelf-rail').getBoundingClientRect();
+                    return spine.left >= rail.left - 1 && spine.right <= rail.right + 1;
+                }"""
+            )
+        )
+        self.assertGreater(
+            page.locator('[data-home-section="memory"] .home-shelf-rail').evaluate(
+                "element => element.scrollLeft"
+            ),
+            0,
+        )
+        self.assertEqual(page.evaluate("window.scrollY"), page_scroll_before)
+        self.assertEqual(
+            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            "memory-extra-11",
+        )
+
+        self.assertEqual(page.locator(".home-shelf-preview").count(), 1)
+        self.assertEqual(page.locator(".home-shelf-preview-actions button").count(), 2)
 
     def test_home_shelf_furniture_keeps_all_bays_visible_and_scroll_controls_accessible(
         self,

@@ -30,8 +30,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea. [U2-R.0–U2-R.3] ya fijaron referencia, assets, escenario,
-  estados independientes y mueble continuo; la siguiente tarea accionable es [U2-R.4].
+- **En curso:** ninguna tarea. [U2-R.0–U2-R.4] ya fijaron referencia, escenario, estados,
+  mueble continuo y sincronización; la siguiente tarea accionable es [U2-R.5].
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -151,13 +151,26 @@ de [U3] y [A2]. La referencia vinculante es
     - **Cierre**: las categorías dejan de reemplazarse mediante pestañas y conviven en un
       único mueble con scroll real. En desktop se ve el siguiente bay cortado; teclado,
       touch y rueda disponen de caminos equivalentes, y móvil conserva su presentación.
-  - [ ] **[U2-R.4] Sincronizar playlist, lomo y preview.** Click/Enter en un bay cambia la
+  - [x] **[U2-R.4] Sincronizar playlist, lomo y preview.** Click/Enter en un bay cambia la
     fuente; click/Enter en un lomo selecciona/alinea su fila; flechas en la lista
     seleccionan y llevan a vista el lomo correspondiente. Preview, fila y lomo deben
     compartir ID tras cada camino. Poner **a la izquierda** `Ver más` y `Editar mi ficha`,
     ambos con el mismo estilo físico dorado y diferente intensidad; conservar el gate
     real de permisos. Archivos: `home.js`, `home.css`, `test_ui_browser.py`. **Modelo:
     Medio. Depende de U2-R.2 y U2-R.3.**
+    - [x] **[U2-R.4a] Unificar selección y alineación.** Converger click/Enter de bay o
+      lomo y flechas/Home/End de playlist en el mismo entry/item; conservar selección
+      recordada, foco y scroll visible en ambos sentidos.
+    - [x] **[U2-R.4b] Preview compartida y permisos.** Sustituir previews repetidas por
+      una única franja activa bajo el mueble; mantener `Ver más` y `Editar mi ficha` a
+      la izquierda, y omitir edición para obras de Club.
+    - [x] **[U2-R.4c] Pulido de cartelera y encuadre.** Llenar el hueco con el poster sin
+      caption redundante ni flechas, integrar puntos al zócalo, liberar el fondo,
+      agrupar `Colección`/`Menú`, contener Hoy/Ayer y sostener 1280×720 poblado.
+    - **Cierre**: fila, lomo y preview activa comparten entry/item después de todos los
+      caminos de interacción; el carrusel permanece independiente. El mueble tiene una
+      sola preview física y la cartelera elimina controles e información redundantes sin
+      perder acceso por playlist, teclado o indicadores.
   - [ ] **[U2-R.5] Implementar la contratapa determinista.** Extraer un mapper puro de ID
     opaco → una de 4–5 plantillas estables; componer sobre
     `vhs-back-cover-shell-v1.png` sinopsis, créditos, año, duración, géneros,
@@ -176,6 +189,10 @@ de [U3] y [A2]. La referencia vinculante es
     Corregir sólo defectos del gate, documentar capturas y no declarar cierre por tests
     verdes si la composición vuelve a divergir. **Modelo: Grande. Depende de todo
     U2-R.**
+  - [ ] **[U2-X.1] Prototipar transición vertical de cartelera.** Experimento posterior,
+    no bloqueante para U2-R: conservar poster saliente/entrante como una tira que avanza
+    verticalmente detrás del marco, medir fluidez con imágenes reales y definir fallback
+    directo para reduced motion antes de decidir si se incorpora.
 
 ### Frente: Colección, búsqueda y alta
 
