@@ -1,4 +1,5 @@
 import { cachedImageSrc, card, posterVariant } from "./card.js";
+import { renderBackCover } from "./back-cover.js";
 import { load, loadCatalog } from "./catalog-data.js";
 import { fields } from "./fields.js";
 import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localFilesText, meta, normalizeRating, titleSubtitle } from "./format.js";
@@ -34,6 +35,8 @@ import { editorialPersonalIds } from "../surfaces/home.js";
 
       export let detailOpenedWithCaseTransition = false;
 
+      export let detailPresentation = "dossier";
+
       export function runWithCaseTransition(update) {
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (reducedMotion || !document.startViewTransition) {
@@ -45,7 +48,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
 
       export function openDetailWithCaseTransition(target, id) {
         detailOpenedWithCaseTransition = true;
-        runWithCaseTransition(() => openDetailFromTrigger(target, id));
+        runWithCaseTransition(() => openDetailFromTrigger(target, id, { presentation: "back-cover" }));
       }
 
       export function openRandomDetail() {
@@ -88,8 +91,8 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         };
       }
 
-      export function openDetailFromTrigger(target, id) {
-        openDetail(id, { context: detailContextForTrigger(target) });
+      export function openDetailFromTrigger(target, id, options = {}) {
+        openDetail(id, { ...options, context: detailContextForTrigger(target) });
       }
 
       export function openDetailForPersonalEdit(target, id) {
@@ -266,10 +269,10 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         </div>`;
       }
 
-      export function openDetail(id, { updateHistory = true, context = null, skipGuard = false } = {}) {
+      export function openDetail(id, { updateHistory = true, context = null, skipGuard = false, presentation = "dossier" } = {}) {
         if (!id) return;
         if (!skipGuard && selectedDetailId && selectedDetailId !== id && hasUnsavedDetailChanges()) {
-          requestDetailTransition(() => openDetail(id, { updateHistory, context, skipGuard: true }));
+          requestDetailTransition(() => openDetail(id, { updateHistory, context, skipGuard: true, presentation }));
           return;
         }
         const activeElement = document.activeElement;
@@ -277,6 +280,8 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
+        detailPresentation = presentation === "back-cover" ? "back-cover" : "dossier";
+        if (detailPresentation !== "back-cover") detailOpenedWithCaseTransition = false;
         setDetailContext(context, id);
         selectedDetailId = id;
         detailPersonalEditing = false;
@@ -303,6 +308,8 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           if (fields.detailDrawer.open) fields.detailDrawer.close();
           fields.detailBody.innerHTML = "";
           fields.detailNavigation.innerHTML = "";
+          fields.detailDrawer.removeAttribute("data-detail-mode");
+          fields.detailDrawerTitle.textContent = "Ficha // lado B";
           document.body.classList.remove("drawer-open");
           detailPersonalEditing = false;
           detailDirtyScopes.clear();
@@ -341,7 +348,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       }
 
       export function renderDetailNavigation() {
-        if (!selectedDetailId) {
+        if (!selectedDetailId || detailPresentation === "back-cover") {
           fields.detailNavigation.innerHTML = "";
           return;
         }
@@ -410,6 +417,16 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const summary = item.wikipedia_extract || item.description || item.notes || "";
         const watched = item.status === "watched";
         const availability = availabilityState(item);
+        fields.detailDrawer.dataset.detailMode = detailPresentation;
+        fields.detailDrawerTitle.textContent = detailPresentation === "back-cover"
+          ? `Contratapa VHS // ${title}`
+          : "Ficha // lado B";
+        if (detailPresentation === "back-cover") {
+          fields.detailNavigation.innerHTML = "";
+          fields.detailBody.innerHTML = renderBackCover(item);
+          clearDetailFeedback();
+          return;
+        }
         const metadataSection = detailPersonalEditing ? "" : `
           <details class="drawer-accordion drawer-editor">
             <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>

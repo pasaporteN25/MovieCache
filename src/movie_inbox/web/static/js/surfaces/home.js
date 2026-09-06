@@ -314,6 +314,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         renderEditorialSections();
         const hasSections = editorialHome.sections.some((section) => section.items?.length);
         fields.homeEmpty.hidden = Boolean(editorialHome.featured.length || hasSections);
+        fields.homeFurniture.hidden = !hasSections;
         fields.homeSections.hidden = !hasSections;
         syncHomeDateControl();
         const collectionsUnavailable = editorialHome.warnings.includes("collections_unavailable");
@@ -545,19 +546,18 @@ import { closeSharedDetail, openCollection } from "./club.js";
       export function selectHomeShelfEntry(sectionId, key, restoreFocus = false) {
         const section = editorialHome.sections.find((entry, index) => homeSectionId(entry, index) === sectionId);
         const entries = Array.isArray(section?.items) ? section.items : [];
-        const index = entries.findIndex((entry) => entry?.key === key);
+        const index = entries.findIndex((entry, candidateIndex) => entryKey(entry, candidateIndex) === key);
         if (index < 0) return;
-        playlistSource = `shelf:${sectionId}`;
+        // A spine owns the lower furniture state: selecting one also activates
+        // its bay, without reprogramming the playlist/marquee above.
         activeHomeSectionId = sectionId;
         activeShelfId = sectionId;
-        selectedEntryKey = entryKey(entries[index], index);
-        selectedItemId = entryItemId(entries[index]);
         homeShelfSelections.set(sectionId, index);
         renderEditorialSections();
-        renderEditorialHero();
-        alignHomePlaylistAndShelf({ focusSpine: restoreFocus });
         if (restoreFocus) {
-          fields.homeSections.querySelector(`[data-click="home-shelf-select"][data-section-id="${CSS.escape(sectionId)}"][data-entry-index="${index}"]`)?.focus();
+          const selectedSpine = fields.homeSections.querySelector(`[data-click="home-shelf-select"][data-section-id="${CSS.escape(sectionId)}"][data-entry-index="${index}"]`);
+          selectedSpine?.scrollIntoView({ block: "nearest", inline: "nearest" });
+          selectedSpine?.focus({ preventScroll: true });
         }
       }
 
@@ -620,9 +620,8 @@ import { closeSharedDetail, openCollection } from "./club.js";
       function homeShelfEntryForSelection(sectionId = activeHomeSectionId) {
         const section = homeSectionById(sectionId);
         const entries = Array.isArray(section?.items) ? section.items : [];
-        const selected = entries.find((entry, index) => entryKey(entry, index) === selectedEntryKey
-          || (selectedItemId && entryItemId(entry) === selectedItemId));
-        if (selected) return selected;
+        // The shelf's preview reflects only its own remembered selection, never
+        // the winamp-style playlist's current item above.
         const rememberedIndex = homeShelfSelections.get(sectionId);
         return entries[Number.isInteger(rememberedIndex) ? Math.max(0, Math.min(entries.length - 1, rememberedIndex)) : 0] || null;
       }
@@ -662,8 +661,8 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const spine = fields.homeSections?.querySelector(`[data-click="home-shelf-select"][data-entry-key="${CSS.escape(key)}"]`);
         const bay = spine?.closest(".home-shelf-bay");
         row?.scrollIntoView({ block: "nearest", inline: "nearest" });
-        spine?.scrollIntoView({ block: "nearest", inline: "nearest" });
-        bay?.scrollIntoView({ block: "nearest", inline: "start" });
+        if (focusBay) bay?.scrollIntoView({ block: "nearest", inline: "start" });
+        else spine?.scrollIntoView({ block: "nearest", inline: "nearest" });
         if (focusRow) row?.focus({ preventScroll: true });
         else if (focusSpine) spine?.focus({ preventScroll: true });
         else if (focusBay) bay?.focus({ preventScroll: true });
@@ -721,29 +720,16 @@ import { closeSharedDetail, openCollection } from "./club.js";
       }
 
       export function editorialSection(section, sectionIndex, active) {
-        const action = section.action || {};
         const entries = Array.isArray(section.items) ? section.items : [];
         const sectionId = homeSectionId(section, sectionIndex);
         const rememberedIndex = homeShelfSelections.get(sectionId);
-        const selectedIndex = playlistSource === `shelf:${sectionId}`
-          ? Math.max(0, Math.min(entries.length - 1, Number.isInteger(rememberedIndex) ? rememberedIndex : 0))
-          : Math.max(0, entries.findIndex((entry, index) => entryKey(entry, index) === selectedEntryKey
-            || (selectedItemId && entryItemId(entry) === selectedItemId)));
-        const selectedEntry = selectedIndex >= 0 ? entries[selectedIndex] : null;
-        const actionButton = action.kind
-          ? `<button class="quiet-action home-section-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(action.label || "Explorar")}</button>`
-          : "";
+        // The shelf keeps its own selection, independent of whatever the
+        // winamp-style playlist above is currently showing.
+        const selectedIndex = Math.max(0, Math.min(entries.length - 1, Number.isInteger(rememberedIndex) ? rememberedIndex : 0));
         return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}" tabindex="0" aria-labelledby="home-section-${escapeAttr(sectionId)}">
-          <header class="home-program-heading" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}">
-            <div>
-              <span class="section-kicker">${escapeHtml(section.eyebrow || "Programación personal")}</span>
-              <h2 id="home-section-${escapeAttr(sectionId)}">${escapeHtml(section.title || "Selección")}</h2>
-              <p>${escapeHtml(section.description || "")}</p>
-            </div>
-            ${actionButton}
-          </header>
+          <h2 id="home-section-${escapeAttr(sectionId)}" class="sr-only">${escapeHtml(section.title || "Selección")}</h2>
           <div class="home-shelf-rail" role="group" aria-label="Opciones de ${escapeAttr(section.title || "la estantería")}">
-            ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, index === selectedIndex)).join("")}
+            ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, active && index === selectedIndex)).join("")}
           </div>
         </section>`;
       }
@@ -793,16 +779,21 @@ import { closeSharedDetail, openCollection } from "./club.js";
       export function homeShelfTape(entry, index, sectionId, selected) {
         const item = entry?.item || {};
         const title = displayTitle(item) || `Obra ${index + 1}`;
-        const meta = [item.year, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Ficha por completar";
+        const year = String(item.year || "S/A");
+        const format = String(item.kind || "obra");
+        const formatSignal = ({ pelicula: "PEL", serie: "SER", anime: "ANI", documental: "DOC" })[format.toLowerCase()]
+          || format.slice(0, 3).toUpperCase();
         const reason = entry?.reason?.label || "Selección del archivo";
-        return `<button class="home-shelf-tape vhs-spine" type="button" data-vhs-state="${selected ? "selected" : "closed"}" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entry?.key || "")}" aria-label="${escapeAttr(`${title}. ${reason}. Opción ${index + 1}`)}">
+        return `<button class="home-shelf-tape vhs-spine" type="button" data-vhs-state="${selected ? "selected" : "closed"}" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entryKey(entry, index))}" aria-label="${escapeAttr(`${title}. ${year}. Formato: ${format}. ${reason}. Opción ${index + 1}`)}">
           <span class="vhs-spine-sticker" aria-hidden="true"></span>
           <span class="vhs-spine-title">${escapeHtml(title)}</span>
-          <span class="vhs-spine-meta">${escapeHtml(meta)}</span>
+          <span class="vhs-spine-meta" aria-hidden="true"><span>${escapeHtml(year)}</span><span>${escapeHtml(formatSignal)}</span></span>
         </button>`;
       }
 
       export function homeShelfPreview(sectionId, entry) {
+        const section = homeSectionById(sectionId) || {};
+        const sectionAction = section.action || {};
         const item = entry?.item || {};
         const origin = entry?.origin || {};
         const title = displayTitle(item) || "Sin título";
@@ -810,6 +801,9 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const reason = entry?.reason || {};
         const metadata = [item.year, firstListValue(item.directors), firstListValue(item.genres)].filter(Boolean);
         const summary = String(reason.detail || item.wikipedia_extract || item.description || "").trim();
+        const duration = homeDurationLabel(item);
+        const availability = availabilityState(item);
+        const status = item.status === "watched" ? "Vista" : "Pendiente";
         const isCollection = origin.kind === "collection";
         const viewMoreAction = isCollection
           ? `<button type="button" class="home-shelf-preview-action" data-click="open-home-collection-detail" data-key="${escapeAttr(entry?.key || "")}">Ver ficha del Club</button>`
@@ -820,14 +814,38 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const artwork = poster
           ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">`
           : `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
+        const categoryAction = sectionAction.kind
+          ? `<button class="home-furniture-category-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(sectionAction.label || "Ver colección")}</button>`
+          : "";
         return `<aside class="home-shelf-preview vhs-case" data-vhs-state="open" data-home-shelf-preview="${escapeAttr(sectionId)}" data-selected-entry-key="${escapeAttr(entry?.key || "")}" data-selected-item-id="${escapeAttr(item.id || "")}" aria-labelledby="home-shelf-preview-${escapeAttr(sectionId)}">
-          <div class="home-shelf-preview-art"><span class="home-shelf-preview-frame" aria-hidden="true"></span>${artwork}</div>
-          <div class="home-shelf-preview-copy">
-            <span>${escapeHtml(isCollection ? `En ${origin.collection_title || "una colección seguida"}` : reason.label || "Selección del archivo")}</span>
-            <h3 id="home-shelf-preview-${escapeAttr(sectionId)}">${escapeHtml(title)}</h3>
-            ${metadata.length ? `<p class="home-shelf-preview-meta">${metadata.map(escapeHtml).join(" · ")}</p>` : ""}
-            <p class="home-shelf-preview-summary">${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
+          <div class="home-furniture-action-panel">
             <div class="home-shelf-preview-actions">${viewMoreAction}${editAction}</div>
+          </div>
+          <div class="home-furniture-display">
+            <div class="home-furniture-display-heading">
+              <p><span>Categoría activa</span><strong>${escapeHtml(section.title || "Selección")}</strong></p>
+              ${categoryAction}
+            </div>
+            <div class="home-furniture-display-body">
+              <div class="home-shelf-preview-art"><span class="home-shelf-preview-frame" aria-hidden="true"></span>${artwork}</div>
+              <div class="home-shelf-preview-copy">
+                ${isCollection ? `<span>En ${escapeHtml(origin.collection_title || "una colección seguida")}</span>` : ""}
+                <h3 id="home-shelf-preview-${escapeAttr(sectionId)}">${escapeHtml(title)}</h3>
+                ${metadata.length ? `<p class="home-shelf-preview-meta">${metadata.map(escapeHtml).join(" · ")}</p>` : ""}
+                <p class="home-shelf-preview-summary">${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
+              </div>
+              <div class="home-furniture-frame-strip" aria-hidden="true"><span></span><span></span></div>
+              <dl class="home-shelf-preview-facts">
+                <div><dt>Disponibilidad</dt><dd>${availability.effective ? "Disponible" : "No disponible"}</dd></div>
+                <div><dt>Estado</dt><dd>${escapeHtml(status)}</dd></div>
+                <div><dt>Duración</dt><dd>${escapeHtml(duration)}</dd></div>
+              </dl>
+            </div>
+          </div>
+          <div class="home-furniture-format-panel" aria-hidden="true">
+            <span>Ficha<br>detalle</span>
+            <i></i>
+            <strong>VHS</strong>
           </div>
         </aside>`;
       }

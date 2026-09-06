@@ -17,6 +17,7 @@ no se copiaron su texto, marcas, personajes ni imágenes.
 | `static/img/night-videotheque-wall-v1.png` | PNG RGB, 1852 × 849 | Fondo de ladrillo nocturno, recortable | `abf0c01372afaad92eff9efbc6bd7667346740db9586186cd0e9c86836c29c30` |
 | `static/img/poster-marquee-frame-v1.png` | PNG RGBA, 1024 × 1536 | Marco vertical; exterior y hueco del poster transparentes | `13095402d2ecddbf22a932ffbeb7f053f893c611b68916426ab41b12f890ad00` |
 | `static/img/vhs-shelf-bay-v1.png` | PNG RGBA, 2017 × 780 | Módulo vacío de mueble continuo | `e30e7a4daa492919a7b6b9de77e196810dbc42c71e7cccb32b817eb846903ddf` |
+| `static/img/vhs-continuous-furniture-v2.png` | PNG RGB, 1802 × 873 | Mueble continuo con consola inferior integrada | `547f82ead86475f57a43e6ac1ee51977f620d6e88f83f1478bf94eb2df6b4a9c` |
 | `static/img/vhs-spine-shell-v1.png` | PNG RGBA, 724 × 2172 | Shell de lomo para texto dinámico | `b7f958da7576f151d436443791080cef1797056cefe49c7ef170c947efce1caf` |
 | `static/img/vhs-back-cover-shell-v1.png` | PNG RGBA, 988 × 1592 | Base vacía para 4–5 plantillas de contratapa | `d7c3add4ffd96b21b9cf07b6f868ff73acb4c89ee161cf6fe6d060c454579c9e` |
 
@@ -38,6 +39,19 @@ Las rutas de la tabla son relativas a `src/movie_inbox/web/`. El north star mide
   resuelven en CSS/SVG para conservar texto nítido, estados y accesibilidad.
 - Si una pieza se reemplaza, crear `v2`, conservar este archivo hasta migrar todos sus
   usos, recalcular el hash y documentar el nuevo prompt.
+
+`vhs-continuous-furniture-v2.png` reemplaza la repetición visible de módulos en Inicio.
+Su hueco superior no contiene divisores: categorías, placas, lomos y selección se
+desplazan como HTML sobre un único mueble. El exterior usa el mismo azul-negro de la
+superficie en lugar de una transparencia simulada, porque dos exportaciones integradas
+hornearon un damero; ninguna de esas pruebas se incorporó al repositorio.
+
+Las zonas seguras, medidas sobre 1802 × 873 px, son: estante superior `x 70–1732 / y
+161–558`, panel inferior izquierdo `x 100–376 / y 620–758`, pantalla central `x 421–1522
+/ y 609–764` y panel derecho `x 1554–1692 / y 608–763`. El HTML debe posicionarse desde
+estas coordenadas relativas; no se deben aproximar los tres paneles con una grilla común.
+El mueble es analógico, pero la pantalla central usa el lenguaje retrofuturista del
+reproductor: vidrio negro azulado, cian, magenta y densidad técnica.
 
 ## Prompts de producción
 
@@ -96,4 +110,17 @@ creases, scuffs, subtle cyan/magenta reflections and a restrained aged-gold acce
 Keep the interior calm for 4–5 semantic HTML layouts with synopsis, credits, runtime and
 two image placeholders. No baked regions, photos, text, barcode, logos, ratings, movie
 art, actors, people or background. Straight-on portrait cutout; alpha outside.
+```
+
+### Mueble continuo con consola
+
+```text
+Create an original, empty, continuous midnight video-club cabinet as a background shell
+behind live HTML controls. Straight-on and ultra-wide: one uninterrupted upper shelf
+cavity for dynamic vertical VHS spines, a substantial upper beam and lower ledge, side
+posts, and an integrated lower technical console with empty rectangular overlay zones.
+Painterly digital illustration / stylized soft 3D, worn purple-black wood and metal,
+aged brass, restrained cyan light from the left and magenta from the right. No upper
+divider or category boundary; no tapes, posters, labels, text, logos, people or movie
+imagery. Flat #05070f exterior; every usable panel remains empty.
 ```

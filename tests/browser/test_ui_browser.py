@@ -304,7 +304,15 @@ class BrowserInterfaceTests(unittest.TestCase):
             lambda route: route.fulfill(
                 status=200,
                 content_type="image/svg+xml",
-                body="""<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900"><rect width="600" height="900" fill="#101727"/><rect x="12" y="12" width="576" height="876" fill="none" stroke="#efb83e" stroke-width="24"/><path d="M0 0L600 900M600 0L0 900" stroke="#20d7df" stroke-width="18"/><circle cx="300" cy="420" r="130" fill="#ff2e95"/><text x="300" y="760" text-anchor="middle" fill="white" font-size="54">POSTER</text></svg>""",
+                body=(
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" '
+                    'viewBox="0 0 600 900"><rect width="600" height="900" fill="#101727"/>'
+                    '<rect x="12" y="12" width="576" height="876" fill="none" '
+                    'stroke="#efb83e" stroke-width="24"/><path d="M0 0L600 900M600 0L0 900" '
+                    'stroke="#20d7df" stroke-width="18"/><circle cx="300" cy="420" '
+                    'r="130" fill="#ff2e95"/><text x="300" y="760" text-anchor="middle" '
+                    'fill="white" font-size="54">POSTER</text></svg>'
+                ),
             ),
         )
         self._open_and_wait_for_catalog(page)
@@ -315,11 +323,15 @@ class BrowserInterfaceTests(unittest.TestCase):
                     const stats = document.querySelector('#stats').getBoundingClientRect();
                     const statsStyle = getComputedStyle(document.querySelector('#stats'));
                     const rows = [...document.querySelectorAll('[data-playlist-entry]')];
-                    const tableWrap = document.querySelector('.spotlight-table-wrap').getBoundingClientRect();
+                    const tableWrap = document.querySelector(
+                        '.spotlight-table-wrap'
+                    ).getBoundingClientRect();
                     return {
                         viewportHeight: window.innerHeight,
                         pageHeight: document.documentElement.scrollHeight,
-                        headerHeight: document.querySelector('.app-header').getBoundingClientRect().height,
+                        headerHeight: document.querySelector(
+                            '.app-header'
+                        ).getBoundingClientRect().height,
                         statsHeight: stats.height,
                         statsLineHeight: parseFloat(statsStyle.lineHeight),
                         firstRowHeight: rows[0]?.getBoundingClientRect().height || 0,
@@ -369,14 +381,26 @@ class BrowserInterfaceTests(unittest.TestCase):
         signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
         marquee_geometry = page.evaluate(
             """() => {
-                const selector = document.querySelector('.spotlight-selector').getBoundingClientRect();
-                const heading = document.querySelector('.spotlight-selector-heading').getBoundingClientRect();
-                const indicators = document.querySelector('.spotlight-selector-options').getBoundingClientRect();
-                const preview = document.querySelector('.spotlight-preview').getBoundingClientRect();
-                const signal = document.querySelector('.spotlight-preview-signal').getBoundingClientRect();
+                const selector = document.querySelector(
+                    '.spotlight-selector'
+                ).getBoundingClientRect();
+                const heading = document.querySelector(
+                    '.spotlight-selector-heading'
+                ).getBoundingClientRect();
+                const indicators = document.querySelector(
+                    '.spotlight-selector-options'
+                ).getBoundingClientRect();
+                const preview = document.querySelector(
+                    '.spotlight-preview'
+                ).getBoundingClientRect();
+                const signal = document.querySelector(
+                    '.spotlight-preview-signal'
+                ).getBoundingClientRect();
                 return {
-                    headingCenterRatio: ((heading.top + heading.height / 2) - selector.top) / selector.height,
-                    indicatorCenterRatio: ((indicators.top + indicators.height / 2) - selector.top) / selector.height,
+                    headingCenterRatio:
+                        ((heading.top + heading.height / 2) - selector.top) / selector.height,
+                    indicatorCenterRatio:
+                        ((indicators.top + indicators.height / 2) - selector.top) / selector.height,
                     signalWidthRatio: signal.width / preview.width
                 };
             }"""
@@ -414,7 +438,9 @@ class BrowserInterfaceTests(unittest.TestCase):
             """element => {
                 const selector = element.closest('.spotlight-selector').getBoundingClientRect();
                 const card = element.getBoundingClientRect();
-                const poster = element.querySelector('.spotlight-poster, .spotlight-poster-fallback');
+                const poster = element.querySelector(
+                    '.spotlight-poster, .spotlight-poster-fallback'
+                );
                 return {
                     topRatio: (card.top - selector.top) / selector.height,
                     bottomRatio: (card.bottom - selector.top) / selector.height,
@@ -446,7 +472,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         desktop_date_control.locator('[data-click="home-date-yesterday"]').click()
         page.wait_for_function(
-            "document.querySelector('.spotlight-selector-heading span')?.textContent.trim() === 'Ayer'"
+            "document.querySelector('.spotlight-selector-heading span')?."
+            "textContent.trim() === 'Ayer'"
         )
         self.assertEqual(
             desktop_date_control.locator('[data-click="home-date-yesterday"]').get_attribute(
@@ -506,9 +533,13 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         self.assertEqual(page.evaluate("document.activeElement.dataset.index"), "1")
         self.assertEqual(selector.nth(1).get_attribute("aria-pressed"), "true")
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before)
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before
+        )
         page.keyboard.press("Enter")
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before)
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before
+        )
 
         page.keyboard.press("Tab")
         self.assertIn(
@@ -569,7 +600,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
 
         self.assertEqual(
-            [value.casefold() for value in page.locator(".spotlight-playlist thead th").all_inner_texts()],
+            [
+                value.casefold()
+                for value in page.locator(".spotlight-playlist thead th").all_inner_texts()
+            ],
             ["#", "título", "director", "año", "tipo", "géneros", "duración"],
         )
         rows = page.locator("[data-playlist-entry]")
@@ -578,9 +612,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(rows.nth(0).locator(".playlist-index").inner_text(), "")
         self.assertEqual(rows.nth(1).locator(".playlist-index").inner_text(), "02")
         self.assertEqual(
-            rows.nth(0).locator(".playlist-index").evaluate(
-                "element => getComputedStyle(element, '::before').content"
-            ),
+            rows.nth(0)
+            .locator(".playlist-index")
+            .evaluate("element => getComputedStyle(element, '::before').content"),
             '"▶"',
         )
         rows.nth(1).click()
@@ -592,7 +626,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         after = page.evaluate("window.getHomePlaybackState()")
         self.assertEqual(after["selectedEntryKey"], selected_key)
         self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), selected_key)
-        self.assertEqual(page.locator("[data-playlist-entry].is-selected").get_attribute("data-entry-key"), selected_key)
+        self.assertEqual(
+            page.locator("[data-playlist-entry].is-selected").get_attribute("data-entry-key"),
+            selected_key,
+        )
         self.assertEqual(page.locator("[data-playlist-entry].is-on-air").count(), 1)
 
         page.keyboard.press("Enter")
@@ -601,11 +638,17 @@ class BrowserInterfaceTests(unittest.TestCase):
             "open-detail-with-case-transition",
         )
 
-        self.assertEqual(page.locator('[data-click="spotlight-prev"], [data-click="spotlight-next"]').count(), 0)
+        self.assertEqual(
+            page.locator('[data-click="spotlight-prev"], [data-click="spotlight-next"]').count(), 0
+        )
         page.locator('[data-click="spotlight-air-select"][data-index="5"]').click()
         self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 5)
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-air-select")
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_key)
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.click"), "spotlight-air-select"
+        )
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_key
+        )
 
         page.locator("#catalogButton").click()
         page.wait_for_selector("#collectionView:not([hidden])")
@@ -623,9 +666,15 @@ class BrowserInterfaceTests(unittest.TestCase):
                 viewport: window.innerHeight,
                 page: document.documentElement.scrollHeight,
                 header: document.querySelector('.app-header')?.getBoundingClientRect().height || 0,
-                spotlight: document.querySelector('#spotlight')?.getBoundingClientRect().height || 0,
-                categories: document.querySelector('#homeShelfCategories')?.getBoundingClientRect().height || 0,
-                sections: document.querySelector('#homeSections')?.getBoundingClientRect().height || 0
+                spotlight: document.querySelector(
+                    '#spotlight'
+                )?.getBoundingClientRect().height || 0,
+                categories: document.querySelector(
+                    '#homeShelfCategories'
+                )?.getBoundingClientRect().height || 0,
+                sections: document.querySelector(
+                    '#homeSections'
+                )?.getBoundingClientRect().height || 0
             })"""
         )
         self.assertLessEqual(
@@ -820,7 +869,14 @@ class BrowserInterfaceTests(unittest.TestCase):
                             {
                                 "key": f"bay-{index}-item",
                                 "origin": {"kind": "catalog"},
-                                "item": items[index % len(items)],
+                                "item": {
+                                    **items[index % len(items)],
+                                    "title": (
+                                        "La insoportable levedad del ser"
+                                        if index == 0
+                                        else items[index % len(items)]["title"]
+                                    ),
+                                },
                                 "reason": {"label": "Selección", "detail": "Disponible."},
                             }
                         ],
@@ -850,12 +906,84 @@ class BrowserInterfaceTests(unittest.TestCase):
         bays = page.locator(".home-shelf-bay")
         self.assertEqual(bays.count(), 4)
         self.assertTrue(all(bays.nth(index).is_visible() for index in range(4)))
+        cabinet = page.locator("#homeFurniture")
         furniture = page.locator("#homeSections")
-        self.assertTrue(
-            furniture.evaluate("element => element.scrollWidth > element.clientWidth")
+        self.assertIn(
+            "vhs-continuous-furniture-v2.png",
+            cabinet.evaluate("element => getComputedStyle(element).backgroundImage"),
         )
+        self.assertTrue(
+            cabinet.evaluate(
+                """element => {
+                    const preview = element.querySelector('#homeShelfPreview');
+                    return preview && preview.parentElement === element;
+                }"""
+            )
+        )
+        self.assertTrue(
+            all(
+                "vhs-shelf-bay-v1.png"
+                not in bays.nth(index).evaluate(
+                    "element => getComputedStyle(element).backgroundImage"
+                )
+                for index in range(4)
+            )
+        )
+        self.assertTrue(furniture.evaluate("element => element.scrollWidth > element.clientWidth"))
+        self.assertEqual(page.locator(".home-program-heading").count(), 0)
+        self.assertEqual(page.locator(".home-shelf-bay > h2.sr-only").count(), 4)
         self.assertEqual(
             furniture.evaluate("element => getComputedStyle(element).scrollbarWidth"), "none"
+        )
+        geometry = cabinet.evaluate(
+            """element => {
+                const cabinet = element.getBoundingClientRect();
+                const shelf = element.querySelector('#homeSections').getBoundingClientRect();
+                const panels = [
+                    element.querySelector('.home-furniture-action-panel'),
+                    element.querySelector('.home-furniture-display'),
+                    element.querySelector('.home-furniture-format-panel'),
+                ].map(node => node.getBoundingClientRect());
+                return {
+                    shelfTop: (shelf.top - cabinet.top) / cabinet.height,
+                    shelfBottom: (shelf.bottom - cabinet.top) / cabinet.height,
+                    panelsContained: panels.every(panel =>
+                        panel.left >= cabinet.left && panel.right <= cabinet.right
+                        && panel.top >= cabinet.top && panel.bottom <= cabinet.bottom
+                    ),
+                    panelsSeparated: panels[0].right <= panels[1].left
+                        && panels[1].right <= panels[2].left,
+                };
+            }"""
+        )
+        self.assertAlmostEqual(geometry["shelfTop"], 0.1844, delta=0.012)
+        self.assertAlmostEqual(geometry["shelfBottom"], 0.639, delta=0.012)
+        self.assertTrue(geometry["panelsContained"])
+        self.assertTrue(geometry["panelsSeparated"])
+        first_spine = page.locator('[data-home-section="bay-0"] .home-shelf-tape')
+        spine_readability = first_spine.evaluate(
+            """element => {
+                const spine = element.getBoundingClientRect();
+                const title = element.querySelector('.vhs-spine-title').getBoundingClientRect();
+                const meta = element.querySelector('.vhs-spine-meta');
+                const metaRect = meta.getBoundingClientRect();
+                return {
+                    titleHeightRatio: title.height / spine.height,
+                    metaHeight: metaRect.height,
+                    metaWritingMode: getComputedStyle(meta).writingMode,
+                };
+            }"""
+        )
+        self.assertGreaterEqual(spine_readability["titleHeightRatio"], 0.5)
+        self.assertLessEqual(spine_readability["metaHeight"], 20)
+        self.assertEqual(spine_readability["metaWritingMode"], "horizontal-tb")
+        self.assertEqual(
+            first_spine.locator(".vhs-spine-meta > span").all_text_contents(),
+            ["1995", "PEL"],
+        )
+        self.assertIn(
+            "La insoportable levedad del ser. 1995. Formato: pelicula.",
+            first_spine.get_attribute("aria-label"),
         )
         self.assertLessEqual(
             page.evaluate("document.documentElement.scrollHeight"),
@@ -873,7 +1001,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertLessEqual(furniture.evaluate("element => element.scrollLeft"), moved)
 
         furniture.evaluate(
-            "element => element.dispatchEvent(new WheelEvent('wheel', {deltaY: 240, bubbles: true, cancelable: true}))"
+            "element => element.dispatchEvent(new WheelEvent('wheel', "
+            "{deltaY: 240, bubbles: true, cancelable: true}))"
         )
         self.assertGreater(furniture.evaluate("element => element.scrollLeft"), start)
 
@@ -900,7 +1029,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "0")
         self.assertEqual(page.locator("#homeSections").get_attribute("tabindex"), "-1")
 
-    def test_home_shelf_bay_spine_playlist_and_preview_share_selection(self) -> None:
+    def test_direct_spine_choice_activates_its_bay_but_keeps_playlist_independent(
+        self,
+    ) -> None:
         page = self.page
 
         def add_sync_sections(route) -> None:
@@ -909,6 +1040,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             items = payload.get("items") or []
             home = payload.get("home") or {}
             if len(items) >= 2:
+
                 def entry(key: str, item_index: int, title: str) -> dict:
                     item = {**items[item_index], "id": f"{key}-item", "title": title}
                     return {
@@ -951,51 +1083,109 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
         self.assertEqual(page.locator(".home-shelf-preview").count(), 1)
 
-        memory_bay = page.locator('[data-home-section="memory"].home-shelf-bay')
-        memory_bay.locator(".home-program-heading").click()
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().playlistSource"), "shelf:memory")
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-akira")
+        initial_state = page.evaluate("window.getHomePlaybackState()")
+        initial_playlist_selection = page.locator("[data-playlist-entry].is-selected").evaluate_all(
+            "elements => elements.map(element => element.dataset.entryKey)"
+        )
+
+        # Clicking a spine in another visible bay activates that bay and its
+        # preview directly. The upper playlist remains independent.
+        memory_spines = page.locator('[data-home-section="memory"] .home-shelf-tape')
+        memory_spines.nth(1).click()
+        state = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(state["activeShelfId"], "memory")
+        self.assertEqual(state["playlistSource"], initial_state["playlistSource"])
+        self.assertEqual(state["selectedEntryKey"], initial_state["selectedEntryKey"])
+        self.assertEqual(state["selectedItemId"], initial_state["selectedItemId"])
+        self.assertEqual(
+            page.locator('[data-home-section="memory"]').get_attribute("data-active"),
+            "true",
+        )
+        self.assertEqual(
+            page.locator('[data-home-section="available"]').get_attribute("data-active"),
+            "false",
+        )
         self.assertEqual(
             page.locator(".home-shelf-preview").get_attribute("data-home-shelf-preview"), "memory"
         )
         self.assertEqual(
-            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"), "memory-akira"
+            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            "memory-heat",
         )
-
-        memory_bay.focus()
-        page.keyboard.press("Enter")
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-akira")
-
-        memory_spines = page.locator('[data-home-section="memory"] .home-shelf-tape')
-        memory_spines.nth(1).click()
-        state = page.evaluate("window.getHomePlaybackState()")
-        self.assertEqual(state["selectedEntryKey"], "memory-heat")
-        self.assertEqual(state["selectedItemId"], "memory-heat-item")
         self.assertEqual(
-            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"), "memory-heat"
+            page.locator(".home-furniture-display-heading strong").text_content(),
+            "Tu archivo pide memoria",
         )
-        self.assertEqual(page.locator('[data-playlist-entry].is-selected').get_attribute("data-entry-key"), "memory-heat")
+        self.assertEqual(
+            page.locator(
+                '[data-home-section="memory"] .home-shelf-tape[aria-pressed="true"]'
+            ).get_attribute("data-entry-key"),
+            "memory-heat",
+        )
+        self.assertEqual(
+            page.locator("[data-playlist-entry].is-selected").evaluate_all(
+                "elements => elements.map(element => element.dataset.entryKey)"
+            ),
+            initial_playlist_selection,
+        )
         self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-heat")
 
-        # Clicking another bay and returning restores the last remembered spine.
-        page.locator('[data-home-section="available"] .home-program-heading').click()
-        page.locator('[data-home-section="memory"] .home-program-heading').click()
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-heat")
+        # Enter on a spine in a different bay follows the same state transition.
+        available_spines = page.locator('[data-home-section="available"] .home-shelf-tape')
+        available_spines.nth(1).focus()
+        page.keyboard.press("Enter")
+        state = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(state["activeShelfId"], "available")
+        self.assertEqual(state["playlistSource"], initial_state["playlistSource"])
+        self.assertEqual(state["selectedEntryKey"], initial_state["selectedEntryKey"])
+        self.assertEqual(
+            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            "available-akira",
+        )
+        self.assertEqual(
+            page.locator(
+                '[data-home-section="available"] .home-shelf-tape[aria-pressed="true"]'
+            ).get_attribute("data-entry-key"),
+            "available-akira",
+        )
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.entryKey"), "available-akira"
+        )
+
+        # Bay activation still owns the explicit playlist synchronization and
+        # restores that bay's remembered spine.
+        memory_bay = page.locator('[data-home-section="memory"].home-shelf-bay')
+        memory_bay.dispatch_event("click")
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().playlistSource"), "shelf:memory"
+        )
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-heat"
+        )
+        self.assertEqual(
+            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            "memory-heat",
+        )
 
         page_scroll_before = page.evaluate("window.scrollY")
-        selected_row = page.locator('[data-playlist-entry].is-selected')
+        selected_row = page.locator("[data-playlist-entry].is-selected")
         selected_row.focus()
         page.keyboard.press("Home")
         self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-akira")
         self.assertEqual(
-            page.locator('[data-home-section="memory"] .home-shelf-tape[data-vhs-state="selected"]').get_attribute("data-entry-key"),
+            page.locator(
+                '[data-home-section="memory"] .home-shelf-tape[data-vhs-state="selected"]'
+            ).get_attribute("data-entry-key"),
             "memory-akira",
         )
         page.keyboard.press("End")
         page.wait_for_timeout(350)
-        self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-extra-11")
         self.assertEqual(
-            page.locator('[data-playlist-entry].is-selected').get_attribute("data-entry-key"), "memory-extra-11"
+            page.evaluate("document.activeElement.dataset.entryKey"), "memory-extra-11"
+        )
+        self.assertEqual(
+            page.locator("[data-playlist-entry].is-selected").get_attribute("data-entry-key"),
+            "memory-extra-11",
         )
         selected_spine = page.locator(
             '[data-home-section="memory"] .home-shelf-tape[data-vhs-state="selected"]'
@@ -1011,9 +1201,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             )
         )
         self.assertGreater(
-            page.locator('[data-home-section="memory"] .home-shelf-rail').evaluate(
-                "element => element.scrollLeft"
-            ),
+            page.locator("#homeSections").evaluate("element => element.scrollLeft"),
             0,
         )
         self.assertEqual(page.evaluate("window.scrollY"), page_scroll_before)
@@ -1092,7 +1280,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.keyboard.press("ArrowRight")
         page.wait_for_timeout(350)
         self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
-        self.assertGreater(page.locator("#homeSections").evaluate("element => element.scrollLeft"), 0)
+        self.assertGreater(
+            page.locator("#homeSections").evaluate("element => element.scrollLeft"), 0
+        )
 
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertFalse(page.locator("#homeShelfCategories").is_visible())
@@ -1135,12 +1325,15 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         preview = page.locator('[data-home-shelf-preview="available"]')
         self.assertEqual(preview.get_by_text("Ver más").count(), 1)
+        self.assertEqual(preview.locator(".home-furniture-frame-strip > span").count(), 2)
         edit_button = preview.get_by_text("Editar mi ficha")
         self.assertEqual(edit_button.count(), 1)
 
         edit_button.click()
         page.wait_for_selector("#detailDrawer[open]")
         page.wait_for_selector("[data-detail-form='personal']")
+        self.assertEqual(page.locator("#detailDrawer").get_attribute("data-detail-mode"), "dossier")
+        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover").count(), 0)
         self.assertEqual(
             page.evaluate("document.activeElement.hasAttribute('data-personal-watched-at')"),
             True,
@@ -1260,7 +1453,43 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.remove_listener("request", record_write)
         self.assertEqual(write_requests, [])
 
-    def test_home_shelf_view_more_opens_dossier_with_reversible_case_transition(
+    def test_back_cover_template_mapper_is_stable_for_opaque_ids(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        result = page.evaluate(
+            """async () => {
+                const module = await import('/static/js/core/back-cover.js');
+                const ids = ['heat', 'akira', 'movie-42', 'opaque:999', 'opaque-2'];
+                const templates = ids.map((id) => [id, module.backCoverTemplateForId(id)]);
+                const rendered = ids.map((id) => {
+                    const host = document.createElement('div');
+                    host.innerHTML = module.renderBackCover({ id, title: id });
+                    return {
+                        template: host.firstElementChild.dataset.backCoverTemplate,
+                        frames: host.querySelectorAll('.vhs-back-cover-frame[role="img"]').length,
+                    };
+                });
+                return { templates, rendered };
+            }"""
+        )
+        self.assertEqual(
+            result["templates"],
+            [
+                ["heat", "episode-collage"],
+                ["akira", "rental-classic"],
+                ["movie-42", "studio-triptych"],
+                ["opaque:999", "midnight-noir"],
+                ["opaque-2", "archive-grid"],
+            ],
+        )
+        self.assertEqual([entry["frames"] for entry in result["rendered"]], [2] * 5)
+        self.assertEqual(
+            [entry["template"] for entry in result["rendered"]],
+            [entry[1] for entry in result["templates"]],
+        )
+
+    def test_home_shelf_view_more_opens_deterministic_back_cover_with_reversible_transition(
         self,
     ) -> None:
         page = self.page
@@ -1271,6 +1500,18 @@ class BrowserInterfaceTests(unittest.TestCase):
             items = payload.get("items") or []
             home = payload.get("home") or {}
             if len(items) >= 1:
+                items[0].update(
+                    {
+                        "directors": ["Michael Mann"],
+                        "writers": ["Michael Mann"],
+                        "cast": ["Al Pacino", "Robert De Niro"],
+                        "duration_minutes": 170,
+                        "genres": ["Crimen", "Drama"],
+                        "rating": 9,
+                        "review": "Una memoria personal de prueba.",
+                        "notes": "Esta nota no debe aparecer como sinopsis.",
+                    }
+                )
                 home["sections"] = [
                     {
                         "id": "available",
@@ -1292,6 +1533,7 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/items?*", add_home_section)
         self._open_and_wait_for_catalog(page)
+        page.set_viewport_size({"width": 1280, "height": 720})
 
         # document.startViewTransition support is exercised for real here (this
         # Playwright build ships a Chromium new enough to have it); we assert on
@@ -1301,11 +1543,86 @@ class BrowserInterfaceTests(unittest.TestCase):
         view_more.click()
         page.wait_for_selector("#detailDrawer[open]")
 
-        case = page.locator("#detailDrawer .drawer-vhs-case")
-        self.assertEqual(case.get_attribute("aria-hidden"), "true")
+        drawer = page.locator("#detailDrawer")
+        self.assertEqual(drawer.get_attribute("data-detail-mode"), "back-cover")
         self.assertEqual(
-            case.evaluate("element => getComputedStyle(element).pointerEvents"), "none"
+            page.locator("#detailDrawerTitle").text_content(), "Contratapa VHS // Heat"
         )
+        case = page.locator("#detailDrawer .vhs-back-cover-shell")
+        self.assertEqual(
+            page.locator("#detailDrawer .vhs-back-cover").get_attribute("data-back-cover-template"),
+            "episode-collage",
+        )
+        self.assertIn(
+            "vhs-back-cover-shell-v1.png",
+            case.evaluate("element => getComputedStyle(element).backgroundImage"),
+        )
+        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-frame").count(), 2)
+        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-frame[role='img']").count(), 2)
+        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-credits").count(), 1)
+        self.assertIn("Michael Mann", page.locator("#detailDrawer").inner_text())
+        self.assertIn("Una memoria personal de prueba.", page.locator("#detailDrawer").inner_text())
+        self.assertNotIn(
+            "Esta nota no debe aparecer como sinopsis.",
+            page.locator("#detailDrawer .vhs-back-cover-synopsis").inner_text(),
+        )
+        content_region = page.locator("#detailDrawer .vhs-back-cover-content")
+        self.assertEqual(content_region.get_attribute("tabindex"), "0")
+        self.assertEqual(content_region.get_attribute("role"), "region")
+        self.assertGreaterEqual(
+            float(content_region.evaluate("element => getComputedStyle(element).fontSize")[:-2]),
+            11,
+        )
+        self.assertGreaterEqual(case.bounding_box()["width"], 460)
+        geometry = page.locator("#detailDrawer .vhs-back-cover").evaluate(
+            """element => {
+                const shell = element.querySelector(
+                    '.vhs-back-cover-shell'
+                ).getBoundingClientRect();
+                const content = element.querySelector('.vhs-back-cover-content');
+                const box = content.getBoundingClientRect();
+                return {
+                    inside: box.left >= shell.left && box.right <= shell.right
+                        && box.top >= shell.top && box.bottom <= shell.bottom,
+                    contentOverflow: content.scrollHeight - content.clientHeight,
+                };
+            }"""
+        )
+        self.assertTrue(geometry["inside"])
+        self.assertLessEqual(geometry["contentOverflow"], 1)
+        template_overflows = page.locator("#detailDrawer .vhs-back-cover").evaluate(
+            """element => {
+                const original = element.dataset.backCoverTemplate;
+                const overflows = [
+                    'rental-classic',
+                    'episode-collage',
+                    'studio-triptych',
+                    'midnight-noir',
+                    'archive-grid',
+                ].map((template) => {
+                element.className = `vhs-back-cover vhs-back-cover--${template}`;
+                const content = element.querySelector('.vhs-back-cover-content');
+                return content.scrollHeight - content.clientHeight;
+                });
+                element.className = `vhs-back-cover vhs-back-cover--${original}`;
+                return overflows;
+            }"""
+        )
+        self.assertTrue(all(overflow <= 1 for overflow in template_overflows))
+
+        page.locator("#detailDrawer .vhs-back-cover-synopsis p").evaluate(
+            "element => { element.textContent = `${element.textContent} `.repeat(80); }"
+        )
+        content_region.focus()
+        self.assertEqual(
+            page.evaluate("document.activeElement.classList.contains('vhs-back-cover-content')"),
+            True,
+        )
+        self.assertGreater(
+            content_region.evaluate("element => element.scrollHeight - element.clientHeight"), 0
+        )
+        page.keyboard.press("End")
+        page.wait_for_function("document.querySelector('.vhs-back-cover-content').scrollTop > 0")
 
         # Reversible + doesn't block Escape/focus.
         page.keyboard.press("Escape")

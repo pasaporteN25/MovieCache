@@ -30,9 +30,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** ninguna tarea. [U2-R.0–U2-R.4] ya fijaron referencia, escenario, estados,
-  mueble continuo y franja superior aceptada. La siguiente tarea accionable es
-  [U2-R.5], la contratapa determinista de `Ver más`.
+- **En curso:** [U2-R.C], correcciones de la franja inferior previas al gate. La lectura
+  de lomos y la selección directa entre categorías ya están corregidas; la siguiente
+  tarea accionable es [U2-R.C3], recuperar altura útil en la consola inferior.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -216,19 +216,49 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
       indicadores a bandas verificables del asset, reservar al menos 38 % de la preview
       para la señal y forzar revalidación ETag de assets no versionados. **Modelo: Medio.
       Depende de U2-R.4l.**
+    - [x] **[U2-R.4n] Recuperar el mueble continuo de la referencia.** Reemplazar la
+      repetición de fondos por `vhs-continuous-furniture-v2.png`: un único hueco sin
+      divisores donde conviven hasta cuatro categorías y la siguiente queda cortada.
+      Encastrar lomos sobre el estante, mantener un único scroll lateral y retirar las
+      placas del travesaño: la categoría activa vive discretamente abajo. Integrar las
+      acciones en el panel físico izquierdo, una pantalla retrofuturista tipo Winamp/CRT
+      con dos fotogramas placeholder en el panel central y el distintivo VHS en el panel
+      derecho. Suavizar la pared con tratamiento gráfico y cañerías laterales decorativas
+      sin alterar móvil. **Modelo: Medio. Depende de U2-R.4m.**
     - **Cierre 2026-09-03**: se eligió una marquesina abierta y continua, con marca y
       estadísticas en una línea y `Colección`/`Menú` como placas contiguas. La cartelera
       queda libre de caja y contador; seis filas llenan el reproductor sin inflar listas
       cortas; preview, fila y lomo comparten selección, y la preview elimina razones
-      redundantes y suma una señal decorativa estable por obra. El gate y las decisiones
-      están documentados en `docs/design/u2-r4-upper-gate-v1.md`.
-  - [ ] **[U2-R.5] Implementar la contratapa determinista.** Extraer un mapper puro de ID
+      redundantes y suma una señal decorativa estable por obra. La biblioteca inferior
+      usa un solo mueble continuo con consola integrada, no módulos raster repetidos. El
+      gate y las decisiones están documentados en `docs/design/u2-r4-upper-gate-v1.md`.
+  - [x] **[U2-R.5] Implementar la contratapa determinista.** Extraer un mapper puro de ID
     opaco → una de 4–5 plantillas estables; componer sobre
     `vhs-back-cover-shell-v1.png` sinopsis, créditos, año, duración, géneros,
     disponibilidad/memoria y dos placeholders de imagen. `Ver más` abre con transición
     breve, Escape/reduced motion y retorno de foco; `Editar` sigue abriendo la ficha
     actual. Acotar a un módulo JS nuevo, integración mínima en `home.js`, CSS de
     contratapa y tests del mapper/foco. **Modelo: Medio. Depende de U2-R.4k.**
+    - **Cierre 2026-09-04**: `back-cover.js` concentra el hash puro y cinco plantillas
+      estables sin exponer el ID; `Ver más` compone la contratapa sobre el shell
+      original con sinopsis, ficha, disponibilidad, memoria y exactamente dos
+      placeholders honestos. El diálogo existente conserva Escape, retorno de foco y
+      reduced motion con una transición breve; `Editar mi ficha` sigue entrando al
+      dossier editable. La cobertura de navegador valida las cinco asignaciones,
+      encastre, contenido, foco y separación de ambos flujos.
+  - [ ] **[U2-R.C] Corregir la franja inferior antes del gate.** Aplicar los hallazgos
+    acotados de `docs/design/u2-lower-review-2026-09-05.md` sin reabrir la base técnica
+    ni rediseñar toda la home. **Depende de U2-R.4n y U2-R.5. Precede a U2-R.7.**
+    - [x] **[U2-R.C1] Recuperar lectura de lomos.** Reservar el track principal al título
+      y llevar año/formato a un pie compacto, conservando el nombre accesible completo.
+    - [x] **[U2-R.C2] Corregir selección directa entre categorías.** Click o Enter sobre
+      cualquier lomo activa su categoría y ficha inferior en el mismo gesto, sin cambiar
+      la playlist superior.
+    - [ ] **[U2-R.C3] Recuperar altura útil de la consola.** Mostrar título, año,
+      dirección y sinopsis breve legibles en los tres tamaños desktop; metadata principal
+      de 12 px o más y flujo vertical cuando la altura o el zoom no alcancen.
+    - [ ] **[U2-R.C4] Resolver orientación y grupos cortos.** Comparar placas pequeñas por
+      categoría con el rótulo inferior activo y evitar huecos desproporcionados.
   - [ ] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
     U2 contra la composición previa; fuera del breakpoint desktop conservar/restaurar
     la navegación y flujo móvil anterior, sin intentar este rediseño material. Probar

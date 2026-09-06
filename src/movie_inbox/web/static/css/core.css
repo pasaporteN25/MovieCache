@@ -522,12 +522,23 @@ input,
 @media (min-width: 861px) {
         body:has(#homeView:not([hidden])) {
           background:
-            linear-gradient(180deg, rgba(5, 7, 15, 0.16), rgba(5, 7, 15, 0.78)),
+            linear-gradient(180deg, rgba(5, 7, 15, 0.42), rgba(5, 7, 15, 0.88)),
+            linear-gradient(90deg, rgba(8, 20, 34, 0.52), rgba(8, 9, 21, 0.72) 42%, rgba(31, 7, 29, 0.48)),
             url("../img/night-videotheque-wall-v1.png") center top / cover fixed,
             var(--surface-app);
+          background-blend-mode: normal, color, normal, normal;
         }
 
-        body:has(#homeView:not([hidden]))::before { display: none; }
+        body:has(#homeView:not([hidden]))::before {
+          background:
+            linear-gradient(90deg, transparent 0 3px, rgba(15, 18, 21, .95) 3px 7px, rgba(109, 79, 43, .72) 7px 9px, rgba(9, 11, 15, .98) 9px 15px, transparent 15px) 18px 0 / 18px 100% no-repeat,
+            linear-gradient(90deg, transparent 0 3px, rgba(15, 18, 21, .95) 3px 7px, rgba(109, 79, 43, .72) 7px 9px, rgba(9, 11, 15, .98) 9px 15px, transparent 15px) calc(100% - 18px) 0 / 18px 100% no-repeat,
+            repeating-linear-gradient(0deg, transparent 0 3px, rgba(68, 214, 224, .025) 3px 4px);
+          display: block;
+          mask-image: linear-gradient(#000, #000);
+          opacity: .82;
+          z-index: 0;
+        }
 
         body:has(#homeView:not([hidden])) main {
           max-width: 1672px;
