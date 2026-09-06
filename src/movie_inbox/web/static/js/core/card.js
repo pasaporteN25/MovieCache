@@ -110,13 +110,20 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
       export function handlePosterLoad(event) {
         const spotlightImage = event.target.closest?.("[data-spotlight-image]");
         if (spotlightImage) {
+          spotlightImage.hidden = false;
           spotlightImage.classList.add("is-loaded");
+          const fallback = spotlightImage.nextElementSibling;
+          if (fallback?.matches(".spotlight-poster-fallback")) fallback.hidden = true;
           return;
         }
         const image = event.target.closest?.("[data-poster-image]");
         if (!image) return;
         image.hidden = false;
         image.classList.add("is-loaded");
+        const fallback = image.nextElementSibling;
+        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .spotlight-preview-art-fallback")) {
+          fallback.hidden = true;
+        }
       }
 
       export function handlePosterError(event) {
@@ -124,6 +131,8 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         if (spotlightImage) {
           spotlightImage.hidden = true;
           spotlightImage.closest(".spotlight-slide")?.classList.add("is-image-missing");
+          const fallback = spotlightImage.nextElementSibling;
+          if (fallback?.matches(".spotlight-poster-fallback")) fallback.hidden = false;
           return;
         }
         const image = event.target.closest?.("[data-poster-image]");
@@ -131,7 +140,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         image.classList.remove("is-loaded");
         image.hidden = true;
         const fallback = image.nextElementSibling;
-        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder")) {
+        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .spotlight-preview-art-fallback")) {
           fallback.hidden = false;
         }
       }

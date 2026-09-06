@@ -30,8 +30,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [U2-R.7b], matriz de contenido y estados límite de la home recuperada.
-  [U2-R.7a], [U2-R.C] y
+- **En curso:** [U2-R.7c], gate de interacción y accesibilidad de la home recuperada.
+  [U2-R.7a], [U2-R.7b], [U2-R.C] y
   [U2-R.6] quedaron cerradas con lectura de lomos, selección directa, consola legible,
   categorías orientadas y flujo móvil recompuesto.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
@@ -300,9 +300,15 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
         sin comprimir la consola. Estadísticas/celdas usan 12 px, encabezados 11 px y
         metadata de lomo 10 px; seis funciones y hechos operativos quedan contenidos.
         Evidencia final, score 17/20 y verificaciones en el mismo documento.
-    - [ ] **[U2-R.7b] Matriz de contenido y estados límite.** Verificar 0/1/4 categorías,
+    - [x] **[U2-R.7b] Matriz de contenido y estados límite.** Verificar 0/1/4 categorías,
       filas vacías, poster roto, título/género extensos, permisos personal/Club y
       contratapa determinista con sus dos placeholders.
+      - **Cierre 2026-09-06:** estado totalmente vacío, 1/2/4 categorías, título y
+        géneros extensos, nombre de instancia completo, posters ausentes/rotos,
+        permisos personal/Club y cinco contratapas con dos marcos quedaron cubiertos.
+        Se añadieron fallbacks consistentes a cartelera/preview y una escala compacta de
+        marca sin overflow. Matriz y evidencia en
+        `docs/design/u2-r7b-content-state-matrix-2026-09-06.md`; suite 32/32.
     - [ ] **[U2-R.7c] Gate de interacción y accesibilidad.** Recorrer click, Enter,
       flechas, cambio de estantería, temporizador, foco/retorno, touch, nombres
       accesibles y reduced motion; repetir reflow móvil en 390/320 px sin callejones.

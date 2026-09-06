@@ -357,9 +357,10 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const selectedReason = selectedEntry?.reason || {};
         const selectedSummary = String(selectedItem.description || selectedItem.wikipedia_extract || selectedReason.detail || "").trim();
         const sourceLabel = playlistSourceLabel();
+        const carouselPosterFallback = `<div class="spotlight-poster-fallback poster-${posterVariant(carouselItem.id || carouselTitle)}" aria-hidden="true"${carouselPoster ? " hidden" : ""}><span>Sin portada</span></div>`;
         const posterMarkup = carouselPoster
-          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(carouselPoster))}" alt="Portada de ${escapeAttr(carouselTitle)}" loading="eager" fetchpriority="high" decoding="async">`
-          : `<div class="spotlight-poster-fallback poster-${posterVariant(carouselItem.id || carouselTitle)}" aria-hidden="true"><span>Sin portada</span></div>`;
+          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(carouselPoster))}" alt="Portada de ${escapeAttr(carouselTitle)}" loading="eager" fetchpriority="high" decoding="async">${carouselPosterFallback}`
+          : carouselPosterFallback;
         const selector = `<aside class="spotlight-selector" aria-label="Cartelera automática">
           <div class="spotlight-selector-heading">
             <span>${escapeHtml(homeDatePeriodLabel(editorialHome.generated_for))}</span>
@@ -411,6 +412,11 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const previewEditAction = selectedOrigin.kind === "catalog"
           ? `<button class="spotlight-preview-action is-secondary" type="button" data-click="edit-home-shelf-entry" data-id="${escapeAttr(selectedItem.id || "")}">Editar mi ficha</button>`
           : "";
+        const selectedPoster = String(selectedItem.page_image || "").trim();
+        const selectedPosterFallback = `<span class="spotlight-preview-art-fallback poster-${posterVariant(selectedItem.id || selectedTitle)}" aria-hidden="true"${selectedPoster ? " hidden" : ""}></span>`;
+        const selectedPosterMarkup = selectedPoster
+          ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(selectedPoster))}" alt="" loading="lazy" decoding="async">${selectedPosterFallback}`
+          : selectedPosterFallback;
         fields.spotlightStage.innerHTML = `<div class="spotlight-layout">
           ${selector}
           <div class="spotlight-viewport">
@@ -426,7 +432,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
             </div>
             <aside class="spotlight-preview" aria-labelledby="spotlight-selected-title">
               <div class="spotlight-preview-actions">${previewViewAction}${previewEditAction}</div>
-              <div class="spotlight-preview-art">${selectedItem.page_image ? `<img src="${escapeAttr(cachedImageSrc(String(selectedItem.page_image)))}" alt="" loading="lazy" decoding="async">` : `<span class="poster-${posterVariant(selectedItem.id || selectedTitle)}" aria-hidden="true"></span>`}</div>
+              <div class="spotlight-preview-art">${selectedPosterMarkup}</div>
               <div class="spotlight-copy">
                 <h3 id="spotlight-selected-title">${escapeHtml(selectedTitle)}</h3>
                 <span class="spotlight-metadata">${escapeHtml([selectedItem.year, selectedItem.kind, firstListValue(selectedItem.genres)].filter(Boolean).join(" · ") || "Ficha por completar")}</span>

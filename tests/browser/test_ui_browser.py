@@ -365,6 +365,137 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
 
+    def test_home_empty_payload_exposes_recovery_without_empty_furniture(self) -> None:
+        page = self.page
+
+        def empty_home(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            home = payload.get("home") or {}
+            home["featured"] = []
+            home["sections"] = []
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", empty_home)
+        self._open_and_wait_for_catalog(page)
+
+        self.assertTrue(page.locator(".spotlight-stage.is-empty").is_visible())
+        self.assertIn(
+            "la pantalla espera una obra disponible",
+            page.locator(".spotlight-stage.is-empty").inner_text().casefold(),
+        )
+        self.assertEqual(page.locator("[data-playlist-entry]").count(), 0)
+        self.assertTrue(page.locator("#homeEmpty").is_visible())
+        self.assertTrue(page.locator("#homeFurniture").is_hidden())
+        self.assertTrue(page.locator("#homeShelfCategories").is_hidden())
+        self.assertEqual(page.locator("#homeEmpty button").count(), 3)
+
+    def test_home_single_category_long_content_and_broken_posters_remain_contained(
+        self,
+    ) -> None:
+        page = self.page
+        long_title = (
+            "La extraordinaria e interminable historia del archivo que volvió de medianoche"
+        )
+        long_genre = "Ciencia ficción especulativa y memoria cinematográfica latinoamericana"
+
+        def extreme_home(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            item = {
+                **payload["items"][0],
+                "title": long_title,
+                "genres": [long_genre, "Drama psicológico de expansión internacional"],
+                "page_image": "https://example.invalid/r7b-broken-poster.jpg",
+            }
+            entry = {
+                "key": "r7b-extreme-entry",
+                "origin": {"kind": "catalog"},
+                "item": item,
+                "reason": {"label": "Selección del archivo", "detail": "Disponible."},
+            }
+            payload["home"]["featured"] = [entry]
+            payload["home"]["sections"] = [
+                {
+                    "id": "r7b-single",
+                    "title": "Una sola categoría con un nombre deliberadamente extenso",
+                    "items": [entry],
+                }
+            ]
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", extreme_home)
+        page.set_viewport_size({"width": 1280, "height": 720})
+        self._open_and_wait_for_catalog(page)
+
+        self.assertEqual(page.locator(".home-shelf-bay").count(), 1)
+        self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "1")
+        self.assertTrue(page.locator("#homeShelfCategories").is_hidden())
+        self.assertFalse(
+            page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+        brand_metrics = page.locator("h1").evaluate(
+            """element => ({
+                clientWidth: element.clientWidth,
+                scrollWidth: element.scrollWidth,
+                lockupWidth: element.closest('.brand-lockup').clientWidth,
+            })"""
+        )
+        self.assertLessEqual(
+            brand_metrics["scrollWidth"],
+            brand_metrics["clientWidth"] + 1,
+            brand_metrics,
+        )
+
+        selected_row = page.locator("[data-playlist-entry]")
+        self.assertIn(long_title, selected_row.get_attribute("aria-label"))
+        self.assertIn(long_genre, selected_row.get_attribute("aria-label"))
+        self.assertIn(
+            long_title,
+            page.locator(".home-shelf-tape").get_attribute("aria-label"),
+        )
+
+        marquee_image = page.locator("[data-spotlight-image]")
+        marquee_fallback = page.locator(
+            ".spotlight-poster-trigger > .spotlight-poster-fallback"
+        )
+        marquee_image.dispatch_event("load")
+        self.assertTrue(marquee_fallback.is_hidden())
+        marquee_image.dispatch_event("error")
+        self.assertTrue(marquee_image.is_hidden())
+        self.assertTrue(marquee_fallback.is_visible())
+        self.assertIn("sin portada", marquee_fallback.inner_text().casefold())
+
+        upper_preview = page.locator(".spotlight-preview-art")
+        upper_image = upper_preview.locator("[data-poster-image]")
+        upper_fallback = upper_preview.locator(".spotlight-preview-art-fallback")
+        upper_image.dispatch_event("load")
+        self.assertTrue(upper_fallback.is_hidden())
+        upper_image.dispatch_event("error")
+        self.assertTrue(upper_image.is_hidden())
+        self.assertTrue(upper_fallback.is_visible())
+
+        shelf_preview = page.locator('[data-home-shelf-preview="r7b-single"]')
+        shelf_image = shelf_preview.locator("[data-poster-image]")
+        shelf_fallback = shelf_preview.locator(".home-shelf-preview-placeholder")
+        shelf_image.dispatch_event("error")
+        self.assertTrue(shelf_image.is_hidden())
+        self.assertTrue(shelf_fallback.is_visible())
+
+        for width, height in ((1440, 900), (1920, 1080)):
+            page.set_viewport_size({"width": width, "height": height})
+            self.assertFalse(
+                page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1"),
+                (width, height),
+            )
+            self.assertTrue(
+                page.locator("h1").evaluate(
+                    "element => element.scrollWidth <= element.clientWidth + 1"
+                ),
+                (width, height),
+            )
+
     def test_header_utilities_open_collection_search_and_add(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)
@@ -375,6 +506,7 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.locator(".brand-home").click()
         page.wait_for_selector("#homeView:not([hidden])")
+        page.wait_for_function("document.querySelector('#stats').textContent.includes('2 obras')")
 
         click_desktop_menu_action(page, "add")
         page.wait_for_selector("#collectionView:not([hidden])")

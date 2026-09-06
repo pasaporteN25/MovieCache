@@ -610,7 +610,7 @@ input,
 
         .brand-home {
           display: block;
-          max-width: min(43vw, 620px);
+          max-width: min(51vw, 850px);
           min-width: 0;
           text-decoration: none;
         }
@@ -796,6 +796,9 @@ input,
           padding-bottom: 6px;
           padding-top: 6px;
         }
+        body:has(#homeView:not([hidden])) h1 {
+          font-size: clamp(32px, 2.5vw, 38px);
+        }
 }
 
 @media (min-width: 861px) and (max-height: 800px) {
@@ -805,7 +808,7 @@ input,
           padding-bottom: 6px;
           padding-top: 6px;
         }
-        body:has(#homeView:not([hidden])) h1 { font-size: clamp(29px, 3vw, 38px); }
+        body:has(#homeView:not([hidden])) h1 { font-size: clamp(32px, 2.5vw, 38px); }
 }
 
 /* U2-R.6 mobile recovery: the compact shell keeps the operational commands,
