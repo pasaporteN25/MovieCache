@@ -30,9 +30,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [U2-R.C], correcciones de la franja inferior previas al gate. Lectura de
-  lomos, selección directa y consola legible ya están corregidas; la siguiente tarea
-  accionable es [U2-R.C4], resolver orientación y grupos cortos.
+- **En curso:** [U2-R.6], recuperación móvil posterior a las correcciones de la franja
+  inferior. [U2-R.C] quedó cerrada con lectura de lomos, selección directa, consola
+  legible y categorías orientadas.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -247,7 +247,7 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
       reduced motion con una transición breve; `Editar mi ficha` sigue entrando al
       dossier editable. La cobertura de navegador valida las cinco asignaciones,
       encastre, contenido, foco y separación de ambos flujos.
-  - [ ] **[U2-R.C] Corregir la franja inferior antes del gate.** Aplicar los hallazgos
+  - [x] **[U2-R.C] Corregir la franja inferior antes del gate.** Aplicar los hallazgos
     acotados de `docs/design/u2-lower-review-2026-09-05.md` sin reabrir la base técnica
     ni rediseñar toda la home. **Depende de U2-R.4n y U2-R.5. Precede a U2-R.7.**
     - [x] **[U2-R.C1] Recuperar lectura de lomos.** Reservar el track principal al título
@@ -262,8 +262,12 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
         viewports objetivo, conserva sinopsis de dos líneas y metadata de 12 px sin
         overflow; los botones quedan contenidos y 720p usa scroll vertical de página.
         La descripción propia y luego Wikipedia preceden al motivo editorial.
-    - [ ] **[U2-R.C4] Resolver orientación y grupos cortos.** Comparar placas pequeñas por
+    - [x] **[U2-R.C4] Resolver orientación y grupos cortos.** Comparar placas pequeñas por
       categoría con el rótulo inferior activo y evitar huecos desproporcionados.
+      - **Cierre 2026-09-06:** cada grupo desktop expone una placa con nombre y cantidad;
+        la activa usa el estado dorado y la consola repite el contexto seleccionado. Los
+        grupos de 1–2 obras bajan a 192–220 px, los gaps a 20–36 px y la navegación sólo
+        se muestra cuando el mueble tiene overflow real. Móvil conserva el flujo previo.
   - [ ] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
     U2 contra la composición previa; fuera del breakpoint desktop conservar/restaurar
     la navegación y flujo móvil anterior, sin intentar este rediseño material. Probar

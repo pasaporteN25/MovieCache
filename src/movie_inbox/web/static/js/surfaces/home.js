@@ -603,14 +603,31 @@ import { closeSharedDetail, openCollection } from "./club.js";
           .map((section, sectionIndex) => editorialSection(section, sectionIndex, ids[sectionIndex] === activeHomeSectionId))
           .join("");
         renderHomeShelfPreview();
+        syncHomeFurnitureControls();
+        requestAnimationFrame(syncHomeFurnitureControls);
       }
 
       export function homeFurnitureControls(count) {
         return `<div class="home-shelf-navigation" role="group" aria-label="Recorrido del mueble">
-          <span class="home-shelf-navigation-label">${count} módulos · recorrido lateral</span>
-          <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="prev" aria-label="Mostrar módulo anterior">←</button>
-          <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="next" aria-label="Mostrar módulo siguiente">→</button>
+          <span class="home-shelf-navigation-label">${count} categorías · recorrido lateral</span>
+          <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="prev" aria-label="Mostrar categoría anterior">←</button>
+          <button class="home-shelf-scroll-control" type="button" data-click="home-shelf-scroll" data-direction="next" aria-label="Mostrar categoría siguiente">→</button>
         </div>`;
+      }
+
+      export function syncHomeFurnitureControls() {
+        const rail = homeShelfRail();
+        const navigation = fields.homeShelfCategories;
+        if (!rail || !navigation) return;
+        const count = Number(rail.dataset.bayCount || 0);
+        const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
+        const hasOverflow = count > 1 && maxScroll > 1;
+        navigation.hidden = !hasOverflow;
+        navigation.dataset.overflow = String(hasOverflow);
+        const previous = navigation.querySelector('[data-direction="prev"]');
+        const next = navigation.querySelector('[data-direction="next"]');
+        if (previous) previous.disabled = !hasOverflow || rail.scrollLeft <= 1;
+        if (next) next.disabled = !hasOverflow || rail.scrollLeft >= maxScroll - 1;
       }
 
       function homeSectionById(sectionId) {
@@ -722,12 +739,13 @@ import { closeSharedDetail, openCollection } from "./club.js";
       export function editorialSection(section, sectionIndex, active) {
         const entries = Array.isArray(section.items) ? section.items : [];
         const sectionId = homeSectionId(section, sectionIndex);
+        const countLabel = `${entries.length} ${entries.length === 1 ? "título" : "títulos"}`;
         const rememberedIndex = homeShelfSelections.get(sectionId);
         // The shelf keeps its own selection, independent of whatever the
         // winamp-style playlist above is currently showing.
         const selectedIndex = Math.max(0, Math.min(entries.length - 1, Number.isInteger(rememberedIndex) ? rememberedIndex : 0));
         return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}" tabindex="0" aria-labelledby="home-section-${escapeAttr(sectionId)}">
-          <h2 id="home-section-${escapeAttr(sectionId)}" class="sr-only">${escapeHtml(section.title || "Selección")}</h2>
+          <h2 id="home-section-${escapeAttr(sectionId)}" class="sr-only home-shelf-bay-plaque"><span>${escapeHtml(section.title || "Selección")}</span><small>${escapeHtml(countLabel)}</small></h2>
           <div class="home-shelf-rail" role="group" aria-label="Opciones de ${escapeAttr(section.title || "la estantería")}">
             ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, active && index === selectedIndex)).join("")}
           </div>

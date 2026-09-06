@@ -712,6 +712,7 @@
 
 .home-shelf-scroll-control:hover { background: rgba(var(--gold-rgb), .2); }
 .home-shelf-scroll-control:focus-visible { outline: 3px solid var(--teal); outline-offset: 2px; }
+.home-shelf-scroll-control:disabled { cursor: default; opacity: .34; }
 
 @media (min-width: 861px) {
         .home-shelf-categories {
@@ -1753,7 +1754,7 @@
     border: 0;
     bottom: 36.1%;
     display: grid;
-    gap: clamp(34px, 4vw, 68px);
+    gap: clamp(20px, 2.2vw, 36px);
     grid-auto-columns: max-content;
     grid-auto-flow: column;
     grid-template-rows: minmax(0, 1fr);
@@ -1780,24 +1781,77 @@
     display: block !important;
     filter: none;
     height: 100%;
-    min-width: clamp(460px, 45vw, 680px);
+    min-width: clamp(192px, 15vw, 220px);
     overflow: visible;
     padding: 0;
+    position: relative;
     scroll-snap-align: start;
     width: max-content;
   }
 
   .home-furniture .home-program + .home-program { border-left: 0; }
 
+  .home-furniture .home-shelf-bay-plaque.sr-only {
+    align-items: center;
+    background: rgba(7, 11, 20, .94);
+    border: 1px solid rgba(var(--teal-rgb), .48);
+    clip: auto;
+    clip-path: none;
+    color: #79dce3;
+    display: grid;
+    font-family: var(--font-label);
+    gap: 1px;
+    grid-template-columns: minmax(0, 1fr);
+    height: 34px;
+    left: 0;
+    letter-spacing: .04em;
+    margin: 0;
+    max-width: 240px;
+    overflow: hidden;
+    padding: 4px 8px;
+    pointer-events: none;
+    position: absolute;
+    text-transform: uppercase;
+    top: 3px;
+    white-space: nowrap;
+    width: 100%;
+    z-index: 2;
+  }
+
+  .home-furniture .home-shelf-bay-plaque span {
+    display: block;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .home-furniture .home-shelf-bay-plaque small {
+    color: #9ebfc2;
+    display: block;
+    font-size: 10px;
+    font-weight: 400;
+  }
+
+  .home-furniture .home-shelf-bay[data-active="true"] .home-shelf-bay-plaque {
+    background: rgba(34, 24, 11, .94);
+    border-color: rgba(var(--gold-rgb), .76);
+    color: var(--gold);
+  }
+
+  .home-furniture .home-shelf-bay:focus-visible .home-shelf-bay-plaque {
+    outline: 3px solid var(--teal);
+    outline-offset: 2px;
+  }
+
   .home-furniture .home-shelf-rail {
     align-items: flex-end;
     display: flex;
     gap: clamp(5px, .45vw, 8px);
     height: 100%;
-    margin: 0;
+    margin: 0 auto;
     max-width: none;
     overflow: visible;
-    padding: 5px 0 4px;
+    padding: 42px 0 4px;
     width: max-content;
   }
 

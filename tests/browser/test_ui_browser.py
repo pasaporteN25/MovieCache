@@ -867,18 +867,20 @@ class BrowserInterfaceTests(unittest.TestCase):
                         "description": "Una selección continua del archivo.",
                         "items": [
                             {
-                                "key": f"bay-{index}-item",
+                                "key": f"bay-{index}-item-{item_index}",
                                 "origin": {"kind": "catalog"},
                                 "item": {
-                                    **items[index % len(items)],
+                                    **items[(index + item_index) % len(items)],
+                                    "id": f"bay-{index}-item-{item_index}",
                                     "title": (
                                         "La insoportable levedad del ser"
-                                        if index == 0
-                                        else items[index % len(items)]["title"]
+                                        if index == 0 and item_index == 0
+                                        else items[(index + item_index) % len(items)]["title"]
                                     ),
                                 },
                                 "reason": {"label": "Selección", "detail": "Disponible."},
                             }
+                            for item_index in range(4)
                         ],
                     }
                     for index in range(4)
@@ -930,6 +932,15 @@ class BrowserInterfaceTests(unittest.TestCase):
             )
         )
         self.assertTrue(furniture.evaluate("element => element.scrollWidth > element.clientWidth"))
+        navigation = page.locator("#homeShelfCategories")
+        controls = navigation.locator(".home-shelf-scroll-control")
+        self.assertTrue(navigation.is_visible())
+        self.assertEqual(
+            navigation.locator(".home-shelf-navigation-label").text_content(),
+            "4 categorías · recorrido lateral",
+        )
+        self.assertTrue(controls.nth(0).is_disabled())
+        self.assertFalse(controls.nth(1).is_disabled())
         self.assertEqual(page.locator(".home-program-heading").count(), 0)
         self.assertEqual(page.locator(".home-shelf-bay > h2.sr-only").count(), 4)
         self.assertEqual(
@@ -960,7 +971,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertAlmostEqual(geometry["shelfBottom"], 0.639, delta=0.012)
         self.assertTrue(geometry["panelsContained"])
         self.assertTrue(geometry["panelsSeparated"])
-        first_spine = page.locator('[data-home-section="bay-0"] .home-shelf-tape')
+        first_spine = page.locator('[data-home-section="bay-0"] .home-shelf-tape').nth(0)
         spine_readability = first_spine.evaluate(
             """element => {
                 const spine = element.getBoundingClientRect();
@@ -1002,8 +1013,9 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         furniture.evaluate(
             "element => element.dispatchEvent(new WheelEvent('wheel', "
-            "{deltaY: 240, bubbles: true, cancelable: true}))"
+            "{deltaY: 420, bubbles: true, cancelable: true}))"
         )
+        page.wait_for_timeout(100)
         self.assertGreater(furniture.evaluate("element => element.scrollLeft"), start)
 
         page.emulate_media(reduced_motion="reduce")
@@ -1318,7 +1330,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator(".home-shelf-preview").count(), 1)
         self.assertEqual(page.locator(".home-shelf-preview-actions button").count(), 2)
 
-    def test_home_shelf_furniture_keeps_all_bays_visible_and_scroll_controls_accessible(
+    def test_home_shelf_furniture_compacts_and_labels_short_categories(
         self,
     ) -> None:
         page = self.page
@@ -1369,6 +1381,19 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(categories.count(), 0)
         controls = page.locator(".home-shelf-scroll-control")
         self.assertEqual(controls.count(), 2)
+        self.assertFalse(page.locator("#homeShelfCategories").is_visible())
+        self.assertTrue(all(controls.nth(index).is_disabled() for index in range(2)))
+        plaques = page.locator(".home-shelf-bay-plaque")
+        self.assertEqual(plaques.count(), 2)
+        self.assertTrue(all(plaques.nth(index).is_visible() for index in range(2)))
+        self.assertEqual(
+            plaques.all_text_contents(),
+            ["Disponible esta noche1 título", "Volvé a esto1 título"],
+        )
+        self.assertNotEqual(
+            plaques.nth(0).evaluate("element => getComputedStyle(element).borderColor"),
+            plaques.nth(1).evaluate("element => getComputedStyle(element).borderColor"),
+        )
         self.assertEqual(
             page.locator('.home-program[data-home-section="available"]').get_attribute(
                 "data-active"
@@ -1381,18 +1406,40 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
 
+        geometry = page.locator("#homeSections").evaluate(
+            """element => {
+                const bays = [...element.querySelectorAll('.home-shelf-bay')]
+                    .map(bay => bay.getBoundingClientRect());
+                return {
+                    widths: bays.map(bay => bay.width),
+                    gap: bays[1].left - bays[0].right,
+                    overflows: element.scrollWidth > element.clientWidth + 1,
+                };
+            }"""
+        )
+        self.assertTrue(all(width <= 221 for width in geometry["widths"]))
+        self.assertLessEqual(geometry["gap"], 37)
+        self.assertFalse(geometry["overflows"])
+
         page.locator("#homeSections").focus()
         page.keyboard.press("ArrowRight")
         page.wait_for_timeout(350)
         self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
-        self.assertGreater(
-            page.locator("#homeSections").evaluate("element => element.scrollLeft"), 0
-        )
+        self.assertEqual(page.locator("#homeSections").evaluate("element => element.scrollLeft"), 0)
 
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertFalse(page.locator("#homeShelfCategories").is_visible())
         self.assertTrue(page.locator('.home-program[data-home-section="available"]').is_visible())
         self.assertTrue(page.locator('.home-program[data-home-section="memory"]').is_visible())
+        self.assertTrue(
+            all(
+                plaques.nth(index).evaluate(
+                    "element => element.getBoundingClientRect().width <= 1 "
+                    "&& element.getBoundingClientRect().height <= 1"
+                )
+                for index in range(2)
+            )
+        )
         self.assertFalse(
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )

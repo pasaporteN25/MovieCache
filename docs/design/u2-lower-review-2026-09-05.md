@@ -29,7 +29,7 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
 - [x] Tarea 2: selección directa corregida para click y Enter, manteniendo independiente
   la playlist superior.
 - [x] Tarea 3: altura útil y legibilidad de la consola inferior.
-- [ ] Tarea 4: orientación y espacios entre categorías.
+- [x] Tarea 4: orientación y espacios entre categorías.
 - [ ] Tarea 5: recuperación móvil de R.6.
 - [ ] Tarea 6: gate integral R.7 y actualización final de contratos.
 
@@ -43,6 +43,11 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
 - **Prioridad de contenido:** la ficha inferior usa primero la descripción propia,
   después el extracto de Wikipedia y deja el motivo editorial como último fallback.
   Los placeholders decorativos del poster ceden su texto cuando el panel es compacto.
+- **Categorías corregidas:** cada grupo desktop muestra una placa con nombre y cantidad
+  de títulos, mientras la consola conserva el rótulo de categoría activa. Los grupos de
+  una o dos obras miden **192–220 px** en vez de forzar 460–680 px; el espacio entre
+  grupos queda en **20–36 px**. Los controles aparecen sólo si hay overflow real y
+  reflejan los límites del recorrido. Las placas permanecen ocultas visualmente en móvil.
 
 - **Lomos:** a 1280×720 el título dispone de aproximadamente **7,94 px de alto**, mientras la metadata vertical consume **72 px**. Causa: `core-vhs.css:12` distribuye `5px minmax(0, 1fr) auto`; la metadata de `core-vhs.css:41` desplaza al título cuando `home.css:1804` comprime el lomo. La captura muestra letras amputadas. El espacio entre lomos ya es pequeño (5–8 px); reducirlo no corrige la causa.
 - **Selección:** pulsar directamente una obra de `Tu archivo pide memoria` mantiene la ficha de `Disponible esta noche`. El foco llega al lomo pulsado, pero su `aria-pressed` sigue falso. `home.js:546` recuerda el índice sin cambiar `activeHomeSectionId`; `home.js:846` renderiza la categoría anterior. `bootstrap.js:20` procesa solo el control más cercano.
@@ -53,15 +58,17 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
   descripción y el extracto.
 - **Lo que funciona:** `Ver más` abre la contratapa con sinopsis, créditos y dos espacios de fotograma; Escape devuelve el foco al botón de origen. El mueble es un único asset, con títulos en HTML y acciones doradas a la izquierda. Hay pruebas existentes de teclado, permisos, overflow y ausencia de escrituras al explorar.
 
-## Dos decisiones pendientes
+## Decisiones de contrato
 
 1. **Relación con la lista superior:** recomendado mantener la selección de lomos independiente y actualizar solo la ficha inferior. Alternativa: sincronizar ambas. El código reciente separa selección, pero activar el contenedor aún cambia la playlist y el brief exige sincronización. Unificar contrato y tests tras decidir; no revertir automáticamente lo corregido arriba.
-2. **Categorías:** recomendado recuperar placas pequeñas por grupo, conservando el mueble continuo. Alternativa: solo rótulo de categoría activa abajo. R.4n retiró las placas deliberadamente, por eso recuperarlas requiere una decisión visual explícita.
+2. **Categorías (resuelta 2026-09-06):** se recuperan placas pequeñas por grupo,
+   conservando el mueble continuo y el rótulo activo inferior. El espacio deja de actuar
+   como única separación, y los grupos cortos pasan a dimensionarse por su contenido.
 
 Para la primera decisión se adoptó la recomendación: la selección del lomo actualiza la
 categoría y la ficha inferiores sin cambiar la playlist superior. Activar explícitamente
 el contenedor conserva la sincronización histórica hasta unificar el contrato en R.7.
-La decisión visual sobre placas de categoría sigue pendiente para la tarea 4.
+La decisión visual sobre categorías adoptó las placas compactas para la tarea 4.
 
 ## Alcance y límites de validación
 
