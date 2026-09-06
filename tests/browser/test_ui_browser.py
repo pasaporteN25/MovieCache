@@ -431,9 +431,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             touch_page.route("**/api/items?*", add_touch_gate_fixture)
             self._open_and_wait_for_catalog(touch_page)
             self.assertTrue(
-                touch_page.evaluate(
-                    "window.matchMedia('(prefers-reduced-motion: reduce)').matches"
-                )
+                touch_page.evaluate("window.matchMedia('(prefers-reduced-motion: reduce)').matches")
             )
 
             playback_before = touch_page.evaluate("window.getHomePlaybackState()")
@@ -443,22 +441,18 @@ class BrowserInterfaceTests(unittest.TestCase):
                 playback_before["carouselItemId"],
             )
 
-            furniture = touch_page.get_by_role(
-                "region", name="Mueble horizontal de estanterías"
-            )
+            furniture = touch_page.get_by_role("region", name="Mueble horizontal de estanterías")
             self.assertTrue(furniture.is_visible())
-            memory_spine = touch_page.locator(
-                '[data-home-section="memory"] .home-shelf-tape'
-            ).nth(2)
+            memory_spine = touch_page.locator('[data-home-section="memory"] .home-shelf-tape').nth(
+                2
+            )
             accessible_name = memory_spine.get_attribute("aria-label") or ""
             self.assertIn("Memory obra 3", accessible_name)
             self.assertIn("Opción 3", accessible_name)
 
             memory_spine.tap()
             self.assertEqual(
-                touch_page.locator(".home-shelf-preview").get_attribute(
-                    "data-home-shelf-preview"
-                ),
+                touch_page.locator(".home-shelf-preview").get_attribute("data-home-shelf-preview"),
                 "memory",
             )
             self.assertEqual(memory_spine.get_attribute("aria-pressed"), "true")
@@ -590,10 +584,19 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.locator(".home-shelf-tape").get_attribute("aria-label"),
         )
 
-        marquee_image = page.locator("[data-spotlight-image]")
-        marquee_fallback = page.locator(
-            ".spotlight-poster-trigger > .spotlight-poster-fallback"
+        # Let the browser's real network failures settle before replaying load/error
+        # events. Otherwise a late error from example.invalid can race the synthetic
+        # load below when this case runs as part of the complete browser suite.
+        page.wait_for_function(
+            """() => [
+                document.querySelector('[data-spotlight-image]'),
+                document.querySelector('.spotlight-preview-art [data-poster-image]'),
+                document.querySelector('.home-shelf-preview [data-poster-image]'),
+            ].every(image => image?.hidden === true)"""
         )
+
+        marquee_image = page.locator("[data-spotlight-image]")
+        marquee_fallback = page.locator(".spotlight-poster-trigger > .spotlight-poster-fallback")
         marquee_image.dispatch_event("load")
         self.assertTrue(marquee_fallback.is_hidden())
         marquee_image.dispatch_event("error")

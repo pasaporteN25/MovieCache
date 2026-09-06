@@ -15,10 +15,11 @@ que se envían al navegador. Cuando una interpretación del texto compita con es
 láminas, prevalecen su composición y densidad, con las correcciones explícitas de este
 documento.
 
-La revisión anotada reabre sólo la franja superior. El mueble inferior conserva la base
-estructural y la sincronización cerradas en U2-R.3/R.4; aún debe superar el gate final
-U2-R.7. U2-R.5 completa la contratapa que se abre desde sus acciones, no un rediseño
-automático de las estanterías.
+La revisión anotada reabrió sólo la franja superior. El mueble inferior conservó la base
+estructural de U2-R.3/R.4 y recibió las correcciones de lectura, selección y consola de
+U2-R.C. La recuperación completa superó el gate U2-R.7 el 2026-09-06. U2-R.5 completa
+la contratapa que se abre desde sus acciones, no un rediseño automático de las
+estanterías.
 
 ## Contrato de dirección
 
@@ -27,12 +28,14 @@ marcos, la marquesina y el mueble forman un único espacio físico; los datos y 
 siguen siendo HTML vivo. No es un dashboard de tarjetas, un hero con una grilla debajo
 ni una réplica fotográfica sin jerarquía operativa.
 
-En escritorio, Inicio debe entrar en un viewport de al menos 1280 × 720 a zoom 100 % sin
-scroll vertical. La composición puede reducir densidad entre 1280 y 1600 px, pero no
-ocultar acciones ni texto crítico. Altura insuficiente, zoom alto y necesidades de
-accesibilidad habilitan flujo vertical: evitar el scroll no justifica recortar contenido
-o atrapar el foco. Esta reconstrucción es desktop-first; móvil conserva o recupera la
-composición previa a U2 y se rediseñará en una entrega separada.
+En escritorio, Inicio debe entrar completo en 1920 × 1080 a zoom 100 %. En 1440 × 900 y
+1280 × 720 puede usar flujo vertical acotado antes que comprimir el mueble o esconder
+contenido; el gate final midió aproximadamente 154 y 330 px respectivamente. La
+composición puede reducir densidad entre 1280 y 1600 px, pero no ocultar acciones ni
+texto crítico. Altura insuficiente, zoom alto y necesidades de accesibilidad habilitan
+ese mismo flujo: evitar el scroll no justifica recortar contenido o atrapar el foco.
+Esta reconstrucción es desktop-first; móvil conserva o recupera la composición previa a
+U2 y se rediseñará en una entrega separada.
 
 ### Cabecera y navegación
 
@@ -71,10 +74,11 @@ leve distinto del estado seleccionado. Al hacer click o Enter sobre la cartelera
 fuente vuelve a `Cartelera del día` y se selecciona el item actualmente al aire.
 
 La lista muestra siempre su procedencia: `Cartelera del día` o el nombre de la
-estantería activa. Flechas arriba/abajo recorren filas, Home/End saltan a extremos y
-Enter confirma la selección. Puntero y touch producen el mismo estado sin ser el único
-camino. La fila seleccionada, el lomo seleccionado y el preview representan siempre la
-misma obra.
+estantería activada explícitamente. Flechas arriba/abajo recorren filas, Home/End saltan
+a extremos y Enter confirma la selección. Puntero y touch producen el mismo estado sin
+ser el único camino. Dentro de una fuente de estantería, fila, lomo y preview superior
+representan la misma obra. Elegir directamente un lomo de otro módulo actualiza sólo la
+selección y preview inferiores: no reprograma de manera implícita la playlist superior.
 
 No se reserva una barra horizontal independiente para repetir el título de la
 cartelera. Hoy/Ayer vive en el flujo del encabezado del reproductor como un interruptor
@@ -101,10 +105,12 @@ flechas izquierda/derecha desplazan lateralmente con límites reales y scroll-sn
 Debe existir un equivalente visible y enfocable para teclado/touch; ocultar la barra no
 puede volver invisible la navegación.
 
-Click/Enter sobre una estantería cambia `playlistSource`. Click/Enter sobre un lomo
-además selecciona su obra y alinea la fila correspondiente. Recorrer la lista alinea y
-lleva a vista el lomo correspondiente. El lomo conserva título, año, formato y señales
-de foco/selección como datos HTML superpuestos al shell gráfico.
+Click/Enter sobre una estantería cambia `playlistSource` y recupera su lomo recordado.
+Click/Enter sobre un lomo activa su categoría y actualiza la ficha inferior, conservando
+la playlist superior; ésta sólo cambia mediante la activación explícita del módulo.
+Recorrer una lista cuya fuente es una estantería alinea y lleva a vista el lomo
+correspondiente. El lomo conserva título, año, formato y señales de foco/selección como
+datos HTML superpuestos al shell gráfico.
 
 ### Preview y acciones
 
@@ -145,8 +151,9 @@ tarea posterior y no bloquea esta recuperación.
 | --- | --- | --- |
 | `carouselItemId` | Item al aire y sus indicadores | foco, preview o selección manual |
 | `playlistSource` | `daily` o `shelf:<id>` | contenido editorial del servidor |
-| `selectedItemId` | fila, lomo y preview coordinados | item al aire automáticamente |
-| `activeShelfId` | módulo visible/activo | permisos o datos personales |
+| `selectedItemId` | fila y preview de la playlist activa | item al aire automáticamente |
+| `activeShelfId` | módulo y preview inferiores activos | fuente superior sin activación explícita |
+| `homeShelfSelections` | lomo recordado por módulo | selección manual de la playlist superior |
 | `detailItemId` | contratapa abierta | selección al cerrarse |
 | `backCoverTemplate` | variante estable derivada del ID | cambiar por render o sesión |
 
@@ -157,8 +164,8 @@ tarea posterior y no bloquea esta recuperación.
 | Tick automático | sin cambio; brillo leve si coincide | sin cambio | sin cambio | avanza |
 | Click/Enter en cartelera | fuente diaria + selecciona item al aire | alinea si está visible | actualiza | conserva item |
 | Click/Enter en estantería | carga esa fuente | conserva/elige primer válido | actualiza | sigue independiente |
-| Click/Enter en lomo | selecciona su fila | selecciona y enfoca | actualiza | sigue independiente |
-| Flecha arriba/abajo en lista | cambia selección | desplaza/alinea correlato | actualiza | sigue independiente |
+| Click/Enter en lomo | sin cambio | selecciona, activa categoría y enfoca | actualiza la ficha inferior | sigue independiente |
+| Flecha arriba/abajo en lista | cambia selección | desplaza/alinea correlato si la fuente es esa estantería | actualiza la preview superior | sigue independiente |
 | `Ver más` | conserva selección | conserva selección | abre contratapa | pausa sólo si evita distracción |
 | Escape en contratapa | recupera foco previo | conserva selección | vuelve a franja | reanuda según política |
 
@@ -185,7 +192,8 @@ Ningún texto se rasteriza y ninguna película real se representa en estos asset
 - Casos con 0, 1 y 4 categorías; filas vacías; poster roto; título y género extensos.
 - Recorrido completo por teclado, foco visible, lector de pantalla y reduced motion.
 - Temporizador probado para demostrar que no roba selección ni foco.
-- Lista/lomo/preview coherentes tras click, Enter, flechas y cambio de estantería.
+- Lista/lomo/preview coherentes dentro de la fuente activa; la ficha inferior responde
+  al lomo directo sin reprogramar la playlist superior.
 - Mueble con indicio lateral de continuidad, sin scrollbar visible y sin callejón para
   teclado o touch.
 - Cabecera en una línea, cartelera libre de caja exterior y placa de día centrada sin
@@ -195,3 +203,19 @@ Ningún texto se rasteriza y ninguna película real se representa en estos asset
 - Acciones doradas a la izquierda; edición ausente cuando no hay permiso.
 - Contratapa determinista, dos placeholders y retorno de foco correcto.
 - Móvil sin regresiones respecto de la composición anterior a U2.
+
+### Resultado del gate — 2026-09-06
+
+**Aceptado.** La evidencia se divide en tres cortes auditables:
+
+- `docs/design/u2-r7a-visual-gate-2026-09-06.md`: comparación y mediciones desktop.
+- `docs/design/u2-r7b-content-state-matrix-2026-09-06.md`: estados límite, permisos y
+  fallbacks.
+- `docs/design/u2-r7c-interaction-accessibility-gate-2026-09-06.md`: teclado, foco,
+  touch real, nombres accesibles, reduced motion y reflow 390/320 px.
+
+El cierre contractual R7d dejó 560 pruebas generales y 31 pruebas de navegador en verde,
+además de Ruff, formato, mypy estricto, `compileall`, sintaxis JavaScript y
+`git diff --check`. El resultado integral conserva **17/20**: sin hallazgos P0/P1
+abiertos; profiling y una pasada manual exhaustiva con lector de pantalla siguen siendo
+mejoras de release, no bloqueos de U2-R.

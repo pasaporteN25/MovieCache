@@ -7,10 +7,13 @@ Método: dos evaluaciones independientes (design_review y detector_evidence), m�
 
 ## Diagnóstico
 
-U2 está cerrada como base técnica; la aceptación visual sigue pendiente en U2-R. El mueble continuo, las acciones inferiores y la contratapa determinista ya existen. La sensación de trabajo incompleto proviene sobre todo de la pérdida de lectura y de una selección defectuosa, no de falta de assets.
+U2-R quedó aceptada el 2026-09-06. El mueble continuo, las acciones inferiores y la
+contratapa determinista conservan su identidad; los defectos originales de lectura,
+selección, altura útil y flujo móvil fueron corregidos sin reemplazar el sistema por una
+composición genérica.
 
-R.4n, R.5 y R.6 están terminadas; R.7 (aceptación integral) sigue pendiente. Los fixes
-correctivos se incorporaron en el orden siguiente, preservando la historia del trabajo.
+R.4n, R.5, R.6 y el gate integral R.7 están terminados. Los fixes correctivos se
+incorporaron en el orden siguiente, preservando la historia del trabajo.
 
 ## Orden de implementación sugerido
 
@@ -33,7 +36,7 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
 - [x] Tarea 3: altura útil y legibilidad de la consola inferior.
 - [x] Tarea 4: orientación y espacios entre categorías.
 - [x] Tarea 5: recuperación móvil de R.6.
-- [ ] Tarea 6: gate integral R.7 y actualización final de contratos.
+- [x] Tarea 6: gate integral R.7 y actualización final de contratos.
 
 ## Evidencia comprobada
 
@@ -58,6 +61,17 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
   desplazarlos por encima de la navegación fija y no aparece overflow horizontal.
   Una portada rota revela el placeholder propio; una carga válida lo oculta. La variante
   personal conserva dos acciones y la del Club sólo su acción pública.
+- **Gate visual integral:** una home sintética de seis funciones y cuatro categorías se
+  comparó en 1280×720, 1440×900 y 1920×1080. No hay overflow horizontal; la escena
+  completa entra en 1080p y las alturas menores usan flujo vertical sin comprimir la
+  consola. Capturas y mediciones: `u2-r7a-visual-gate-2026-09-06.md`.
+- **Estados e interacción:** vacío, 1/2/4 categorías, contenido extenso, posters
+  ausentes/rotos, permisos personal/Club, cinco contratapas, click, Enter, flechas,
+  temporizador, retorno de foco, touch real, nombres accesibles y reduced motion quedaron
+  cubiertos. Matrices: `u2-r7b-content-state-matrix-2026-09-06.md` y
+  `u2-r7c-interaction-accessibility-gate-2026-09-06.md`.
+
+### Hallazgos originales, resueltos
 
 - **Lomos:** a 1280×720 el título dispone de aproximadamente **7,94 px de alto**, mientras la metadata vertical consume **72 px**. Causa: `core-vhs.css:12` distribuye `5px minmax(0, 1fr) auto`; la metadata de `core-vhs.css:41` desplaza al título cuando `home.css:1804` comprime el lomo. La captura muestra letras amputadas. El espacio entre lomos ya es pequeño (5–8 px); reducirlo no corrige la causa.
 - **Selección:** pulsar directamente una obra de `Tu archivo pide memoria` mantiene la ficha de `Disponible esta noche`. El foco llega al lomo pulsado, pero su `aria-pressed` sigue falso. `home.js:546` recuerda el índice sin cambiar `activeHomeSectionId`; `home.js:846` renderiza la categoría anterior. `bootstrap.js:20` procesa solo el control más cercano.
@@ -78,26 +92,34 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
    conservando el mueble continuo y el rótulo activo inferior. El espacio deja de actuar
    como única separación, y los grupos cortos pasan a dimensionarse por su contenido.
 
-Para la primera decisión se adoptó la recomendación: la selección del lomo actualiza la
-categoría y la ficha inferiores sin cambiar la playlist superior. Activar explícitamente
-el contenedor conserva la sincronización histórica hasta unificar el contrato en R.7.
-La decisión visual sobre categorías adoptó las placas compactas para la tarea 4.
+La decisión final conserva dos gestos distintos: seleccionar un lomo actualiza la
+categoría y la ficha inferiores sin cambiar la playlist superior; activar explícitamente
+el contenedor reprograma la playlist con esa estantería y recupera su lomo recordado. El
+brief y las pruebas ya describen el mismo contrato. La decisión visual sobre categorías
+adoptó las placas compactas para la tarea 4.
 
 ## Alcance y límites de validación
 
-Se inspeccionó la mitad inferior con tres categorías y 18 obras sintéticas, en 1280×720, 1440×900, 1920×1080 y 390×844. El fixture no tenía posters y dejó vacía la cartelera superior; esta revisión no certifica el encuadre de una home completa con seis funciones. No se usaron catálogos personales.
+La aceptación final usó una home sintética completa con seis funciones, hasta cuatro
+categorías, contenido extenso y posters válidos, ausentes o rotos. Se midieron
+1280×720, 1440×900, 1920×1080, 390×844 y 320×720. No se usaron catálogos personales.
 
-El detector sobre `index.home.html` devolvió cero hallazgos; ese escaneo no cubre el CSS/JS externo y no invalida los defectos visuales. No se ejecutaron suites completas, pruebas de lector de pantalla, touch real ni zoom: quedan para el gate. Las pruebas existentes de geometría no verifican suficiente lectura interna y la de selección activa el módulo antes del lomo, omitiendo el fallo reproducido.
+El gate recorrió el árbol accesible calculado por Chromium mediante roles y nombres,
+foco visible, teclado, un contexto táctil real y `prefers-reduced-motion`. Esto cierra la
+cobertura automatizable de U2-R; una campaña manual exhaustiva con NVDA/VoiceOver sigue
+siendo una mejora de release y no se presenta como ejecutada.
 
-Para R.6 se repitió la comprobación con una home sintética completa a 390×844, portada
-rota y título/sinopsis largos; 320 px de ancho cubre el reflow equivalente a zoom alto.
-Se midieron la cabecera, la grilla, la legibilidad interna y el despeje de las acciones
-respecto de la navegación fija. El detector de `impeccable` sobre el CSS/JS tocado devolvió
-cero hallazgos y las 35 pruebas de navegador quedaron verdes. Touch real, lector de
-pantalla y comparación integral multiviewport permanecen correctamente en R.7.
+El detector de `impeccable` sobre todo `src/movie_inbox/web/static` informó 146 avisos
+consultivos de documentación de color/tipografía y un warning. El warning `side-tab` fue
+verificado como falso positivo: corresponde al triángulo del selector de cartelera, no
+a un borde lateral de tarjeta. No quedaron hallazgos P0/P1. El score integral se mantiene
+en **17/20 — Muy bueno**.
 
-No se asigna una nota global de usabilidad con cobertura parcial. La revisión independiente valoró positivamente identidad/materialidad y detectó problemas de reconocimiento, jerarquía y respuesta a la selección. Usuario habitual: no puede leer títulos; baja visión: microtexto; primera visita: ficha de una obra distinta a la elegida.
-
-No hubo overlay inyectado: la API disponible admite evaluación de DOM de solo lectura. Se usaron capturas y mediciones directas. Pestañas temporales cerradas y viewport restaurado; servidor de revisión detenido al entregar. Snapshot de revisión asociado al target `src-movie-inbox-web-static-index-home-html`; no se encontró lista de exclusiones.
+La regresión final ejecutó 560 pruebas generales y 31 de navegador; Ruff, formato, mypy
+estricto, `compileall`, sintaxis de 26 módulos JavaScript y `git diff --check` quedaron
+verdes. Cuatro smoke tests TMDB se omitieron porque requieren un token voluntario real.
+El primer pase completo expuso una carrera de prueba entre el error de red real de un
+poster y un evento sintético de carga; se estabilizó esperando el estado de error antes
+de verificar el recovery y la suite completa volvió a verde.
 
 Fuera de esta entrega: nuevas texturas, animación vertical de cartelera, fotogramas reales, U3/Colección y rediseño móvil completo. Los placeholders de fotogramas son una decisión aceptada, no una integración faltante que deba bloquear el cierre.
