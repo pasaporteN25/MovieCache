@@ -30,9 +30,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [U2-R.6], recuperación móvil posterior a las correcciones de la franja
-  inferior. [U2-R.C] quedó cerrada con lectura de lomos, selección directa, consola
-  legible y categorías orientadas.
+- **En curso:** [U2-R.7], gate visual y de regresión de la home recuperada. [U2-R.C] y
+  [U2-R.6] quedaron cerradas con lectura de lomos, selección directa, consola legible,
+  categorías orientadas y flujo móvil recompuesto.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -268,11 +268,17 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
         la activa usa el estado dorado y la consola repite el contexto seleccionado. Los
         grupos de 1–2 obras bajan a 192–220 px, los gaps a 20–36 px y la navegación sólo
         se muestra cuando el mueble tiene overflow real. Móvil conserva el flujo previo.
-  - [ ] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
+  - [x] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
     U2 contra la composición previa; fuera del breakpoint desktop conservar/restaurar
     la navegación y flujo móvil anterior, sin intentar este rediseño material. Probar
     390×844, zoom alto, poster roto, título largo y acciones por permiso. **Modelo:
     Medio. Depende de U2-R.1–U2-R.5.**
+    - **Cierre 2026-09-06:** la cabecera móvil reserva una fila completa a la marca y otra
+      a sus cuatro utilidades; la preview apila display y acciones, recupera portada +
+      texto en 92 px + resto y conserva sinopsis de 15 px y controles de 44 px. Posters
+      rotos muestran fallback, títulos largos no fragmentan la marca, 390/320 px no
+      desbordan y las variantes personal/Club respetan sus permisos. Playwright 35/35 y
+      detector de layout en verde; lector, touch real y gate visual completo pasan a R.7.
   - [ ] **[U2-R.7] Ejecutar gate visual y de regresión.** Comparar con el north star en
     1280×720, 1440×900 y 1920×1080; revisar coherencia de estado, flujo vertical legible
     a 720p, ausencia de overflow horizontal, indicio lateral, teclado, touch, lector,

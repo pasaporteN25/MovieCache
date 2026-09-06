@@ -131,7 +131,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         image.classList.remove("is-loaded");
         image.hidden = true;
         const fallback = image.nextElementSibling;
-        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder")) {
+        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder")) {
           fallback.hidden = false;
         }
       }
@@ -139,4 +139,3 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
       export function cachedImageSrc(url) {
         return `/image-cache?url=${encodeURIComponent(url)}`;
       }
-

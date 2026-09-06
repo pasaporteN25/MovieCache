@@ -794,3 +794,48 @@ input,
         }
         body:has(#homeView:not([hidden])) h1 { font-size: clamp(29px, 3vw, 38px); }
 }
+
+/* U2-R.6 mobile recovery: the compact shell keeps the operational commands,
+   but gives the instance name a complete row instead of squeezing it beside
+   four controls. */
+@media (max-width: 860px) {
+        .app-header {
+          align-items: stretch;
+          gap: 10px;
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .brand-lockup {
+          grid-column: 1;
+          grid-row: 1;
+          width: 100%;
+        }
+
+        .brand-home { min-width: 0; }
+
+        h1 {
+          font-size: clamp(24px, 7.2vw, 28px);
+          line-height: 1;
+          overflow-wrap: normal;
+          text-wrap: balance;
+          word-break: normal;
+        }
+
+        .header-utilities {
+          display: grid;
+          grid-column: 1;
+          grid-row: 2;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          justify-self: stretch;
+          width: 100%;
+        }
+
+        .header-utilities > *,
+        .header-utilities .header-command,
+        .header-utilities .header-utility-action,
+        .header-utilities .system-menu > summary {
+          justify-content: center;
+          min-width: 0;
+          width: 100%;
+        }
+}

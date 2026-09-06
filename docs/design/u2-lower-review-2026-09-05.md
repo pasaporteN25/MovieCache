@@ -1,6 +1,7 @@
 # U2: revisión inferior y hoja de ruta
 
-Fecha: 2026-09-05. Revisión del árbol de trabajo actual, incluidos cambios sin commit. No se modificó la interfaz ni el estado del backlog.
+Fecha: 2026-09-05. Revisión del árbol de trabajo original, actualizada con las correcciones
+aplicadas por partes hasta el 2026-09-06.
 
 Método: dos evaluaciones independientes (design_review y detector_evidence), más comprobación visual e interacción en navegador local con catálogo sintético. Referencia: boceto aportado por el usuario y brief de recuperación vigente. La cabecera corregida se conserva.
 
@@ -8,7 +9,8 @@ Método: dos evaluaciones independientes (design_review y detector_evidence), m�
 
 U2 está cerrada como base técnica; la aceptación visual sigue pendiente en U2-R. El mueble continuo, las acciones inferiores y la contratapa determinista ya existen. La sensación de trabajo incompleto proviene sobre todo de la pérdida de lectura y de una selección defectuosa, no de falta de assets.
 
-R.4n y R.5 figuran terminadas, pero R.6 (móvil) y R.7 (aceptación integral) siguen pendientes. Conviene incorporar los siguientes fixes correctivos antes de R.7, preservando la historia del trabajo realizado.
+R.4n, R.5 y R.6 están terminadas; R.7 (aceptación integral) sigue pendiente. Los fixes
+correctivos se incorporaron en el orden siguiente, preservando la historia del trabajo.
 
 ## Orden de implementación sugerido
 
@@ -30,7 +32,7 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
   la playlist superior.
 - [x] Tarea 3: altura útil y legibilidad de la consola inferior.
 - [x] Tarea 4: orientación y espacios entre categorías.
-- [ ] Tarea 5: recuperación móvil de R.6.
+- [x] Tarea 5: recuperación móvil de R.6.
 - [ ] Tarea 6: gate integral R.7 y actualización final de contratos.
 
 ## Evidencia comprobada
@@ -48,11 +50,22 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
   una o dos obras miden **192–220 px** en vez de forzar 460–680 px; el espacio entre
   grupos queda en **20–36 px**. Los controles aparecen sólo si hay overflow real y
   reflejan los límites del recorrido. Las placas permanecen ocultas visualmente en móvil.
+- **Móvil corregido:** a **390×844** la cabecera baja de aproximadamente **338 px** a
+  **168 px** y la marca pasa de una columna de **75 px** a una línea útil de **336 px**.
+  La preview deja la grilla exterior de 100 px + resto: display y acciones se apilan,
+  mientras portada y texto usan **92 px + 212 px** dentro de la ficha. La sinopsis
+  computa **15/21,75 px**, los botones miden **44 px**, el fondo inferior permite
+  desplazarlos por encima de la navegación fija y no aparece overflow horizontal.
+  Una portada rota revela el placeholder propio; una carga válida lo oculta. La variante
+  personal conserva dos acciones y la del Club sólo su acción pública.
 
 - **Lomos:** a 1280×720 el título dispone de aproximadamente **7,94 px de alto**, mientras la metadata vertical consume **72 px**. Causa: `core-vhs.css:12` distribuye `5px minmax(0, 1fr) auto`; la metadata de `core-vhs.css:41` desplaza al título cuando `home.css:1804` comprime el lomo. La captura muestra letras amputadas. El espacio entre lomos ya es pequeño (5–8 px); reducirlo no corrige la causa.
 - **Selección:** pulsar directamente una obra de `Tu archivo pide memoria` mantiene la ficha de `Disponible esta noche`. El foco llega al lomo pulsado, pero su `aria-pressed` sigue falso. `home.js:546` recuerda el índice sin cambiar `activeHomeSectionId`; `home.js:846` renderiza la categoría anterior. `bootstrap.js:20` procesa solo el control más cercano.
 - **Consola (diagnóstico previo):** el display medía aproximadamente **55 / 72 / 88 px de alto** a 1280×720, 1440×900 y 1920×1080. La cascada ocultaba la sinopsis en los tres tamaños y reducía metadata/hechos a **8/7 px**. A 720p también desaparecían hechos y placeholders, y los botones bajaban a 20 px de alto. La geometría exterior entraba, pero el contenido perdía utilidad.
-- **Móvil:** la nueva estructura sigue dentro de una grilla de **100 px + 209 px**: acciones a la izquierda y toda portada/ficha a la derecha. Se verificó además la marca fragmentada verticalmente en la cabecera. La restauración móvil continúa siendo trabajo real pendiente.
+- **Móvil (diagnóstico previo):** la estructura quedaba dentro de una grilla de
+  **100 px + 209 px**, con acciones a la izquierda y toda portada/ficha a la derecha;
+  la marca también aparecía fragmentada verticalmente. La corrección R.6 elimina ambos
+  defectos sin trasladar el mueble material de desktop al breakpoint móvil.
 - **Contenido (diagnóstico previo):** `home.js` priorizaba `reason.detail` sobre la
   sinopsis. La corrección aplicada reserva ese valor como último fallback detrás de la
   descripción y el extracto.
@@ -75,6 +88,13 @@ La decisión visual sobre categorías adoptó las placas compactas para la tarea
 Se inspeccionó la mitad inferior con tres categorías y 18 obras sintéticas, en 1280×720, 1440×900, 1920×1080 y 390×844. El fixture no tenía posters y dejó vacía la cartelera superior; esta revisión no certifica el encuadre de una home completa con seis funciones. No se usaron catálogos personales.
 
 El detector sobre `index.home.html` devolvió cero hallazgos; ese escaneo no cubre el CSS/JS externo y no invalida los defectos visuales. No se ejecutaron suites completas, pruebas de lector de pantalla, touch real ni zoom: quedan para el gate. Las pruebas existentes de geometría no verifican suficiente lectura interna y la de selección activa el módulo antes del lomo, omitiendo el fallo reproducido.
+
+Para R.6 se repitió la comprobación con una home sintética completa a 390×844, portada
+rota y título/sinopsis largos; 320 px de ancho cubre el reflow equivalente a zoom alto.
+Se midieron la cabecera, la grilla, la legibilidad interna y el despeje de las acciones
+respecto de la navegación fija. El detector de `impeccable` sobre el CSS/JS tocado devolvió
+cero hallazgos y las 35 pruebas de navegador quedaron verdes. Touch real, lector de
+pantalla y comparación integral multiviewport permanecen correctamente en R.7.
 
 No se asigna una nota global de usabilidad con cobertura parcial. La revisión independiente valoró positivamente identidad/materialidad y detectó problemas de reconocimiento, jerarquía y respuesta a la selección. Usuario habitual: no puede leer títulos; baja visión: microtexto; primera visita: ficha de una obra distinta a la elegida.
 

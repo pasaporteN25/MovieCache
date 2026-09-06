@@ -243,6 +243,128 @@ class BrowserInterfaceTests(unittest.TestCase):
             self.assertIsNotNone(box, selector)
             self.assertGreaterEqual(box["height"], 44, selector)
 
+    def test_mobile_home_restores_header_preview_and_broken_poster_flow(self) -> None:
+        page = self.page
+
+        def add_mobile_recovery_fixture(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            item = dict(payload["items"][0])
+            item.update(
+                {
+                    "title": "La insoportable levedad del ser y otras historias de medianoche",
+                    "year": "1988",
+                    "kind": "pelicula",
+                    "description": (
+                        "Una historia extensa para verificar que la sinopsis conserve una "
+                        "lectura cómoda, visible y ordenada en una pantalla móvil angosta."
+                    ),
+                    "page_image": "https://example.invalid/u2-r6-broken-poster.jpg",
+                }
+            )
+            payload["home"]["sections"] = [
+                {
+                    "id": "available",
+                    "title": "Disponible esta noche",
+                    "action": {"kind": "catalog", "label": "Ver colección", "filters": {}},
+                    "items": [
+                        {
+                            "key": "available-long-title",
+                            "origin": {"kind": "catalog"},
+                            "item": item,
+                            "reason": {"label": "Lista para ver", "detail": "Disponible."},
+                        }
+                    ],
+                }
+            ]
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_mobile_recovery_fixture)
+        page.set_viewport_size({"width": 390, "height": 844})
+        self._open_and_wait_for_catalog(page)
+        preview = page.locator('[data-home-shelf-preview="available"]')
+        preview.wait_for()
+        page.wait_for_function(
+            "document.querySelector('.home-shelf-preview-art img')?.hidden === true"
+        )
+        poster = preview.locator(".home-shelf-preview-art img")
+        fallback = preview.locator(".home-shelf-preview-placeholder")
+        poster.dispatch_event("load")
+        self.assertFalse(poster.is_hidden())
+        self.assertFalse(fallback.is_visible())
+        poster.dispatch_event("error")
+        self.assertTrue(poster.is_hidden())
+        self.assertTrue(fallback.is_visible())
+
+        geometry = page.evaluate(
+            """() => {
+                const box = selector => document.querySelector(selector).getBoundingClientRect();
+                const header = box('.app-header');
+                const brand = box('.brand-lockup');
+                const title = box('h1');
+                const display = box('.home-furniture-display');
+                const body = box('.home-furniture-display-body');
+                const art = box('.home-shelf-preview-art');
+                const copy = box('.home-shelf-preview-copy');
+                const panel = box('.home-furniture-action-panel');
+                const summaryStyle = getComputedStyle(
+                    document.querySelector('.home-shelf-preview-summary')
+                );
+                return {
+                    overflow: document.documentElement.scrollWidth - innerWidth,
+                    headerHeight: header.height,
+                    brandWidth: brand.width,
+                    titleWidth: title.width,
+                    titleHeight: title.height,
+                    displayWidth: display.width,
+                    bodyColumns: getComputedStyle(
+                        document.querySelector('.home-furniture-display-body')
+                    ).gridTemplateColumns,
+                    artWidth: art.width,
+                    artRatio: art.height / art.width,
+                    sameRow: Math.abs(art.top - copy.top),
+                    panelAfterDisplay: panel.top - display.bottom,
+                    panelWidth: panel.width,
+                    summaryFontSize: Number.parseFloat(summaryStyle.fontSize),
+                    summaryLineHeight: Number.parseFloat(summaryStyle.lineHeight),
+                    summaryDisplay: summaryStyle.display,
+                };
+            }"""
+        )
+        self.assertLessEqual(geometry["overflow"], 1)
+        self.assertLess(geometry["headerHeight"], 230)
+        self.assertGreater(geometry["brandWidth"], 320)
+        self.assertGreater(geometry["titleWidth"], 300)
+        self.assertLess(geometry["titleHeight"], 90)
+        self.assertGreater(geometry["displayWidth"], 330)
+        self.assertIn("92px", geometry["bodyColumns"])
+        self.assertGreaterEqual(geometry["artWidth"], 90)
+        self.assertAlmostEqual(geometry["artRatio"], 1.5, delta=0.08)
+        self.assertLessEqual(geometry["sameRow"], 1)
+        self.assertGreaterEqual(geometry["panelAfterDisplay"], 11)
+        self.assertGreater(geometry["panelWidth"], 330)
+        self.assertGreaterEqual(geometry["summaryFontSize"], 15)
+        self.assertGreaterEqual(geometry["summaryLineHeight"], 21)
+        self.assertIn(geometry["summaryDisplay"], ("flow-root", "-webkit-box"))
+        self.assertTrue(fallback.is_visible())
+        self.assertEqual(preview.locator(".home-shelf-preview-action").count(), 2)
+        for action in preview.locator(".home-shelf-preview-action").all():
+            action_box = action.bounding_box()
+            self.assertIsNotNone(action_box)
+            self.assertGreaterEqual(action_box["height"], 44)
+
+        page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+        page.wait_for_timeout(100)
+        navigation_top = page.locator(".primary-nav").bounding_box()["y"]
+        for action in preview.locator(".home-shelf-preview-action").all():
+            action_box = action.bounding_box()
+            self.assertLessEqual(action_box["y"] + action_box["height"], navigation_top - 8)
+
+        page.set_viewport_size({"width": 320, "height": 720})
+        self.assertFalse(
+            page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
+        )
+
     def test_header_utilities_open_collection_search_and_add(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)
@@ -329,6 +451,8 @@ class BrowserInterfaceTests(unittest.TestCase):
                     return {
                         viewportHeight: window.innerHeight,
                         pageHeight: document.documentElement.scrollHeight,
+                        pageWidth: document.documentElement.scrollWidth,
+                        viewportWidth: window.innerWidth,
                         headerHeight: document.querySelector(
                             '.app-header'
                         ).getBoundingClientRect().height,
@@ -340,7 +464,13 @@ class BrowserInterfaceTests(unittest.TestCase):
                     };
                 }"""
             )
-            self.assertLessEqual(layout_metrics["pageHeight"], height + 1, layout_metrics)
+            # U2-R.C3 deliberately lets the complete lower cabinet continue
+            # vertically instead of compressing or hiding its console at 720p.
+            self.assertGreaterEqual(layout_metrics["pageHeight"], height, layout_metrics)
+            self.assertLessEqual(layout_metrics["pageHeight"], height + 320, layout_metrics)
+            self.assertLessEqual(
+                layout_metrics["pageWidth"], layout_metrics["viewportWidth"] + 1, layout_metrics
+            )
             self.assertLessEqual(layout_metrics["headerHeight"], 70, layout_metrics)
             self.assertLessEqual(
                 layout_metrics["statsHeight"],
@@ -677,10 +807,9 @@ class BrowserInterfaceTests(unittest.TestCase):
                 )?.getBoundingClientRect().height || 0
             })"""
         )
+        self.assertGreater(viewport_metrics["page"], viewport_metrics["viewport"])
         self.assertLessEqual(
-            viewport_metrics["page"],
-            viewport_metrics["viewport"] + 1,
-            viewport_metrics,
+            viewport_metrics["page"], viewport_metrics["viewport"] + 320, viewport_metrics
         )
 
     def test_desktop_menu_duplicate_commands_close_details_and_navigate(self) -> None:
@@ -1158,7 +1287,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             home = payload.get("home") or {}
             if len(items) >= 2:
 
-                def entry(key: str, item_index: int, title: str) -> dict:
+                def entry(key: str, item_index: int, title: str) -> dict[str, Any]:
                     item = {**items[item_index], "id": f"{key}-item", "title": title}
                     return {
                         "key": key,
@@ -1530,6 +1659,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             route.fulfill(response=response, json=payload)
 
         page.route("**/api/items?*", add_collection_origin_section)
+        page.set_viewport_size({"width": 390, "height": 844})
         self._open_and_wait_for_catalog(page)
 
         preview = page.locator('[data-home-shelf-preview="followed"]')
@@ -1537,6 +1667,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         # The whole point: a not-yet-personal recommendation never offers to
         # "edit my record" for a record that doesn't exist yet.
         self.assertEqual(preview.get_by_text("Editar mi ficha").count(), 0)
+        collection_action_box = preview.get_by_text("Ver ficha del Club").bounding_box()
+        self.assertIsNotNone(collection_action_box)
+        self.assertGreater(collection_action_box["width"], 300)
+        self.assertGreaterEqual(collection_action_box["height"], 44)
 
         preview.get_by_text("Ver ficha del Club").click()
         shared_dialog = page.locator("#sharedDetailDialog")

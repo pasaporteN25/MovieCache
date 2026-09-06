@@ -842,9 +842,10 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const editAction = isCollection
           ? ""
           : `<button type="button" class="quiet-action home-shelf-preview-action" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>`;
+        const artworkFallback = `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
         const artwork = poster
-          ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">`
-          : `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
+          ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">${artworkFallback}`
+          : artworkFallback;
         const categoryAction = sectionAction.kind
           ? `<button class="home-furniture-category-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(sectionAction.label || "Ver colección")}</button>`
           : "";
