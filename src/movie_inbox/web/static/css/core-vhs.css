@@ -46,7 +46,7 @@
         color: var(--muted);
         display: flex;
         font-family: var(--font-label);
-        font-size: clamp(8px, 0.65vw, 10px);
+        font-size: var(--text-label);
         gap: 4px;
         justify-content: space-between;
         line-height: 1;

@@ -445,6 +445,10 @@ class BrowserInterfaceTests(unittest.TestCase):
                     const stats = document.querySelector('#stats').getBoundingClientRect();
                     const statsStyle = getComputedStyle(document.querySelector('#stats'));
                     const rows = [...document.querySelectorAll('[data-playlist-entry]')];
+                    const firstHeader = document.querySelector('.spotlight-playlist th');
+                    const firstCell = document.querySelector('.spotlight-playlist td');
+                    const firstSpineMeta = document.querySelector('.vhs-spine-meta');
+                    const previewFacts = document.querySelector('.spotlight-preview-facts');
                     const tableWrap = document.querySelector(
                         '.spotlight-table-wrap'
                     ).getBoundingClientRect();
@@ -456,6 +460,18 @@ class BrowserInterfaceTests(unittest.TestCase):
                         headerHeight: document.querySelector(
                             '.app-header'
                         ).getBoundingClientRect().height,
+                        statsFontSize: parseFloat(statsStyle.fontSize),
+                        playlistHeaderFontSize: parseFloat(
+                            getComputedStyle(firstHeader).fontSize
+                        ),
+                        playlistCellFontSize: parseFloat(
+                            getComputedStyle(firstCell).fontSize
+                        ),
+                        spineMetaFontSize: parseFloat(
+                            getComputedStyle(firstSpineMeta).fontSize
+                        ),
+                        previewFactsFit:
+                            previewFacts.scrollWidth <= previewFacts.clientWidth + 1,
                         statsHeight: stats.height,
                         statsLineHeight: parseFloat(statsStyle.lineHeight),
                         firstRowHeight: rows[0]?.getBoundingClientRect().height || 0,
@@ -468,10 +484,19 @@ class BrowserInterfaceTests(unittest.TestCase):
             # vertically instead of compressing or hiding its console at 720p.
             self.assertGreaterEqual(layout_metrics["pageHeight"], height, layout_metrics)
             self.assertLessEqual(layout_metrics["pageHeight"], height + 320, layout_metrics)
+            if (width, height) == (1440, 900):
+                self.assertLessEqual(layout_metrics["pageHeight"], height + 160, layout_metrics)
+            if (width, height) == (1920, 1080):
+                self.assertLessEqual(layout_metrics["pageHeight"], height + 1, layout_metrics)
             self.assertLessEqual(
                 layout_metrics["pageWidth"], layout_metrics["viewportWidth"] + 1, layout_metrics
             )
             self.assertLessEqual(layout_metrics["headerHeight"], 70, layout_metrics)
+            self.assertGreaterEqual(layout_metrics["statsFontSize"], 12, layout_metrics)
+            self.assertGreaterEqual(layout_metrics["playlistHeaderFontSize"], 11, layout_metrics)
+            self.assertGreaterEqual(layout_metrics["playlistCellFontSize"], 12, layout_metrics)
+            self.assertGreaterEqual(layout_metrics["spineMetaFontSize"], 10, layout_metrics)
+            self.assertTrue(layout_metrics["previewFactsFit"], layout_metrics)
             self.assertLessEqual(
                 layout_metrics["statsHeight"],
                 layout_metrics["statsLineHeight"] * 1.35,

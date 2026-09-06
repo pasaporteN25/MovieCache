@@ -30,7 +30,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [U2-R.7a], gate visual desktop de la home recuperada. [U2-R.C] y
+- **En curso:** [U2-R.7b], matriz de contenido y estados límite de la home recuperada.
+  [U2-R.7a], [U2-R.C] y
   [U2-R.6] quedaron cerradas con lectura de lomos, selección directa, consola legible,
   categorías orientadas y flujo móvil recompuesto.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
@@ -286,7 +287,7 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
     Corregir sólo defectos del gate, documentar capturas y no declarar cierre por tests
     verdes si la composición vuelve a divergir. **Modelo: Grande. Depende de todo
     U2-R.**
-    - [ ] **[U2-R.7a] Gate de encuadre desktop.** Capturar una home sintética poblada en
+    - [x] **[U2-R.7a] Gate de encuadre desktop.** Capturar una home sintética poblada en
       1280×720, 1440×900 y 1920×1080; comparar cabecera, cartelera/playlist, continuidad
       del mueble y consola con las dos láminas vinculantes. Medir overflow y flujo a
       720p, registrar evidencia y corregir sólo bloqueos visuales de este gate.
@@ -294,6 +295,11 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
         horizontal. Gate todavía rojo: texto operativo de 8–10 px y 202 px de flujo
         vertical incluso en 1920×1080. Evidencia y score preliminar en
         `docs/design/u2-r7a-visual-gate-2026-09-06.md`.
+      - **Cierre 2026-09-06:** decisión 1A + 2A aplicada. La escena completa entra en
+        1920×1080, 1440×900 reduce el recorrido a 154 px y 720p conserva flujo vertical
+        sin comprimir la consola. Estadísticas/celdas usan 12 px, encabezados 11 px y
+        metadata de lomo 10 px; seis funciones y hechos operativos quedan contenidos.
+        Evidencia final, score 17/20 y verificaciones en el mismo documento.
     - [ ] **[U2-R.7b] Matriz de contenido y estados límite.** Verificar 0/1/4 categorías,
       filas vacías, poster roto, título/género extensos, permisos personal/Club y
       contratapa determinista con sus dos placeholders.

@@ -1,6 +1,6 @@
 # U2-R.7a: gate visual desktop
 
-Fecha: 2026-09-06. Estado: **gate abierto; dos hallazgos P1**.
+Fecha: 2026-09-06. Estado: **gate cerrado; sin hallazgos P1 abiertos**.
 
 ## Alcance y método
 
@@ -10,7 +10,11 @@ obras, seis funciones y cuatro categorías de seis lomos; no se leyó ningún ca
 personal. Se capturaron el primer viewport y el final del flujo en 1280×720, 1440×900 y
 1920×1080.
 
-Evidencia:
+La corrección aplicó la decisión **1A + 2A**: compactación selectiva gobernada por altura
+y piso tipográfico según función. El mueble conserva 640 px y la consola aprobada en
+U2-R.C3; el espacio se recupera en la franja superior y en el ritmo entre secciones.
+
+Evidencia final:
 
 | Viewport | Primer encuadre | Franja inferior |
 | --- | --- | --- |
@@ -25,115 +29,93 @@ playlist CRT, lomos HTML dentro de un único mueble, consola retrofuturista y ac
 físicas doradas. No volvió al hero genérico ni a filas de cards. El DOM conserva títulos,
 metadata, estados y controles reales; los assets sólo aportan materialidad.
 
-## Audit Health Score preliminar
+La lectura principal **cartelera → estantería → consola** entra completa en 1920×1080.
+En 1440×900 el recorrido bajó de 228 a 154 px. En 1280×720 conserva flujo vertical para
+no volver a comprimir ni ocultar el contenido inferior aceptado en U2-R.C3.
 
-Este score fotografía el arranque de R.7. Accesibilidad e interacción se vuelven a medir
-en R.7c y el resultado definitivo pertenece a R.7d.
+## Audit Health Score de R7a
 
-| # | Dimensión | Score | Hallazgo principal |
+Accesibilidad e interacción se vuelven a medir de forma integral en R.7c y el resultado
+definitivo pertenece a R.7d.
+
+| # | Dimensión | Score | Evidencia principal |
 | --- | --- | --- | --- |
-| 1 | Accesibilidad | 2/4 | Texto operativo visible de 8–10 px. |
-| 2 | Performance | 3/4 | Posters lazy y estructura estable; falta profiling del gate final. |
-| 3 | Responsive | 3/4 | Sin overflow horizontal; la escena completa no entra en 1080p. |
-| 4 | Theming | 3/4 | Lenguaje coherente, con colores materiales aún fuera de tokens documentados. |
+| 1 | Accesibilidad | 3/4 | Piso visible corregido; resta el recorrido asistivo de R.7c. |
+| 2 | Performance | 3/4 | Posters lazy y estructura estable; falta profiling final. |
+| 3 | Responsive | 4/4 | Sin overflow horizontal y escena completa en 1080p. |
+| 4 | Theming | 3/4 | Lenguaje coherente; quedan colores materiales por documentar. |
 | 5 | Integridad de implementación | 4/4 | Sistema propio y consistente con las referencias. |
-| **Total** |  | **15/20 — Bueno** | **Corregir los dos P1 antes del cierre.** |
+| **Total** |  | **17/20 — Muy bueno** | **R7a puede cerrar.** |
 
-## Mediciones
+## Mediciones finales
 
 | Métrica | 1280×720 | 1440×900 | 1920×1080 |
 | --- | ---: | ---: | ---: |
-| Alto de página | 1050 px | 1128 px | 1282 px |
-| Flujo vertical requerido | 330 px | 228 px | 202 px |
-| Alto cabecera | 60 px | 64 px | 64 px |
-| Alto cartelera/lista | 260 px | 306 px | 400 px |
-| Alto mueble | 640 px | 640 px | 700 px |
+| Alto de página | 1050 px | 1054 px | 1080 px |
+| Flujo vertical requerido | 330 px | 154 px | 0 px |
+| Alto cabecera | 60 px | 60 px | 60 px |
+| Alto cartelera/lista | 276 px | 274 px | 300 px |
+| Alto mueble | 640 px | 640 px | 640 px |
 | Filas reales | 6 | 6 | 6 |
-| Ancho visible del recorrido | 1129 px | 1275 px | 1488 px |
-| Ancho total del recorrido | 1831 px | 1952 px | 2380 px |
-| Categorías parcialmente visibles | 3 de 4 | 3 de 4 | 3 de 4 |
 | Overflow horizontal de página | 0 px | 0 px | 0 px |
 
 Tipografía visible relevante:
 
 | Elemento | 1280 | 1440 | 1920 |
 | --- | ---: | ---: | ---: |
-| Estadísticas de instancia | 8 px | 8 px | 8 px |
-| Encabezado de playlist | 8 px | 8 px | 8 px |
-| Celdas de playlist | 10 px | 10 px | 10 px |
+| Estadísticas de instancia | 12 px | 12 px | 12 px |
+| Encabezado de playlist | 11 px | 11 px | 11 px |
+| Celdas de playlist | 12 px | 12 px | 12 px |
 | Título de lomo | 11 px | 11 px | 11 px |
-| Metadata de lomo | 8,32 px | 9,36 px | 10 px |
+| Metadata de lomo | 10 px | 10 px | 10 px |
 | Sinopsis de consola | 12 px | 12 px | 12 px |
 | Acción inferior | 12 px | 12 px | 13 px |
 
-El detector de `impeccable` sobre HTML y CSS de Inicio reportó 25 avisos de escala
-tipográfica; entre ellos están los tamaños de 6–9 px que el test de tokens también
-detecta. Los avisos de colores literales se revisaron como deuda de tokens, no como una
-ruptura automática: varios modelan el metal, CRT y desgaste específicos del brief.
+La columna de hechos de la preview recibió ancho desde el osciloscopio decorativo. Una
+regresión de navegador comprueba que su contenido no desborde en ninguno de los tres
+viewports.
 
-## Hallazgos priorizados
+## Hallazgos resueltos
 
-### [P1] La escena completa no entra en el viewport de mayor resolución
+### [Resuelto P1] Encuadre completo en el viewport mayor
 
-- **Categoría:** Responsive / fidelidad visual.
-- **Impacto:** incluso a 1920×1080 el usuario no puede leer en un mismo encuadre la
-  relación cartelera → estantería → consola que sí presenta el north star; debe recorrer
-  202 px para descubrir la franja de acciones y detalle.
-- **Evidencia:** los tres pares de capturas y la tabla de flujo vertical.
-- **Recomendación:** crear un modo desktop compacto gobernado por altura que reduzca
-  espacio estructural antes que texto o contenido. Mantener el flujo vertical aceptado
-  en 720p, pero recuperar la escena completa en 1080p.
-- **Comando sugerido:** `$impeccable layout`.
+- 1920×1080 pasó de 202 px de recorrido vertical a 0 px.
+- El mueble no se redujo por debajo de 640 px y su consola conserva al menos 112 px.
+- 720p mantiene flujo vertical explícito, sin ocultación ni compresión de texto.
 
-### [P1] Microtexto operativo fuera de la escala documentada
+### [Resuelto P1] Microtexto operativo dentro de la escala acordada
 
-- **Categoría:** Accesibilidad / tipografía / integridad.
-- **Impacto:** estadísticas, encabezados y metadata pierden reconocimiento para baja
-  visión y en pantallas de densidad alta. La falla no es cosmética: son datos que
-  distinguen funciones, disponibilidad y procedencia.
-- **Evidencia:** tamaños computados de 8–10 px y el gate rojo de
-  `DesignTokenTests.test_minimum_label_size_and_high_contrast_fallback_are_present`.
-- **Recomendación:** consolidar el piso visible en la rampa documentada, dando espacio a
-  las columnas o reduciendo información secundaria antes de reducir texto.
-- **Comando sugerido:** `$impeccable typeset`.
+- Estadísticas, celdas, acciones y sinopsis operativas usan 12 px.
+- Encabezados tabulares usan 11 px; etiquetas secundarias y metadata de lomo, 10 px.
+- `DesignTokenTests.test_minimum_label_size_and_high_contrast_fallback_are_present`
+  queda verde y la hoja efectiva ya no contiene declaraciones de `font-size: 8px/9px`.
 
-### [P2] Un nombre de instancia largo pierde su final en desktop
+## Hallazgos P2 que siguen su propio corte
 
-- **Categoría:** Responsive / identidad.
-- **Impacto:** `Movie Inbox Browser Test` aparece como `MOVIE INBOX BROWS…`. El nombre
-  accesible sigue completo y no rompe el layout, pero el owner pierde parte de su marca.
-- **Recomendación:** verificar en R.7b si el título puede ceder espacio de forma gradual
-  antes del ellipsis sin separar marca y estadísticas.
-- **Comando sugerido:** `$impeccable harden`.
+### Un nombre de instancia largo pierde su final en desktop
 
-### [P2] La paleta material contiene tonos literales no documentados
+`Movie Inbox Browser Test` conserva nombre accesible completo, pero todavía usa ellipsis
+visual. R.7b verificará si puede ceder espacio gradualmente sin separar marca y
+estadísticas ni agrandar la cabecera.
 
-- **Categoría:** Theming / integridad.
-- **Impacto:** no altera la captura actual, pero dificulta mantener contraste y roles de
-  señal al ajustar la escena.
-- **Recomendación:** inventariar sólo los tonos realmente visibles de Inicio y promover
-  los estables a tokens; no tokenizar automáticamente cada sombra del asset.
-- **Comando sugerido:** `$impeccable document`.
+### La paleta material contiene tonos literales no documentados
 
-## Hallazgos positivos
+No altera el gate visual actual. R.7d inventariará sólo los tonos estables y visibles;
+no se tokenizará automáticamente cada sombra o desgaste de los assets.
 
-- Cabecera de 60–64 px en una línea y navegación agrupada como la revisión anotada.
-- Cartelera sin caja exterior, poster completo 2:3, placa `Hoy` centrada y sin contador.
-- Seis filas reales: ninguna tabla falsa ni hueco dominante.
-- Cuatro categorías dentro de un único mueble; tres quedan total o parcialmente visibles
-  y el cuarto exige overflow lateral real, con controles en ambos límites.
-- Consola útil en los tres tamaños: sinopsis de dos líneas, hechos y acciones contenidos.
-- Cero overflow horizontal de página en los tres viewports.
+## Verificación
+
+- `DesignTokenTests`: 2/2.
+- Regresiones focales de cartelera y consola: 2/2.
+- Detector `layout` de `impeccable`: 0 hallazgos.
+- Detector `type`: 14 avisos consultivos por clamps y tamaños display históricos fuera
+  de la rampa documental; ninguno corresponde ya a texto visible de 6–9 px ni bloquea
+  este gate. Su normalización global, si aporta valor, pertenece al cierre R.7d.
+- Revisión visual final de las seis capturas: sin recortes operativos, sin overflow
+  horizontal y con la composición completa visible en 1080p.
 
 ## Próximo corte
 
-R.7a permanece abierto hasta corregir y recapturar los dos P1. Después se ejecuta R.7b;
-el título de instancia largo viaja con esa matriz de contenido. El orden recomendado es:
-
-1. **[P1] `$impeccable typeset`** — eliminar texto visible por debajo del piso acordado.
-2. **[P1] `$impeccable layout`** — recuperar el encuadre completo en 1920×1080.
-3. **[P2] `$impeccable harden`** — verificar nombre largo y datos extremos en R.7b.
-4. **[Final] `$impeccable polish`** — repetir capturas y gate integral.
-
-Se pueden ejecutar esos cortes de a uno, juntos o en otro orden. Después de las
-correcciones debe repetirse `$impeccable audit` para comprobar el cambio de score.
+Continúa **U2-R.7b**, matriz de contenido y estados límite: 0/1/4 categorías, filas
+vacías, poster roto, títulos y géneros extensos, permisos personal/Club y contratapa con
+sus dos placeholders.

@@ -633,7 +633,7 @@ input,
           border-left: 1px solid rgba(var(--teal-rgb), 0.42);
           color: #91d5d9;
           font-family: var(--font-label);
-          font-size: 8px;
+          font-size: var(--text-meta);
           letter-spacing: 0.055em;
           line-height: 1;
           margin: 0;
@@ -773,7 +773,7 @@ input,
         h1 { font-size: clamp(27px, 3vw, 34px); }
 
         .stats {
-          font-size: 7px;
+          font-size: var(--text-meta);
           padding-left: 8px;
         }
 
@@ -782,6 +782,19 @@ input,
           font-size: 14px;
           padding-left: 14px;
           padding-right: 14px;
+        }
+}
+
+@media (min-width: 861px) and (max-height: 1100px) {
+        body:has(#homeView:not([hidden])) main {
+          padding-bottom: 8px;
+          padding-top: 8px;
+        }
+        body:has(#homeView:not([hidden])) .app-header {
+          margin-bottom: 6px;
+          min-height: 60px;
+          padding-bottom: 6px;
+          padding-top: 6px;
         }
 }
 
