@@ -365,6 +365,140 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
 
+    def test_mobile_touch_accessible_names_and_reduced_motion_survive_reflow(self) -> None:
+        touch_context = self.browser.new_context(
+            viewport={"width": 390, "height": 844},
+            bypass_csp=True,
+            has_touch=True,
+            is_mobile=True,
+            reduced_motion="reduce",
+            storage_state=self.context.storage_state(),
+        )
+        touch_page = touch_context.new_page()
+
+        def add_touch_gate_fixture(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if len(items) >= 2:
+                home["featured"] = [
+                    {
+                        "key": f"touch-featured-{index}",
+                        "origin": {"kind": "catalog"},
+                        "item": {
+                            **items[index],
+                            "id": f"touch-featured-item-{index}",
+                            "title": f"Función táctil {index + 1}",
+                        },
+                        "reason": {"label": "Selección táctil", "detail": "Disponible."},
+                    }
+                    for index in range(2)
+                ]
+                home["hero"] = home["featured"][0]
+
+                def shelf_entry(section_id: str, index: int) -> dict[str, Any]:
+                    item = items[index % len(items)]
+                    return {
+                        "key": f"{section_id}-touch-{index}",
+                        "origin": {"kind": "catalog"},
+                        "item": {
+                            **item,
+                            "id": f"{section_id}-touch-item-{index}",
+                            "title": f"{section_id.title()} obra {index + 1}",
+                        },
+                        "reason": {
+                            "label": "Selección del archivo",
+                            "detail": "Disponible para el gate táctil.",
+                        },
+                    }
+
+                home["sections"] = [
+                    {
+                        "id": section_id,
+                        "title": title,
+                        "items": [shelf_entry(section_id, index) for index in range(6)],
+                    }
+                    for section_id, title in (
+                        ("available", "Disponible esta noche"),
+                        ("memory", "Tu archivo pide memoria"),
+                    )
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        try:
+            touch_page.route("**/api/items?*", add_touch_gate_fixture)
+            self._open_and_wait_for_catalog(touch_page)
+            self.assertTrue(
+                touch_page.evaluate(
+                    "window.matchMedia('(prefers-reduced-motion: reduce)').matches"
+                )
+            )
+
+            playback_before = touch_page.evaluate("window.getHomePlaybackState()")
+            self.assertFalse(touch_page.evaluate("window.tickHomeAutoplay()"))
+            self.assertEqual(
+                touch_page.evaluate("window.getHomePlaybackState().carouselItemId"),
+                playback_before["carouselItemId"],
+            )
+
+            furniture = touch_page.get_by_role(
+                "region", name="Mueble horizontal de estanterías"
+            )
+            self.assertTrue(furniture.is_visible())
+            memory_spine = touch_page.locator(
+                '[data-home-section="memory"] .home-shelf-tape'
+            ).nth(2)
+            accessible_name = memory_spine.get_attribute("aria-label") or ""
+            self.assertIn("Memory obra 3", accessible_name)
+            self.assertIn("Opción 3", accessible_name)
+
+            memory_spine.tap()
+            self.assertEqual(
+                touch_page.locator(".home-shelf-preview").get_attribute(
+                    "data-home-shelf-preview"
+                ),
+                "memory",
+            )
+            self.assertEqual(memory_spine.get_attribute("aria-pressed"), "true")
+            self.assertEqual(
+                touch_page.locator(".home-shelf-preview h3").text_content(),
+                "Memory obra 3",
+            )
+
+            view_more = touch_page.locator(".home-shelf-preview").get_by_role(
+                "button", name="Ver más"
+            )
+            view_more.tap()
+            touch_page.wait_for_selector("#detailDrawer[open]")
+            self.assertEqual(touch_page.evaluate("document.activeElement.id"), "closeDetail")
+            touch_page.locator("#closeDetail").tap()
+            touch_page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
+
+            for width, height in ((390, 844), (320, 720)):
+                touch_page.set_viewport_size({"width": width, "height": height})
+                self.assertFalse(
+                    touch_page.evaluate(
+                        "document.documentElement.scrollWidth > window.innerWidth + 1"
+                    ),
+                    width,
+                )
+                self.assertTrue(
+                    touch_page.get_by_role(
+                        "region", name="Mueble horizontal de estanterías"
+                    ).is_visible(),
+                    width,
+                )
+                target_size = touch_page.locator(
+                    '[data-home-section="memory"] .home-shelf-tape[aria-pressed="true"]'
+                ).bounding_box()
+                self.assertIsNotNone(target_size, width)
+                self.assertGreaterEqual(target_size["width"], 44, width)
+                self.assertGreaterEqual(target_size["height"], 44, width)
+        finally:
+            touch_context.close()
+
     def test_home_empty_payload_exposes_recovery_without_empty_furniture(self) -> None:
         page = self.page
 
@@ -1554,6 +1688,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(
             page.evaluate("document.activeElement.dataset.entryKey"), "available-akira"
         )
+        focus_ring = available_spines.nth(1).evaluate(
+            """element => {
+                const style = getComputedStyle(element);
+                return { style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+            }"""
+        )
+        self.assertNotEqual(focus_ring["style"], "none")
+        self.assertGreaterEqual(focus_ring["width"], 2)
 
         # Bay activation still owns the explicit playlist synchronization and
         # restores that bay's remembered spine.

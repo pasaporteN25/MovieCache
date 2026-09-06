@@ -30,8 +30,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [U2-R.7c], gate de interacción y accesibilidad de la home recuperada.
-  [U2-R.7a], [U2-R.7b], [U2-R.C] y
+- **En curso:** [U2-R.7d], regresión y cierre contractual de la home recuperada.
+  [U2-R.7a], [U2-R.7b], [U2-R.7c], [U2-R.C] y
   [U2-R.6] quedaron cerradas con lectura de lomos, selección directa, consola legible,
   categorías orientadas y flujo móvil recompuesto.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
@@ -309,9 +309,14 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
         Se añadieron fallbacks consistentes a cartelera/preview y una escala compacta de
         marca sin overflow. Matriz y evidencia en
         `docs/design/u2-r7b-content-state-matrix-2026-09-06.md`; suite 32/32.
-    - [ ] **[U2-R.7c] Gate de interacción y accesibilidad.** Recorrer click, Enter,
+    - [x] **[U2-R.7c] Gate de interacción y accesibilidad.** Recorrer click, Enter,
       flechas, cambio de estantería, temporizador, foco/retorno, touch, nombres
       accesibles y reduced motion; repetir reflow móvil en 390/320 px sin callejones.
+      - **Cierre 2026-09-06:** click/Enter/flechas, sincronización explícita de módulo,
+        temporizador, foco/retorno, nombres accesibles, reduced motion y tap real quedaron
+        cubiertos. El contexto móvil 390/320 conserva targets de 44×44 px y cero overflow
+        horizontal. Matriz y score 17/20 en
+        `docs/design/u2-r7c-interaction-accessibility-gate-2026-09-06.md`; gate focal 10/10.
     - [ ] **[U2-R.7d] Regresión y cierre contractual.** Ejecutar suites completas,
       resolver o documentar cualquier gate rojo, validar formato/tipos/compilación,
       actualizar brief/revisión/backlog y cerrar U2-R sólo con evidencia integral.
