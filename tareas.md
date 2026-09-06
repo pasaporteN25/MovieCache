@@ -24,20 +24,15 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U2-R] | Recuperar Inicio según el north star aceptado | base técnica de U2 |
-| 2 | [U3] | Replantear Colección, búsqueda, filtros y alta | U2-R |
-| 3 | [A2] | Cliente Android basico | A1 + entorno Android |
-| 4 | [I1] | Evaluacion de integraciones | A1 |
-| 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 1 | [U3] | Replantear Colección, búsqueda, filtros y alta | U2-R cerrada |
+| 2 | [A2] | Cliente Android basico | A1 + entorno Android |
+| 3 | [I1] | Evaluacion de integraciones | A1 |
+| 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [U2-R.7d], regresión y cierre contractual de la home recuperada.
-  [U2-R.7a], [U2-R.7b], [U2-R.7c], [U2-R.C] y
-  [U2-R.6] quedaron cerradas con lectura de lomos, selección directa, consola legible,
-  categorías orientadas y flujo móvil recompuesto.
-- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
-  U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
-  y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
-  quedaron cerradas el 2026-09-03.
+- **En curso:** sin tarea activa. La siguiente entrega accionable es [U3.1].
+- **Cerrado recientemente:** [U2-R] superó su aceptación integral el 2026-09-06;
+  [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2] conservan su historia en
+  `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
@@ -67,27 +62,144 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 
 ### Frente: Superficie publica y despliegue
 
+### Frente: Inicio videoclub (exploraciones posteriores)
+
+[U2-R] quedó cerrada y se preserva en `Hecho`. Las dos exploraciones siguientes no
+bloquean U3 ni reabren la recuperación aceptada.
+
+  - [ ] **[U2-X.1] Prototipar transición vertical de cartelera.** Experimento posterior,
+    no bloqueante para U2-R: conservar poster saliente/entrante como una tira que avanza
+    verticalmente detrás del marco, medir fluidez con imágenes reales y definir fallback
+    directo para reduced motion antes de decidir si se incorpora.
+  - [ ] **[U2-X.2] Evaluar señal temporal basada en medios reales.** Después de U2-R,
+    investigar si archivos locales autorizados o una fuente con licencia permiten
+    derivar waveform/espectro y marcas temporales reales. No bloquear la preview ni
+    representar datos inventados como análisis de la película.
+
+### Frente: Colección, búsqueda y alta
+
+#### [U3] Replantear Colección como destino único de descubrimiento
+- **Alcance**: hacer que `Colección` reúna de manera comprensible examinar el catálogo,
+  buscar local/externo, comparar, filtrar y agregar, sin reproducir una barra de
+  utilidades separada en Inicio. Este frente rediseña flujo y presentación; no sustituye
+  los algoritmos multilingües, matching o fuentes ya entregados por Q/F.
+- **Criterio de cierre**: una persona distingue explorar, buscar y agregar sin perder
+  query, modo `Comparar`, filtros ni posición al volver; los filtros cotidianos son
+  visibles y los avanzados usan divulgación progresiva; URL/historial preservan estado.
+- **Depende de**: [U2-R], para que navegación y vocabulario queden estables.
+- **Modelo sugerido**: Grande para U3.1; Medio para las implementaciones posteriores.
+
+  - [ ] **[U3.1] Auditar y congelar la arquitectura de Colección.** Inventariar buscador,
+    alta, comparación, filtros, URL, estados vacíos y permisos; producir wireflow y
+    contrato de estados antes de tocar código. Incluir explícitamente los casos donde
+    editar la query no puede degradar `Comparar` a búsqueda común. **Modelo: Grande.**
+  - [ ] **[U3.2] Rediseñar entrada de búsqueda/alta y filtros.** Implementar cabecera de
+    tarea unificada, intención clara de agregar, filtros cotidianos visibles, `Más
+    filtros` y chips activos; mantener endpoints y resultados existentes. Acotar a
+    `index.collection.html`, `css/catalog.css` y componentes de búsqueda necesarios.
+    **Modelo: Medio. Depende de U3.1.**
+  - [ ] **[U3.3] Preservar modos, URL e historial.** Alinear browse/search/compare con la
+    nueva UI, restaurar foco/scroll al volver y cubrir query, filtros y modo con pruebas
+    de navegador. **Modelo: Medio. Depende de U3.2.**
+
+### Frente: Clientes, integraciones y nuevos medios
+
+#### [A1] Definir API versionada y sesiones para dispositivos
+- **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
+  busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
+- **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
+  servidor-cliente antes de iniciar una app.
+- **Depende de**: [T4], [D1].
+- **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
+
+  - [x] **[A1.1] Congelar contrato de dispositivo v1.** ADR y OpenAPI estático para
+    HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
+    patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
+    prueba de que la superficie y la serialización no heredan rutas o paths internos.
+  - [x] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
+    access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
+    dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
+    desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
+  - [x] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
+    paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
+    estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
+    expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
+
+#### [A2] Cliente Android basico
+- **Alcance**: login seguro, lectura/busqueda/detalle y edicion de estado, fecha vista,
+  puntaje y review; disponibilidad fisica solo lectura, sin offline ni administracion.
+- **Criterio de cierre**: MVP contra la API de [A1], matriz de compatibilidad y pruebas
+  de red/autenticacion/ciclo de vida.
+- **Depende de**: [A1].
+- **Modelo sugerido**: Grande. Proyecto cliente multiplataforma potencial.
+
+  - [ ] **[A2.1] Fundacion Android y conexion segura.** Modulo Android nativo con
+    Kotlin/Compose, Hilt/KSP, Retrofit/OkHttp y serializacion; configuracion de URL HTTPS
+    por instancia, excepcion HTTP solo para loopback de debug, almacenamiento Keystore de
+    tokens y flujo de login/refresh/logout contra `/api/v1/auth/*`. Cierre: `assembleDebug`
+    y pruebas MockWebServer sin secretos en logs, memoria o backups.
+  - [ ] **[A2.2] Lectura del catalogo personal.** Estados Compose para catalogo paginado,
+    busqueda local y detalle, con loading/error/empty explicitos, Coil para imagenes y
+    disponibilidad solo lectura. Cierre: pruebas de repositorio y de UI para páginas,
+    cursor inválido, sesión vencida y campos desconocidos compatibles.
+  - [ ] **[A2.3] Edicion personal y gate de cliente.** Formulario de estado, fecha vista,
+    puntaje y review con `PATCH` parcial, manejo de conflicto/error y cierre de sesión;
+    matriz API/cliente, pruebas de rotación, recreación de Activity y configuración de
+    instancia. No agrega offline, Scanner, administración ni mutaciones compartidas.
+
+**Nota de arranque A2, 2026-09-02.** El checkout todavía no contiene un proyecto Android.
+La terminal disponible detecta Java 8 y no detecta Gradle ni `ANDROID_SDK_ROOT`; A2.1 debe
+ejecutarse en un entorno con JDK 17+ y Android SDK configurado antes de poder prometer un
+APK o una prueba de emulador reproducible.
+
+#### [I1] Evaluar Radarr, Sonarr y Letterboxd
+- **Alcance**: separar importacion, enlaces e inventario; revisar autenticacion,
+  licencias, IDs, webhooks/rate limits y que datos personales saldrian de la instancia.
+- **Criterio de cierre**: matriz y ADR por integracion; cada aprobada genera su propia
+  tarea de adaptador.
+- **Depende de**: [A1] para contratos externos estables y [L1] para inventario.
+- **Modelo sugerido**: Grande. Tres productos con semanticas distintas.
+
+#### [M1] Definir verticales de juegos y musica
+- **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
+  valores a `kind` ni reciclar campos audiovisuales antes de la decision.
+- **Criterio de cierre**: ADR por vertical con recomendacion avanzar/descartar y backlog
+  independiente si se aprueba.
+- **Depende de**: despues de estabilizar los frentes anteriores.
+- **Modelo sugerido**: Grande. Descubrimiento de producto, no un cambio de enum.
+
+---
+
+## En curso
+
+Sin tareas activas.
+
+## Hecho
+
 ### Frente: Inicio videoclub (recuperación visual prioritaria)
 
-**Decisión 2026-09-03.** [U2] quedó técnicamente cerrada, pero la revisión visual
-rechazó su composición: hero convencional, lomos aislados y exceso de vacío no expresan
-el videoclub continuo aprobado. No se reabre ni borra su historia. [U2-R] conserva sus
-contratos útiles de permisos, teclado y datos, y reemplaza la arquitectura visual antes
-de [U3] y [A2]. La referencia vinculante es
+**Decisión original 2026-09-03.** [U2] había quedado técnicamente cerrada, pero la
+revisión visual rechazó su composición: hero convencional, lomos aislados y exceso de
+vacío no expresaban el videoclub continuo aprobado. Sin borrar esa historia, [U2-R]
+conservó los contratos útiles de permisos, teclado y datos y reemplazó la arquitectura
+visual antes de [U3] y [A2]. La referencia vinculante es
 `docs/design/u2-recovery-north-star-v1.png`; el contrato autosuficiente está en
 `docs/briefs/home-videotheque-recovery-v1.md`. Para la franja superior, la corrección
 vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
 
 #### [U2-R] Recuperar Inicio según el north star aceptado
+**Cerrado 2026-09-06 — commit `a322d1f`.** Gate integral 17/20, sin hallazgos P0/P1
+abiertos.
 - **Alcance**: reconstruir Inicio de escritorio como una escena física compacta: una
   cartelera vertical autónoma, una lista tipo Winamp cuya fuente puede ser la
   programación diaria o una estantería, y cuatro módulos dentro de un mueble horizontal
   continuo. `Ver más` abre una contratapa VHS y `Editar mi ficha` reutiliza el editor.
 - **Criterio de cierre**: el mueble muestra continuidad lateral sin scrollbar visible;
   1280×720 permite flujo vertical antes que ocultar o comprimir contenido; no hay
-  overflow horizontal; cartelera automática y selección manual no se pisan; fila, lomo
-  y preview siempre coinciden; teclado/touch/lector/reduced motion son equivalentes;
-  móvil no queda peor que antes de U2.
+  overflow horizontal; cartelera automática y selección manual no se pisan; fila/lomo
+  coinciden dentro de la fuente activa y el lomo directo gobierna la ficha inferior sin
+  reprogramar la playlist; teclado/touch/lector/reduced motion son equivalentes; móvil
+  no queda peor que antes de U2.
 - **Depende de**: base técnica de [U2]. **Precede a**: [U3] y [A2]. No cambia `/api/home`,
   A1, permisos ni rutas públicas.
 - **Modelo sugerido**: Medio por subtask de implementación; Grande para la exploración
@@ -280,7 +392,7 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
       rotos muestran fallback, títulos largos no fragmentan la marca, 390/320 px no
       desbordan y las variantes personal/Club respetan sus permisos. Playwright 35/35 y
       detector de layout en verde; lector, touch real y gate visual completo pasan a R.7.
-  - [ ] **[U2-R.7] Ejecutar gate visual y de regresión.** Comparar con el north star en
+  - [x] **[U2-R.7] Ejecutar gate visual y de regresión.** Comparar con el north star en
     1280×720, 1440×900 y 1920×1080; revisar coherencia de estado, flujo vertical legible
     a 720p, ausencia de overflow horizontal, indicio lateral, teclado, touch, lector,
     reduced motion y suites completas.
@@ -317,117 +429,14 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
         cubiertos. El contexto móvil 390/320 conserva targets de 44×44 px y cero overflow
         horizontal. Matriz y score 17/20 en
         `docs/design/u2-r7c-interaction-accessibility-gate-2026-09-06.md`; gate focal 10/10.
-    - [ ] **[U2-R.7d] Regresión y cierre contractual.** Ejecutar suites completas,
+    - [x] **[U2-R.7d] Regresión y cierre contractual.** Ejecutar suites completas,
       resolver o documentar cualquier gate rojo, validar formato/tipos/compilación,
       actualizar brief/revisión/backlog y cerrar U2-R sólo con evidencia integral.
-  - [ ] **[U2-X.1] Prototipar transición vertical de cartelera.** Experimento posterior,
-    no bloqueante para U2-R: conservar poster saliente/entrante como una tira que avanza
-    verticalmente detrás del marco, medir fluidez con imágenes reales y definir fallback
-    directo para reduced motion antes de decidir si se incorpora.
-  - [ ] **[U2-X.2] Evaluar señal temporal basada en medios reales.** Después de U2-R,
-    investigar si archivos locales autorizados o una fuente con licencia permiten
-    derivar waveform/espectro y marcas temporales reales. No bloquear la preview ni
-    representar datos inventados como análisis de la película.
-
-### Frente: Colección, búsqueda y alta
-
-#### [U3] Replantear Colección como destino único de descubrimiento
-- **Alcance**: hacer que `Colección` reúna de manera comprensible examinar el catálogo,
-  buscar local/externo, comparar, filtrar y agregar, sin reproducir una barra de
-  utilidades separada en Inicio. Este frente rediseña flujo y presentación; no sustituye
-  los algoritmos multilingües, matching o fuentes ya entregados por Q/F.
-- **Criterio de cierre**: una persona distingue explorar, buscar y agregar sin perder
-  query, modo `Comparar`, filtros ni posición al volver; los filtros cotidianos son
-  visibles y los avanzados usan divulgación progresiva; URL/historial preservan estado.
-- **Depende de**: [U2-R], para que navegación y vocabulario queden estables.
-- **Modelo sugerido**: Grande para U3.1; Medio para las implementaciones posteriores.
-
-  - [ ] **[U3.1] Auditar y congelar la arquitectura de Colección.** Inventariar buscador,
-    alta, comparación, filtros, URL, estados vacíos y permisos; producir wireflow y
-    contrato de estados antes de tocar código. Incluir explícitamente los casos donde
-    editar la query no puede degradar `Comparar` a búsqueda común. **Modelo: Grande.**
-  - [ ] **[U3.2] Rediseñar entrada de búsqueda/alta y filtros.** Implementar cabecera de
-    tarea unificada, intención clara de agregar, filtros cotidianos visibles, `Más
-    filtros` y chips activos; mantener endpoints y resultados existentes. Acotar a
-    `index.collection.html`, `css/catalog.css` y componentes de búsqueda necesarios.
-    **Modelo: Medio. Depende de U3.1.**
-  - [ ] **[U3.3] Preservar modos, URL e historial.** Alinear browse/search/compare con la
-    nueva UI, restaurar foco/scroll al volver y cubrir query, filtros y modo con pruebas
-    de navegador. **Modelo: Medio. Depende de U3.2.**
-
-### Frente: Clientes, integraciones y nuevos medios
-
-#### [A1] Definir API versionada y sesiones para dispositivos
-- **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
-  busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
-- **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
-  servidor-cliente antes de iniciar una app.
-- **Depende de**: [T4], [D1].
-- **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
-
-  - [x] **[A1.1] Congelar contrato de dispositivo v1.** ADR y OpenAPI estático para
-    HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
-    patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
-    prueba de que la superficie y la serialización no heredan rutas o paths internos.
-  - [x] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
-    access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
-    dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
-    desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
-  - [x] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
-    paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
-    estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
-    expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
-
-#### [A2] Cliente Android basico
-- **Alcance**: login seguro, lectura/busqueda/detalle y edicion de estado, fecha vista,
-  puntaje y review; disponibilidad fisica solo lectura, sin offline ni administracion.
-- **Criterio de cierre**: MVP contra la API de [A1], matriz de compatibilidad y pruebas
-  de red/autenticacion/ciclo de vida.
-- **Depende de**: [A1].
-- **Modelo sugerido**: Grande. Proyecto cliente multiplataforma potencial.
-
-  - [ ] **[A2.1] Fundacion Android y conexion segura.** Modulo Android nativo con
-    Kotlin/Compose, Hilt/KSP, Retrofit/OkHttp y serializacion; configuracion de URL HTTPS
-    por instancia, excepcion HTTP solo para loopback de debug, almacenamiento Keystore de
-    tokens y flujo de login/refresh/logout contra `/api/v1/auth/*`. Cierre: `assembleDebug`
-    y pruebas MockWebServer sin secretos en logs, memoria o backups.
-  - [ ] **[A2.2] Lectura del catalogo personal.** Estados Compose para catalogo paginado,
-    busqueda local y detalle, con loading/error/empty explicitos, Coil para imagenes y
-    disponibilidad solo lectura. Cierre: pruebas de repositorio y de UI para páginas,
-    cursor inválido, sesión vencida y campos desconocidos compatibles.
-  - [ ] **[A2.3] Edicion personal y gate de cliente.** Formulario de estado, fecha vista,
-    puntaje y review con `PATCH` parcial, manejo de conflicto/error y cierre de sesión;
-    matriz API/cliente, pruebas de rotación, recreación de Activity y configuración de
-    instancia. No agrega offline, Scanner, administración ni mutaciones compartidas.
-
-**Nota de arranque A2, 2026-09-02.** El checkout todavía no contiene un proyecto Android.
-La terminal disponible detecta Java 8 y no detecta Gradle ni `ANDROID_SDK_ROOT`; A2.1 debe
-ejecutarse en un entorno con JDK 17+ y Android SDK configurado antes de poder prometer un
-APK o una prueba de emulador reproducible.
-
-#### [I1] Evaluar Radarr, Sonarr y Letterboxd
-- **Alcance**: separar importacion, enlaces e inventario; revisar autenticacion,
-  licencias, IDs, webhooks/rate limits y que datos personales saldrian de la instancia.
-- **Criterio de cierre**: matriz y ADR por integracion; cada aprobada genera su propia
-  tarea de adaptador.
-- **Depende de**: [A1] para contratos externos estables y [L1] para inventario.
-- **Modelo sugerido**: Grande. Tres productos con semanticas distintas.
-
-#### [M1] Definir verticales de juegos y musica
-- **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
-  valores a `kind` ni reciclar campos audiovisuales antes de la decision.
-- **Criterio de cierre**: ADR por vertical con recomendacion avanzar/descartar y backlog
-  independiente si se aprueba.
-- **Depende de**: despues de estabilizar los frentes anteriores.
-- **Modelo sugerido**: Grande. Descubrimiento de producto, no un cambio de enum.
-
----
-
-## En curso
-
-Sin tareas activas.
-
-## Hecho
+      - **Cierre 2026-09-06 — commit `a322d1f`:** 560 pruebas generales y 31 de
+        navegador quedaron verdes; Ruff, formato, mypy estricto, `compileall`, sintaxis
+        de 26 módulos JavaScript y `git diff --check` pasaron. El brief y la revisión
+        reflejan el contrato final; evidencia integral en
+        `docs/design/u2-r7d-contract-closure-2026-09-06.md`.
 
 #### [U2-R.0] Congelar dirección y kit material
 **Cerrado 2026-09-03 — commit `9406887`.**
