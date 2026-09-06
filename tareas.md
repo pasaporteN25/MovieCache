@@ -30,9 +30,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 4 | [I1] | Evaluacion de integraciones | A1 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** [U2-R.C], correcciones de la franja inferior previas al gate. La lectura
-  de lomos y la selección directa entre categorías ya están corregidas; la siguiente
-  tarea accionable es [U2-R.C3], recuperar altura útil en la consola inferior.
+- **En curso:** [U2-R.C], correcciones de la franja inferior previas al gate. Lectura de
+  lomos, selección directa y consola legible ya están corregidas; la siguiente tarea
+  accionable es [U2-R.C4], resolver orientación y grupos cortos.
 - **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2].
   U2 conserva su cierre verificable en `Hecho`, pero su aceptación visual fue rechazada
   y el trabajo correctivo restante vive solamente en [U2-R]; [U2-R.1] y [U2-R.2]
@@ -82,10 +82,11 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
   cartelera vertical autónoma, una lista tipo Winamp cuya fuente puede ser la
   programación diaria o una estantería, y cuatro módulos dentro de un mueble horizontal
   continuo. `Ver más` abre una contratapa VHS y `Editar mi ficha` reutiliza el editor.
-- **Criterio de cierre**: en desktop objetivo no hay scroll vertical; el mueble muestra
-  continuidad lateral sin scrollbar visible; cartelera automática y selección manual
-  no se pisan; fila, lomo y preview siempre coinciden; teclado/touch/lector/reduced
-  motion son equivalentes; móvil no queda peor que antes de U2.
+- **Criterio de cierre**: el mueble muestra continuidad lateral sin scrollbar visible;
+  1280×720 permite flujo vertical antes que ocultar o comprimir contenido; no hay
+  overflow horizontal; cartelera automática y selección manual no se pisan; fila, lomo
+  y preview siempre coinciden; teclado/touch/lector/reduced motion son equivalentes;
+  móvil no queda peor que antes de U2.
 - **Depende de**: base técnica de [U2]. **Precede a**: [U3] y [A2]. No cambia `/api/home`,
   A1, permisos ni rutas públicas.
 - **Modelo sugerido**: Medio por subtask de implementación; Grande para la exploración
@@ -254,9 +255,13 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
     - [x] **[U2-R.C2] Corregir selección directa entre categorías.** Click o Enter sobre
       cualquier lomo activa su categoría y ficha inferior en el mismo gesto, sin cambiar
       la playlist superior.
-    - [ ] **[U2-R.C3] Recuperar altura útil de la consola.** Mostrar título, año,
+    - [x] **[U2-R.C3] Recuperar altura útil de la consola.** Mostrar título, año,
       dirección y sinopsis breve legibles en los tres tamaños desktop; metadata principal
       de 12 px o más y flujo vertical cuando la altura o el zoom no alcancen.
+      - **Cierre 2026-09-05:** la pantalla central mide 114/114/124 px en los tres
+        viewports objetivo, conserva sinopsis de dos líneas y metadata de 12 px sin
+        overflow; los botones quedan contenidos y 720p usa scroll vertical de página.
+        La descripción propia y luego Wikipedia preceden al motivo editorial.
     - [ ] **[U2-R.C4] Resolver orientación y grupos cortos.** Comparar placas pequeñas por
       categoría con el rótulo inferior activo y evitar huecos desproporcionados.
   - [ ] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
@@ -265,8 +270,9 @@ vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
     390×844, zoom alto, poster roto, título largo y acciones por permiso. **Modelo:
     Medio. Depende de U2-R.1–U2-R.5.**
   - [ ] **[U2-R.7] Ejecutar gate visual y de regresión.** Comparar con el north star en
-    1280×720, 1440×900 y 1920×1080; revisar coherencia de estado, ausencia de scroll
-    vertical, indicio lateral, teclado, touch, lector, reduced motion y suites completas.
+    1280×720, 1440×900 y 1920×1080; revisar coherencia de estado, flujo vertical legible
+    a 720p, ausencia de overflow horizontal, indicio lateral, teclado, touch, lector,
+    reduced motion y suites completas.
     Corregir sólo defectos del gate, documentar capturas y no declarar cierre por tests
     verdes si la composición vuelve a divergir. **Modelo: Grande. Depende de todo
     U2-R.**

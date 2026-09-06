@@ -28,18 +28,29 @@ Primera entrega recomendada: tarea 1 solamente. Revisar su resultado visual ante
 - [x] Tarea 1: lectura de lomos corregida y verificada en los tres tamaños desktop.
 - [x] Tarea 2: selección directa corregida para click y Enter, manteniendo independiente
   la playlist superior.
-- [ ] Tarea 3: altura útil y legibilidad de la consola inferior.
+- [x] Tarea 3: altura útil y legibilidad de la consola inferior.
 - [ ] Tarea 4: orientación y espacios entre categorías.
 - [ ] Tarea 5: recuperación móvil de R.6.
 - [ ] Tarea 6: gate integral R.7 y actualización final de contratos.
 
 ## Evidencia comprobada
 
+- **Consola corregida:** el mueble conserva una altura útil de **640 / 640 / 700 px** y
+  la pantalla central mide aproximadamente **114 / 114 / 124 px** a 1280×720,
+  1440×900 y 1920×1080. Título, año, dirección y sinopsis de dos líneas permanecen
+  visibles; metadata y sinopsis computan 12 px, las acciones miden al menos 36 px y no
+  desbordan su panel. A 720p la página usa flujo vertical en vez de comprimir el mueble.
+- **Prioridad de contenido:** la ficha inferior usa primero la descripción propia,
+  después el extracto de Wikipedia y deja el motivo editorial como último fallback.
+  Los placeholders decorativos del poster ceden su texto cuando el panel es compacto.
+
 - **Lomos:** a 1280×720 el título dispone de aproximadamente **7,94 px de alto**, mientras la metadata vertical consume **72 px**. Causa: `core-vhs.css:12` distribuye `5px minmax(0, 1fr) auto`; la metadata de `core-vhs.css:41` desplaza al título cuando `home.css:1804` comprime el lomo. La captura muestra letras amputadas. El espacio entre lomos ya es pequeño (5–8 px); reducirlo no corrige la causa.
 - **Selección:** pulsar directamente una obra de `Tu archivo pide memoria` mantiene la ficha de `Disponible esta noche`. El foco llega al lomo pulsado, pero su `aria-pressed` sigue falso. `home.js:546` recuerda el índice sin cambiar `activeHomeSectionId`; `home.js:846` renderiza la categoría anterior. `bootstrap.js:20` procesa solo el control más cercano.
-- **Consola:** el display mide aproximadamente **55 / 72 / 88 px de alto** a 1280×720, 1440×900 y 1920×1080. `home.css:2069` oculta la sinopsis en los tres tamaños y reduce metadata/hechos a **8/7 px**. A 720p también desaparecen hechos y placeholders, y los botones bajan a 20 px de alto. La geometría exterior entra, pero el contenido pierde utilidad.
+- **Consola (diagnóstico previo):** el display medía aproximadamente **55 / 72 / 88 px de alto** a 1280×720, 1440×900 y 1920×1080. La cascada ocultaba la sinopsis en los tres tamaños y reducía metadata/hechos a **8/7 px**. A 720p también desaparecían hechos y placeholders, y los botones bajaban a 20 px de alto. La geometría exterior entraba, pero el contenido perdía utilidad.
 - **Móvil:** la nueva estructura sigue dentro de una grilla de **100 px + 209 px**: acciones a la izquierda y toda portada/ficha a la derecha. Se verificó además la marca fragmentada verticalmente en la cabecera. La restauración móvil continúa siendo trabajo real pendiente.
-- **Contenido:** `home.js:797` prioriza `reason.detail` sobre la sinopsis. Cuando se recupere el espacio de lectura, priorizar descripción/extracto y presentar el motivo editorial por separado, si aporta información.
+- **Contenido (diagnóstico previo):** `home.js` priorizaba `reason.detail` sobre la
+  sinopsis. La corrección aplicada reserva ese valor como último fallback detrás de la
+  descripción y el extracto.
 - **Lo que funciona:** `Ver más` abre la contratapa con sinopsis, créditos y dos espacios de fotograma; Escape devuelve el foco al botón de origen. El mueble es un único asset, con títulos en HTML y acciones doradas a la izquierda. Hay pruebas existentes de teclado, permisos, overflow y ausencia de escrituras al explorar.
 
 ## Dos decisiones pendientes

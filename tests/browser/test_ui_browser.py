@@ -985,7 +985,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             "La insoportable levedad del ser. 1995. Formato: pelicula.",
             first_spine.get_attribute("aria-label"),
         )
-        self.assertLessEqual(
+        self.assertGreater(
             page.evaluate("document.documentElement.scrollHeight"),
             page.evaluate("window.innerHeight") + 1,
         )
@@ -1009,6 +1009,111 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.emulate_media(reduced_motion="reduce")
         self.assertEqual(
             furniture.evaluate("element => getComputedStyle(element).scrollBehavior"), "auto"
+        )
+
+    def test_home_furniture_console_keeps_primary_copy_legible_at_desktop_sizes(
+        self,
+    ) -> None:
+        page = self.page
+        synopsis = (
+            "Un detective y un ladrón profesional se enfrentan en Los Ángeles "
+            "mientras sus vidas privadas empiezan a reflejarse."
+        )
+
+        def add_console_copy(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload.get("items") or []
+            home = payload.get("home") or {}
+            if items:
+                item = {
+                    **items[0],
+                    "title": "Heat: fuego contra fuego",
+                    "description": synopsis,
+                    "wikipedia_extract": "Este extracto no debe desplazar la descripción.",
+                    "directors": ["Michael Mann"],
+                    "genres": ["Policial"],
+                }
+                home["sections"] = [
+                    {
+                        "id": "console",
+                        "title": "Disponible esta noche",
+                        "items": [
+                            {
+                                "key": "console-heat",
+                                "origin": {"kind": "catalog"},
+                                "item": item,
+                                "reason": {
+                                    "label": "Lista para ver",
+                                    "detail": "El motivo editorial queda detrás de la sinopsis.",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            payload["home"] = home
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_console_copy)
+        self._open_and_wait_for_catalog(page)
+        preview = page.locator('[data-home-shelf-preview="console"]')
+        self.assertEqual(preview.locator(".home-shelf-preview-summary").text_content(), synopsis)
+        self.assertIn(
+            "Dirección: Michael Mann",
+            preview.locator(".home-shelf-preview-meta").text_content(),
+        )
+
+        for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
+            with self.subTest(viewport=(width, height)):
+                page.set_viewport_size({"width": width, "height": height})
+                metrics = preview.evaluate(
+                    """element => {
+                        const cabinet = element.closest('.home-furniture');
+                        const display = element.querySelector('.home-furniture-display');
+                        const copy = element.querySelector('.home-shelf-preview-copy');
+                        const title = copy.querySelector('h3');
+                        const meta = copy.querySelector('.home-shelf-preview-meta');
+                        const summary = copy.querySelector('.home-shelf-preview-summary');
+                        const panel = element.querySelector('.home-furniture-action-panel');
+                        const panelRect = panel.getBoundingClientRect();
+                        const actions = [...panel.querySelectorAll('button')];
+                        return {
+                            cabinetHeight: cabinet.getBoundingClientRect().height,
+                            displayHeight: display.getBoundingClientRect().height,
+                            titleHeight: title.getBoundingClientRect().height,
+                            metaFontSize: parseFloat(getComputedStyle(meta).fontSize),
+                            summaryFontSize: parseFloat(getComputedStyle(summary).fontSize),
+                            summaryHeight: summary.getBoundingClientRect().height,
+                            copyFits: copy.scrollHeight <= copy.clientHeight + 1,
+                            actionHeights: actions.map(
+                                action => action.getBoundingClientRect().height
+                            ),
+                            actionsContained: actions.every(action => {
+                                const rect = action.getBoundingClientRect();
+                                return rect.top >= panelRect.top - 1
+                                    && rect.bottom <= panelRect.bottom + 1
+                                    && rect.left >= panelRect.left - 1
+                                    && rect.right <= panelRect.right + 1;
+                            }),
+                        };
+                    }"""
+                )
+                self.assertGreaterEqual(metrics["cabinetHeight"], 639)
+                self.assertGreaterEqual(metrics["displayHeight"], 112)
+                self.assertGreaterEqual(metrics["titleHeight"], 16)
+                self.assertGreaterEqual(metrics["metaFontSize"], 12)
+                self.assertGreaterEqual(metrics["summaryFontSize"], 12)
+                self.assertGreaterEqual(metrics["summaryHeight"], 16)
+                self.assertTrue(metrics["copyFits"])
+                self.assertTrue(metrics["actionsContained"])
+                self.assertTrue(
+                    all(action_height >= 36 for action_height in metrics["actionHeights"])
+                )
+
+        page.set_viewport_size({"width": 1280, "height": 720})
+        self.assertGreater(
+            page.evaluate("document.documentElement.scrollHeight"),
+            page.evaluate("window.innerHeight"),
         )
 
     def test_home_shelf_furniture_handles_zero_categories_without_empty_controls(self) -> None:

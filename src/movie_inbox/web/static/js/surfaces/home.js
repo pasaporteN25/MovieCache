@@ -799,8 +799,21 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const title = displayTitle(item) || "Sin título";
         const poster = String(item.page_image || "").trim();
         const reason = entry?.reason || {};
-        const metadata = [item.year, firstListValue(item.directors), firstListValue(item.genres)].filter(Boolean);
-        const summary = String(reason.detail || item.wikipedia_extract || item.description || "").trim();
+        const director = firstListValue(item.directors);
+        const genre = firstListValue(item.genres);
+        const metadata = [
+          item.year ? String(item.year) : "",
+          director ? `Dirección: ${director}` : "",
+          genre ? String(genre) : ""
+        ].filter(Boolean);
+        const summary = String(
+          item.description || item.wikipedia_extract || reason.detail || ""
+        ).trim();
+        const metadataMarkup = metadata.length
+          ? `<p class="home-shelf-preview-meta">${metadata
+            .map((value) => `<span>${escapeHtml(value)}</span>`)
+            .join("")}</p>`
+          : "";
         const duration = homeDurationLabel(item);
         const availability = availabilityState(item);
         const status = item.status === "watched" ? "Vista" : "Pendiente";
@@ -831,12 +844,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
               <div class="home-shelf-preview-copy">
                 ${isCollection ? `<span>En ${escapeHtml(origin.collection_title || "una colección seguida")}</span>` : ""}
                 <h3 id="home-shelf-preview-${escapeAttr(sectionId)}">${escapeHtml(title)}</h3>
-                ${metadata.length ? `<p class="home-shelf-preview-meta">${metadata.map(escapeHtml).join(" · ")}</p>` : ""}
+                ${metadataMarkup}
                 <p class="home-shelf-preview-summary">${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
               </div>
               <div class="home-furniture-frame-strip" aria-hidden="true"><span></span><span></span></div>
               <dl class="home-shelf-preview-facts">
-                <div><dt>Disponibilidad</dt><dd>${availability.effective ? "Disponible" : "No disponible"}</dd></div>
+                <div><dt>Acceso</dt><dd>${availability.effective ? "Disponible" : "No disponible"}</dd></div>
                 <div><dt>Estado</dt><dd>${escapeHtml(status)}</dd></div>
                 <div><dt>Duración</dt><dd>${escapeHtml(duration)}</dd></div>
               </dl>
