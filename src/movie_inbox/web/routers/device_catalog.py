@@ -23,11 +23,15 @@ from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.web.catalog_api import patch_item_personal
 from movie_inbox.web.dependencies import (
     SessionCatalog,
+    _resolved_path,
     device_json,
     require_device_identity,
     session_catalog_rows,
 )
 from movie_inbox.web.responses import ApiRequestError, DeviceApiRequestError, identity_payload
+
+# Name of the persistent secret the device sync key is derived from.
+DEVICE_SYNC_SECRET = "device_sync_key"
 
 router = APIRouter()
 _DEVICE_PAGE_SIZE = 50
@@ -151,15 +155,24 @@ def _device_catalog_entries(
     except (CatalogRepositoryError, LibraryRepositoryError, IdentityRepositoryError) as error:
         raise _catalog_error(error) from error
     entries: list[DeviceCatalogItem] = []
-    secret = request.app.state.viewer_config.api_token.encode("utf-8")
+    # [A1.4]: the key is derived from a persistent instance secret rather than
+    # from api_token, and from the source's position rather than its path.
+    # Rotating the token or relocating a catalogue are both normal operations
+    # and must not re-key every work in a paired client's local replica.
+    secret = request.app.state.identity_repository.instance_secret(DEVICE_SYNC_SECRET).encode(
+        "utf-8"
+    )
     for row in rows:
         source_reference = str(row.get("_source_file") or "")
         catalog_item_id = str(row.get("id") or "")
         if not source_reference or not catalog_item_id:
             continue
+        # Item ids are only unique within one source file, so the source still
+        # takes part in the key -- by position, which carries no path.
+        source_slot = catalog.references_by_path.get(_resolved_path(source_reference), "source-0")
         entries.append(
             DeviceCatalogItem(
-                _opaque_item_id(secret, identity.catalog.id, source_reference, catalog_item_id),
+                _opaque_item_id(secret, identity.catalog.id, source_slot, catalog_item_id),
                 source_reference,
                 catalog_item_id,
                 dict(row),
@@ -287,8 +300,8 @@ def _decode(value: str) -> dict[str, Any]:
     return payload
 
 
-def _opaque_item_id(secret: bytes, catalog_id: str, source_reference: str, item_id: str) -> str:
-    message = "\x1f".join((catalog_id, source_reference, item_id)).encode("utf-8")
+def _opaque_item_id(secret: bytes, catalog_id: str, source_slot: str, item_id: str) -> str:
+    message = "\x1f".join((catalog_id, source_slot, item_id)).encode("utf-8")
     digest = hmac.new(secret, message, hashlib.sha256).digest()[:24]
     return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
 

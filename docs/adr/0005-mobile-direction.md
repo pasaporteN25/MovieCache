@@ -120,6 +120,32 @@ Los tres se resuelven **de forma aditiva** — campos y rutas nuevas, sin cambia
 significado de ninguno existente — así que caben dentro de v1 según la propia regla de
 versionado de ADR-0003.
 
+### 6.1 Qué se implementó de [A1.4], y qué no — 2026-09-07
+
+De los tres huecos, **sólo el segundo era de corrección**. Los otros dos resultaron ser
+optimizaciones, y construirlos ahora habría sido peor que no hacerlo.
+
+**Hecho: la clave durable.** El secreto pasa de `viewer_config.api_token` a un secreto
+persistente por instancia, y la ruta absoluta del archivo de origen se reemplaza por la
+posición de esa fuente. Los ids de obra sólo son únicos dentro de un archivo —`load_items`
+concatena las fuentes sin deduplicar—, así que la fuente sigue participando de la clave,
+pero sin llevar una ruta. Verificado de punta a punta: rotar el `api_token` deja los ids
+idénticos, y siguen siendo opacos.
+
+**No hecho, y a propósito: las marcas de tiempo.** No existe hoy ninguna marca que
+registre una edición personal: `curation_updated_at` la escriben sólo curaduría y fusión,
+y `patch_personal` no toca ninguna. Exponer `curation_updated_at` como `updated_at` sería
+**peor que no exponer nada**, porque un cliente construiría su lógica de fusión sobre una
+marca que no cambia cuando cambia un puntaje. Agregar una marca real toca el contrato
+portable `catalog.schema.json`, que es una decisión más grande que "aditivo a la API de
+dispositivo" y merece tomarse aparte.
+
+**No hecho: el feed de cambios.** La fusión a tres bandas no lo necesita para ser
+correcta: la base vive en el cliente, así que comparar contra el estado actual completo
+del servidor alcanza. Un feed es una optimización de transferencia, depende de las marcas
+de tiempo que no existen, y con catálogos del orden de las cientos de obras no compra
+nada. Queda pendiente de una necesidad real, no de una fecha.
+
 ## Corrección a una afirmación previa
 
 En el análisis del 2026-09-07 escribí que ADR-0002 "ya resolvió este problema" y que se

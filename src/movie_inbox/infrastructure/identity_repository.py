@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 15
+INSTANCE_SCHEMA_VERSION = 16
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -428,6 +428,14 @@ CREATE TABLE charades_difficulty (
 CREATE INDEX ix_charades_difficulty_user ON charades_difficulty(user_id, difficulty);
 """
 
+INSTANCE_SCHEMA_V16 = """
+CREATE TABLE instance_secrets (
+    name TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -443,6 +451,7 @@ INSTANCE_MIGRATIONS = {
     13: ("streaming regions, platforms and member choices", INSTANCE_SCHEMA_V13),
     14: ("dated streaming availability snapshots", INSTANCE_SCHEMA_V14),
     15: ("human charades difficulty decisions", INSTANCE_SCHEMA_V15),
+    16: ("persistent instance secrets for durable device keys", INSTANCE_SCHEMA_V16),
 }
 
 
@@ -1438,6 +1447,42 @@ class SqliteIdentityRepository:
         for column, declaration in additions.items():
             if column not in columns:
                 connection.execute(f"ALTER TABLE scanner_history ADD COLUMN {column} {declaration}")
+
+    def instance_secret(self, name: str) -> str:
+        """A stable per-instance secret, created once and kept.
+
+        The device sync key is derived from this rather than from
+        `api_token`: rotating that token is a normal operation, and it must not
+        re-key every work in a paired client's local replica.
+        """
+
+        with self._thread_lock, closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT value FROM instance_secrets WHERE name = ?", (name,)
+            ).fetchone()
+            if row is not None:
+                return str(row["value"])
+            value = uuid.uuid4().hex + uuid.uuid4().hex
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.execute(
+                    "INSERT INTO instance_secrets(name, value, created_at) VALUES (?, ?, ?)",
+                    (name, value, _utc_now()),
+                )
+                connection.commit()
+            except sqlite3.IntegrityError:
+                # Another worker created it first; theirs wins.
+                connection.rollback()
+                existing = connection.execute(
+                    "SELECT value FROM instance_secrets WHERE name = ?", (name,)
+                ).fetchone()
+                return str(existing["value"]) if existing else value
+            except sqlite3.Error as error:
+                connection.rollback()
+                raise IdentityRepositoryError(
+                    f"Cannot create instance secret in: {self.path}"
+                ) from error
+        return value
 
     @staticmethod
     def _catalog(connection: sqlite3.Connection, user_id: str) -> PersonalCatalog | None:
