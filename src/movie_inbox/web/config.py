@@ -53,6 +53,7 @@ class ViewerConfig:
     library_allowed_roots: tuple[str, ...] = ()
     library_scheduler_poll_seconds: float = 15.0
     anime_offline_index: str = ""
+    imdb_dataset_index: str = ""
     external_credentials: ExternalSourceCredentials = field(
         default_factory=ExternalSourceCredentials,
         repr=False,

@@ -132,6 +132,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     configure_external_catalog(
         config.external_credentials.tmdb_read_access_token,
         config.anime_offline_index,
+        config.imdb_dataset_index,
     )
     instance_db = Path(config.instance_db)
     identity_repository = SqliteIdentityRepository(instance_db)

@@ -111,6 +111,19 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--imdb-dataset-index",
+        type=Path,
+        default=(
+            Path(os.environ["MOVIE_INBOX_IMDB_DATASET_INDEX"])
+            if os.environ.get("MOVIE_INBOX_IMDB_DATASET_INDEX")
+            else None
+        ),
+        help=(
+            "Use a local IMDb dataset index as the first authority for titles, "
+            "classification and runtime. Build it with `movie-inbox imdb-dataset sync`."
+        ),
+    )
+    parser.add_argument(
         "--session-days",
         type=int,
         default=DEFAULT_SESSION_TTL_SECONDS // (24 * 60 * 60),
@@ -246,6 +259,9 @@ def main(argv: list[str] | None = None) -> int:
         anime_offline_index=str(args.anime_offline_index.resolve())
         if args.anime_offline_index
         else "",
+        imdb_dataset_index=str(args.imdb_dataset_index.resolve())
+        if args.imdb_dataset_index
+        else "",
         external_credentials=external_credentials,
     )
     identity_repository = SqliteIdentityRepository(instance_db)
@@ -304,6 +320,11 @@ def main(argv: list[str] | None = None) -> int:
         f"Anime offline fallback: {config.anime_offline_index}"
         if config.anime_offline_index
         else "Anime offline fallback: not configured"
+    )
+    print(
+        f"IMDb dataset index: {config.imdb_dataset_index}"
+        if config.imdb_dataset_index
+        else "IMDb dataset index: not configured"
     )
     print(f"Open {url}")
     if public_presentation_origin:

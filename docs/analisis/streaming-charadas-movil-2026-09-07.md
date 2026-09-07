@@ -488,11 +488,45 @@ con el trabajo visual**, salvo donde se indica.
   revocación, y el tope de retención de seis meses aplica al snapshot. Hallazgo propio de
   este catálogo: el cine de autor tiene cobertura engañosa — o no aparece, o aparece sólo
   en plataformas marginales que la lista de ignoradas va a esconder.
-- **[S3] Consulta, persistencia y procedencia.** Snapshot con fecha de consulta, refresco
-  perezoso, reuso del cooldown y extensión del servicio de retirada. `en_plataforma`
-  derivado. Nunca escribe `en_catalogo`. *Medio. Depende de S1 y S2.*
-- **[S4] Superficie: ficha, filtros, plataformas ignoradas.** *Medio. Depende de S3 y de
-  la aceptación de [U3], porque los filtros viven en Colección.*
+- **[S3] Consulta, persistencia y procedencia.** **Cerrada 2026-09-07 — commit `1e0b2b7`.**
+  Snapshot fechado en tabla propia, refresco perezoso a los 30 días, corte contractual a
+  los 180, `en_plataforma` derivado al leer y la retirada de TMDb extendida para
+  borrarlos. El catálogo portable no se tocó: sigue en schema v9.
+- **[S4] Superficie: ficha, filtros, plataformas ignoradas.** **Asignada a Codex el
+  2026-09-07** por decisión del owner: es trabajo de presentación y encaja con el
+  rediseño de Colección de [U3]. El backend ya está entregado y probado; ver el traspaso
+  más abajo.
+
+#### Traspaso de [S4] a Codex
+
+El backend está completo. Lo que falta es sólo mostrarlo.
+
+**Lo que hay que consumir:**
+
+- `GET /api/streaming/availability` — devuelve `{"availability": {<item_id>: {...}}}` para
+  el catálogo de quien llama. Sólo trae las obras que tienen identidad TMDb; una obra
+  ausente del mapa significa **"no sabemos"**, nunca "no está disponible".
+- Cada fila trae `en_plataforma` (booleano ya derivado, con las plataformas ocultas del
+  usuario aplicadas), `available_on`, `acquire_on`, `checked_at`, `region_code`, `link` y
+  `known`.
+- `GET`/`POST /api/streaming/preferences` — lee y escribe la región elegida y la lista de
+  `ignored_providers` del usuario. El `POST` rechaza con `400` un id de plataforma que no
+  existe en la región activa.
+
+**Tres reglas que la interfaz no puede romper:**
+
+1. **`known: false` no es "no disponible".** Es "no lo consultamos". Merece un texto
+   distinto, no un tilde en gris.
+2. **`available_on` y `acquire_on` no son lo mismo.** Lo primero se mira con la
+   suscripción; lo segundo se alquila o se compra. Decisión del owner: sólo lo primero
+   es "Disponible en X"; lo segundo necesita otro verbo, tipo "se consigue en".
+3. **La atribución a JustWatch es obligatoria** donde se muestre disponibilidad, y es
+   distinta del aviso de TMDb que ya existe. Los términos incluyen una cláusula de
+   revocación de acceso a toda la API, así que no es opcional. Texto y detalle en
+   `docs/adr/0004-streaming-availability-source.md`.
+
+**Decisión del owner sobre la fecha:** la ficha dice "Disponible en Netflix" sin fecha; el
+`checked_at` se informa en `Administrar`. El dato puede tener hasta dos meses.
 
 ### Frente: Charadas
 
