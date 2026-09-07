@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 12
+INSTANCE_SCHEMA_VERSION = 13
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -365,6 +365,43 @@ CREATE INDEX ix_device_sessions_refresh_expiry
 ON device_sessions(refresh_token_hash, refresh_expires_at);
 """
 
+INSTANCE_SCHEMA_V13 = """
+CREATE TABLE streaming_regions (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE streaming_providers (
+    region_code TEXT NOT NULL REFERENCES streaming_regions(code) ON DELETE CASCADE,
+    provider_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    display_priority INTEGER NOT NULL DEFAULT 0,
+    logo_path TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (region_code, provider_id)
+);
+CREATE INDEX ix_streaming_providers_region
+ON streaming_providers(region_code, display_priority);
+
+CREATE TABLE streaming_region_policy (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    default_region TEXT NOT NULL DEFAULT '',
+    members_may_choose INTEGER NOT NULL DEFAULT 0 CHECK (members_may_choose IN (0, 1)),
+    updated_at TEXT NOT NULL
+);
+INSERT INTO streaming_region_policy(id, default_region, members_may_choose, updated_at)
+VALUES (1, '', 0, '');
+
+CREATE TABLE member_streaming_preferences (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    region TEXT NOT NULL DEFAULT '',
+    ignored_providers_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -377,6 +414,7 @@ INSTANCE_MIGRATIONS = {
     10: ("shared library availability collections", INSTANCE_SCHEMA_V10),
     11: ("revocable public availability presentations", INSTANCE_SCHEMA_V11),
     12: ("revocable opaque device sessions", INSTANCE_SCHEMA_V12),
+    13: ("streaming regions, platforms and member choices", INSTANCE_SCHEMA_V13),
 }
 
 

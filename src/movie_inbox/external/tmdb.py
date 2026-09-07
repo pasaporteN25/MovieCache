@@ -104,6 +104,52 @@ class TmdbAdapter:
         )
         return tmdb_detail_result(raw, media_type, language=self.language) or {}
 
+    def watch_regions(self) -> list[dict[str, Any]]:
+        """Markets the provider can answer availability for (ADR-0004)."""
+
+        raw = self._request("/watch/providers/regions", {"language": self.language})
+        regions: list[dict[str, Any]] = []
+        for row in object_list(raw.get("results")):
+            if not isinstance(row, Mapping):
+                continue
+            code = clean_text(str(row.get("iso_3166_1") or ""))
+            name = clean_text(str(row.get("native_name") or row.get("english_name") or ""))
+            if len(code) == 2 and code.isalpha():
+                regions.append({"code": code.upper(), "name": name or code.upper()})
+        return regions
+
+    def watch_providers(self, region_code: str) -> list[dict[str, Any]]:
+        """Platform catalogue for one market, with the upstream's literal names.
+
+        Movies and TV expose separate catalogues; a platform present in either
+        one belongs to the market, so both are merged and de-duplicated by id.
+        """
+
+        merged: dict[str, dict[str, Any]] = {}
+        for medium in ("movie", "tv"):
+            raw = self._request(
+                f"/watch/providers/{medium}",
+                {"language": self.language, "watch_region": region_code},
+            )
+            for row in object_list(raw.get("results")):
+                if not isinstance(row, Mapping):
+                    continue
+                provider_id = _positive_id(row.get("provider_id"))
+                name = clean_text(str(row.get("provider_name") or ""))
+                if not provider_id or not name:
+                    continue
+                merged.setdefault(
+                    provider_id,
+                    {
+                        "region_code": region_code,
+                        "provider_id": provider_id,
+                        "name": name,
+                        "display_priority": max(0, int(row.get("display_priority") or 0)),
+                        "logo_path": str(row.get("logo_path") or "").strip(),
+                    },
+                )
+        return sorted(merged.values(), key=lambda row: (row["display_priority"], row["name"]))
+
     def _request(self, path: str, parameters: Mapping[str, object]) -> dict[str, Any]:
         url = f"{TMDB_API_BASE_URL}{path}?{urlencode(parameters)}"
         return fetch_json(

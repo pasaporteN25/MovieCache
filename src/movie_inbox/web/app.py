@@ -39,7 +39,9 @@ from movie_inbox.application.privacy_service import PrivacyService
 from movie_inbox.application.public_presentation_service import PublicPresentationService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
+from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.external.tmdb import TmdbAdapter
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.curation_history import (
     JsonCurationHistoryRepository,
@@ -61,6 +63,7 @@ from movie_inbox.infrastructure.starter_collections import (
     AKIRA_KUROSAWA_SEED_KEY,
     akira_kurosawa_collection,
 )
+from movie_inbox.infrastructure.streaming_repository import SqliteStreamingRepository
 from movie_inbox.web.assets import (
     render_html,
     render_login_html,
@@ -101,6 +104,7 @@ from movie_inbox.web.routers import (
     public_presentations,
     scanner,
     search,
+    streaming,
 )
 from movie_inbox.web.security import LoginAttemptLimiter, PublicReadLimiter, viewer_allowed_hosts
 
@@ -229,6 +233,16 @@ def create_app(config: ViewerConfig) -> FastAPI:
     public_presentation_service = PublicPresentationService(
         SqlitePublicPresentationRepository(instance_db), collection_repository
     )
+    # The loaders are only wired when a credential is present, so an instance
+    # without TMDb keeps a usable back office that simply cannot refresh from
+    # upstream, instead of failing at call time.
+    streaming_token = config.external_credentials.tmdb_read_access_token
+    streaming_adapter = TmdbAdapter(streaming_token) if streaming_token else None
+    streaming_service = StreamingService(
+        SqliteStreamingRepository(instance_db),
+        region_loader=streaming_adapter.watch_regions if streaming_adapter else None,
+        provider_loader=streaming_adapter.watch_providers if streaming_adapter else None,
+    )
     home_service = EditorialHomeService()
     home_snapshot_repository = SqliteHomeSnapshotRepository(instance_db)
     import_repository = SqliteImportDraftRepository(instance_db)
@@ -281,6 +295,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.library_scheduler = library_scheduler
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
+    app.state.streaming_service = streaming_service
     app.state.device_login_limiter = login_limiter
     app.add_middleware(
         TrustedHostMiddleware,
@@ -468,6 +483,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(club.router)
     app.include_router(admin.router)
     app.include_router(integrations.router)
+    app.include_router(streaming.router)
     app.include_router(search.router)
     app.include_router(device_auth.router)
     app.include_router(device_catalog.router)
