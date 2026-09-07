@@ -41,6 +41,7 @@ from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.external.imdb_dataset_source import ImdbDatasetSource
 from movie_inbox.external.tmdb import TmdbAdapter
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.curation_history import (
@@ -102,6 +103,7 @@ from movie_inbox.web.routers import (
     imports,
     integrations,
     public_presentations,
+    ratings,
     scanner,
     search,
     streaming,
@@ -300,6 +302,9 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
     app.state.streaming_service = streaming_service
+    app.state.imdb_dataset_source = (
+        ImdbDatasetSource(Path(config.imdb_dataset_index)) if config.imdb_dataset_index else None
+    )
     app.state.device_login_limiter = login_limiter
     app.add_middleware(
         TrustedHostMiddleware,
@@ -488,6 +493,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(admin.router)
     app.include_router(integrations.router)
     app.include_router(streaming.router)
+    app.include_router(ratings.router)
     app.include_router(search.router)
     app.include_router(device_auth.router)
     app.include_router(device_catalog.router)

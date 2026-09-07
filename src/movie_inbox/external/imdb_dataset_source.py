@@ -16,9 +16,11 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from movie_inbox.domain.imdb_dataset import IMDB_ATTRIBUTION_NOTICE, dataset_metadata
+from movie_inbox.domain.public_ratings import IMDB_SOURCE, PublicRating, public_rating
 from movie_inbox.infrastructure.imdb_dataset_index import (
     ImdbDatasetIndexStale,
     lookup_by_tconst,
+    lookup_ratings_by_tconst,
 )
 
 # Field families the matrix gives the index. Anything outside this set is left to
@@ -50,14 +52,38 @@ class ImdbDatasetSource:
         `imdb-dataset sync` must keep enriching exactly as it did before.
         """
 
-        tconst = str(imdb_id or "").strip().lower()
-        if not tconst.startswith("tt") or not tconst[2:].isdigit():
+        tconst = _tconst(imdb_id)
+        if not tconst:
             return {}
         try:
             found = lookup_by_tconst(self.index_path, tconst)
         except (FileNotFoundError, ImdbDatasetIndexStale, OSError):
             return {}
         return dataset_metadata(found)
+
+    def rating_for(self, imdb_id: str) -> PublicRating | None:
+        """The public score for one work, read from the index at display time.
+
+        Deliberately not part of `metadata_for`: ratings move, and merging one
+        into the catalogue would store a number that quietly goes stale. The
+        index is the storage, and the owner controls when it is re-synced.
+        """
+
+        tconst = _tconst(imdb_id)
+        if not tconst:
+            return None
+        try:
+            found = lookup_ratings_by_tconst(self.index_path, tconst)
+        except (FileNotFoundError, ImdbDatasetIndexStale, OSError):
+            return None
+        if found is None:
+            return None
+        return public_rating(IMDB_SOURCE, found.average_rating, found.num_votes)
+
+
+def _tconst(imdb_id: str) -> str:
+    value = str(imdb_id or "").strip().lower()
+    return value if value.startswith("tt") and value[2:].isdigit() else ""
 
 
 def apply_dataset_authority(

@@ -25,6 +25,7 @@ BASICS = "\t".join(
         "genres",
     ]
 )
+RATINGS = "\t".join(["tconst", "averageRating", "numVotes"])
 AKAS = "\t".join(
     [
         "titleId",
@@ -56,8 +57,15 @@ def write_dataset(root: Path) -> Path:
         handle.write("tt0113277\t1\tFuego contra fuego\tAR\t\\N\t\\N\t\\N\t0\n")
         handle.write("tt0113277\t2\tHeat\tUS\t\\N\t\\N\t\\N\t1\n")
         handle.write("tt0113277\t3\tHiito\tJP\t\\N\t\\N\t\\N\t0\n")
+    ratings = root / "title.ratings.tsv.gz"
+    with gzip.open(ratings, "wt", encoding="utf-8") as handle:
+        handle.write(RATINGS + "\n")
+        handle.write("tt0113277\t8.3\t712345\n")
+        handle.write("tt0306414\t9.3\t401234\n")
+        # A rating for a work the type filter drops: it must not survive either.
+        handle.write("tt0959621\t9.6\t23456\n")
     destination = root / "imdb-dataset.db"
-    build_index(basics, akas, destination)
+    build_index(basics, akas, destination, ratings)
     return destination
 
 

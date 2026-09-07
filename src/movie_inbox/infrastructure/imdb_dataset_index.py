@@ -123,6 +123,13 @@ class AkaEntry:
 
 
 @dataclass(frozen=True)
+class RatingLookupResult:
+    tconst: str
+    average_rating: float
+    num_votes: int
+
+
+@dataclass(frozen=True)
 class TitleLookupResult:
     tconst: str
     title_type: str
@@ -330,6 +337,31 @@ def _fetch_title(connection: sqlite3.Connection, tconst: str) -> TitleLookupResu
         runtime_minutes=row["runtime_minutes"],
         genres=row["genres"],
         akas=akas,
+    )
+
+
+def lookup_ratings_by_tconst(path: Path, tconst: str) -> RatingLookupResult | None:
+    """Public score for one work, read on demand.
+
+    Kept out of `TitleLookupResult` on purpose: ratings move, so they are read
+    when they are shown rather than merged into a catalogue that would then hold
+    a number that quietly goes stale.
+    """
+
+    connection = _open_readonly(path)
+    try:
+        row = connection.execute(
+            "SELECT average_rating, num_votes FROM imdb_title_ratings WHERE tconst = ?",
+            (tconst,),
+        ).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        return None
+    return RatingLookupResult(
+        tconst=tconst,
+        average_rating=float(row["average_rating"]),
+        num_votes=int(row["num_votes"]),
     )
 
 

@@ -472,9 +472,22 @@ con el trabajo visual**, salvo donde se indica.
   matriz de autoridad de [Q5] y el prototipo desconectado. Opt-in, sin volverse
   obligatorio para una instalación que no lo indexó. *Grande. Sin dependencias, pero va
   después de F5.4 por decisión de prioridad.*
-- **[F6.2] Elegir la señal de notoriedad para charadas.** `vote_count` de TMDb contra
-  `title.ratings` de IMDb; decisión explícita de que no toca `rating` personal. *Medio.
-  Depende de F5.4; F6.1 sólo si se elige el camino IMDb.*
+- **[F6.2] Señal de notoriedad y puntajes públicos.** **Mitad de datos cerrada
+  2026-09-07.** El owner decidió **tomar las dos fuentes en vez de elegir una**, para que
+  el lector compare en lugar de que se le imponga una vara, con su propio puntaje al lado.
+  `title.ratings` entra al índice liviano y se lee al mostrar, nunca se guarda en el
+  catálogo. `GET /api/ratings` lo expone. La regla de [F3.2] sigue firme y ahora es
+  estructural: un puntaje público nunca llega a `rating` personal.
+  - **Pendiente, para Codex:** presentarlos en la ficha, junto al puntaje propio, con la
+    atribución de IMDb que exigen sus términos (`attribution.imdb` viene en la respuesta).
+    Un puntaje con menos de 50 votos llega marcado `is_meaningful: false` — merece verse
+    distinto, porque un 9,9 de tres personas al lado de un 8,3 de setecientas mil invita
+    una comparación que no existe.
+  - **Pendiente, mío:** los puntajes de TMDb. Se dejaron fuera a propósito: mostrarlos
+    exige guardar un número que envejece o una llamada de red por vista, o sea el mismo
+    tratamiento de snapshot fechado que [S3] le dio a la disponibilidad. Los de IMDb no
+    tienen ese problema porque salen del índice local y el owner controla cuándo se
+    re-sincroniza.
 
 ### Frente: Disponibilidad en streaming
 
