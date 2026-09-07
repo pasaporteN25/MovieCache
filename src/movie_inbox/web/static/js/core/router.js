@@ -5,6 +5,7 @@ import { currentIdentity, currentView, inboxMode, items, setCurrentView, setInbo
 import { loadLibraries } from "../surfaces/admin-libraries.js";
 import { loadImageCacheStatus, loadMembers, syncImageCacheStatusPolling } from "../surfaces/admin-members.js";
 import { loadPublicPresentations } from "../surfaces/admin-public-presentations.js";
+import { loadStreamingConfiguration } from "../surfaces/admin-streaming.js";
 import { COLLECTION_MULTI_FILTER_KEYS, applyCollectionRoute, collectionRouteValues, collectionSearchMessage, render, renderHeaderStats, resetCollectionFilters, setCollectionSearchMode } from "../surfaces/catalog-grid.js";
 import { activeQuery, clearManualSearch, manualResults, renderManualResults, runSearch, setCatalogMergeResults, setManualResults, setSearchState, setSelectedManualIndex, showFixedLocalItemForLink } from "../surfaces/catalog-search.js";
 import { loadClub } from "../surfaces/club.js";
@@ -69,7 +70,7 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
 
       export function goToAdmin(options = {}) {
         showView("admin", options);
-        Promise.all([loadMembers(), loadLibraries(), loadImageCacheStatus(), loadPublicPresentations()]);
+        Promise.all([loadMembers(), loadLibraries(), loadImageCacheStatus(), loadPublicPresentations(), loadStreamingConfiguration()]);
       }
 
       export function showView(view, options = {}) {
@@ -252,5 +253,6 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         if (requestedView === "admin") {
           loadMembers();
           loadPublicPresentations();
+          loadStreamingConfiguration();
         }
       }
