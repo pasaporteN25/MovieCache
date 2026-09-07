@@ -63,6 +63,20 @@ y los shims de import (`catalog_*.py`) ya no viven en `scripts/`: se movieron a
 contenedor Docker — ahí el camino es `movie-inbox <subcomando>`. La lógica nueva va
 siempre al paquete.
 
+## Reparto de trabajo entre agentes (desde 2026-09-07)
+
+El trabajo corre en paralelo, dividido por especialidad:
+
+- **Claude** — infraestructura, backend, modelo de datos, capas, contratos con fuentes
+  externas, migraciones y pruebas. Frentes propios: activación real de TMDb,
+  disponibilidad en streaming, charadas y dirección móvil
+  (`docs/analisis/streaming-charadas-movil-2026-09-07.md`).
+- **Codex** — dirección visual y frontend de presentación: [U2-P] y sus derivados.
+
+`tareas.md` es compartido: cada frente agrega su sección y no reescribe las ajenas. Antes
+de commitear, comprobar que el árbol no arrastra trabajo sin commitear del otro frente en
+los mismos archivos.
+
 ## Archivos personales — no tocar, no leer como fixture
 
 Datos reales del usuario, fuera del repo por `.gitignore`: `scripts/*.json`,
