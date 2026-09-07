@@ -2,6 +2,12 @@
 
 ## Estado y referencia vinculante
 
+**Actualización del usuario, 2026-09-06:** U2-P abre una revisión visual adicional con
+dos referencias anotadas. Su registro está en `home-u2-p-refinement-v1.md`. El cierre
+U2-R de este documento conserva evidencia histórica; no implica aprobación visual
+definitiva del usuario. Los nuevos pedidos confirmados tienen precedencia: centrar
+Hoy/Ayer y retirar la hilera de indicadores inferiores. El resto sigue en relevamiento.
+
 Este brief reemplaza la dirección visual de `home-video-store-v2.md` sin borrar la
 historia técnica de U2. El resultado implementado por U2 no superó la aceptación visual
 del 2026-09-03: conservó varias interacciones útiles, pero convirtió la portada en un

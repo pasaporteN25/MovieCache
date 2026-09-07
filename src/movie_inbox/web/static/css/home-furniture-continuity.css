@@ -1,0 +1,22 @@
+/* U2-P.5 — El mueble continúa fuera del encuadre a la derecha.
+   Se prolonga el objeto completo, no su textura por separado: marco, huecos y
+   consola conservan una única escala. La Home recorta sólo el excedente visual. */
+@media (min-width: 861px) {
+  #homeView {
+    --home-furniture-overrun: clamp(72px, 6vw, 112px);
+    overflow-x: clip;
+  }
+
+  #homeView .home-furniture {
+    background-position: left center;
+    max-width: none;
+    width: calc(100% + var(--home-furniture-overrun));
+  }
+
+  /* El carril sigue terminando dentro del área operable: el último lomo puede
+     desplazarse completamente a la vista aunque la carcasa continúe detrás. */
+  #homeView .home-furniture .home-editorial-sections,
+  #homeView .home-furniture .home-editorial-sections.home-editorial-sections {
+    right: calc(var(--home-furniture-overrun) + 4.2%);
+  }
+}

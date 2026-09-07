@@ -811,9 +811,6 @@ class BrowserInterfaceTests(unittest.TestCase):
                 const heading = document.querySelector(
                     '.spotlight-selector-heading'
                 ).getBoundingClientRect();
-                const indicators = document.querySelector(
-                    '.spotlight-selector-options'
-                ).getBoundingClientRect();
                 const preview = document.querySelector(
                     '.spotlight-preview'
                 ).getBoundingClientRect();
@@ -821,18 +818,20 @@ class BrowserInterfaceTests(unittest.TestCase):
                     '.spotlight-preview-signal'
                 ).getBoundingClientRect();
                 return {
-                    headingCenterRatio:
-                        ((heading.top + heading.height / 2) - selector.top) / selector.height,
-                    indicatorCenterRatio:
-                        ((indicators.top + indicators.height / 2) - selector.top) / selector.height,
+                    headingCenterError: Math.abs(
+                        heading.top + heading.height / 2 - selector.top
+                        - (8 + (selector.height - 16) * 139 / 1536)
+                    ),
+                    headingHorizontalError: Math.abs(
+                        heading.left + heading.width / 2 - selector.left - selector.width / 2
+                    ),
                     signalWidthRatio: signal.width / preview.width
                 };
             }"""
         )
-        self.assertGreaterEqual(marquee_geometry["headingCenterRatio"], 0.085)
-        self.assertLessEqual(marquee_geometry["headingCenterRatio"], 0.115)
-        self.assertGreaterEqual(marquee_geometry["indicatorCenterRatio"], 0.87)
-        self.assertLessEqual(marquee_geometry["indicatorCenterRatio"], 0.915)
+        self.assertLessEqual(marquee_geometry["headingCenterError"], 0.5)
+        self.assertLessEqual(marquee_geometry["headingHorizontalError"], 0.5)
+        self.assertEqual(page.locator(".spotlight-selector-options").count(), 0)
         self.assertGreaterEqual(marquee_geometry["signalWidthRatio"], 0.38)
         self.assertEqual(
             page.locator("#spotlight").evaluate(
@@ -910,7 +909,199 @@ class BrowserInterfaceTests(unittest.TestCase):
             signal_points,
         )
 
-    def test_home_selector_keeps_one_tab_stop_and_changes_preview_with_arrows(self) -> None:
+        # Align to the cream aperture in the raster asset, not the whole selector.
+        for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
+            page.set_viewport_size({"width": width, "height": height})
+            for action, label in (("today", "Hoy"), ("yesterday", "Ayer")):
+                desktop_date_control.locator(f'[data-click="home-date-{action}"]').click()
+                page.wait_for_function(
+                    "label => document.querySelector('.spotlight-selector-heading span')"
+                    "?.textContent.trim() === label",
+                    arg=label,
+                )
+                offset = page.locator(".spotlight-selector-heading").evaluate(
+                    """element => {
+                        const heading = element.getBoundingClientRect();
+                        const selector = element.parentElement.getBoundingClientRect();
+                        return {
+                            x: Math.abs(heading.x + heading.width / 2
+                                - selector.x - selector.width / 2),
+                            y: Math.abs(heading.y + heading.height / 2
+                                - selector.y - 8 - (selector.height - 16) * 139 / 1536)
+                        };
+                    }"""
+                )
+                self.assertLessEqual(offset["x"], 0.5, (width, label, offset))
+                self.assertLessEqual(offset["y"], 0.5, (width, label, offset))
+
+    def test_home_typography_is_local_scoped_and_works_with_csp(self) -> None:
+        # Fresh context: exercise the real CSP, not the shared bypass used by other tests.
+        context = self.browser.new_context(storage_state=self.context.storage_state())
+        try:
+            page = context.new_page()
+            page.goto(self.base_url)
+            page.locator('#stats:has-text("2 obras")').wait_for()
+            page.locator(".vhs-spine-title").first.wait_for()
+            page.evaluate("document.fonts.ready")
+            for name in (
+                "barlow-condensed-600-latin",
+                "ibm-plex-mono-400-latin",
+                "oswald-400-latin",
+            ):
+                response = page.request.get(f"{self.base_url}/static/fonts/{name}.woff2")
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.headers["content-type"], "font/woff2")
+            session = context.new_cdp_session(page)
+            session.send("DOM.enable")
+            session.send("CSS.enable")
+            root = session.send("DOM.getDocument")["root"]["nodeId"]
+            for selector, family, weight in (
+                (".vhs-spine-title", "Barlow Condensed", "600"),
+                (".home-shelf-bay-plaque > span", "Oswald", "400"),
+                (".home-shelf-bay-plaque > small", "IBM Plex Mono", "400"),
+                (".home-shelf-preview-copy h3", "IBM Plex Mono", "400"),
+            ):
+                element = page.locator(selector).first
+                element.evaluate("el => el.textContent = 'ÁÉÍÓÚÜÑ áéíóúüñ ¿Año? 2026 Łódź'")
+                page.evaluate("document.fonts.ready")
+                node = session.send("DOM.querySelector", {"nodeId": root, "selector": selector})
+                fonts = session.send("CSS.getPlatformFontsForNode", {"nodeId": node["nodeId"]})
+                self.assertTrue(fonts["fonts"])
+                self.assertTrue(all(font["isCustomFont"] for font in fonts["fonts"]), fonts)
+                self.assertTrue(all(family in font["familyName"] for font in fonts["fonts"]))
+                self.assertEqual(element.evaluate("el => getComputedStyle(el).fontWeight"), weight)
+                self.assertEqual(element.evaluate("el => getComputedStyle(el).fontStyle"), "normal")
+            self.assertNotIn(
+                "Barlow", page.locator("h1").evaluate("el => getComputedStyle(el).fontFamily")
+            )
+            font_urls = page.evaluate(
+                "performance.getEntriesByType('resource').filter(e => e.name.endsWith('.woff2'))"
+                ".map(e => e.name)"
+            )
+            self.assertTrue(font_urls)
+            self.assertTrue(
+                all(url.startswith(self.base_url + "/static/fonts/") for url in font_urls)
+            )
+            for width in (1920, 1440, 1280, 720, 390, 320):
+                page.set_viewport_size({"width": width, "height": 900})
+                self.assertFalse(
+                    page.evaluate("document.documentElement.scrollWidth > innerWidth + 1")
+                )
+        finally:
+            context.close()
+
+    def test_home_font_failure_keeps_text_and_navigation_usable(self) -> None:
+        page = self.page
+        page.route("**/*.woff2", lambda route: route.abort())
+        self._open_and_wait_for_catalog(page)
+        page.evaluate("document.fonts.ready")
+        self.assertFalse(page.evaluate("document.fonts.check('600 16px \"Barlow Condensed\"')"))
+        self.assertFalse(page.evaluate("document.fonts.check('400 16px \"Oswald\"')"))
+        for width in (1280, 390, 320):
+            page.set_viewport_size({"width": width, "height": 900})
+            title = page.locator(".vhs-spine-title").first
+            self.assertTrue(title.is_visible())
+            self.assertTrue(title.inner_text())
+            plaque = page.locator(".home-shelf-bay-plaque").first
+            self.assertTrue(plaque.is_visible())
+            self.assertTrue(plaque.inner_text())
+            self.assertFalse(page.evaluate("document.documentElement.scrollWidth > innerWidth + 1"))
+        page.locator(".home-shelf-tape").first.focus()
+        page.keyboard.press("Enter")
+        self.assertTrue(page.locator(".home-shelf-preview-copy h3").is_visible())
+
+    def test_home_material_plaques_and_inset_spines_keep_geometry_on_desktop_and_mobile(
+        self,
+    ) -> None:
+        page = self.page
+        label = 'Colección "Noches del archivo" & otras historias para volver a descubrir'
+
+        def add_long_category(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            payload["home"]["sections"] = [
+                {
+                    "id": "plaque-review",
+                    "title": label,
+                    "items": [
+                        {
+                            "key": "plaque-item",
+                            "origin": {"kind": "catalog"},
+                            "item": payload["items"][0],
+                        }
+                    ],
+                }
+            ]
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_long_category)
+        page.set_viewport_size({"width": 1440, "height": 900})
+        self._open_and_wait_for_catalog(page)
+        page.evaluate("document.fonts.ready")
+        plaque = page.locator(".home-shelf-bay-plaque").first
+        self.assertEqual(plaque.get_attribute("title"), label)
+        self.assertEqual(plaque.locator("span").text_content(), label)
+        self.assertIn(
+            "home-category-plaque-v1.png",
+            plaque.evaluate("node => getComputedStyle(node).borderImageSource"),
+        )
+        self.assertIn(
+            "Oswald", plaque.locator("span").evaluate("node => getComputedStyle(node).fontFamily")
+        )
+        self.assertEqual(
+            plaque.locator("span").evaluate("node => getComputedStyle(node).fontWeight"), "400"
+        )
+        desktop = page.locator(".home-shelf-tape").first.evaluate(
+            """node => {
+                const spine = node.getBoundingClientRect();
+                const furniture = node.closest('#homeFurniture').getBoundingClientRect();
+                const plaque = document.querySelector('.home-shelf-bay-plaque');
+                const plate = plaque.getBoundingClientRect();
+                return {
+                    width: spine.width, height: spine.height,
+                    base: spine.bottom - furniture.top,
+                    plateHeight: plate.height,
+                    plateAbove: plate.bottom <= spine.top,
+                    insetWidth: getComputedStyle(node, '::after').width,
+                    insetPointer: getComputedStyle(node, '::after').pointerEvents,
+                    longTitleMode: getComputedStyle(plaque.querySelector('span')).textOverflow,
+                };
+            }"""
+        )
+        self.assertAlmostEqual(desktop["width"], 74.875, delta=1)
+        self.assertAlmostEqual(desktop["height"], 281.656, delta=1)
+        self.assertAlmostEqual(desktop["base"], 400.969, delta=1)
+        self.assertAlmostEqual(desktop["plateHeight"], 48, delta=1)
+        self.assertTrue(desktop["plateAbove"])
+        self.assertEqual(desktop["insetWidth"], "5px")
+        self.assertEqual(desktop["insetPointer"], "none")
+        self.assertEqual(desktop["longTitleMode"], "ellipsis")
+        for width in (390, 320):
+            page.set_viewport_size({"width": width, "height": 844})
+            mobile = plaque.evaluate(
+                """node => {
+                    const box = node.getBoundingClientRect();
+                    const title = node.querySelector('span');
+                    const spine = document.querySelector('.home-shelf-tape')
+                        .getBoundingClientRect();
+                    return {
+                        contained: box.left >= 0 && box.right <= innerWidth,
+                        above: box.bottom <= spine.top,
+                        titleFits: title.scrollWidth <= title.clientWidth + 1,
+                        wrapping: getComputedStyle(title).whiteSpace,
+                        spineHeight: spine.height,
+                    };
+                }"""
+            )
+            self.assertTrue(plaque.is_visible())
+            self.assertTrue(mobile["contained"], (width, mobile))
+            self.assertTrue(mobile["above"], (width, mobile))
+            self.assertTrue(mobile["titleFits"], (width, mobile))
+            self.assertEqual(mobile["wrapping"], "normal")
+            self.assertAlmostEqual(mobile["spineHeight"], 280, delta=1)
+            self.assertFalse(page.evaluate("document.documentElement.scrollWidth > innerWidth + 1"))
+
+    def test_home_poster_replaces_dots_and_keeps_keyboard_navigation(self) -> None:
         page = self.page
 
         def add_second_featured(route) -> None:
@@ -944,25 +1135,40 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/items?*", add_second_featured)
         self._open_and_wait_for_catalog(page)
-        selector = page.locator(".spotlight-selector-option")
-        self.assertEqual(selector.count(), 2)
-        self.assertEqual(selector.nth(0).get_attribute("tabindex"), "0")
-        self.assertEqual(selector.nth(1).get_attribute("tabindex"), "-1")
-        self.assertLessEqual(selector.nth(0).bounding_box()["height"], 40)
+        selector = page.locator(".spotlight-poster-trigger")
+        self.assertEqual(page.locator(".spotlight-selector-option").count(), 0)
+        self.assertEqual(page.locator(".spotlight-selector button").count(), 1)
+        self.assertEqual(selector.get_attribute("aria-describedby"), "spotlight-navigation-help")
         first_signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
 
-        selector.nth(0).focus()
+        selector.focus()
         selected_before = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
         page.keyboard.press("ArrowDown")
 
         self.assertEqual(page.evaluate("document.activeElement.dataset.index"), "1")
-        self.assertEqual(selector.nth(1).get_attribute("aria-pressed"), "true")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-select")
+        self.assertIn(
+            "Recomendación 2 de 2", page.locator("#spotlight-navigation-help").inner_text()
+        )
         self.assertEqual(
             page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before
         )
+        self.assertFalse(page.evaluate("window.tickHomeAutoplay()"))
+        self.assertEqual(selector.get_attribute("data-index"), "1")
+        for key, expected in (
+            ("ArrowRight", "0"),
+            ("ArrowLeft", "1"),
+            ("Home", "0"),
+            ("End", "1"),
+            ("ArrowUp", "0"),
+        ):
+            page.keyboard.press(key)
+            self.assertEqual(page.evaluate("document.activeElement.dataset.index"), expected)
+        page.keyboard.press("End")
         page.keyboard.press("Enter")
         self.assertEqual(
-            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before
+            page.evaluate("window.getHomePlaybackState().selectedEntryKey"),
+            "browser-selector-alternate",
         )
 
         page.keyboard.press("Tab")
@@ -970,12 +1176,12 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("document.activeElement.dataset.click"),
             {
                 "spotlight-select",
-                "spotlight-air-select",
                 "playlist-select",
                 "home-date-today",
                 "home-date-yesterday",
             },
         )
+        self.assertTrue(page.evaluate("window.tickHomeAutoplay()"))
         page.locator("[data-playlist-entry]").nth(1).click()
         second_signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
         self.assertNotEqual(second_signal_points, first_signal_points)
@@ -1065,11 +1271,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(
             page.locator('[data-click="spotlight-prev"], [data-click="spotlight-next"]').count(), 0
         )
-        page.locator('[data-click="spotlight-air-select"][data-index="5"]').click()
+        page.locator(".spotlight-poster-trigger").focus()
+        page.keyboard.press("End")
         self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 5)
-        self.assertEqual(
-            page.evaluate("document.activeElement.dataset.click"), "spotlight-air-select"
-        )
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-select")
         self.assertEqual(
             page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_key
         )
@@ -1274,6 +1479,66 @@ class BrowserInterfaceTests(unittest.TestCase):
             "0s",
         )
 
+    def test_home_spines_keep_vhs_signature_and_accessible_real_type_and_title(self) -> None:
+        page = self.page
+        titles = [
+            "Heat",
+            "Ñ" * 22,
+            "Ó" * 23,
+            "A" * 36,
+            "B" * 37,
+            'Una noche "especial" <img src=x onerror="alert(1)"> & otra historia',
+        ]
+        kinds = ["pelicula", "serie", "anime", "documental", "obra", "serie"]
+
+        def add_spine_variants(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            item = next(item for item in payload["items"] if item["id"] == "heat")
+            payload["home"]["sections"] = [
+                {
+                    "id": "spine-variants",
+                    "title": "Lomos de prueba",
+                    "items": [
+                        {
+                            "key": f"spine-variant-{index}",
+                            "origin": {"kind": "catalog"},
+                            "item": {**item, "title": title, "kind": kinds[index]},
+                        }
+                        for index, title in enumerate(titles)
+                    ],
+                }
+            ]
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_spine_variants)
+        self._open_and_wait_for_catalog(page)
+        spines = page.locator('[data-home-section="spine-variants"] .home-shelf-tape')
+        self.assertEqual(spines.count(), len(titles))
+        self.assertEqual(
+            spines.evaluate_all("elements => elements.map(node => node.dataset.titleLength)"),
+            ["short", "short", "long", "long", "xlong", "xlong"],
+        )
+        for index, title in enumerate(titles):
+            with self.subTest(title=title):
+                spine = spines.nth(index)
+                self.assertEqual(spine.get_attribute("title"), title)
+                self.assertEqual(spine.locator(".vhs-spine-title").text_content(), title)
+                self.assertIn(
+                    f"{title}. 1995. Tipo: {kinds[index]}.", spine.get_attribute("aria-label")
+                )
+                self.assertEqual(spine.locator(".vhs-spine-year").text_content(), "1995")
+                self.assertEqual(spine.locator(".vhs-spine-format").text_content(), "VHS")
+                self.assertEqual(
+                    spine.locator(".vhs-spine-meta").get_attribute("aria-hidden"), "true"
+                )
+                self.assertEqual(spine.locator("img").count(), 0)
+                self.assertIsNone(spine.get_attribute("onerror"))
+        spines.first.click()
+        page.locator('[data-home-shelf-preview="spine-variants"]').get_by_text("Ver más").click()
+        page.wait_for_selector("#detailDrawer[open]")
+        self.assertIn("pelicula", page.locator("#detailDrawer").inner_text().lower())
+
     def test_home_shelf_furniture_has_four_bays_real_overflow_and_wheel_limits(self) -> None:
         page = self.page
 
@@ -1372,6 +1637,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         geometry = cabinet.evaluate(
             """element => {
                 const cabinet = element.getBoundingClientRect();
+                const home = element.closest('#homeView').getBoundingClientRect();
                 const shelf = element.querySelector('#homeSections').getBoundingClientRect();
                 const panels = [
                     element.querySelector('.home-furniture-action-panel'),
@@ -1381,6 +1647,11 @@ class BrowserInterfaceTests(unittest.TestCase):
                 return {
                     shelfTop: (shelf.top - cabinet.top) / cabinet.height,
                     shelfBottom: (shelf.bottom - cabinet.top) / cabinet.height,
+                    cabinetOverrun: cabinet.right - home.right,
+                    visibleFraction: (home.right - cabinet.left) / cabinet.width,
+                    shelfRightInset: home.right - shelf.right,
+                    pageOverflow: document.documentElement.scrollWidth - innerWidth,
+                    homeOverflowX: getComputedStyle(element.closest('#homeView')).overflowX,
                     panelsContained: panels.every(panel =>
                         panel.left >= cabinet.left && panel.right <= cabinet.right
                         && panel.top >= cabinet.top && panel.bottom <= cabinet.bottom
@@ -1390,33 +1661,50 @@ class BrowserInterfaceTests(unittest.TestCase):
                 };
             }"""
         )
-        self.assertAlmostEqual(geometry["shelfTop"], 0.1844, delta=0.012)
+        self.assertAlmostEqual(geometry["shelfTop"], 0.088, delta=0.012)
         self.assertAlmostEqual(geometry["shelfBottom"], 0.639, delta=0.012)
+        self.assertGreaterEqual(geometry["cabinetOverrun"], 71)
+        self.assertLessEqual(geometry["visibleFraction"], 0.95)
+        self.assertGreaterEqual(geometry["shelfRightInset"], 40)
+        self.assertLessEqual(geometry["pageOverflow"], 1)
+        self.assertEqual(geometry["homeOverflowX"], "clip")
         self.assertTrue(geometry["panelsContained"])
         self.assertTrue(geometry["panelsSeparated"])
         first_spine = page.locator('[data-home-section="bay-0"] .home-shelf-tape').nth(0)
         spine_readability = first_spine.evaluate(
             """element => {
                 const spine = element.getBoundingClientRect();
-                const title = element.querySelector('.vhs-spine-title').getBoundingClientRect();
+                const titleNode = element.querySelector('.vhs-spine-title');
+                const title = titleNode.getBoundingClientRect();
+                const titleStyle = getComputedStyle(titleNode);
                 const meta = element.querySelector('.vhs-spine-meta');
                 const metaRect = meta.getBoundingClientRect();
+                const year = element.querySelector('.vhs-spine-year').getBoundingClientRect();
+                const format = element.querySelector('.vhs-spine-format').getBoundingClientRect();
                 return {
                     titleHeightRatio: title.height / spine.height,
-                    metaHeight: metaRect.height,
+                    footerStacked: year.bottom <= format.top,
+                    metaContained: metaRect.bottom <= spine.bottom,
+                    titleWritingMode: titleStyle.writingMode,
+                    titleTransform: titleStyle.transform,
+                    titleStyle: titleStyle.fontStyle,
                     metaWritingMode: getComputedStyle(meta).writingMode,
                 };
             }"""
         )
         self.assertGreaterEqual(spine_readability["titleHeightRatio"], 0.5)
-        self.assertLessEqual(spine_readability["metaHeight"], 20)
+        self.assertTrue(spine_readability["footerStacked"])
+        self.assertTrue(spine_readability["metaContained"])
+        self.assertEqual(spine_readability["titleWritingMode"], "vertical-rl")
+        self.assertEqual(spine_readability["titleTransform"], "matrix(-1, 0, 0, -1, 0, 0)")
+        self.assertEqual(spine_readability["titleStyle"], "normal")
         self.assertEqual(spine_readability["metaWritingMode"], "horizontal-tb")
         self.assertEqual(
             first_spine.locator(".vhs-spine-meta > span").all_text_contents(),
-            ["1995", "PEL"],
+            ["1995", "VHS"],
         )
         self.assertIn(
-            "La insoportable levedad del ser. 1995. Formato: pelicula.",
+            "La insoportable levedad del ser. 1995. Tipo: pelicula.",
             first_spine.get_attribute("aria-label"),
         )
         self.assertGreater(
@@ -1440,6 +1728,23 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         page.wait_for_timeout(100)
         self.assertGreater(furniture.evaluate("element => element.scrollLeft"), start)
+
+        furniture.evaluate("element => { element.scrollLeft = element.scrollWidth; }")
+        page.wait_for_timeout(350)
+        final_spine = page.locator('[data-home-section="bay-3"] .home-shelf-tape').last
+        end_geometry = final_spine.evaluate(
+            """element => {
+                const spine = element.getBoundingClientRect();
+                const shelf = element.closest('#homeSections').getBoundingClientRect();
+                const home = element.closest('#homeView').getBoundingClientRect();
+                return {
+                    completelyVisible: spine.left >= shelf.left - 1
+                        && spine.right <= shelf.right + 1
+                        && spine.right <= home.right + 1,
+                };
+            }"""
+        )
+        self.assertTrue(end_geometry["completelyVisible"])
 
         page.emulate_media(reduced_motion="reduce")
         self.assertEqual(
@@ -1822,8 +2127,8 @@ class BrowserInterfaceTests(unittest.TestCase):
             ["Disponible esta noche1 título", "Volvé a esto1 título"],
         )
         self.assertNotEqual(
-            plaques.nth(0).evaluate("element => getComputedStyle(element).borderColor"),
-            plaques.nth(1).evaluate("element => getComputedStyle(element).borderColor"),
+            plaques.nth(0).evaluate("element => getComputedStyle(element).color"),
+            plaques.nth(1).evaluate("element => getComputedStyle(element).color"),
         )
         self.assertEqual(
             page.locator('.home-program[data-home-section="available"]').get_attribute(
@@ -1865,8 +2170,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(
             all(
                 plaques.nth(index).evaluate(
-                    "element => element.getBoundingClientRect().width <= 1 "
-                    "&& element.getBoundingClientRect().height <= 1"
+                    "element => element.getBoundingClientRect().width <= innerWidth "
+                    "&& element.getBoundingClientRect().height >= 48"
                 )
                 for index in range(2)
             )

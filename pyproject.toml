@@ -37,6 +37,9 @@ where = ["src"]
     "static/js/surfaces/*.js",
     "static/img/*.png",
     "static/img/*.svg",
+    "static/fonts/*.woff2",
+    "static/fonts/*-OFL.txt",
+    "static/fonts/README.md",
 ]
 "movie_inbox.search_lab" = ["corpus/*.json"]
 

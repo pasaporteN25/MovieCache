@@ -85,6 +85,7 @@ export function renderBackCover(item) {
         <section class="vhs-back-cover-facts" aria-label="Datos de la edición">
           <dl>
             ${fact("Año", item?.year || "Sin dato")}
+            ${fact("Tipo", item?.kind || "Sin dato")}
             ${fact("Duración", duration)}
             ${fact("Géneros", genres)}
             ${fact("Disponibilidad", availability.effective ? "Disponible" : "No disponible")}

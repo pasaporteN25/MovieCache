@@ -36,6 +36,20 @@ colors:
   danger-border: "#b9564c"
   danger-ink: "#8e2f28"
 typography:
+  home-plaque:
+    fontFamily: '"Oswald", "Arial Narrow", "Trebuchet MS", sans-serif'
+    fontWeight: 400
+    fontSize: "20px"
+    lineHeight: 1.15
+    letterSpacing: "0.12em"
+  home-plaque-mobile:
+    fontSize: "18px"
+  home-signage:
+    fontFamily: '"Barlow Condensed", "Arial Narrow", "Trebuchet MS", sans-serif'
+    fontWeight: 600
+  home-data:
+    fontFamily: '"IBM Plex Mono", "Courier New", monospace'
+    fontWeight: 400
   display:
     fontFamily: '"Arial Narrow", "Trebuchet MS", sans-serif'
     fontSize: "clamp(28px, 4vw, 46px)"
@@ -188,6 +202,65 @@ Cada color de señal tiene variantes derivadas para usos puntuales, además de s
 **The Signal Hierarchy Rule.** Playhead Pink llama a actuar, CRT Cyan confirma y orienta, Rental Sticker Gold destaca valor o excepción y Tape Violet estructura; no intercambiar sus roles por decoración.
 
 ## Typography
+
+### Excepción Home U2-P.2 (2026-09-06)
+
+Opción B elegida por el usuario: **Barlow Condensed 600 normal** en títulos de lomos
+y categorías en el corte inicial; **IBM Plex Mono 400 normal** en consola, playlist
+y datos de Home. P.4 reemplaza sólo el rol de placas/categorías por Oswald 400.
+Fuentes WOFF2 autoalojadas, latin/latin-ext a demanda, `font-display: swap`, sin pesos
+ni cursivas sintéticos. Fallbacks: Arial Narrow/Trebuchet y Courier New respectivamente.
+Implementación acotada a `#homeView` en `home-type.css`: la marca global, Colección,
+Club, formularios y el dossier conservan su tipografía. P.2 no cambió la construcción
+de los lomos; P.3 fue autorizada posteriormente el 2026-09-07 y se describe abajo.
+Las reglas globales siguientes siguen vigentes fuera de estos roles de Home.
+
+### Lomos Home U2-P.3 (2026-09-07)
+
+Una hilera de cajas con cuerpo, no trazos separados. El asset existente del lomo se
+encuadra al 174% de ancho para quitar su margen transparente visual, sin alterar sus
+bytes. Cajas de 72–84 px en escritorio, 68 px en móvil; separación entre cajas de
+6 px. Mantener las proporciones del mueble general para P.5.
+
+Rotulación cálida `#dfcba9`, Barlow Condensed 600 normal, lectura inferior-superior.
+Escala 20/18/16 px según longitud (hasta 22, hasta 36, más de 36 caracteres), columnas
+balanceadas para títulos largos. Pie independiente: año de 14 px y placa VHS de 12 px,
+ambos Plex 400. VHS es firma de la interfaz, no formato factual de la obra. El tipo
+real sigue accesible en el botón y en la fila Tipo de la ficha.
+
+La caja seleccionada tiene borde dorado y leve elevación; el foco sigue siendo cyan.
+El título completo permanece en HTML, nombre accesible y tooltip; no comprimir letras
+ni bajar de 16 px para esconder un caso extremo. No aplica a cajas de otras superficies.
+
+### Placas y altura Home U2-P.3/P.4 (elección del 2026-09-07)
+
+El usuario eligió **Oswald 400 + opción de lomo B**. Las placas usan el asset
+`home-category-plaque-v1.png`: metal ennegrecido, marco de latón y tornillos, con texto
+HTML dorado y conteo real Plex. `border-image` preserva las esquinas. No hay Bebas Neue
+en producción. Oswald WOFF2 latin/latin-ext local, con OFL, sin síntesis.
+
+En escritorio las placas de 48 px suben al travesaño; título 20 px y tracking .12em.
+Su ancho se limita al grupo y a 440 px. Los nombres que no caben conservan el texto
+completo accesible y en tooltip. En móvil la placa fluye antes de su fila, título de
+18 px, líneas libres y sin elipsis. Mantener selección cálida y foco cyan existentes.
+
+El carril sube de 18.44% a 8.8% y deja 60 px superiores para señalización. La base del
+lomo y su ancho no se mueven: en el mueble de 640 px gana 43.7 px de alto. Móvil usa
+280 px de alto y el mismo ancho 68 px. La opción B añade canto interior de 5 px,
+luz lateral y sombra corta, sin perspectiva, sin escalar letras ni rehacer el VHS.
+La consola sigue pendiente de P.6; el poste derecho se resuelve en P.5.
+
+### Continuidad del mueble Home U2-P.5 (2026-09-07)
+
+En escritorio el mueble se prolonga entre 72 y 112 px fuera del borde derecho de
+`homeView`; el contenedor recorta ese excedente y el poste terminal del raster queda
+fuera de cuadro. El asset completo se escala como una sola pieza, preservando el
+registro entre marco, estante y consola. No repetir una franja ni fabricar una unión.
+
+El carril de categorías compensa el excedente: conserva márgenes operables dentro del
+viewport y permite llevar el último lomo completamente a la vista. No hay scroll
+horizontal de página. En móvil continúa la composición apilada sin este sobreancho.
+P.5 no reordena la consola ni cambia su contenido; esa composición pertenece a P.6.
 
 **Display Font:** Arial Narrow (con Trebuchet MS como fallback)
 **Body Font:** Space Grotesk (con Trebuchet MS, Verdana y system-ui como fallbacks)

@@ -116,72 +116,6 @@
       }
       .spotlight-selector-heading span { color: var(--muted); }
       .spotlight-selector-heading strong { color: var(--gold); }
-      .spotlight-selector-options { display: grid; grid-auto-rows: minmax(0, 1fr); }
-      .spotlight-selector-option {
-        align-content: center;
-        background: transparent;
-        border: 0;
-        border-bottom: 1px solid var(--line);
-        border-radius: 0;
-        display: grid;
-        gap: 2px 9px;
-        grid-template-columns: 20px minmax(0, 1fr);
-        min-height: 52px;
-        padding: 7px 12px;
-        text-align: left;
-        width: 100%;
-      }
-      .spotlight-selector-option:last-child { border-bottom: 0; }
-      .spotlight-selector-option > span {
-        color: var(--gold);
-        font-family: var(--font-label);
-        font-size: var(--text-label);
-        grid-row: span 2;
-      }
-      .spotlight-selector-option strong {
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        color: var(--ink);
-        display: -webkit-box;
-        font-family: var(--font-display);
-        font-size: var(--text-caption);
-        font-style: italic;
-        letter-spacing: 0.035em;
-        line-height: 1.05;
-        overflow: hidden;
-        text-transform: uppercase;
-      }
-      .spotlight-selector-option small {
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 1;
-        color: var(--muted);
-        display: -webkit-box;
-        font-size: var(--text-caption);
-        line-height: 1.25;
-        overflow: hidden;
-      }
-      .spotlight-selector-option[aria-pressed="true"] {
-        background: linear-gradient(90deg, rgba(var(--red-rgb), 0.2), rgba(var(--violet-rgb), 0.08));
-        box-shadow: inset 0 2px 0 var(--red);
-        position: relative;
-      }
-      .spotlight-selector-option[aria-pressed="true"]::before {
-        border-bottom: 4px solid transparent;
-        border-left: 6px solid var(--teal);
-        border-top: 4px solid transparent;
-        content: "";
-        left: 2px;
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-      }
-      .spotlight-selector-option:hover { background: rgba(var(--teal-rgb), 0.08); }
-      .spotlight-selector-option:focus-visible {
-        outline: 3px solid var(--teal);
-        outline-offset: -3px;
-        position: relative;
-        z-index: 1;
-      }
       .spotlight-viewport { aspect-ratio: 16 / 5.25; min-height: 260px; min-width: 0; position: relative; }
       .spotlight-empty {
         align-content: center;
@@ -332,8 +266,7 @@
         padding-top: 24px;
       }
       /* En escritorio, el selector de categorías gobierna una sola estantería
-         activa: no se apilan todas las filas. En móvil (<=860px, ver el
-         breakpoint que ya define .spotlight-selector-options) todas quedan
+         activa: no se apilan todas las filas. En móvil (<=860px) todas quedan
          visibles y apiladas, como antes de esta entrega. */
       @media (min-width: 861px) {
         .home-program[data-active="false"] { display: none; }
@@ -635,19 +568,8 @@
 
         .spotlight-selector { border-bottom: 1px solid rgba(var(--violet-rgb), 0.48); border-right: 0; }
 
-        .spotlight-selector-options {
-          display: grid;
-          grid-auto-columns: minmax(168px, 1fr);
-          grid-auto-flow: column;
-          grid-auto-rows: 1fr;
-          overflow-x: auto;
-          overscroll-behavior-inline: contain;
-          scroll-snap-type: inline proximity;
-        }
 
-        .spotlight-selector-option { border-bottom: 0; border-right: 1px solid var(--line); min-height: 74px; scroll-snap-align: start; }
 
-        .spotlight-selector-option:last-child { border-right: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -849,25 +771,8 @@
         .spotlight-selector-heading span,
         .spotlight-selector-heading strong { color: var(--gold); }
 
-        .spotlight-selector-options {
-          align-content: end;
-          gap: 2px;
-          grid-auto-rows: minmax(34px, 1fr);
-          margin: 8px 9px 0;
-          max-height: 198px;
-          overflow: auto;
-          scrollbar-width: thin;
-          scrollbar-color: var(--gold) transparent;
-        }
 
-        .spotlight-selector-option {
-          background: rgba(5, 7, 15, 0.54);
-          min-height: 34px;
-          padding: 5px 7px;
-        }
 
-        .spotlight-selector-option strong { font-size: 10px; }
-        .spotlight-selector-option small { font-size: 10px; }
 
         .spotlight-viewport {
           aspect-ratio: auto;
@@ -1114,43 +1019,6 @@
   section.home-program[data-active="false"] { display: none !important; }
   .spotlight-selector { grid-template-rows: auto auto minmax(0, 1fr); }
   .spotlight-poster-card { display: grid; gap: 4px; justify-items: center; padding: 2px 9px 5px; }
-  .spotlight-selector-options {
-    align-items: center;
-    display: flex;
-    gap: 8px;
-    justify-content: center;
-    margin: 3px 9px 0;
-    max-height: none;
-    overflow: visible;
-  }
-  .spotlight-selector-option {
-    background: rgba(var(--gold-rgb), .18);
-    border: 1px solid rgba(var(--gold-rgb), .62);
-    border-radius: 50%;
-    display: block;
-    flex: 0 0 11px;
-    height: 11px;
-    min-height: 11px;
-    overflow: hidden;
-    padding: 0;
-    position: relative;
-    width: 11px;
-  }
-  .spotlight-selector-option > * {
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-    height: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
-  }
-  .spotlight-selector-option[aria-pressed="true"] {
-    background: var(--red);
-    border-color: var(--red);
-    box-shadow: 0 0 9px rgba(var(--red-rgb), .72);
-  }
-  .spotlight-selector-option[aria-pressed="true"]::before { display: none; }
   .spotlight-viewport { display: flex; flex-direction: column; min-height: 0; }
   .spotlight-table-wrap { flex: 1 1 auto; }
   .spotlight-layout { min-height: clamp(310px, 42vh, 400px); }
@@ -1161,7 +1029,6 @@
 
 @media (max-width: 860px) {
   .spotlight-poster-card { display: grid; gap: 4px; justify-items: center; padding: 6px 10px; }
-  .spotlight-selector-options { max-height: 115px; }
   .spotlight-preview { grid-template-columns: 82px minmax(0, 1fr); }
 }
 
@@ -1323,7 +1190,9 @@
     margin: 0;
     padding: 0 3px;
     position: absolute;
-    top: 9.8%;
+    /* Asset 1024×1536: centro de placa (512, 139). El fondo mide
+       100% - 16px y queda a 8px del borde superior del selector. */
+    top: calc(9.05% + 6.55px);
     transform: translate(-50%, -50%);
     width: clamp(116px, 14vh, 162px);
     z-index: 3;
@@ -1384,15 +1253,6 @@
     width: 100%;
   }
 
-  .spotlight-selector-options {
-    bottom: 9.2%;
-    left: 50%;
-    margin: 0;
-    max-width: 78%;
-    position: absolute;
-    transform: translateX(-50%);
-    z-index: 3;
-  }
 
   .spotlight-viewport {
     background:

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>U2-P · Prueba de tipografía</title>
+<style>
+@font-face { font-family: Oswald; src: url('./u2-p-fonts/Oswald-Variable.ttf') format('truetype'); font-weight: 200 700; font-display: swap; }
+@font-face { font-family: 'Barlow Condensed'; src: url('./u2-p-fonts/BarlowCondensed-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'IBM Plex Mono'; src: url('./u2-p-fonts/IBMPlexMono-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+* { box-sizing: border-box; }
+:root { color-scheme: dark; font-family: 'Trebuchet MS', sans-serif; color: #eee5d6; background: #090c10; }
+body { margin: 0; padding: 32px; }
+header, main, footer { max-width: 1440px; margin-inline: auto; }
+h1 { font-size: 32px; font-weight: 600; margin: 0 0 12px; }
+header p, footer p { max-width: 70ch; font-size: 16px; line-height: 1.5; color: #c6c7bd; }
+a { color: #9ad8df; }
+main { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-block: 32px; }
+section { min-width: 0; }
+h2 { font-size: 20px; margin: 0 0 8px; }
+.verdict { line-height: 1.5; font-size: 16px; min-height: 72px; margin: 0 0 24px; color: #c6c7bd; }
+.incumbent { --display: 'Arial Narrow', 'Trebuchet MS', sans-serif; --label: 'Courier New', monospace; }
+.oswald { --display: Oswald, sans-serif; --label: 'IBM Plex Mono', monospace; }
+.barlow { --display: 'Barlow Condensed', sans-serif; --label: 'IBM Plex Mono', monospace; }
+.specimen { background: #111214; border-block: 1px solid #765e3d; padding: 20px 16px; }
+.brand { font: 600 28px/1.2 var(--display); text-align: center; color: #d3b78a; margin-bottom: 20px; }
+.plate { padding: 12px 8px; border: 1px solid #927448; color: #d3b78a; text-align: center; background: #1c1915; }
+.plate strong { display: block; font: 600 20px/1.25 var(--display); letter-spacing: .06em; }
+.plate small { display: block; font: 400 12px/1.5 var(--label); margin-top: 4px; }
+.spines { display: flex; gap: 8px; justify-content: center; padding: 24px 0 16px; }
+.spine { display: flex; flex-direction: column; align-items: center; padding: 12px 6px 8px; height: 340px; width: 80px; min-width: 0; border: 3px double #897355; background: #101315; color: #dfc6a3; }
+.spine strong { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 22px/1.2 var(--display); text-transform: uppercase; flex: 1; min-height: 0; white-space: nowrap; }
+.spine.long strong { font-size: 18px; }
+.spine footer { font: 400 14px/1.5 var(--label); margin-top: 12px; text-align: center; }
+.badge { display: block; border: 1px solid #927448; padding: 0 6px; font: 400 12px/1.5 var(--label); }
+.console { border-top: 1px solid #31515a; padding-top: 16px; color: #9ad8df; font: 400 14px/1.55 var(--label); }
+.console h3 { font: 400 16px/1.4 var(--label); margin: 0 0 12px; }
+.console p { margin: 0; }
+.glyphs { color: #dfc6a3; font: 600 20px/1.6 var(--display); overflow-wrap: anywhere; margin: 16px 0 0; }
+.glyphs.mono { margin: 4px 0 0; font: 400 14px/1.6 var(--label); }
+.incumbent .brand, .incumbent .plate strong, .incumbent .spine strong { font-style: italic; font-weight: 900; }
+.incumbent .spine strong { font-size: 16px; }
+.incumbent .spine.long strong { font-size: 12px; }
+footer { border-top: 1px solid #33414a; padding-top: 16px; }
+@media (max-width: 1000px) { main { grid-template-columns: 1fr; max-width: 540px; } .verdict { min-height: 0; } body { padding: 20px; } }
+</style>
+<header>
+  <h1>La letra de nuestra videoteca</h1>
+  <p>U2-P.2 · Comparación local, todavía sin aplicar a Inicio. Misma caja, mismos textos y mismo color: cambia la tipografía. La lectura inferior → superior ya está acordada.</p>
+</header>
+<main id="comparison"></main>
+<footer>
+  <p>Mi propuesta: <strong>A, Oswald 600 + IBM Plex Mono 400</strong>. Oswald se acerca más a la rotulación alta del boceto; Barlow Condensed ofrece una alternativa menos rígida. Plex queda reservado a consola y datos: no reemplaza el texto general de toda la aplicación.</p>
+  <p>Muestras de marca y categorías de Inicio, títulos de la referencia anotada y sinopsis de Heat del catálogo de pruebas. Estas cajas son probetas tipográficas, no un rediseño terminado del mueble. El control actual conserva su cursiva y reduce el título largo para que entre.</p>
+  <p>Fuentes y licencias locales: <a href="u2-p-fonts/oswald-OFL.txt">Oswald</a>, <a href="u2-p-fonts/barlowcondensed-OFL.txt">Barlow Condensed</a> y <a href="u2-p-fonts/ibmplexmono-OFL.txt">IBM Plex Mono</a>. <a href="u2-p-fonts/README.md">Procedencia y condiciones de integración</a>.</p>
+</footer>
+<script>
+const variants = [
+  ['incumbent', 'Control · Pila actual', 'Arial Narrow / Trebuchet + Courier New. Depende de las fuentes instaladas; la cursiva resta altura y definición.'],
+  ['oswald', 'A · Oswald + IBM Plex Mono', 'Mi recomendación. Alta, firme y condensada: una rotulación cercana al boceto, con datos de consola bien separados.'],
+  ['barlow', 'B · Barlow Condensed + IBM Plex Mono', 'Algo más suave y abierta. Conserva la condensación, pero tiene menos rigidez de rótulo mecánico.'],
+];
+for (const [id, name, note] of variants) {
+  const section = document.createElement('section');
+  section.className = id;
+  section.innerHTML = `<h2>${name}</h2><p class="verdict">${note}</p>
+    <div class="specimen"><div class="brand">MOVIE INBOX</div>
+      <div class="plate"><strong>DISPONIBLE ESTA NOCHE</strong><small>6 TÍTULOS</small></div>
+      <div class="spines">
+        <div class="spine"><strong>Amores perros</strong><footer>2000<span class="badge">VHS</span></footer></div>
+        <div class="spine"><strong>Millennium Actress</strong><footer>2001<span class="badge">VHS</span></footer></div>
+        <div class="spine long"><strong>The Killing of a Sacred Deer</strong><footer>2017<span class="badge">VHS</span></footer></div>
+      </div>
+      <div class="console"><h3>HEAT (1995)</h3><p>Un detective y un ladrón profesional se enfrentan en Los Ángeles.</p><p>ESTADO · PENDIENTE</p></div>
+      <p class="glyphs" id="glyphs-${id}">ÁÉÍÓÚÜÑ · áéíóúüñ · ¿Qué año? ¡Sí! 0123456789</p>
+      <p class="glyphs mono" id="mono-${id}">Dirección · Duración · Año · 01:48</p>
+    </div>`;
+  document.querySelector('#comparison').append(section);
+}
+</script>
+</html>

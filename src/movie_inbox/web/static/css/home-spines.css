@@ -1,0 +1,124 @@
+/* U2-P.3 — Cajas de perfil: un cuerpo continuo, rotulación cálida y pie apilado.
+   El PNG 724×2172 contiene la caja en x≈150–566. Ampliar sólo el encuadre de fondo
+   recupera ese cuerpo sin deformar el layout ni modificar el asset original. */
+#homeView {
+  --home-spine-width: clamp(72px, 5.2vw, 84px);
+  --home-spine-gap: 6px;
+  --home-spine-title-size: 20px;
+  --home-spine-title-long: 18px;
+  --home-spine-title-xlong: 16px;
+  --home-spine-ink: #dfcba9;
+}
+
+#homeView .home-shelf-rail {
+  gap: var(--home-spine-gap);
+}
+
+#homeView .home-shelf-tape.vhs-spine {
+  background: url("../img/vhs-spine-shell-v1.png") center / 174% 102% no-repeat;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  box-shadow: inset -5px 0 3px rgb(0 0 0 / 90%),
+    inset 2px 0 1px rgb(234 218 171 / 36%), 4px 5px 4px rgb(0 0 0 / 90%);
+  color: var(--home-spine-ink);
+  filter: none;
+  flex: 0 0 var(--home-spine-width);
+  gap: 8px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 14px 10px 12px;
+}
+
+#homeView .vhs-spine-sticker { display: none; }
+
+/* Opción B aprobada: canto interior, sin sumar ancho ni inclinar el texto. */
+#homeView .home-shelf-tape.vhs-spine::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  right: 3px;
+  width: 5px;
+  border-left: 1px solid rgb(207 183 139 / 42%);
+  background: linear-gradient(90deg, rgb(19 17 21 / 38%), rgb(0 0 0 / 88%));
+  pointer-events: none;
+}
+
+#homeView .vhs-spine-title {
+  -webkit-line-clamp: unset;
+  display: block;
+  font-size: var(--home-spine-title-size);
+  letter-spacing: .025em;
+  line-height: 1.08;
+  max-height: none;
+  min-height: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: start;
+  text-wrap: balance;
+  text-shadow: 0 1px 1px #000;
+  transform: rotate(180deg);
+  width: auto;
+  max-width: 100%;
+  writing-mode: vertical-rl;
+}
+
+#homeView [data-title-length="long"] .vhs-spine-title {
+  font-size: var(--home-spine-title-long);
+}
+
+#homeView [data-title-length="xlong"] .vhs-spine-title {
+  font-size: var(--home-spine-title-xlong);
+  line-height: 1;
+}
+
+#homeView .home-shelf-tape[data-title-length="xlong"] { padding-inline: 8px; }
+
+#homeView .vhs-spine-meta {
+  align-content: end;
+  display: grid;
+  gap: 4px;
+  justify-content: center;
+  justify-items: center;
+  color: var(--home-spine-ink);
+  line-height: 1.1;
+  overflow: visible;
+}
+
+#homeView .vhs-spine-year {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+#homeView .vhs-spine-format {
+  border: 1px solid #8a7351;
+  border-radius: 2px;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 2px 5px;
+}
+
+#homeView .home-shelf-tape.vhs-spine[data-vhs-state="selected"] {
+  border-color: #c6a572;
+  box-shadow: inset 0 0 0 1px #79623d, inset -5px 0 3px rgb(0 0 0 / 90%),
+    inset 2px 0 1px rgb(234 218 171 / 36%), 4px 5px 4px rgb(0 0 0 / 90%);
+  color: #ffe0a2;
+}
+
+#homeView .home-shelf-tape.vhs-spine:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (min-width: 861px) {
+  #homeView .home-shelf-rail { margin-inline: 0; }
+}
+
+@media (max-width: 860px) {
+  #homeView {
+    --home-spine-width: 68px;
+    --home-spine-title-size: 20px;
+    --home-spine-title-long: 18px;
+  }
+  #homeView .home-shelf-tape.vhs-spine { height: 280px; }
+}

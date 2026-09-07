@@ -160,6 +160,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
       export function tickHomeAutoplay() {
         if (typeof document !== "undefined" && document.visibilityState === "hidden") return false;
         if (fields.homeView?.hidden) return false;
+        if (fields.spotlightStage?.querySelector(".spotlight-poster-trigger:focus")) return false;
         if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
         const featured = editorialHome.featured || [];
         if (featured.length < 2) return false;
@@ -366,22 +367,11 @@ import { closeSharedDetail, openCollection } from "./club.js";
             <span>${escapeHtml(homeDatePeriodLabel(editorialHome.generated_for))}</span>
           </div>
           <div class="spotlight-poster-card">
-            <button class="spotlight-poster-trigger" type="button" data-click="spotlight-select" data-index="${spotlightIndex}" aria-label="Seleccionar ${escapeAttr(carouselTitle)} de la cartelera">
+            <button class="spotlight-poster-trigger" type="button" data-click="spotlight-select" data-index="${spotlightIndex}" aria-label="Seleccionar ${escapeAttr(carouselTitle)} de la cartelera"${featured.length > 1 ? ' aria-describedby="spotlight-navigation-help"' : ""}>
               ${posterMarkup}
             </button>
           </div>
-          <div class="spotlight-selector-options">
-            ${featured.map((candidate, index) => {
-              const candidateTitle = displayTitle(candidate.item || {}) || `Recomendación ${index + 1}`;
-              const candidateReason = candidate.reason?.label || "Selección del día";
-              const selected = index === spotlightIndex;
-              return `<button class="spotlight-selector-option" type="button" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="spotlight-air-select" data-index="${index}" aria-label="${escapeAttr(`${candidateTitle}. ${candidateReason}. Recomendación ${index + 1} de ${featured.length}`)}">
-                <span>${String(index + 1).padStart(2, "0")}</span>
-                <strong>${escapeHtml(candidateTitle)}</strong>
-                <small>${escapeHtml(candidateReason)}</small>
-              </button>`;
-            }).join("")}
-          </div>
+          ${featured.length > 1 ? `<span id="spotlight-navigation-help" class="sr-only">Recomendación ${spotlightIndex + 1} de ${featured.length}. Usá las flechas para cambiar de portada, Inicio o Fin para ir a los extremos y Enter para seleccionar. La rotación se pausa mientras la portada tiene el foco.</span>` : ""}
         </aside>`;
         const tableRows = sourceEntries.map((entry, index) => {
           const item = entry?.item || {};
@@ -485,12 +475,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
         carouselItemId = entryKey(featured[spotlightIndex], spotlightIndex);
         renderEditorialHero();
         if (restoreFocus) {
-          fields.spotlightStage.querySelector(`.spotlight-selector-option[data-index="${spotlightIndex}"]`)?.focus({ preventScroll: true });
+          fields.spotlightStage.querySelector(".spotlight-poster-trigger")?.focus({ preventScroll: true });
         }
       }
 
       export function moveSpotlightSelector(event) {
-        if (!event.target.closest("[data-click='spotlight-select'], [data-click='spotlight-air-select']")) return;
+        if (!event.target.closest("[data-click='spotlight-select']")) return;
         const count = editorialHome.featured.length;
         if (!count) return;
         const offsets = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
@@ -751,7 +741,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         // winamp-style playlist above is currently showing.
         const selectedIndex = Math.max(0, Math.min(entries.length - 1, Number.isInteger(rememberedIndex) ? rememberedIndex : 0));
         return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}" tabindex="0" aria-labelledby="home-section-${escapeAttr(sectionId)}">
-          <h2 id="home-section-${escapeAttr(sectionId)}" class="sr-only home-shelf-bay-plaque"><span>${escapeHtml(section.title || "Selección")}</span><small>${escapeHtml(countLabel)}</small></h2>
+          <h2 id="home-section-${escapeAttr(sectionId)}" class="sr-only home-shelf-bay-plaque" title="${escapeAttr(section.title || "Selección")}"><span>${escapeHtml(section.title || "Selección")}</span><small>${escapeHtml(countLabel)}</small></h2>
           <div class="home-shelf-rail" role="group" aria-label="Opciones de ${escapeAttr(section.title || "la estantería")}">
             ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, active && index === selectedIndex)).join("")}
           </div>
@@ -804,14 +794,14 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const item = entry?.item || {};
         const title = displayTitle(item) || `Obra ${index + 1}`;
         const year = String(item.year || "S/A");
-        const format = String(item.kind || "obra");
-        const formatSignal = ({ pelicula: "PEL", serie: "SER", anime: "ANI", documental: "DOC" })[format.toLowerCase()]
-          || format.slice(0, 3).toUpperCase();
+        const kind = String(item.kind || "obra");
+        const titleLength = Array.from(title).length;
+        const titleLengthClass = titleLength <= 22 ? "short" : titleLength <= 36 ? "long" : "xlong";
         const reason = entry?.reason?.label || "Selección del archivo";
-        return `<button class="home-shelf-tape vhs-spine" type="button" data-vhs-state="${selected ? "selected" : "closed"}" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entryKey(entry, index))}" aria-label="${escapeAttr(`${title}. ${year}. Formato: ${format}. ${reason}. Opción ${index + 1}`)}">
+        return `<button class="home-shelf-tape vhs-spine" type="button" data-vhs-state="${selected ? "selected" : "closed"}" data-title-length="${titleLengthClass}" title="${escapeAttr(title)}" aria-pressed="${selected}" tabindex="${selected ? "0" : "-1"}" data-click="home-shelf-select" data-section-id="${escapeAttr(sectionId)}" data-entry-index="${index}" data-entry-key="${escapeAttr(entryKey(entry, index))}" aria-label="${escapeAttr(`${title}. ${year}. Tipo: ${kind}. ${reason}. Opción ${index + 1}`)}">
           <span class="vhs-spine-sticker" aria-hidden="true"></span>
           <span class="vhs-spine-title">${escapeHtml(title)}</span>
-          <span class="vhs-spine-meta" aria-hidden="true"><span>${escapeHtml(year)}</span><span>${escapeHtml(formatSignal)}</span></span>
+          <span class="vhs-spine-meta" aria-hidden="true"><span class="vhs-spine-year">${escapeHtml(year)}</span><span class="vhs-spine-format">VHS</span></span>
         </button>`;
       }
 

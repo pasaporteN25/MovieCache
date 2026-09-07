@@ -24,13 +24,18 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U3] | Replantear Colección, búsqueda, filtros y alta | U2-R cerrada |
-| 2 | [A2] | Cliente Android basico | A1 + entorno Android |
-| 3 | [I1] | Evaluacion de integraciones | A1 |
-| 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 1 | [U2-P] | Afinar Home con las observaciones visuales del usuario | relevamiento U2-P.0 |
+| 2 | [U3] | Replantear Colección, búsqueda, filtros y alta | U2-P aceptada |
+| 3 | [A2] | Cliente Android basico | A1 + entorno Android |
+| 4 | [I1] | Evaluacion de integraciones | A1 |
+| 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 
-- **En curso:** sin tarea activa. La siguiente entrega accionable es [U3.1].
-- **Cerrado recientemente:** [U2-R] superó su aceptación integral el 2026-09-06;
+- **En curso:** [U2-P.1] implementada/verificada, pendiente de revisión y commit;
+  [U2-P.2] opción B integrada; [U2-P.3/P.4] Oswald 400 + lomo B elegidos e integrados,
+  revisión visual final y commit pendientes. [U2-P.5] implementada/verificada;
+  siguiente pendiente: P.6. U3.1 espera.
+- **Cerrado recientemente:** [U2-R] cerró su gate técnico el 2026-09-06;
+  la revisión visual del usuario continúa en U2-P;
   [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2] conservan su historia en
   `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
@@ -62,6 +67,52 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
 
 ### Frente: Superficie publica y despliegue
 
+### Frente: Inicio videoclub (afinación visual U2-P)
+
+#### [U2-P] Afinar Home según la comparación anotada del usuario
+
+**Abierta 2026-09-06.** La revisión del usuario identifica diferencias materiales con
+el boceto que exceden pequeños ajustes. U2-R conserva su historia de validación; su
+cierre anterior no representa aceptación visual definitiva del usuario.
+
+- **Alcance:** cartelera, tipografía, lomos, placas, continuidad del mueble y consola.
+- **Proceso:** implementación por partes autorizada el 2026-09-06. Confirmar las
+  interpretaciones aún abiertas. Brief: `docs/briefs/home-u2-p-refinement-v1.md`.
+- **Precede a:** U3.1, por decisión del usuario. Subdivisión provisional:
+  - [ ] **[U2-P.0] Relevamiento y decisiones.** En curso; dos referencias anotadas
+    guardadas, pedidos explícitos e inferencias registrados. Primera ronda confirmada:
+    continuidad fuera de pantalla, créditos + estado resumido y fuentes libres primero.
+    Orientación confirmada: abajo hacia arriba, condensada sin cursiva. Placa VHS como
+    firma visual y tipo real en la ficha confirmados. Abierta a nuevas observaciones.
+  - [ ] **[U2-P.1] Cartelera.** Centrar ópticamente Hoy/Ayer y retirar toda la hilera de
+    indicadores inferiores. Implementada y verificada: 31 BrowserInterfaceTests,
+    Hoy/Ayer en tres tamaños desktop, revisión 390/320 px. Pendiente revisión/commit.
+  - [ ] **[U2-P.2] Tipografía.** Comparar, elegir e integrar familias libres con muestras de cada
+    zona; comparación y licencias locales listas en `docs/design/u2-p-font-comparison.html`.
+    Opción B elegida el 2026-09-06: Barlow Condensed 600 para lomos/placas e IBM Plex
+    Mono 400 para consola/datos. Integración WOFF2 local verificada el 2026-09-07:
+    CSP, fallback, glifos, responsive y wheel con licencias. Pendiente revisión/commit.
+  - [ ] **[U2-P.3] Lomos.** Revisar espesor, separación, orientación, título y pie.
+    Lectura abajo hacia arriba, condensada sin cursiva y placa VHS confirmadas. Tipo
+    real en la ficha. Autorizada e implementada el 2026-09-07 tras consulta: encuadre
+    del asset, cuerpo, gap 6 px, títulos cálidos 20/18/16 px y pie año/VHS. Capturas en
+    `docs/design/u2-p3-evidence/`. Ajuste posterior elegido: lomo B, +43,7 px de alto
+    desktop sin cambiar ancho/base y canto sutil. Evidencia actual `u2-p4-evidence/`.
+    Pendiente revisión visual final/commit.
+  - [ ] **[U2-P.4] Placas.** Recuperar señalización material por categoría.
+    Oswald 400 elegida e integrada el 2026-09-07: metal envejecido, travesaño desktop,
+    encabezado material antes de cada fila móvil. Nombres y conteos reales, fuente
+    WOFF2 local con OFL. Pendiente revisión final/commit.
+  - [ ] **[U2-P.5] Mueble.** Prolongar el marco fuera de pantalla a la derecha, como
+    confirmó el usuario. Implementada el 2026-09-07: sobreancho desktop 72–112 px,
+    poste derecho fuera del cuadro, carril finito con último lomo alcanzable y 0 px
+    de overflow de página. Evidencia `docs/design/u2-p5-evidence/`. Pendiente revisión/commit.
+  - [ ] **[U2-P.6] Consola.** Centrar acciones y reorganizar ficha, sinopsis, imágenes,
+    créditos con estado resumido y tira de detalle. Se subdividirá tras resolver campos
+    y distribución; P.2/P.5.
+  - [ ] **[U2-P.7] Aceptación.** Comparación visual con el usuario y regresión focal;
+    depende de P.1–P.6. No cerrar sólo por tests verdes.
+
 ### Frente: Inicio videoclub (exploraciones posteriores)
 
 [U2-R] quedó cerrada y se preserva en `Hecho`. Las dos exploraciones siguientes no
@@ -86,7 +137,7 @@ bloquean U3 ni reabren la recuperación aceptada.
 - **Criterio de cierre**: una persona distingue explorar, buscar y agregar sin perder
   query, modo `Comparar`, filtros ni posición al volver; los filtros cotidianos son
   visibles y los avanzados usan divulgación progresiva; URL/historial preservan estado.
-- **Depende de**: [U2-R], para que navegación y vocabulario queden estables.
+- **Depende de**: [U2-R] y aceptación de [U2-P], para estabilizar la Home antes de U3.1.
 - **Modelo sugerido**: Grande para U3.1; Medio para las implementaciones posteriores.
 
   - [ ] **[U3.1] Auditar y congelar la arquitectura de Colección.** Inventariar buscador,
@@ -172,7 +223,13 @@ APK o una prueba de emulador reproducible.
 
 ## En curso
 
-Sin tareas activas.
+[U2-P.1] Cartelera implementada y verificada, pendiente revisión/commit.
+[U2-P.2] Opción B integrada y verificada; pendiente revisión/commit.
+[U2-P.3] Autorizada e implementada con prioridad visual; revisión del usuario/commit pendientes.
+[U2-P.3/P.4] Ajuste Oswald 400 + lomo B elegido e integrado.
+[U2-P.5] Continuidad derecha implementada/verificada; próximo P.6.
+Detalle, evidencia y dudas restantes en
+`docs/briefs/home-u2-p-refinement-v1.md`. P.0 sigue recibiendo observaciones.
 
 ## Hecho
 
