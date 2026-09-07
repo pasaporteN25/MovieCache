@@ -11,7 +11,6 @@ existing convention of patching the importing module's own bound name.
 from __future__ import annotations
 
 import os
-import ssl
 import tempfile
 import time
 from dataclasses import dataclass
@@ -24,15 +23,14 @@ AVAILABLE_DATASETS = ("title.basics", "title.akas")
 _USER_AGENT = "MovieInbox/0.2 (+local personal catalog)"
 _CHUNK_SIZE = 1_048_576
 
-# datasets.imdbws.com's CloudFront/AmazonS3 chain ships an intermediate CA
-# certificate whose Basic Constraints extension isn't marked critical — a
-# common defect in older-style chains (confirmed independently: curl accepts
-# it without complaint). Python 3.13+ enables ssl.VERIFY_X509_STRICT by
-# default, which enforces that RFC 5280 detail strictly and rejects the
-# handshake. Chain-of-trust and hostname verification stay fully enforced;
-# only that one extra conformance check is relaxed, and only for this host.
-_DATASET_SSL_CONTEXT = ssl.create_default_context()
-_DATASET_SSL_CONTEXT.verify_flags &= ~ssl.VERIFY_X509_STRICT
+# [F1] used to relax ssl.VERIFY_X509_STRICT here, blaming a non-critical Basic
+# Constraints extension in the CloudFront/AmazonS3 chain. That diagnosis was
+# wrong: the failing certificate came from a local TLS-intercepting antivirus
+# that had installed its own root in the Windows store, not from Amazon. Once
+# the host was excluded from interception, the real chain (Amazon RSA 2048 M04)
+# verified cleanly under the strict default, and also against certifi alone —
+# so the relaxation weakened certificate validation for every user without
+# buying anything. Re-measured 2026-09-07; keep the library default.
 
 
 @dataclass(frozen=True)
@@ -64,7 +62,7 @@ def download_dataset_file(name: str, destination: Path, *, timeout: float = 30.0
             suffix=".tmp",
         ) as handle:
             temporary_path = Path(handle.name)
-            with urlopen(request, timeout=timeout, context=_DATASET_SSL_CONTEXT) as response:
+            with urlopen(request, timeout=timeout) as response:
                 while True:
                     chunk = response.read(_CHUNK_SIZE)
                     if not chunk:
