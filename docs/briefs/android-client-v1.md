@@ -1,5 +1,11 @@
 # Cliente Android v1: corte de A2
 
+> **Reemplazado el 2026-09-07 por `android-client-v2.md`.** ADR-0005 decidió un cliente
+> autónomo que funciona sin instancia, y este documento especifica un cliente delgado que
+> arranca por el login. No se borra: sus decisiones de seguridad —Keystore, HTTPS, límite
+> de errores en el repositorio, ignorar campos desconocidos— siguen vigentes y v2 las
+> conserva explícitamente.
+
 ## Propósito
 
 El cliente Android consume únicamente la Device API v1 de la misma instancia Movie Inbox.
