@@ -284,10 +284,12 @@ reespecificación antes de tomarse**, no sólo ejecución.
 
 - `catalog.schema.json` v9 es un contrato portable versionado con round-trip completo.
   Es exactamente lo que hace viable un cliente autónomo que después sincroniza.
-- **[W3] / ADR-0002 ya resolvió un problema de la misma forma:** intercambio manual
-  offline entre homeservers, con contrato versionado, identidad técnica, integridad y
-  límites de privacidad, sin servicio central. Sincronizar dispositivo ↔ instancia es ese
-  mismo problema. Se reusa el contrato, no se inventa uno.
+- **[W3] / ADR-0002 aporta los principios, no el formato.** *(Corregido el 2026-09-07 en
+  ADR-0005: la afirmación original era demasiado fuerte.)* El formato `.mipkg` excluye por
+  contrato estado de visionado, rating, review y notas — justo lo que una sincronización
+  de dispositivo debe llevar, así que el formato no se reusa. Sí se reusan sus principios:
+  previsualizar antes de escribir, digest de integridad, sin servicio central, decisión
+  explícita del owner, receipts y "nunca fusionar por parecido".
 - Charadas es el primer entregable ideal de esta dirección: datos de sólo lectura, sin
   sincronización, sin red, y es lo que el owner más quiere en el teléfono.
 
@@ -551,9 +553,13 @@ El backend está completo. Lo que falta es sólo mostrarlo.
 
 ### Frente: Dirección móvil
 
-- **[MB1] ADR de dirección móvil.** Autónomo contra cliente delgado, alcance de la
-  sincronización opcional, rol del QR, convergencia de estado personal, reuso del contrato
-  de [W3]. **Bloquea a [A2], que queda suspendida hasta que esto se resuelva.** *Grande.*
+- **[MB1] ADR de dirección móvil.** **Cerrada 2026-09-07 —
+  `docs/adr/0005-mobile-direction.md`.** Cliente autónomo con almacén propio; el servidor
+  es un par opcional. La sincronización la inicia una persona y **nunca borra**. La
+  convergencia de estado personal es una **fusión a tres bandas** contra la base de la
+  última sincronización: si sólo un lado cambió se aplica, si ambos cambiaron distinto
+  decide la persona — sin depender de relojes confiables. El QR aparea, no transporta.
+  [A2] queda suspendida hasta reespecificarse y [A1] gana una extensión aditiva.
 - **[MB2] Auditoría móvil con usuarios reales.** Inicio, Colección, ficha y Club en
   teléfono, con cuentas creadas de antemano y HTTPS servido según [D1.2]. Insumo para MB1.
   *Medio.* **Sin dependencias — puede hacerse ya.**
