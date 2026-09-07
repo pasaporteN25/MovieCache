@@ -147,12 +147,56 @@ progresión y son ajustables tras jugar. El temporizador es local y no se sincro
   a futuro, pero exige guardar resultados y eso reabre el estado compartido.
 - Cualquier cambio a `kind`, al esquema portable o a las rutas existentes.
 
+## De dónde salen las obras
+
+**Decidido: las dos fuentes.** El catálogo personal y las colecciones de Club seguidas.
+
+Se verificó que no se complica: un ítem de colección guarda `SHARED_CATALOG_FIELDS`, que
+incluye los tres campos de título, `year`, `kind` y los identificadores externos fuertes
+(`tmdb_id`, `imdb_url`, `wikidata_id`). Tiene todo lo que el mazo necesita, incluso para
+deduplicar. El respaldo de "sólo Club" que el owner ofreció no hace falta.
+
+Importa porque **seguir una colección no copia las obras** (`PRODUCT.md`): una obra de una
+colección seguida no está en el catálogo personal, así que el mazo se arma leyendo dos
+almacenes distintos y uniéndolos, no uno solo.
+
+### Deduplicar en el mazo puede ser más laxo que en el catálogo
+
+Una obra puede estar en el catálogo personal **y** en una colección seguida. En el mazo
+tiene que aparecer una sola vez, o alguien actúa la misma película dos veces.
+
+Se unifica por identificador externo fuerte y, además, por título normalizado más año
+exacto. **Eso es deliberadamente más laxo que `decide_match`, y no contradice la invariante
+3**, porque el costo del error es distinto: una fusión equivocada en el catálogo pierde
+datos personales de forma difícil de revertir, mientras que en un mazo cuesta *una entrada
+menos en una lista de juego*. Nada se escribe: la unificación vive en la construcción del
+mazo y no toca ninguna ficha.
+
+Ante un empate gana la copia del catálogo personal, que es la que el dueño mantiene.
+
+## Qué obras entran
+
+**Decidido: todas.** `status` no filtra. Una obra pendiente puede ser perfectamente
+conocida por el grupo, y una vista puede no serlo — el estado personal del dueño del
+teléfono no dice nada sobre qué sabe la gente en la sala.
+
+Las únicas exclusiones son estructurales: una obra sin ningún título utilizable, y una obra
+cuya categoría de dificultad todavía nadie determinó.
+
+## Cuántas categorías de dificultad
+
+**Decidido: cuatro** — fácil, medio, medio alto y difícil, las que nombró el owner. Los
+umbrales son ajustables tras jugar sin cambiar la estructura, y agregar una quinta más
+adelante no rompe nada: el mínimo por categoría y la tabla de tiempos crecen con ella.
+
+(Estas categorías son las de la **obra**. Las tres opciones de tiempo por categoría son
+otra cosa y están en la tabla del temporizador.)
+
 ## Qué queda abierto
 
-1. **De dónde salen las obras elegibles.** Catálogo personal, colecciones de Club seguidas,
-   o ambas. Importa porque seguir una colección **no copia las obras** (`PRODUCT.md`), así
-   que jugar con una colección seguida es un caso distinto de jugar con el catálogo propio.
-2. **Si `status` filtra.** ¿Entran las pendientes, o sólo las vistas? Una obra que el dueño
-   del teléfono no vio igual puede ser conocida por el grupo.
-3. **Cuántos baldes finalmente.** El owner mencionó cuatro "o alguna más". El contrato
-   asume cuatro y los umbrales son ajustables sin cambiar la estructura.
+Nada bloquea a [G2]. Quedan dos ajustes que sólo se pueden resolver jugando:
+
+1. **Los umbrales de los extremos** (~10.000 y ~1.000.000 de votos) son un punto de partida
+   razonado, no medido contra partidas reales.
+2. **Los tiempos de medio alto y difícil** extienden la progresión que fijó el owner para
+   fácil y medio; conviene revisarlos después de la primera noche de juego.
