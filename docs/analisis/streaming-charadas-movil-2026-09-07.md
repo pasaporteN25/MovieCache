@@ -573,9 +573,14 @@ El backend está completo. Lo que falta es sólo mostrarlo.
   **miniatura local más portada en segundo plano**; y **una cuenta por instalación**.
   Consecuencia para charadas: la dificultad se calcula en el servidor y viaja como un
   campo chico, porque el índice IMDb de ~1,1 GB no va al teléfono.
-- **[MB2] Auditoría móvil con usuarios reales.** Inicio, Colección, ficha y Club en
-  teléfono, con cuentas creadas de antemano y HTTPS servido según [D1.2]. Insumo para MB1.
-  *Medio.* **Sin dependencias — puede hacerse ya.**
+- **[MB2] Auditoría móvil.** **Mitad medible cerrada 2026-09-07 —
+  `docs/design/mb2-mobile-audit-2026-09-07.md`.** Medición con emulación real de
+  dispositivo a 390 y 320 px. **Bandeja es la única superficie con problemas reales**:
+  desborda 317 px a 390 y 387 a 320, y tiene 53 nodos de contenido por debajo de 12 px.
+  Inicio y Club están limpios; Colección y Ficha también, una vez descontada la decoración
+  y los checkboxes envueltos en label — la primera pasada los contaba mal y exageraba.
+  Los arreglos son del frente visual. La prueba con personas queda como protocolo escrito
+  en el mismo documento.
 
 ### Nota sobre [I1]
 
