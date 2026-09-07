@@ -481,9 +481,13 @@ con el trabajo visual**, salvo donde se indica.
 - **[S1] Back office de regiones y plataformas.** Tablas dedicadas, migración, servicio,
   endpoints solo-owner, sección de admin. Región por usuario con habilitación del admin y
   default de instancia. *Grande.*
-- **[S2] Evaluar fuentes de disponibilidad.** Matriz y ADR al estilo [F3.1]/[F3.2]:
-  cobertura AR, términos, atribución JustWatch, retención. Sin código. *Grande.* **Sin
-  dependencias — puede correr en paralelo con S1 y F6.1.**
+- **[S2] Evaluar fuentes de disponibilidad.** **Cerrada 2026-09-07 —
+  `docs/adr/0004-streaming-availability-source.md`.** TMDb elegida, medida contra la API
+  real: AR soportada entre 139 regiones, 59 proveedores, las seis plataformas pedidas
+  presentes. Dos condiciones: atribución obligatoria a JustWatch con cláusula de
+  revocación, y el tope de retención de seis meses aplica al snapshot. Hallazgo propio de
+  este catálogo: el cine de autor tiene cobertura engañosa — o no aparece, o aparece sólo
+  en plataformas marginales que la lista de ignoradas va a esconder.
 - **[S3] Consulta, persistencia y procedencia.** Snapshot con fecha de consulta, refresco
   perezoso, reuso del cooldown y extensión del servicio de retirada. `en_plataforma`
   derivado. Nunca escribe `en_catalogo`. *Medio. Depende de S1 y S2.*
