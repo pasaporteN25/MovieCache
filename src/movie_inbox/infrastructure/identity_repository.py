@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 13
+INSTANCE_SCHEMA_VERSION = 14
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -402,6 +402,19 @@ CREATE TABLE member_streaming_preferences (
 );
 """
 
+INSTANCE_SCHEMA_V14 = """
+CREATE TABLE streaming_availability (
+    work_key TEXT NOT NULL,
+    region_code TEXT NOT NULL REFERENCES streaming_regions(code) ON DELETE CASCADE,
+    checked_at TEXT NOT NULL,
+    link TEXT NOT NULL DEFAULT '',
+    offers_json TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (work_key, region_code)
+);
+CREATE INDEX ix_streaming_availability_checked
+ON streaming_availability(checked_at);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -415,6 +428,7 @@ INSTANCE_MIGRATIONS = {
     11: ("revocable public availability presentations", INSTANCE_SCHEMA_V11),
     12: ("revocable opaque device sessions", INSTANCE_SCHEMA_V12),
     13: ("streaming regions, platforms and member choices", INSTANCE_SCHEMA_V13),
+    14: ("dated streaming availability snapshots", INSTANCE_SCHEMA_V14),
 }
 
 

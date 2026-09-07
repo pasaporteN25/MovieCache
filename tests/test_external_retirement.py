@@ -146,6 +146,58 @@ class TmdbRetirementServiceTests(unittest.TestCase):
             self.assertEqual(repositories[json_path.resolve()].read()[0].tmdb_id, "48691")
             self.assertEqual(repositories[sqlite_path.resolve()].read()[0].tmdb_id, "48691")
 
+    def test_purging_tmdb_also_drops_streaming_availability_snapshots(self) -> None:
+        # ADR-0004: availability snapshots are TMDb data under the same six-month
+        # retention ceiling, so retiring TMDb has to remove them too or the purge
+        # would leave the instance holding data it promised to drop. They are
+        # deliberately not restored by undo: unlike a catalogue field, a snapshot
+        # is a re-fetchable fact about someone else's offers, so bringing a stale
+        # copy back would be worse than asking again.
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.json"
+            repository = open_catalog_repository(path, normalize_item)
+            repository.write([tmdb_item("owner-item")])
+            purged: list[int] = []
+
+            def purge_availability() -> int:
+                purged.append(1)
+                return 7
+
+            service = TmdbRetirementService(
+                lambda _path: repository,
+                MemoryCurationHistoryRepository(),
+                lambda: [RetirementCatalog("owner", path, True)],
+                purge_availability,
+            )
+
+            preview = service.preview()
+            result = service.purge(preview["preview_id"], confirmed=True)
+
+            self.assertEqual(len(purged), 1)
+            self.assertEqual(result["purged_availability"], 7)
+            self.assertEqual(repository.read()[0].tmdb_id, "")
+
+            service.undo(result["operation"]["id"])
+
+            # Undo restores the catalogue field but does not resurrect snapshots.
+            self.assertEqual(repository.read()[0].tmdb_id, "48691")
+            self.assertEqual(len(purged), 1)
+
+    def test_retirement_without_a_streaming_store_still_purges(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.json"
+            repository = open_catalog_repository(path, normalize_item)
+            repository.write([tmdb_item("owner-item")])
+            service = TmdbRetirementService(
+                lambda _path: repository,
+                MemoryCurationHistoryRepository(),
+                lambda: [RetirementCatalog("owner", path, True)],
+            )
+            preview = service.preview()
+            result = service.purge(preview["preview_id"], confirmed=True)
+            self.assertEqual(result["purged_availability"], 0)
+            self.assertEqual(repository.read()[0].tmdb_id, "")
+
     def test_stale_preview_and_read_only_catalog_block_purge(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "catalog.json"

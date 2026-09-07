@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 # ISO 3166-1 alpha-2. The authoritative list of *supported* regions comes from
@@ -36,6 +37,16 @@ OFFER_KINDS = (SUBSCRIPTION_OFFER, FREE_OFFER, ADS_OFFER, RENT_OFFER, BUY_OFFER)
 # something false, so they are carried separately and phrased differently.
 AVAILABILITY_OFFERS = frozenset({SUBSCRIPTION_OFFER, FREE_OFFER, ADS_OFFER})
 ACQUISITION_OFFERS = frozenset({RENT_OFFER, BUY_OFFER})
+
+# The owner accepted a 1-2 month lag, so a snapshot is refreshed opportunistically
+# after this long rather than on every read.
+STALE_AFTER_DAYS = 30
+
+# Hard ceiling from the TMDb API terms: nothing obtained from them may be kept
+# for longer than six months. A row past this is neither served nor retained,
+# independently of whether a refresh succeeds — the limit is contractual, not a
+# performance tuning knob, so it is enforced here rather than left to a caller.
+MAX_RETENTION_DAYS = 180
 
 
 class StreamingConfigurationError(ValueError):
@@ -116,6 +127,175 @@ class MemberStreamingPreferences:
 
     def to_dict(self) -> dict[str, Any]:
         return {"region": self.region, "ignored_providers": list(self.ignored_providers)}
+
+
+@dataclass(frozen=True)
+class PlatformOffer:
+    """One way a platform makes a work available in a market."""
+
+    provider_id: str
+    provider_name: str
+    kind: str
+
+    @property
+    def is_availability(self) -> bool:
+        return self.kind in AVAILABILITY_OFFERS
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "provider_id": self.provider_id,
+            "provider_name": self.provider_name,
+            "kind": self.kind,
+        }
+
+
+@dataclass(frozen=True)
+class AvailabilitySnapshot:
+    """What a market offered for one work, and when we last asked.
+
+    ``checked_at`` is part of the fact, not decoration. The underlying data
+    changes with licensing deals and no one is notified, so a snapshot without
+    its date would be a claim we cannot support.
+    """
+
+    work_key: str
+    region_code: str
+    checked_at: str
+    offers: tuple[PlatformOffer, ...] = ()
+    link: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "work_key": self.work_key,
+            "region_code": self.region_code,
+            "checked_at": self.checked_at,
+            "link": self.link,
+            "offers": [offer.to_dict() for offer in self.offers],
+        }
+
+
+@dataclass(frozen=True)
+class PlatformAvailability:
+    """The derived answer one viewer gets for one work.
+
+    ``en_plataforma`` is deliberately named after the field it feeds and is
+    computed, never stored next to the snapshot: storing it would let the
+    boolean and the offers that justify it drift apart, and its value depends
+    on who is asking because each viewer hides different platforms.
+    """
+
+    en_plataforma: bool
+    available_on: tuple[PlatformOffer, ...] = ()
+    acquire_on: tuple[PlatformOffer, ...] = ()
+    checked_at: str = ""
+    region_code: str = ""
+    link: str = ""
+    known: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "en_plataforma": self.en_plataforma,
+            "available_on": [offer.to_dict() for offer in self.available_on],
+            "acquire_on": [offer.to_dict() for offer in self.acquire_on],
+            "checked_at": self.checked_at,
+            "region_code": self.region_code,
+            "link": self.link,
+            "known": self.known,
+        }
+
+
+def platform_availability(
+    snapshot: AvailabilitySnapshot | None,
+    preferences: MemberStreamingPreferences | None = None,
+    *,
+    now: datetime | None = None,
+) -> PlatformAvailability:
+    """Derive one viewer's answer from a shared snapshot.
+
+    A missing, expired or fully hidden snapshot yields ``known=False`` rather
+    than ``en_plataforma=False``: "we do not know" and "it is on no platform"
+    are different answers, and collapsing them would state something we never
+    checked.
+    """
+
+    if snapshot is None or snapshot_is_expired(snapshot, now=now):
+        return PlatformAvailability(en_plataforma=False, known=False)
+    ignored = set((preferences or MemberStreamingPreferences()).ignored_providers)
+    visible = [offer for offer in snapshot.offers if offer.provider_id not in ignored]
+    available = tuple(offer for offer in visible if offer.is_availability)
+    acquire = tuple(offer for offer in visible if offer.kind in ACQUISITION_OFFERS)
+    return PlatformAvailability(
+        en_plataforma=bool(available),
+        available_on=available,
+        acquire_on=acquire,
+        checked_at=snapshot.checked_at,
+        region_code=snapshot.region_code,
+        link=snapshot.link,
+        known=True,
+    )
+
+
+def snapshot_is_stale(snapshot: AvailabilitySnapshot, *, now: datetime | None = None) -> bool:
+    """Whether the snapshot is old enough to be worth refreshing."""
+
+    return _age(snapshot.checked_at, now) >= timedelta(days=STALE_AFTER_DAYS)
+
+
+def snapshot_is_expired(snapshot: AvailabilitySnapshot, *, now: datetime | None = None) -> bool:
+    """Whether the terms forbid serving or keeping this row any longer."""
+
+    return _age(snapshot.checked_at, now) >= timedelta(days=MAX_RETENTION_DAYS)
+
+
+def work_key(tmdb_id: Any, media_type: Any) -> str:
+    """Identity of a work for availability purposes.
+
+    Movies and series have overlapping numeric ids upstream, so the media type
+    is part of the key; without it a series could answer for a film.
+    """
+
+    identifier = str(tmdb_id or "").strip()
+    medium = str(media_type or "").strip().casefold()
+    if not identifier.isdigit() or medium not in {"movie", "tv"}:
+        raise StreamingConfigurationError(f"Invalid work key: {tmdb_id!r}/{media_type!r}")
+    return f"{medium}:{identifier}"
+
+
+def availability_snapshot(value: Mapping[str, Any]) -> AvailabilitySnapshot:
+    offers: list[PlatformOffer] = []
+    for row in _as_list(value.get("offers")):
+        if not isinstance(row, Mapping):
+            continue
+        kind = str(row.get("kind") or "").strip().casefold()
+        if kind not in OFFER_KINDS:
+            continue
+        offers.append(
+            PlatformOffer(
+                provider_id=normalize_provider_id(row.get("provider_id")),
+                provider_name=normalize_provider_name(row.get("provider_name")),
+                kind=kind,
+            )
+        )
+    return AvailabilitySnapshot(
+        work_key=str(value.get("work_key") or ""),
+        region_code=normalize_region_code(value.get("region_code")),
+        checked_at=str(value.get("checked_at") or ""),
+        offers=tuple(offers),
+        link=str(value.get("link") or "").strip()[:400],
+    )
+
+
+def _age(checked_at: str, now: datetime | None) -> timedelta:
+    moment = now or datetime.now(UTC)
+    try:
+        stamp = datetime.fromisoformat(str(checked_at).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        # An unreadable timestamp cannot be shown to be within the retention
+        # window, so it is treated as maximally old rather than as fresh.
+        return timedelta(days=MAX_RETENTION_DAYS * 10)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=UTC)
+    return moment - stamp
 
 
 def normalize_region_code(value: Any) -> str:

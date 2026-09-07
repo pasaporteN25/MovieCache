@@ -178,10 +178,23 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 )
         return catalogs
 
+    # The loaders are only wired when a credential is present, so an instance
+    # without TMDb keeps a usable back office that simply cannot refresh from
+    # upstream, instead of failing at call time.
+    streaming_token = config.external_credentials.tmdb_read_access_token
+    streaming_adapter = TmdbAdapter(streaming_token) if streaming_token else None
+    streaming_service = StreamingService(
+        SqliteStreamingRepository(instance_db),
+        region_loader=streaming_adapter.watch_regions if streaming_adapter else None,
+        provider_loader=streaming_adapter.watch_providers if streaming_adapter else None,
+        availability_loader=streaming_adapter.watch_availability if streaming_adapter else None,
+    )
+
     tmdb_retirement_service = TmdbRetirementService(
         lambda path: catalog_service(path).repository,
         JsonCurationHistoryRepository(retirement_history_path(instance_db)),
         retirement_catalogs,
+        streaming_service.purge_all_availability,
     )
 
     def catalog_universe() -> list[dict[str, Any]]:
@@ -232,16 +245,6 @@ def create_app(config: ViewerConfig) -> FastAPI:
     collection_service = CollectionService(collection_repository)
     public_presentation_service = PublicPresentationService(
         SqlitePublicPresentationRepository(instance_db), collection_repository
-    )
-    # The loaders are only wired when a credential is present, so an instance
-    # without TMDb keeps a usable back office that simply cannot refresh from
-    # upstream, instead of failing at call time.
-    streaming_token = config.external_credentials.tmdb_read_access_token
-    streaming_adapter = TmdbAdapter(streaming_token) if streaming_token else None
-    streaming_service = StreamingService(
-        SqliteStreamingRepository(instance_db),
-        region_loader=streaming_adapter.watch_regions if streaming_adapter else None,
-        provider_loader=streaming_adapter.watch_providers if streaming_adapter else None,
     )
     home_service = EditorialHomeService()
     home_snapshot_repository = SqliteHomeSnapshotRepository(instance_db)

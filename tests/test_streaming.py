@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from movie_inbox.application.auth_service import AuthService
@@ -14,7 +15,11 @@ from movie_inbox.application.streaming_service import (
 from movie_inbox.domain.streaming import (
     ACQUISITION_OFFERS,
     AVAILABILITY_OFFERS,
+    MAX_RETENTION_DAYS,
+    STALE_AFTER_DAYS,
+    AvailabilitySnapshot,
     MemberStreamingPreferences,
+    PlatformOffer,
     RegionPolicy,
     StreamingConfigurationError,
     StreamingProvider,
@@ -23,8 +28,12 @@ from movie_inbox.domain.streaming import (
     is_available_offer,
     member_preferences,
     normalize_region_code,
+    platform_availability,
     region_policy,
+    snapshot_is_expired,
+    snapshot_is_stale,
     visible_providers,
+    work_key,
 )
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.streaming_repository import SqliteStreamingRepository
@@ -220,3 +229,173 @@ class StreamingServiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AvailabilityDomainTests(unittest.TestCase):
+    def _snapshot(self, days_old: float, offers=()) -> AvailabilitySnapshot:
+        checked = datetime.now(UTC) - timedelta(days=days_old)
+        return AvailabilitySnapshot(
+            work_key="movie:78",
+            region_code="AR",
+            checked_at=checked.isoformat().replace("+00:00", "Z"),
+            offers=tuple(offers),
+        )
+
+    def test_work_key_separates_films_from_series_with_the_same_id(self) -> None:
+        # Upstream ids overlap across media types; without the type a series
+        # could answer for a film.
+        self.assertNotEqual(work_key("1398", "movie"), work_key("1398", "tv"))
+        for bad in (("", "movie"), ("abc", "movie"), ("78", "pelicula"), (None, None)):
+            with self.subTest(value=bad), self.assertRaises(StreamingConfigurationError):
+                work_key(*bad)
+
+    def test_rent_only_offers_are_reported_but_are_not_availability(self) -> None:
+        snapshot = self._snapshot(1, [PlatformOffer("3", "Google Play Movies", "rent")])
+        result = platform_availability(snapshot)
+        self.assertTrue(result.known)
+        self.assertFalse(result.en_plataforma)
+        self.assertEqual(
+            [offer.provider_name for offer in result.acquire_on], ["Google Play Movies"]
+        )
+        self.assertEqual(result.available_on, ())
+
+    def test_subscription_offers_make_a_work_available(self) -> None:
+        snapshot = self._snapshot(1, [PlatformOffer("8", "Netflix", "flatrate")])
+        self.assertTrue(platform_availability(snapshot).en_plataforma)
+
+    def test_missing_or_expired_snapshots_are_unknown_not_unavailable(self) -> None:
+        # "We never checked" and "it is on no platform" are different answers;
+        # collapsing them would state something we never verified.
+        self.assertFalse(platform_availability(None).known)
+        expired = self._snapshot(
+            MAX_RETENTION_DAYS + 1, [PlatformOffer("8", "Netflix", "flatrate")]
+        )
+        result = platform_availability(expired)
+        self.assertFalse(result.known)
+        self.assertFalse(result.en_plataforma)
+
+    def test_retention_ceiling_and_refresh_threshold_are_distinct(self) -> None:
+        fresh = self._snapshot(1)
+        stale = self._snapshot(STALE_AFTER_DAYS + 1)
+        self.assertFalse(snapshot_is_stale(fresh))
+        self.assertTrue(snapshot_is_stale(stale))
+        self.assertFalse(snapshot_is_expired(stale))
+        self.assertTrue(snapshot_is_expired(self._snapshot(MAX_RETENTION_DAYS + 1)))
+        # The contractual ceiling has to sit inside the six months the terms allow.
+        self.assertLessEqual(MAX_RETENTION_DAYS, 180)
+
+    def test_an_unreadable_timestamp_is_treated_as_expired(self) -> None:
+        broken = AvailabilitySnapshot("movie:78", "AR", "no es una fecha")
+        self.assertTrue(snapshot_is_expired(broken))
+        self.assertFalse(platform_availability(broken).known)
+
+    def test_a_viewer_hiding_every_offering_platform_gets_no_false_negative(self) -> None:
+        snapshot = self._snapshot(1, [PlatformOffer("8", "Netflix", "flatrate")])
+        hidden = MemberStreamingPreferences(ignored_providers=("8",))
+        result = platform_availability(snapshot, hidden)
+        self.assertTrue(result.known)
+        self.assertFalse(result.en_plataforma)
+        self.assertEqual(result.available_on, ())
+
+
+class AvailabilityServiceTests(StreamingServiceTests):
+    """Reuses the [S1] fixture and adds an availability loader on top."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.calls: list[tuple[str, str, str]] = []
+        self.fail_next = False
+
+        def loader(media_type: str, tmdb_id: str, region: str) -> dict[str, object]:
+            self.calls.append((media_type, tmdb_id, region))
+            if self.fail_next:
+                raise TimeoutError("upstream caido")
+            return {
+                "link": "https://www.themoviedb.org/movie/78/watch?locale=AR",
+                "offers": [
+                    {"provider_id": "8", "provider_name": "Netflix", "kind": "flatrate"},
+                    {"provider_id": "3", "provider_name": "Google Play", "kind": "rent"},
+                ],
+            }
+
+        self.service.availability_loader = loader
+        self.service.add_region({"code": "AR", "name": "Argentina"})
+        self.service.set_policy({"default_region": "AR", "members_may_choose": False})
+
+    def _items(self) -> list[dict[str, object]]:
+        return [
+            {"id": "heat", "tmdb_id": "949", "kind": "pelicula", "en_catalogo": True},
+            {"id": "sopranos", "tmdb_id": "1398", "kind": "serie", "en_catalogo": False},
+            {"id": "sin-identidad", "kind": "pelicula"},
+        ]
+
+    def test_availability_never_writes_en_catalogo(self) -> None:
+        # CLAUDE.md invariant 2: owning the file and being on a platform are
+        # independent facts, and this flow must not conflate them.
+        items = self._items()
+        before = [dict(item) for item in items]
+        resolved = self.service.availability_for(self._identity(), items)
+        self.assertEqual(items, before)
+        self.assertTrue(resolved["heat"].en_plataforma)
+        self.assertTrue(items[0]["en_catalogo"])
+        self.assertFalse(items[1]["en_catalogo"])
+        # A work available on a platform did not become "in the catalogue".
+        self.assertFalse(items[1]["en_catalogo"])
+        self.assertTrue(resolved["sopranos"].en_plataforma)
+
+    def test_a_work_without_upstream_identity_is_unknown_not_unavailable(self) -> None:
+        resolved = self.service.availability_for(self._identity(), self._items())
+        self.assertNotIn("sin-identidad", resolved)
+
+    def test_media_type_follows_the_catalogue_kind(self) -> None:
+        self.service.availability_for(self._identity(), self._items())
+        self.assertIn(("movie", "949", "AR"), self.calls)
+        self.assertIn(("tv", "1398", "AR"), self.calls)
+
+    def test_a_fresh_snapshot_is_not_fetched_again(self) -> None:
+        self.service.availability_for(self._identity(), self._items())
+        first = len(self.calls)
+        self.service.availability_for(self._identity(), self._items())
+        self.assertEqual(len(self.calls), first, "un snapshot fresco no debe reconsultarse")
+
+    def test_an_upstream_failure_keeps_serving_the_stored_snapshot(self) -> None:
+        self.service.availability_for(self._identity(), self._items())
+        stored = self.repository.availability("AR", ["movie:949"])["movie:949"]
+        # Age the row past the refresh threshold, then make the upstream fail.
+        aged = datetime.now(UTC) - timedelta(days=STALE_AFTER_DAYS + 1)
+        self.repository.save_availability(
+            AvailabilitySnapshot(
+                stored.work_key,
+                stored.region_code,
+                aged.isoformat().replace("+00:00", "Z"),
+                stored.offers,
+                stored.link,
+            )
+        )
+        self.fail_next = True
+        resolved = self.service.availability_for(self._identity(), self._items())
+        self.assertTrue(resolved["heat"].known)
+        self.assertTrue(resolved["heat"].en_plataforma)
+
+    def test_refreshes_are_capped_per_request(self) -> None:
+        self.service.max_refresh_per_request = 1
+        self.service.availability_for(self._identity(), self._items())
+        self.assertEqual(len(self.calls), 1)
+
+    def test_without_an_enabled_region_nothing_is_consulted(self) -> None:
+        self.service.set_region_enabled("AR", False)
+        self.assertEqual(self.service.availability_for(self._identity(), self._items()), {})
+        self.assertEqual(self.calls, [])
+
+    def test_expired_rows_are_purged_and_a_full_purge_empties_the_store(self) -> None:
+        self.service.availability_for(self._identity(), self._items())
+        self.assertTrue(self.repository.availability("AR", ["movie:949"]))
+        self.assertEqual(self.service.purge_expired_availability(), 0)
+        aged = datetime.now(UTC) - timedelta(days=MAX_RETENTION_DAYS + 5)
+        self.repository.save_availability(
+            AvailabilitySnapshot("movie:949", "AR", aged.isoformat().replace("+00:00", "Z"))
+        )
+        self.assertEqual(self.service.purge_expired_availability(), 1)
+        self.service.availability_for(self._identity(), self._items())
+        self.assertEqual(self.service.purge_all_availability(), 2)
+        self.assertEqual(self.repository.availability("AR", ["movie:949", "tv:1398"]), {})

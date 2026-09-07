@@ -8,7 +8,8 @@ themselves. Every method below is explicit about which of the two it serves.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from movie_inbox.application.streaming_repository import (
@@ -17,18 +18,25 @@ from movie_inbox.application.streaming_repository import (
 )
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.streaming import (
+    MAX_RETENTION_DAYS,
+    AvailabilitySnapshot,
     MemberStreamingPreferences,
+    PlatformAvailability,
     RegionPolicy,
     StreamingConfigurationError,
     StreamingProvider,
     StreamingRegion,
+    availability_snapshot,
     effective_region,
     member_preferences,
     normalize_region_code,
+    platform_availability,
     region_policy,
+    snapshot_is_stale,
     streaming_provider,
     streaming_region,
     visible_providers,
+    work_key,
 )
 
 
@@ -45,6 +53,8 @@ class StreamingSourceUnavailable(RuntimeError):
 # `application/` keeps its hands off `external/`.
 RegionCatalogueLoader = Callable[[], list[dict[str, Any]]]
 ProviderCatalogueLoader = Callable[[str], list[dict[str, Any]]]
+# (media_type, tmdb_id, region_code) -> {"link": str, "offers": [...]}
+AvailabilityLoader = Callable[[str, str, str], dict[str, Any]]
 
 
 class StreamingService:
@@ -54,10 +64,17 @@ class StreamingService:
         *,
         region_loader: RegionCatalogueLoader | None = None,
         provider_loader: ProviderCatalogueLoader | None = None,
+        availability_loader: AvailabilityLoader | None = None,
+        max_refresh_per_request: int = 12,
     ) -> None:
         self.repository = repository
         self.region_loader = region_loader
         self.provider_loader = provider_loader
+        self.availability_loader = availability_loader
+        # A page can show a whole catalogue; refreshing every stale row inline
+        # would turn one navigation into hundreds of upstream calls. The rest
+        # keep serving their existing snapshot and get refreshed on later reads.
+        self.max_refresh_per_request = max(0, int(max_refresh_per_request))
 
     @property
     def upstream_configured(self) -> bool:
@@ -178,9 +195,108 @@ class StreamingService:
         validated = member_preferences(payload, known_providers=known)
         return self.repository.set_member_preferences(identity.user.id, validated)
 
+    # --- availability -----------------------------------------------------------------
+
+    def availability_for(
+        self,
+        identity: AuthenticatedIdentity,
+        items: Sequence[dict[str, Any]],
+    ) -> dict[str, PlatformAvailability]:
+        """Resolve platform availability for catalogue items, by item id.
+
+        Never writes to the catalogue. `en_catalogo` means the viewer has the
+        file and is a different fact entirely (CLAUDE.md invariant 2); this only
+        ever reads items to learn their upstream identity.
+        """
+
+        policy = self.repository.region_policy()
+        preferences = self.repository.member_preferences(identity.user.id)
+        enabled = [region.code for region in self.repository.list_regions() if region.enabled]
+        region = effective_region(policy, preferences, enabled_regions=enabled)
+        if not region:
+            return {}
+
+        keys: dict[str, str] = {}
+        for item in items:
+            item_id = str(item.get("id") or "")
+            try:
+                keys[item_id] = work_key(item.get("tmdb_id"), _media_type(item))
+            except StreamingConfigurationError:
+                # No upstream identity means we cannot ask; the viewer is told
+                # "unknown" rather than "not available".
+                continue
+
+        stored = self.repository.availability(region, sorted(set(keys.values())))
+        stored = self._refresh_stale(region, keys, stored)
+        return {
+            item_id: platform_availability(stored.get(key), preferences)
+            for item_id, key in keys.items()
+        }
+
+    def purge_expired_availability(self) -> int:
+        """Discard snapshots past the contractual retention ceiling."""
+
+        cutoff = datetime.now(UTC) - timedelta(days=MAX_RETENTION_DAYS)
+        return self.repository.purge_availability(
+            before=cutoff.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        )
+
+    def purge_all_availability(self) -> int:
+        """Drop every snapshot, for the TMDb retirement flow."""
+
+        return self.repository.purge_availability()
+
+    def _refresh_stale(
+        self,
+        region: str,
+        keys: dict[str, str],
+        stored: dict[str, AvailabilitySnapshot],
+    ) -> dict[str, AvailabilitySnapshot]:
+        if self.availability_loader is None:
+            return stored
+        budget = self.max_refresh_per_request
+        for key in dict.fromkeys(keys.values()):
+            if budget <= 0:
+                break
+            snapshot = stored.get(key)
+            if snapshot is not None and not snapshot_is_stale(snapshot):
+                continue
+            media_type, _, tmdb_id = key.partition(":")
+            try:
+                raw = self.availability_loader(media_type, tmdb_id, region)
+            except Exception:
+                # Availability is supplementary: an upstream outage or rate
+                # limit must not break the surface that asked. The existing
+                # snapshot keeps being served until it expires on its own.
+                budget -= 1
+                continue
+            budget -= 1
+            fresh = availability_snapshot(
+                {
+                    "work_key": key,
+                    "region_code": region,
+                    "checked_at": _timestamp(),
+                    "link": raw.get("link", ""),
+                    "offers": raw.get("offers", []),
+                }
+            )
+            stored[key] = self.repository.save_availability(fresh)
+        return stored
+
     def _require_region(self, code: str) -> StreamingRegion:
         normalized = normalize_region_code(code)
         for region in self.repository.list_regions():
             if region.code == normalized:
                 return region
         raise StreamingRegionNotFound(f"Region is not configured: {normalized}")
+
+
+def _media_type(item: dict[str, Any]) -> str:
+    """Map a catalogue `kind` onto the upstream's movie/tv split."""
+
+    kind = str(item.get("kind") or "").strip().casefold()
+    return "tv" if kind in {"serie", "series", "anime_serie"} else "movie"
+
+
+def _timestamp() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from movie_inbox.domain.streaming import (
+    AvailabilitySnapshot,
     MemberStreamingPreferences,
     RegionPolicy,
     StreamingProvider,
@@ -46,3 +47,15 @@ class StreamingRepository(Protocol):
         user_id: str,
         preferences: MemberStreamingPreferences,
     ) -> MemberStreamingPreferences: ...
+
+    def availability(
+        self,
+        region_code: str,
+        work_keys: list[str],
+    ) -> dict[str, AvailabilitySnapshot]: ...
+
+    def save_availability(self, snapshot: AvailabilitySnapshot) -> AvailabilitySnapshot: ...
+
+    def purge_availability(self, *, before: str = "") -> int:
+        """Drop snapshots, or only those checked before an ISO timestamp."""
+        ...

@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.streaming_repository import (
     StreamingRegionNotFound,
     StreamingRepositoryError,
@@ -20,7 +21,9 @@ from movie_inbox.application.streaming_service import (
     StreamingSourceUnavailable,
 )
 from movie_inbox.domain.streaming import StreamingConfigurationError
+from movie_inbox.web.catalog_api import load_items
 from movie_inbox.web.dependencies import (
+    SessionCatalog,
     authorized_json,
     require_owner,
     require_ready_identity,
@@ -117,6 +120,29 @@ def refresh_providers(code: str, request: Request) -> JSONResponse:
     except (OSError, ValueError):
         return error_response("streaming_source_unavailable", 502)
     return JSONResponse({"providers": [provider.to_dict() for provider in providers]})
+
+
+@router.get("/api/streaming/availability", dependencies=[Depends(require_token)])
+def streaming_availability(request: Request) -> JSONResponse:
+    """Platform availability for the caller's own catalogue.
+
+    Read-only by construction: it loads the viewer's items to learn their
+    upstream identity and never writes to the catalogue. `en_catalogo` is a
+    different fact and is not touched here.
+    """
+
+    identity = require_ready_identity(request)
+    service = request.app.state.streaming_service
+    try:
+        catalog = SessionCatalog.from_identity(request.app.state.viewer_config, identity)
+        resolved = service.availability_for(identity, load_items(catalog.config.patterns))
+    except CatalogRepositoryError:
+        return error_response("catalog_unavailable", 503)
+    except StreamingRepositoryError:
+        return error_response("streaming_unavailable", 503)
+    return JSONResponse(
+        {"availability": {item_id: row.to_dict() for item_id, row in resolved.items()}}
+    )
 
 
 @router.get("/api/streaming/preferences", dependencies=[Depends(require_token)])

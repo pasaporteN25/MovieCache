@@ -150,6 +150,36 @@ class TmdbAdapter:
                 )
         return sorted(merged.values(), key=lambda row: (row["display_priority"], row["name"]))
 
+    def watch_availability(
+        self,
+        media_type: str,
+        tmdb_id: str,
+        region_code: str,
+    ) -> dict[str, Any]:
+        """Offers for one work in one market, flattened by offer kind.
+
+        Returns an empty mapping when the market has no data for the work, which
+        the caller must distinguish from "not offered anywhere": the upstream
+        simply has nothing recorded for many older or obscure titles.
+        """
+
+        if media_type not in {"movie", "tv"} or not str(tmdb_id).isdigit():
+            return {}
+        raw = self._request(f"/{media_type}/{tmdb_id}/watch/providers", {})
+        region = object_dict(object_dict(raw.get("results")).get(region_code))
+        if not region:
+            return {}
+        offers: list[dict[str, Any]] = []
+        for kind in ("flatrate", "free", "ads", "rent", "buy"):
+            for row in object_list(region.get(kind)):
+                if not isinstance(row, Mapping):
+                    continue
+                provider_id = _positive_id(row.get("provider_id"))
+                name = clean_text(str(row.get("provider_name") or ""))
+                if provider_id and name:
+                    offers.append({"provider_id": provider_id, "provider_name": name, "kind": kind})
+        return {"link": str(region.get("link") or "").strip(), "offers": offers}
+
     def _request(self, path: str, parameters: Mapping[str, object]) -> dict[str, Any]:
         url = f"{TMDB_API_BASE_URL}{path}?{urlencode(parameters)}"
         return fetch_json(

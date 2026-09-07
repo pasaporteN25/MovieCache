@@ -14,7 +14,9 @@ from movie_inbox.application.streaming_repository import (
     StreamingRepositoryError,
 )
 from movie_inbox.domain.streaming import (
+    AvailabilitySnapshot,
     MemberStreamingPreferences,
+    PlatformOffer,
     RegionPolicy,
     StreamingProvider,
     StreamingRegion,
@@ -192,6 +194,80 @@ class SqliteStreamingRepository:
             )
         return preferences
 
+    def availability(
+        self,
+        region_code: str,
+        work_keys: list[str],
+    ) -> dict[str, AvailabilitySnapshot]:
+        if not work_keys:
+            return {}
+        found: dict[str, AvailabilitySnapshot] = {}
+        with self._thread_lock, closing(self._connect()) as connection:
+            # Chunked to stay under SQLite's variable limit for a large catalogue.
+            for start in range(0, len(work_keys), 400):
+                chunk = work_keys[start : start + 400]
+                placeholders = ",".join("?" for _ in chunk)
+                rows = connection.execute(
+                    f"""SELECT work_key, region_code, checked_at, link, offers_json
+                    FROM streaming_availability
+                    WHERE region_code = ? AND work_key IN ({placeholders})""",
+                    (region_code, *chunk),
+                ).fetchall()
+                for row in rows:
+                    found[str(row["work_key"])] = AvailabilitySnapshot(
+                        work_key=str(row["work_key"]),
+                        region_code=str(row["region_code"]),
+                        checked_at=str(row["checked_at"]),
+                        offers=tuple(_offers(row["offers_json"])),
+                        link=str(row["link"]),
+                    )
+        return found
+
+    def save_availability(self, snapshot: AvailabilitySnapshot) -> AvailabilitySnapshot:
+        with self._thread_lock, closing(self._connect()) as connection:
+            self._write(
+                connection,
+                """INSERT INTO streaming_availability(
+                    work_key, region_code, checked_at, link, offers_json
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(work_key, region_code) DO UPDATE SET
+                    checked_at = excluded.checked_at,
+                    link = excluded.link,
+                    offers_json = excluded.offers_json""",
+                (
+                    snapshot.work_key,
+                    snapshot.region_code,
+                    snapshot.checked_at,
+                    snapshot.link,
+                    json.dumps(
+                        [offer.to_dict() for offer in snapshot.offers],
+                        ensure_ascii=True,
+                        separators=(",", ":"),
+                    ),
+                ),
+            )
+        return snapshot
+
+    def purge_availability(self, *, before: str = "") -> int:
+        with self._thread_lock, closing(self._connect()) as connection:
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                cursor = (
+                    connection.execute(
+                        "DELETE FROM streaming_availability WHERE checked_at < ?", (before,)
+                    )
+                    if before
+                    else connection.execute("DELETE FROM streaming_availability")
+                )
+                removed = int(cursor.rowcount or 0)
+                connection.commit()
+            except sqlite3.Error as error:
+                connection.rollback()
+                raise StreamingRepositoryError(
+                    f"Cannot purge streaming availability in: {self.path}"
+                ) from error
+        return removed
+
     def _write(
         self,
         connection: sqlite3.Connection,
@@ -214,6 +290,24 @@ class SqliteStreamingRepository:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute(f"PRAGMA busy_timeout = {int(self.busy_timeout * 1000)}")
         return connection
+
+
+def _offers(value: object) -> list[PlatformOffer]:
+    try:
+        decoded = json.loads(str(value or "[]"))
+    except json.JSONDecodeError as error:
+        raise StreamingRepositoryError("Stored availability offers are invalid JSON") from error
+    if not isinstance(decoded, list):
+        raise StreamingRepositoryError("Stored availability offers must be an array")
+    return [
+        PlatformOffer(
+            provider_id=str(row.get("provider_id") or ""),
+            provider_name=str(row.get("provider_name") or ""),
+            kind=str(row.get("kind") or ""),
+        )
+        for row in decoded
+        if isinstance(row, dict)
+    ]
 
 
 def _json_list(value: object) -> list[str]:
