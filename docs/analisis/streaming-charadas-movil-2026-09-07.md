@@ -560,6 +560,12 @@ El backend está completo. Lo que falta es sólo mostrarlo.
   última sincronización: si sólo un lado cambió se aplica, si ambos cambiaron distinto
   decide la persona — sin depender de relojes confiables. El QR aparea, no transporta.
   [A2] queda suspendida hasta reespecificarse y [A1] gana una extensión aditiva.
+  Ampliada el mismo día con cuatro decisiones más del owner: **Android nativo con
+  Kotlin**; dar de alta sin conexión produce un **borrador que no expira** (a
+  diferencia de los de importación, que mueren a las 48 h); las imágenes usan
+  **miniatura local más portada en segundo plano**; y **una cuenta por instalación**.
+  Consecuencia para charadas: la dificultad se calcula en el servidor y viaja como un
+  campo chico, porque el índice IMDb de ~1,1 GB no va al teléfono.
 - **[MB2] Auditoría móvil con usuarios reales.** Inicio, Colección, ficha y Club en
   teléfono, con cuentas creadas de antemano y HTTPS servido según [D1.2]. Insumo para MB1.
   *Medio.* **Sin dependencias — puede hacerse ya.**

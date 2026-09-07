@@ -151,16 +151,73 @@ sincronización.
 fusión a tres bandas obliga a construir una interfaz de conflictos en móvil. A cambio, la
 aplicación sirve sin servidor, que es el requisito.
 
+## Decisiones sumadas el 2026-09-07
+
+Cuatro de los puntos abiertos originales quedaron resueltos por el owner el mismo día.
+
+### 7. Dar de alta sin conexión produce un borrador, nunca una pérdida
+
+**Decidido.** Estando offline se puede dar de alta una obra con lo que la persona sepa —
+al menos un título. Eso crea un **borrador local pendiente de enriquecimiento**. Cuando
+vuelve la red, la búsqueda y el enriquecimiento corren de forma asíncrona.
+
+No hace falta inventar el concepto: `PRODUCT.md` ya define borradores privados para las
+importaciones, y este es el mismo patrón aplicado a otro origen. Con **una diferencia
+obligatoria**: los borradores de importación expiran a las 48 horas, y esa expiración acá
+sería un defecto. Un borrador offline puede esperar días a que haya red, así que **no
+expira**; sólo lo cierra la persona, resolviéndolo o descartándolo.
+
+Al resolverse, el borrador entra por el camino de alta que ya existe, no por uno nuevo:
+el matching sigue siendo conservador (invariante 3), y una coincidencia fuerte con una
+obra ya presente se combina mediante `auto_merge_on_add` en vez de crear un duplicado
+([Q6]). Una coincidencia dudosa queda para revisión humana, como en cualquier otro alta.
+
+### 8. Las imágenes se re-descargan en segundo plano, con una miniatura local
+
+**Decidido, en la variante mixta.** El teléfono guarda una **miniatura** por obra —
+barata y disponible sin red — y **re-descarga la portada completa en segundo plano**.
+
+Tampoco es una política nueva: es la que el servidor ya aplica, donde las portadas se
+cargan progresivamente después del primer acceso y *"la navegación visible tiene prioridad
+y nunca espera a que termine la cola global"* (`PRODUCT.md`). Se replica esa regla, no se
+inventa otra.
+
+Consecuencia: una portada ausente nunca bloquea una pantalla ni una sincronización. El
+fallback ya existente de portada rota es el estado normal mientras la cola avanza.
+
+### 9. Plataforma: Android nativo con Kotlin
+
+**Decidido.** No es PWA ni multiplataforma. Eso fija el almacén local en las herramientas
+del ecosistema y hace que el comportamiento definido arriba —réplica local, fusión a tres
+bandas, cola de imágenes, borradores sin expiración— sea responsabilidad del cliente
+Kotlin.
+
+Deja de depender de [MB2]: la auditoría móvil pasa a informar el diseño de las pantallas,
+no la elección de plataforma.
+
+### 10. Una cuenta por instalación
+
+**Decidido.** El teléfono conoce **qué** cuenta es —la identidad viaja en el apareamiento—
+pero guarda **una sola**. Varias cuentas en un mismo aparato exigirían aislamiento entre
+almacenes y cifrado en reposo, porque las reviews y notas de una persona no deberían
+leerse desde la sesión de otra en el mismo teléfono. Ese costo no se paga hasta que haya
+un caso real que lo pida.
+
+## Consecuencia para charadas
+
+La señal de notoriedad que la dificultad necesita sale del índice IMDb, que pesa ~1,1 GB y
+**no va al teléfono**. Por lo tanto la clasificación de dificultad se calcula **del lado
+del servidor** y viaja como un campo chico por obra. Un teléfono nunca autónomo para
+*clasificar*, sí autónomo para *jugar*. [G1] tiene que fijar ese campo.
+
 ## Qué queda abierto
 
-1. **Multi-usuario en el teléfono.** El owner habló de sincronizar "catálogos y usuarios".
-   Si un teléfono guarda más de una cuenta, hace falta decidir aislamiento y cifrado en
-   reposo. Este ADR asume **una cuenta por instalación** hasta que se resuelva.
-2. **Qué tan lejos llega el offline.** Buscar en fuentes externas y enriquecer necesitan
-   red por definición. Falta decidir si el teléfono puede dar de alta una obra sin
-   metadata y completarla después, o si el alta exige conexión.
-3. **Imágenes.** Las portadas son el grueso del tamaño. Falta decidir si viajan, se
-   re-descargan o se degradan a un marcador.
-4. **Plataforma.** Este ADR no elige entre Android nativo, KMP o PWA; fija el
-   comportamiento que cualquiera de las tres tiene que cumplir. La elección depende de
-   [MB2], la auditoría móvil con usuarios reales.
+1. **Autenticación local.** Si la aplicación sirve sin servidor, ¿alcanza la pantalla de
+   bloqueo del teléfono, o quiere PIN/biometría propia? Las reviews y notas son datos
+   personales y hoy en la web los protege una sesión.
+2. **Primer arranque.** Hay dos entradas legítimas —crear un catálogo en el teléfono, o
+   escanear un QR y traerse uno— y ambas tienen que funcionar. Falta decidir cuál se
+   ofrece primero y qué pasa si alguien crea datos locales y después aparea.
+3. **Varios teléfonos contra la misma instancia.** Funciona por construcción, porque la
+   base de la fusión es **por par**, pero conviene fijarlo explícitamente antes de
+   implementar.
