@@ -545,9 +545,16 @@ El backend está completo. Lo que falta es sólo mostrarlo.
 
 ### Frente: Charadas
 
-- **[G1] Contrato de datos, generador determinista y dificultad.** Mínimo de 300 obras,
-  huella del conjunto de datos en la semilla, señales de dificultad, camino de
-  clasificación manual. Sin código. *Grande.*
+- **[G1] Contrato de datos, generador determinista y dificultad.** **Cerrada 2026-09-07 —
+  `docs/briefs/charades-v1.md`.** Semilla = opciones + huella del mazo, mostrada en
+  pantalla para que dos jugadores verifiquen que están en el mismo. Mínimo de 300 obras y
+  **25 por balde**, porque el balde flaco es el que define si el juego funciona.
+  **Hallazgo medido:** la clasificación automática de dificultad **no funciona** — el
+  conteo de votos mide atención cinéfila global, no reconocimiento en la sala, y no
+  distingue `Los siete samuráis` (370k, pocos) de `Batman` (400k, todos). Se automatizan
+  sólo los extremos y la banda intermedia va a revisión humana, que pasa a ser el camino
+  principal y no un plan B. Una dificultad puesta a mano sobrevive a cualquier recálculo.
+  Se calcula en el servidor y viaja como un campo chico.
 - **[G2] Implementar generador y temporizador.** *Medio. Depende de G1 y de la decisión
   móvil de MB1.*
 
