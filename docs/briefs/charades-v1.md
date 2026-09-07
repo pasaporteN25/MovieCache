@@ -38,15 +38,16 @@ Una obra sin ningún título utilizable queda fuera del mazo.
 El owner fijó **300 obras**. El contrato agrega la parte que importa de verdad:
 
 - **300 obras elegibles** en total para habilitar el juego.
-- **Al menos 25 por balde de dificultad** para que ese balde se ofrezca.
+- **Al menos 25 por categoría de dificultad** para que esa categoría se ofrezca.
 
-El total no es el límite real: 300 obras repartidas en cuatro baldes dan ~75 cada uno, pero
-si el reparto sale desparejo, **el balde flaco define si el juego funciona**. Un balde por
-debajo del mínimo no se ofrece, en vez de ofrecerse y repetir seis títulos.
+El total no es el límite real: 300 obras repartidas en cuatro categorías dan ~75 cada una,
+pero si el reparto sale desparejo, **la categoría más flaca define si el juego funciona**.
+Una categoría por debajo del mínimo no se ofrece, en vez de ofrecerse y repetir seis
+títulos.
 
 **Advertencia medida, no teórica.** Un catálogo de autor sesga el mazo entero: Kurosawa,
-Tarkovski y compañía caen casi todos en los baldes difíciles. Para que exista un balde
-fácil hacen falta títulos masivamente conocidos, que no son los que acumula un catálogo
+Tarkovski y compañía caen casi todos en las categorías difíciles. Para que exista una
+categoría fácil hacen falta títulos masivamente conocidos, que no son los que acumula un catálogo
 curado de cinéfilo. Al elegir los directores que se sumen al Club conviene tenerlo presente.
 
 ## El generador determinista
@@ -109,7 +110,7 @@ curaduría y a las importaciones.
 
 La banda intermedia es donde vive casi todo un catálogo real, así que la revisión humana
 **no es un plan de contingencia: es el camino principal**, y la interfaz tiene que tratarla
-como tal. Una pasada de "repartí estas obras en cuatro baldes", rápida y reanudable, no un
+como tal. Una pasada de "repartí estas obras en cuatro categorías", rápida y reanudable, no un
 formulario por obra.
 
 ### La clasificación manual es autoritativa
