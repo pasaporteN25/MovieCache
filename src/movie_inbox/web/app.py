@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -20,6 +20,7 @@ from movie_inbox.application.auth_service import (
     AuthService,
     PasswordPolicyError,
 )
+from movie_inbox.application.charades_service import CharadesService
 from movie_inbox.application.collection_service import CollectionService
 from movie_inbox.application.external_retirement import (
     RetirementCatalog,
@@ -41,8 +42,10 @@ from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.external.imdb import imdb_id_from_text
 from movie_inbox.external.imdb_dataset_source import ImdbDatasetSource
 from movie_inbox.external.tmdb import TmdbAdapter
+from movie_inbox.infrastructure.charades_repository import SqliteCharadesRepository
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.curation_history import (
     JsonCurationHistoryRepository,
@@ -76,6 +79,7 @@ from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.dependencies import (
     AUTH_SESSION_COOKIE,
     HISTORY_SESSION_COOKIE,
+    SessionCatalog,
     authenticated_json,
     blocked_until_password_change,
     login_json,
@@ -95,6 +99,7 @@ from movie_inbox.web.responses import (
 from movie_inbox.web.routers import (
     admin,
     catalog,
+    charades,
     club,
     curation,
     device_auth,
@@ -302,6 +307,34 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
     app.state.streaming_service = streaming_service
+    dataset_source = (
+        ImdbDatasetSource(Path(config.imdb_dataset_index)) if config.imdb_dataset_index else None
+    )
+
+    def charades_catalog(identity: AuthenticatedIdentity) -> list[dict[str, Any]]:
+        catalog = SessionCatalog.from_identity(config, identity)
+        return load_items(catalog.config.patterns)
+
+    def charades_collections(identity: AuthenticatedIdentity) -> list[dict[str, Any]]:
+        # Following a collection does not copy its works, so they are read from
+        # the collection store rather than found in the personal catalogue.
+        rows: list[dict[str, Any]] = []
+        for collection in collection_service.followed_collections(identity.user.id):
+            rows.extend(dict(entry.item) for entry in collection.items)
+        return rows
+
+    def charades_votes(row: Mapping[str, Any]) -> int | None:
+        if dataset_source is None:
+            return None
+        found = dataset_source.rating_for(imdb_id_from_text(str(row.get("imdb_url") or "")))
+        return found.votes if found is not None else None
+
+    app.state.charades_service = CharadesService(
+        SqliteCharadesRepository(instance_db),
+        catalog_loader=charades_catalog,
+        collection_loader=charades_collections,
+        vote_lookup=charades_votes,
+    )
     app.state.imdb_dataset_source = (
         ImdbDatasetSource(Path(config.imdb_dataset_index)) if config.imdb_dataset_index else None
     )
@@ -494,6 +527,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(integrations.router)
     app.include_router(streaming.router)
     app.include_router(ratings.router)
+    app.include_router(charades.router)
     app.include_router(search.router)
     app.include_router(device_auth.router)
     app.include_router(device_catalog.router)

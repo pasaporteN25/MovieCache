@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 14
+INSTANCE_SCHEMA_VERSION = 15
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -415,6 +415,19 @@ CREATE INDEX ix_streaming_availability_checked
 ON streaming_availability(checked_at);
 """
 
+INSTANCE_SCHEMA_V15 = """
+CREATE TABLE charades_difficulty (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    work_key TEXT NOT NULL,
+    difficulty TEXT NOT NULL CHECK (
+        difficulty IN ('facil', 'medio', 'medio_alto', 'dificil')
+    ),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, work_key)
+);
+CREATE INDEX ix_charades_difficulty_user ON charades_difficulty(user_id, difficulty);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -429,6 +442,7 @@ INSTANCE_MIGRATIONS = {
     12: ("revocable opaque device sessions", INSTANCE_SCHEMA_V12),
     13: ("streaming regions, platforms and member choices", INSTANCE_SCHEMA_V13),
     14: ("dated streaming availability snapshots", INSTANCE_SCHEMA_V14),
+    15: ("human charades difficulty decisions", INSTANCE_SCHEMA_V15),
 }
 
 
