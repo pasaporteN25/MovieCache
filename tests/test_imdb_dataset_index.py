@@ -59,7 +59,11 @@ class BuildIndexTests(unittest.TestCase):
         report = build_index(self.basics_path, self.akas_path, self.destination)
         self.assertEqual(report.basics_rows, 2)
         self.assertEqual(report.basics_skipped_lines, 1)  # the header
-        self.assertEqual(report.akas_rows, 3)
+        # Only the alias in a region this catalogue reads is stored. The two
+        # region-less `imdbDisplay` rows are dropped without losing anything:
+        # the original title is already a column on the work itself.
+        self.assertEqual(report.akas_rows, 1)
+        self.assertEqual(report.akas_filtered_rows, 2)
         self.assertEqual(report.akas_skipped_lines, 1)  # the header
         self.assertTrue(self.destination.exists())
         self.assertEqual(report.index_size_bytes, self.destination.stat().st_size)
@@ -78,10 +82,11 @@ class BuildIndexTests(unittest.TestCase):
         assert result is not None
         self.assertEqual(result.primary_title, "Heat")
         self.assertEqual(result.start_year, 1995)
-        self.assertEqual([aka.title for aka in result.akas], ["Heat", "Calor"])
-        self.assertEqual(result.akas[1].region, "ES")
-        self.assertTrue(result.akas[0].is_original_title)
-        self.assertFalse(result.akas[1].is_original_title)
+        self.assertEqual([aka.title for aka in result.akas], ["Calor"])
+        self.assertEqual(result.akas[0].region, "ES")
+        self.assertFalse(result.akas[0].is_original_title)
+        # The original title survives on the work, not as an aka row.
+        self.assertEqual(result.original_title, "Heat")
 
     def test_lookup_by_tconst_returns_none_for_an_unknown_id(self) -> None:
         self._write_two_title_dataset()
@@ -105,7 +110,7 @@ class BuildIndexTests(unittest.TestCase):
         build_index(self.basics_path, self.akas_path, self.destination)
         stats = index_stats(self.destination)
         self.assertEqual(stats.basics_rows, 2)
-        self.assertEqual(stats.akas_rows, 3)
+        self.assertEqual(stats.akas_rows, 1)
         self.assertEqual(stats.index_size_bytes, self.destination.stat().st_size)
 
     def test_a_second_build_fully_replaces_the_first_instead_of_appending(self) -> None:

@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 IMDB_DATASETS_BASE_URL = "https://datasets.imdbws.com/"
-AVAILABLE_DATASETS = ("title.basics", "title.akas")
+AVAILABLE_DATASETS = ("title.basics", "title.akas", "title.ratings")
 
 _USER_AGENT = "MovieInbox/0.2 (+local personal catalog)"
 _CHUNK_SIZE = 1_048_576

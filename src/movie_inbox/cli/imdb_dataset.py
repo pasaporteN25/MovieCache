@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
 
     sync_parser = commands.add_parser(
-        "sync", help="Download title.basics/title.akas and (re)build the local index."
+        "sync", help="Download the IMDb datasets and (re)build the lean local index."
     )
     sync_parser.add_argument(
         "--output-dir",
@@ -95,6 +95,7 @@ def run_sync(output_dir: Path, report_path: Path | None) -> int:
         output_dir / "title.basics.tsv.gz",
         output_dir / "title.akas.tsv.gz",
         index_path,
+        output_dir / "title.ratings.tsv.gz",
     )
     report: dict[str, Any] = {
         "downloads": downloads,
@@ -102,6 +103,9 @@ def run_sync(output_dir: Path, report_path: Path | None) -> int:
         "basics_skipped_lines": build_report.basics_skipped_lines,
         "akas_rows": build_report.akas_rows,
         "akas_skipped_lines": build_report.akas_skipped_lines,
+        "basics_filtered_rows": build_report.basics_filtered_rows,
+        "akas_filtered_rows": build_report.akas_filtered_rows,
+        "ratings_rows": build_report.ratings_rows,
         "index_build_seconds": round(build_report.elapsed_seconds, 3),
         "index_size_bytes": build_report.index_size_bytes,
         "index_path": str(index_path),
@@ -119,12 +123,15 @@ def print_sync_report(report: dict[str, Any]) -> None:
         megabytes = info["bytes_downloaded"] / 1_048_576
         print(f"- Downloaded {name}.tsv.gz: {megabytes:.1f} MB in {info['elapsed_seconds']:.1f}s")
     print(
-        f"- Indexed {report['basics_rows']} titles ({report['basics_skipped_lines']} lines skipped)"
+        f"- Indexed {report['basics_rows']} titles "
+        f"({report.get('basics_filtered_rows', 0)} skipped as episodes, games or other "
+        f"types this catalogue never classifies)"
     )
     print(
         f"- Indexed {report['akas_rows']} alternate titles "
-        f"({report['akas_skipped_lines']} lines skipped)"
+        f"({report.get('akas_filtered_rows', 0)} skipped as outside the regions read here)"
     )
+    print(f"- Indexed {report.get('ratings_rows', 0)} public ratings")
     print(f"- Index build time: {report['index_build_seconds']:.1f}s")
     print(f"- Index size on disk: {report['index_size_bytes'] / 1_048_576:.1f} MB")
     print(f"- Index path: {report['index_path']}")
@@ -136,6 +143,7 @@ def run_stats(output_dir: Path) -> int:
     print("IMDb dataset index stats")
     print(f"- Titles: {stats.basics_rows}")
     print(f"- Alternate titles: {stats.akas_rows}")
+    print(f"- Public ratings: {stats.ratings_rows}")
     print(f"- Size on disk: {stats.index_size_bytes / 1_048_576:.1f} MB")
     return 0
 

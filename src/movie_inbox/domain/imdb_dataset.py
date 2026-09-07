@@ -17,6 +17,7 @@ IMDB_ATTRIBUTION_NOTICE = (
 _NULL = "\\N"
 _TITLE_BASICS_COLUMNS = 9
 _TITLE_AKAS_COLUMNS = 8
+_TITLE_RATINGS_COLUMNS = 3
 
 
 def _field(value: str) -> str | None:
@@ -61,6 +62,21 @@ def parse_title_basics_row(line: str) -> dict[str, Any] | None:
         "runtime_minutes": _int_field(runtime_minutes),
         "genres": _field(genres),
     }
+
+
+def parse_title_ratings_row(line: str) -> dict[str, Any] | None:
+    columns = line.rstrip("\r\n").split("\t")
+    if len(columns) != _TITLE_RATINGS_COLUMNS or columns[0] == "tconst":
+        return None
+    tconst, average_rating, num_votes = columns
+    votes = _int_field(num_votes)
+    if not tconst or votes is None:
+        return None
+    try:
+        rating = float(average_rating)
+    except ValueError:
+        return None
+    return {"tconst": tconst, "average_rating": rating, "num_votes": votes}
 
 
 def parse_title_akas_row(line: str) -> dict[str, Any] | None:
