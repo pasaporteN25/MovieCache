@@ -474,22 +474,39 @@ con el trabajo visual**, salvo donde se indica.
   matriz de autoridad de [Q5] y el prototipo desconectado. Opt-in, sin volverse
   obligatorio para una instalación que no lo indexó. *Grande. Sin dependencias, pero va
   después de F5.4 por decisión de prioridad.*
-- **[F6.2] Señal de notoriedad y puntajes públicos.** **Mitad de datos cerrada
+- **[F6.2] Señal de notoriedad y puntajes públicos.** **Cerrada del lado de datos
   2026-09-07.** El owner decidió **tomar las dos fuentes en vez de elegir una**, para que
   el lector compare en lugar de que se le imponga una vara, con su propio puntaje al lado.
-  `title.ratings` entra al índice liviano y se lee al mostrar, nunca se guarda en el
-  catálogo. `GET /api/ratings` lo expone. La regla de [F3.2] sigue firme y ahora es
-  estructural: un puntaje público nunca llega a `rating` personal.
-  - **Pendiente, para Codex:** presentarlos en la ficha, junto al puntaje propio, con la
-    atribución de IMDb que exigen sus términos (`attribution.imdb` viene en la respuesta).
-    Un puntaje con menos de 50 votos llega marcado `is_meaningful: false` — merece verse
-    distinto, porque un 9,9 de tres personas al lado de un 8,3 de setecientas mil invita
-    una comparación que no existe.
-  - **Pendiente, mío:** los puntajes de TMDb. Se dejaron fuera a propósito: mostrarlos
-    exige guardar un número que envejece o una llamada de red por vista, o sea el mismo
-    tratamiento de snapshot fechado que [S3] le dio a la disponibilidad. Los de IMDb no
-    tienen ese problema porque salen del índice local y el owner controla cuándo se
+  `GET /api/ratings` devuelve las dos juntas, ordenadas por cantidad de votos: la más
+  respaldada primero, sin que ninguna fuente tenga prioridad fija. La regla de [F3.2]
+  sigue firme y ahora es estructural: un puntaje público nunca llega a `rating` personal,
+  y el endpoint sólo lee.
+  - **IMDb** sale del índice liviano y se lee al mostrar, nunca se guarda en el catálogo.
+    No envejece ni caduca: el archivo está en disco y el owner controla cuándo se
     re-sincroniza.
+  - **TMDb** entra como **snapshot fechado**, con exactamente el tratamiento que [S3] le
+    dio a la disponibilidad y por el mismo motivo — es un número que se mueve detrás de
+    una llamada HTTP. Tabla propia (`public_rating_snapshots`, migración de instancia
+    **v17**), refresco perezoso a los 30 días, tope contractual de 180 y un presupuesto de
+    12 refrescos por pedido para que una página no se convierta en cientos de llamadas. El
+    catálogo portable no se tocó: sigue en schema v9.
+  - **Dos decisiones que conviene no deshacer.** Una obra sin votos arriba **no se guarda
+    como cero**: no votada es una respuesta normal, así que se vuelve a preguntar más
+    adelante en vez de recordarla mal. Y una obra sin ningún puntaje **está ausente del
+    mapa**, no presente con lista vacía — la lista vacía se leería como "nadie la votó".
+  - **Retirada de TMDb.** Ahora borra las dos cosas que vinieron de ahí: disponibilidad y
+    puntajes. El índice de IMDb queda intacto a propósito, no es dato de TMDb para
+    reclamar. El resultado pasó a llamarse `purged_snapshots`, porque `purged_availability`
+    había dejado de ser cierto.
+  - **Pendiente, para Codex:** presentarlos en la ficha, junto al puntaje propio, con las
+    atribuciones que exigen sus términos — vienen en la respuesta como `attribution.imdb`
+    y `attribution.tmdb`, y sólo aparece la de una fuente que la instancia tenga
+    configurada. Un puntaje con menos de 50 votos llega marcado `is_meaningful: false` —
+    merece verse distinto, porque un 9,9 de tres personas al lado de un 8,3 de setecientas
+    mil invita una comparación que no existe.
+  - **Lo único que no se verificó contra la API real** es la lectura de puntajes de TMDb:
+    el archivo del token no está en la máquina en este momento. Queda como smoke
+    voluntario en `tests/test_external_tmdb_live_smoke.py`, que se salta solo sin token.
 
 ### Frente: Disponibilidad en streaming
 
@@ -594,8 +611,10 @@ reinventarla dos veces.
 
 1. **[F5.4]** — el owner tiene que crear el API Read Access Token en su cuenta de TMDb y
    dejarlo en un archivo del servidor. El token no pasa por el chat. Bloquea el arranque.
-2. **[F6.2] / [G1]** — usar un conteo de votos público como señal de notoriedad para
-   dificultad de juego, sin que toque `rating` personal ni se presente como valoración.
+2. ~~**[F6.2] / [G1]** — usar un conteo de votos público como señal de notoriedad para
+   dificultad de juego.~~ **Resuelta.** [G1] midió que el conteo de votos no sirve como
+   clasificador de dificultad, así que se automatizan sólo los extremos; y [F6.2] dejó los
+   puntajes públicos servidos aparte del `rating` personal, nunca como valoración propia.
 3. **[G1]** — criterio de dificultad definitivo, y si se acepta una fuente de títulos
    populares además del catálogo curado, para que los baldes fáciles existan.
 4. **[MB1]** — convergencia de estado personal editado sin conexión en dos réplicas.

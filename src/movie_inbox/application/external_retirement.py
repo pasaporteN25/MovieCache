@@ -44,17 +44,18 @@ class TmdbRetirementService:
         repository_factory: RepositoryFactory,
         history: CurationHistoryRepository,
         catalogs: Callable[[], Sequence[RetirementCatalog]],
-        availability_purge: Callable[[], int] | None = None,
+        snapshot_purge: Callable[[], int] | None = None,
     ) -> None:
         self.repository_factory = repository_factory
         self.history_repository = history
         self.catalogs = catalogs
-        # Availability snapshots are TMDb data too, so retiring TMDb has to drop
-        # them as well or the purge would be incomplete. They are deliberately
-        # left out of the undo payload: unlike a catalogue field, a snapshot is
-        # a re-fetchable fact about a third party's offers, never the user's own
-        # work, so restoring a stale copy would be worse than asking again.
-        self.availability_purge = availability_purge
+        # Availability and public-score snapshots are TMDb data too, so retiring
+        # TMDb has to drop them as well or the purge would be incomplete. They
+        # are deliberately left out of the undo payload: unlike a catalogue
+        # field, a snapshot is a re-fetchable fact about a third party, never
+        # the user's own work, so restoring a stale copy would be worse than
+        # asking again.
+        self.snapshot_purge = snapshot_purge
 
     def preview(self) -> dict[str, Any]:
         internal = self._preview_internal()
@@ -98,16 +99,16 @@ class TmdbRetirementService:
                 preview["before"],
             )
             raise
-        purged_availability = 0
-        if self.availability_purge is not None:
+        purged_snapshots = 0
+        if self.snapshot_purge is not None:
             # After the catalogue write and its history entry: a failure here
             # must not roll back a purge that already succeeded, and the rows
             # are re-fetchable, so leaving them is recoverable.
-            purged_availability = self.availability_purge()
+            purged_snapshots = self.snapshot_purge()
         return {
             "preview": public,
             "operation": public_operation(operation),
-            "purged_availability": purged_availability,
+            "purged_snapshots": purged_snapshots,
         }
 
     def history(self) -> dict[str, Any]:

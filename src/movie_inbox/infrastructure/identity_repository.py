@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 16
+INSTANCE_SCHEMA_VERSION = 17
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -436,6 +436,19 @@ CREATE TABLE instance_secrets (
 );
 """
 
+INSTANCE_SCHEMA_V17 = """
+CREATE TABLE public_rating_snapshots (
+    work_key TEXT NOT NULL,
+    source TEXT NOT NULL,
+    checked_at TEXT NOT NULL,
+    average REAL NOT NULL,
+    votes INTEGER NOT NULL,
+    PRIMARY KEY (work_key, source)
+);
+CREATE INDEX ix_public_rating_snapshots_checked
+ON public_rating_snapshots(source, checked_at);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -452,6 +465,7 @@ INSTANCE_MIGRATIONS = {
     14: ("dated streaming availability snapshots", INSTANCE_SCHEMA_V14),
     15: ("human charades difficulty decisions", INSTANCE_SCHEMA_V15),
     16: ("persistent instance secrets for durable device keys", INSTANCE_SCHEMA_V16),
+    17: ("dated public score snapshots", INSTANCE_SCHEMA_V17),
 }
 
 

@@ -38,10 +38,12 @@ from movie_inbox.application.library_service import (
 from movie_inbox.application.member_service import MemberService
 from movie_inbox.application.privacy_service import PrivacyService
 from movie_inbox.application.public_presentation_service import PublicPresentationService
+from movie_inbox.application.public_ratings_service import PublicRatingsService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.domain.public_ratings import PublicRating
 from movie_inbox.external.imdb import imdb_id_from_text
 from movie_inbox.external.imdb_dataset_source import ImdbDatasetSource
 from movie_inbox.external.tmdb import TmdbAdapter
@@ -61,6 +63,9 @@ from movie_inbox.infrastructure.library_scanner import scan_media_files
 from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogProvisioner
 from movie_inbox.infrastructure.public_presentation_repository import (
     SqlitePublicPresentationRepository,
+)
+from movie_inbox.infrastructure.public_ratings_repository import (
+    SqlitePublicRatingsRepository,
 )
 from movie_inbox.infrastructure.scanner_history import SqliteScannerHistoryRepository
 from movie_inbox.infrastructure.starter_collections import (
@@ -198,11 +203,37 @@ def create_app(config: ViewerConfig) -> FastAPI:
         availability_loader=streaming_adapter.watch_availability if streaming_adapter else None,
     )
 
+    dataset_source = (
+        ImdbDatasetSource(Path(config.imdb_dataset_index)) if config.imdb_dataset_index else None
+    )
+
+    def imdb_rating(imdb_id: str) -> PublicRating | None:
+        return dataset_source.rating_for(imdb_id) if dataset_source is not None else None
+
+    def imdb_id_of(row: dict[str, Any]) -> str:
+        return imdb_id_from_text(str(row.get("imdb_url") or ""))
+
+    public_ratings_service = PublicRatingsService(
+        SqlitePublicRatingsRepository(instance_db),
+        imdb_lookup=imdb_rating if dataset_source is not None else None,
+        imdb_id_reader=imdb_id_of,
+        tmdb_loader=streaming_adapter.public_rating if streaming_adapter else None,
+    )
+
+    def purge_tmdb_derived_data() -> int:
+        # Availability and public scores are both TMDb data, so retiring TMDb
+        # has to drop both or the purge would be incomplete. The IMDb index is
+        # deliberately untouched: it is not TMDb's data to reclaim.
+        return (
+            streaming_service.purge_all_availability()
+            + public_ratings_service.purge_all_tmdb_ratings()
+        )
+
     tmdb_retirement_service = TmdbRetirementService(
         lambda path: catalog_service(path).repository,
         JsonCurationHistoryRepository(retirement_history_path(instance_db)),
         retirement_catalogs,
-        streaming_service.purge_all_availability,
+        purge_tmdb_derived_data,
     )
 
     def catalog_universe() -> list[dict[str, Any]]:
@@ -307,9 +338,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
     app.state.streaming_service = streaming_service
-    dataset_source = (
-        ImdbDatasetSource(Path(config.imdb_dataset_index)) if config.imdb_dataset_index else None
-    )
+    app.state.public_ratings_service = public_ratings_service
 
     def charades_catalog(identity: AuthenticatedIdentity) -> list[dict[str, Any]]:
         catalog = SessionCatalog.from_identity(config, identity)
@@ -335,9 +364,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
         collection_loader=charades_collections,
         vote_lookup=charades_votes,
     )
-    app.state.imdb_dataset_source = (
-        ImdbDatasetSource(Path(config.imdb_dataset_index)) if config.imdb_dataset_index else None
-    )
+    app.state.imdb_dataset_source = dataset_source
     app.state.device_login_limiter = login_limiter
     app.add_middleware(
         TrustedHostMiddleware,

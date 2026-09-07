@@ -58,6 +58,19 @@ class TmdbLiveSmokeTests(unittest.TestCase):
         detail = self.adapter.metadata(movie["url"])
         self.assertEqual(detail["imdb_url"], "https://www.imdb.com/title/tt0113277/")
         self.assertIn("alternative_titles", detail)
+    def test_public_scores_come_back_as_a_number_and_a_vote_count(self) -> None:
+        # [F6.2]: the score half of the API, which the offline tests can only
+        # check against a payload we wrote ourselves. Heat is rated by enough
+        # people that both numbers are stable enough to assert loosely.
+        found = self.adapter.public_rating("movie", "949")
+        self.assertTrue(found, "TMDb should have a score for Heat")
+        self.assertGreater(found["average"], 0.0)
+        self.assertLessEqual(found["average"], 10.0)
+        self.assertGreater(found["votes"], 1000)
+
+    def test_an_unusable_reference_asks_nothing_and_yields_nothing(self) -> None:
+        self.assertEqual(self.adapter.public_rating("libro", "949"), {})
+        self.assertEqual(self.adapter.public_rating("movie", "no-es-un-id"), {})
 
 
 if __name__ == "__main__":

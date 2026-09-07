@@ -174,7 +174,7 @@ class TmdbRetirementServiceTests(unittest.TestCase):
             result = service.purge(preview["preview_id"], confirmed=True)
 
             self.assertEqual(len(purged), 1)
-            self.assertEqual(result["purged_availability"], 7)
+            self.assertEqual(result["purged_snapshots"], 7)
             self.assertEqual(repository.read()[0].tmdb_id, "")
 
             service.undo(result["operation"]["id"])
@@ -195,7 +195,7 @@ class TmdbRetirementServiceTests(unittest.TestCase):
             )
             preview = service.preview()
             result = service.purge(preview["preview_id"], confirmed=True)
-            self.assertEqual(result["purged_availability"], 0)
+            self.assertEqual(result["purged_snapshots"], 0)
             self.assertEqual(repository.read()[0].tmdb_id, "")
 
     def test_stale_preview_and_read_only_catalog_block_purge(self) -> None:

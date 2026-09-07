@@ -16,6 +16,13 @@ TMDB_API_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_WEB_BASE_URL = "https://www.themoviedb.org"
 TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p"
 TMDB_DEFAULT_LANGUAGE = "es-AR"
+# Required wherever TMDb data is shown, per their terms. Same wording the search
+# surface already renders, kept here so the API can hand it to any client rather
+# than each one carrying its own copy of a legal obligation.
+TMDB_ATTRIBUTION_NOTICE = (
+    "Este producto usa TMDb y sus APIs pero no está avalado, certificado ni "
+    "aprobado de ninguna forma por TMDb."
+)
 _TMDB_REFERENCE_PATH = re.compile(r"^/(movie|tv)/(\d+)(?:[-/]|$)", flags=re.IGNORECASE)
 _MOVIE_APPEND = "alternative_titles,translations,credits,external_ids,release_dates,images"
 _TV_APPEND = "alternative_titles,translations,credits,external_ids,images"
@@ -179,6 +186,30 @@ class TmdbAdapter:
                 if provider_id and name:
                     offers.append({"provider_id": provider_id, "provider_name": name, "kind": kind})
         return {"link": str(region.get("link") or "").strip(), "offers": offers}
+
+    def public_rating(self, media_type: str, tmdb_id: str) -> dict[str, Any]:
+        """The upstream's aggregate score for one work, with its vote count.
+
+        Deliberately a bare detail call with no ``append_to_response``: the
+        caller wants two numbers, and asking for credits, images and
+        translations to reach them would multiply the payload for nothing.
+
+        Returns an empty mapping when the work is unrated or unknown, which the
+        caller must not store as a zero -- a work nobody has voted on is a
+        normal answer that should be asked about again later.
+        """
+
+        if media_type not in {"movie", "tv"} or not str(tmdb_id).isdigit():
+            return {}
+        raw = self._request(f"/{media_type}/{tmdb_id}", {"language": self.language})
+        try:
+            average = float(raw.get("vote_average") or 0.0)
+            votes = int(raw.get("vote_count") or 0)
+        except (TypeError, ValueError):
+            return {}
+        if votes <= 0 or average <= 0.0:
+            return {}
+        return {"average": round(average, 1), "votes": votes}
 
     def _request(self, path: str, parameters: Mapping[str, object]) -> dict[str, Any]:
         url = f"{TMDB_API_BASE_URL}{path}?{urlencode(parameters)}"
