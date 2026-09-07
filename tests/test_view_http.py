@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.privacy import PrivacyPreferences
+from movie_inbox.external.registry import default_source_adapters
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -1664,6 +1665,25 @@ class ViewerHttpTests(unittest.TestCase):
         status, body = self.request("GET", "/static/img/tmdb-logo.svg")
         self.assertEqual(status, 200)
         self.assertIn(b"<svg", body)
+
+    def test_every_registrable_external_source_has_a_frontend_label(self) -> None:
+        # [F5.4]: TMDb reached production without an entry in SOURCE_LABELS, so every
+        # real result rendered as "Sin fuente". Cosmetic in the result card, but
+        # duplicateSignalsCollide() compares labels rather than raw sources, so two
+        # items from different unlabelled sources also collapsed into one signal and
+        # the [V5-4] disambiguation fallback lost a real distinguishing fact. Only a
+        # live run with a valid token could surface it, so pin it structurally here.
+        status, body = self.request("GET", "/static/js/core/format.js")
+        self.assertEqual(status, 200)
+        block = re.search(r"const SOURCE_LABELS = \{(.*?)\n\s*\};", body.decode("utf-8"), re.DOTALL)
+        self.assertIsNotNone(block)
+        assert block is not None
+        labelled = set(re.findall(r"(\w+)\s*:", block.group(1)))
+        registrable = {
+            adapter.name for adapter in default_source_adapters("token-that-registers-tmdb")
+        }
+        self.assertIn("tmdb", registrable)
+        self.assertEqual(sorted(registrable - labelled), [])
 
     def test_vhs_frame_is_a_packaged_local_png_asset(self) -> None:
         status, body = self.request("GET", "/static/img/vhs-cassette-frame-v1.png")
