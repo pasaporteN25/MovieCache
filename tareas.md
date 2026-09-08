@@ -26,9 +26,15 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | --- | --- | --- | --- |
 | 1 | [U2-P] | Afinar Home con las observaciones visuales del usuario | relevamiento U2-P.0 |
 | 2 | [U3] | Replantear Colección, búsqueda, filtros y alta | U2-P aceptada |
-| 3 | [A2] | Cliente Android basico | A1 + entorno Android |
-| 4 | [I1] | Evaluacion de integraciones | A1 |
+| 3 | [B1] | Mejorar el algoritmo de búsqueda y de colecciones | diagnóstico 2026-08-26 |
+| 4 | [A2] | Cliente Android autónomo | A2.0 (entorno) + ADR-0005 |
 | 5 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
+
+**Reordenamiento del 2026-09-07, por decisión del owner.** Las integraciones externas
+([I1]) quedaron evaluadas y **explícitamente postergadas**: hay problemas mejores adelante.
+La prioridad pasa a ser el algoritmo y la presentación de búsqueda y colecciones ([B1] del
+lado de infraestructura, [U3] del lado visual).
 
 - **En curso:** [U2-P.1] implementada/verificada, pendiente de revisión y commit;
   [U2-P.2] opción B integrada; [U2-P.3/P.4] Oswald 400 + lomo B elegidos e integrados,
@@ -175,41 +181,131 @@ bloquean U3 ni reabren la recuperación aceptada.
     paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
     estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
     expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
+  - [x] **[A1.4] Clave de sincronización durable.** Cerrada 2026-09-07, commit `609f56e`.
+    Nació de los tres huecos que midió ADR-0005 para un cliente con réplica local. Sólo
+    uno era un problema de corrección y se arregló: el id opaco se derivaba del
+    `api_token` rotable más la ruta del archivo, así que rotar el token o mover el
+    catálogo re-clavaba todas las obras. Ahora sale de un secreto de instancia persistente
+    (migración v16, tabla `instance_secrets`) más la *posición* de la fuente, que no lleva
+    ruta. Los otros dos huecos —marcas de tiempo y feed de cambios— se dejaron sin hacer a
+    propósito, con el motivo escrito en la sección 6.1 de `docs/adr/0005-mobile-direction.md`:
+    ningún timestamp registra hoy una edición personal, y la fusión a tres bandas no
+    necesita un feed para ser correcta.
 
-#### [A2] Cliente Android basico
-- **Alcance**: login seguro, lectura/busqueda/detalle y edicion de estado, fecha vista,
-  puntaje y review; disponibilidad fisica solo lectura, sin offline ni administracion.
-- **Criterio de cierre**: MVP contra la API de [A1], matriz de compatibilidad y pruebas
-  de red/autenticacion/ciclo de vida.
-- **Depende de**: [A1].
-- **Modelo sugerido**: Grande. Proyecto cliente multiplataforma potencial.
+#### [A2] Cliente Android autónomo
 
-  - [ ] **[A2.1] Fundacion Android y conexion segura.** Modulo Android nativo con
-    Kotlin/Compose, Hilt/KSP, Retrofit/OkHttp y serializacion; configuracion de URL HTTPS
-    por instancia, excepcion HTTP solo para loopback de debug, almacenamiento Keystore de
-    tokens y flujo de login/refresh/logout contra `/api/v1/auth/*`. Cierre: `assembleDebug`
-    y pruebas MockWebServer sin secretos en logs, memoria o backups.
-  - [ ] **[A2.2] Lectura del catalogo personal.** Estados Compose para catalogo paginado,
-    busqueda local y detalle, con loading/error/empty explicitos, Coil para imagenes y
-    disponibilidad solo lectura. Cierre: pruebas de repositorio y de UI para páginas,
-    cursor inválido, sesión vencida y campos desconocidos compatibles.
-  - [ ] **[A2.3] Edicion personal y gate de cliente.** Formulario de estado, fecha vista,
-    puntaje y review con `PATCH` parcial, manejo de conflicto/error y cierre de sesión;
-    matriz API/cliente, pruebas de rotación, recreación de Activity y configuración de
-    instancia. No agrega offline, Scanner, administración ni mutaciones compartidas.
+> **Reespecificada el 2026-09-07.** La versión anterior de esta sección describía un
+> **cliente delgado** que arrancaba por el login y dejaba el modo offline fuera de alcance.
+> ADR-0005 decidió lo contrario y el owner lo confirmó: el teléfono es **autónomo**,
+> funciona sin instancia detrás y sincronizar es opcional. Eso no reordena las entregas
+> viejas, las invierte, así que se reemplazaron enteras. El contrato vigente está en
+> `docs/briefs/android-client-v2.md`; el brief v1 quedó marcado como reemplazado.
+
+- **Alcance**: aplicación Android nativa (Kotlin + Compose) con **almacén local propio**.
+  Explorar, buscar, abrir una obra y editar estado personal sin red y sin cuenta. La
+  sincronización con una instancia es opt-in, la inicia una persona, se aparea por QR y
+  **nunca borra**.
+- **Criterio de cierre**: `assembleDebug` verde, la aplicación sirve sola sin servidor, y
+  la sincronización converge por fusión a tres bandas con resolución humana del conflicto.
+- **Depende de**: [A2.0] para el entorno; la sincronización además de [A1.4], ya cerrada.
+- **Modelo sugerido**: Grande. Es un proyecto cliente completo, no una pantalla más.
+
+  - [ ] **[A2.0] Entorno.** JDK 17 o superior, Android SDK, Gradle Wrapper y un
+    `assembleDebug` que compile. **Es la primera tarea y bloquea todo lo demás**: medido en
+    la máquina de trabajo el 2026-09-07, hay JDK 1.8.0_471, no hay Gradle, no hay
+    `ANDROID_SDK_ROOT` ni `ANDROID_HOME`, y el repositorio no contiene proyecto Android.
+    Hasta que esto exista, el resto de [A2] es papel. Guía paso a paso en
+    `docs/briefs/android-setup.md`.
+  - [ ] **[A2.1] Proyecto Android y almacén local.** Kotlin/Compose, Hilt con KSP,
+    coroutines y `StateFlow`; el repositorio es el límite de errores. Guarda la capa de
+    obra y la capa personal con la forma del contrato portable v9, **no** la capa operativa
+    —rutas, archivos, bibliotecas, Scanner, curaduría—, que además no significa nada en un
+    teléfono. Funciona **sin red y sin cuenta**: crear un catálogo local es una entrada
+    legítima, no un modo degradado. Una cuenta por instalación.
+  - [ ] **[A2.2] Leer y editar en local.** Explorar, buscar, abrir una obra y editar
+    estado, fecha, puntaje y review, todo sin red. Dar de alta sin conexión produce un
+    **borrador pendiente de enriquecimiento que no expira** —a diferencia de los de
+    importación, que mueren a las 48 h—; sólo lo cierra la persona.
+  - [ ] **[A2.3] Charadas.** Primer entregable con valor visible y el que valida el almacén
+    local: datos de sólo lectura, sin red, sin sincronización. El backend está entregado
+    ([G2]) y el contrato en `docs/briefs/charades-v1.md`. El generador es deliberadamente
+    portable —FNV-1a más un LCG documentado— para que el cliente produzca **el mismo mazo**
+    que el servidor; esa reimplementación en Kotlin es parte de esta entrega, con pruebas
+    contra vectores del servidor. La dificultad **no** se calcula en el teléfono: sale del
+    índice IMDb de ~1,1 GB y viaja resuelta como un campo por obra.
+  - [ ] **[A2.4] Apareamiento por QR.** El QR lleva origen, identidad técnica y un token de
+    un solo uso; **no** lleva el catálogo, que no entra ni cerca en los ~2953 bytes de un
+    QR. La transferencia va por HTTPS en la red local. Depende de [A1.4], ya cerrada.
+  - [ ] **[A2.5] Sincronización.** Fusión a tres bandas contra la base de la última
+    sincronización: lo que cambió de un solo lado se aplica, lo que cambió igual en los dos
+    converge, y **decide la persona** cuando ambos cambiaron distinto. Por campo, sin
+    depender de relojes confiables. Incluye interfaz de conflictos, que es trabajo real y
+    no un diálogo de dos botones. La sincronización **nunca borra**.
+  - [ ] **[A2.6] Imágenes.** Miniatura local y portada completa en segundo plano.
+
+  **Lo que sobrevive del brief v1** y se conserva para cuando exista sincronización:
+  tokens en Android Keystore y nunca en preferencias sin cifrar, logs, analytics, URI,
+  portapapeles ni backups; HTTPS con certificado válido, con la excepción de
+  `http://10.0.2.2` sólo en `debug`; ignorar campos opcionales desconocidos; respetar
+  `X-Movie-Inbox-Api-Version`; y no usar el `/api/` histórico, cookies ni
+  `X-Movie-Inbox-Token`.
+
+  **Abierto y del owner:** quién escribe el cliente (el reparto vigente separa
+  infraestructura de visual, y una app Android es un tercer tipo de trabajo), si la
+  aplicación quiere PIN o biometría propia además de la pantalla de bloqueo del teléfono, y
+  qué se ofrece primero en el primer arranque: crear local o aparear.
 
 **Nota de arranque A2, 2026-09-02.** El checkout todavía no contiene un proyecto Android.
 La terminal disponible detecta Java 8 y no detecta Gradle ni `ANDROID_SDK_ROOT`; A2.1 debe
 ejecutarse en un entorno con JDK 17+ y Android SDK configurado antes de poder prometer un
 APK o una prueba de emulador reproducible.
 
-#### [I1] Evaluar Radarr, Sonarr y Letterboxd
-- **Alcance**: separar importacion, enlaces e inventario; revisar autenticacion,
-  licencias, IDs, webhooks/rate limits y que datos personales saldrian de la instancia.
-- **Criterio de cierre**: matriz y ADR por integracion; cada aprobada genera su propia
-  tarea de adaptador.
-- **Depende de**: [A1] para contratos externos estables y [L1] para inventario.
-- **Modelo sugerido**: Grande. Tres productos con semanticas distintas.
+#### [I1] Evaluar Radarr, Sonarr y Letterboxd — **cerrada 2026-09-07**
+
+Criterio de cierre cumplido: matriz en
+`docs/analisis/i1-radarr-sonarr-letterboxd-2026-09-07.md` y un ADR por integración.
+**Ninguna se construyó, y por decisión del owner ninguna se construye por ahora**: la
+evaluación queda como trabajo hecho para cuando haga falta.
+
+- **Radarr — aceptada con condiciones (ADR-0006).** Entrega `tmdbId`, la identidad fuerte
+  que `decide_match` ya reconoce: empareja con `shared_tmdb_id` a 1.0. No acelera al
+  Scanner, **le evita adivinar**. Compuerta que no es técnica: si el owner no corre Radarr,
+  vale cero.
+- **Sonarr — rechazada por ahora (ADR-0007).** Misma API, veredicto distinto, y no por la
+  fuente. Informa `episodeFileCount`/`totalEpisodeCount`; medido, 3 de 86 episodios, y
+  `en_catalogo` es booleano: `true` y `false` son las dos falsas. Reabre cuando se decida
+  qué significa "tener" una serie parcial.
+- **Letterboxd — rechazada como integración, aceptada como importación (ADR-0008).** API
+  por invitación sin garantía, export con Pro, y el CSV **no trae ningún identificador**.
+  El parser existente ya lee el archivo y el emparejamiento por títulos alternativos
+  funciona; el homónimo es el techo, así que la persona se queda en el medio.
+
+**Si esto se retoma**, la tarea más chica y con mejor relación valor/costo es el preset de
+importación de Letterboxd: armar el `column_map` solo, decidir qué se hace con `Rewatch` y
+`Tags` —que no tienen destino— y convertir la escala de estrellas a 1–10.
+
+#### [B1] Mejorar el algoritmo de búsqueda y de colecciones
+
+**Abierto el 2026-09-07 por decisión del owner**, que pidió priorizar esto por encima de
+las integraciones externas. Es el lado de infraestructura; la presentación de las mismas
+superficies es [U3], del frente visual, y las dos conviene que avancen conversando.
+
+- **Alcance**: la calidad del resultado, no su dibujo. Ranking, evidencia de identidad,
+  composición entre fuentes y cómo se arma y ordena una colección.
+- **Punto de partida ya escrito**: el diagnóstico del 2026-08-26 en este mismo archivo
+  (frente de búsqueda) y `docs/search-quality.md`. Ese diagnóstico ya nombra tres cosas
+  concretas: las tres fuentes externas reciben casi la misma consulta, el puente de aliases
+  de Wikidata **no** se activa cuando IMDb devuelve vacío —sólo cuando devuelve filas bajo
+  el umbral—, y `runSearch()` restablece el modo `browse`, así que editar la consulta
+  durante `Comparar` pierde el contexto.
+- **Herramienta que ya existe**: `movie-inbox search-lab run --enforce` mide el ranking
+  productivo sin cambiarlo y es gate en CI desde v0.3.0. Cualquier cambio de algoritmo se
+  mide contra él **antes y después**, o no se sabe si mejoró.
+- **Criterio de cierre**: pendiente de acotar con el owner. No se abren subtareas todavía
+  para no inventar alcance.
+- **Invariante que no se negocia**: el gate de v0.3.0 sigue en pie — cero falsos positivos
+  conocidos en auto-match. Un ranking más generoso que gane recall rompiendo eso no es una
+  mejora.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
