@@ -1,7 +1,8 @@
 # [A2.0] Cómo llegar a probar Movie Inbox en un teléfono Android
 
 **Fecha:** 2026-09-07. **Tarea:** [A2.0], la primera de [A2] y la que bloquea el resto.
-**Contrato del cliente:** `docs/briefs/android-client-v2.md`. **Dirección:** ADR-0005.
+**Plan de construcción:** `docs/briefs/android-client-v3.md`. **Dirección:** ADR-0005,
+enmendada el 2026-09-07 con la cuenta obligatoria.
 
 ## Antes de nada: "probar la app en Android" son dos cosas distintas
 
@@ -13,8 +14,9 @@ Y una de las dos ya se puede hacer hoy.
 | **Camino B** | La aplicación Android nativa de [A2] | no existe todavía |
 
 No son sustitutos. El camino A sirve para ver contenido real en una pantalla real esta
-semana. El camino B es el producto que decidió ADR-0005: uno que funciona **sin instancia
-detrás**, que es justo lo que el navegador nunca va a hacer.
+semana. El camino B es el producto: una aplicación que, **una vez apareada con tu cuenta,
+sigue funcionando sin conexión** — incluso para agregar películas. Eso es justo lo que el
+navegador nunca va a hacer.
 
 ---
 
@@ -114,7 +116,8 @@ Tiene que devolver `True`. Esa es la ruta por defecto del SDK en Windows.
 
 El repositorio **no tiene** proyecto Android todavía, así que crearlo es parte de [A2.0].
 Desde Android Studio: *New Project* → *Empty Activity* → Kotlin, con el módulo dentro de
-este repositorio. El brief v2 fija lo demás (Compose, Hilt con KSP, coroutines).
+este repositorio. El plan v3 fija lo demás: Compose, Hilt con KSP, coroutines, Room para el
+almacén local, WorkManager para la sincronización y `minSdk` 26.
 
 El criterio de cierre de [A2.0] es exactamente este comando, en verde:
 
@@ -129,32 +132,48 @@ Cuando eso compile, [A2.0] está cerrada y [A2.1] se puede empezar.
 Dos opciones, y conviene la segunda para lo que querés:
 
 - **Emulador**, desde el *Device Manager* de Android Studio. Sirve para desarrollar. Ojo:
-  para el emulador, la máquina anfitriona es `10.0.2.2`, no `localhost` — por eso el brief
-  v2 permite esa excepción de HTTP **sólo** en la variante `debug`.
+  para el emulador, la máquina anfitriona es `10.0.2.2`, no `localhost` — por eso el plan
+  permite esa excepción de HTTP **sólo** en la variante `debug`.
 - **Tu teléfono por USB**: activá *Opciones de desarrollador* y *Depuración por USB*,
   conectalo, y Android Studio lo ofrece como destino. Es lo que de verdad querés probar,
   porque el punto de ADR-0005 es cómo se siente en la mano.
 
 ---
 
+## Decidido el 2026-09-07
+
+- **Quién escribe el cliente:** Claude. Es un frente propio y [B1] —búsqueda y
+  colecciones— queda en espera mientras tanto.
+- **Primer arranque:** aparear contra una cuenta que ya existe en la web. Es la única
+  entrada; ADR-0005 quedó enmendada por esto.
+- **Primer hito:** aparear y ver tu catálogo real en el teléfono.
+- **Sincronización:** bidireccional, con fusión a tres bandas.
+
 ## Lo que falta decidir antes de [A2.1], y es tuyo
 
-1. **Quién escribe el cliente.** El reparto vigente pone infraestructura de un lado y lo
-   visual del otro. Una aplicación Android es un tercer tipo de trabajo —Kotlin, Compose,
-   ciclo de vida de Android— y conviene decidirlo **antes** de A2.1, no durante.
-2. **Autenticación local.** Si la aplicación sirve sin servidor, ¿alcanza la pantalla de
-   bloqueo del teléfono o querés PIN o biometría propios? Las reviews y las notas son datos
-   personales.
-3. **Primer arranque.** Crear local o aparear: las dos tienen que funcionar, falta decidir
-   cuál se ofrece primero y qué pasa si alguien crea datos y después aparea.
+1. **Cómo llega el teléfono a la instancia desde la red de casa.** Si el certificado es de
+   una CA pública para un dominio público, el teléfono resuelve la IP pública y el router
+   puede no hacer *hairpinning*. Las salidas son DNS de horizonte partido, o servir también
+   por IP local con certificado autofirmado y su huella en el QR. **Cambia lo que el QR
+   lleva**, así que conviene resolverlo antes de escribir el apareamiento.
+2. **Autenticación local.** Con la cuenta viniendo de la instancia la identidad ya está
+   resuelta, pero falta decidir si querés PIN o biometría propios además de la pantalla de
+   bloqueo del teléfono. Las reviews y las notas son datos personales.
+3. **Qué pasa si desapareás el teléfono.** ¿Los datos locales se borran, quedan de sólo
+   lectura, o se ofrece exportarlos? Mi recomendación es conservarlos y permitir volver a
+   aparear.
 
-## Por qué el orden es este y no el del brief viejo
+## Por qué el orden es este
 
-El brief v1 arrancaba por el login y dejaba el modo offline fuera de alcance. ADR-0005
-decidió lo contrario, así que las entregas se invirtieron: **almacén local primero, juego
-después, sincronización al final**.
+El orden cambió dos veces, y conviene saber por qué para no releer briefs viejos como si
+estuvieran vigentes.
 
-La consecuencia práctica es buena: **A2.1, A2.2 y A2.3 no necesitan nada del servidor**. Se
-puede construir y probar una aplicación que sirve sola antes de escribir una línea de
-sincronización. Y [A2.3] es charadas, cuyo backend ya está entregado — o sea que el primer
-entregable con valor visible no depende de que la sincronización exista.
+El brief **v1** arrancaba por el login y dejaba el modo offline fuera de alcance. ADR-0005
+lo invirtió: almacén local primero, sincronización al final. El brief **v2** escribió ese
+orden.
+
+La enmienda del 2026-09-07 lo volvió a mover, y esta vez por una decisión de producto: **la
+aplicación requiere una cuenta creada en la web**. Sin aparear no hay cuenta, no hay datos y
+no hay aplicación, así que el apareamiento pasó a ser la primera entrega. El orden vigente
+está en `docs/briefs/android-client-v3.md` y arranca por **aparear y ver tu catálogo real**,
+que es además el primer hito que pediste.

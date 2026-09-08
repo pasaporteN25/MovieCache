@@ -194,21 +194,33 @@ bloquean U3 ni reabren la recuperación aceptada.
 
 #### [A2] Cliente Android autónomo
 
-> **Reespecificada el 2026-09-07.** La versión anterior de esta sección describía un
-> **cliente delgado** que arrancaba por el login y dejaba el modo offline fuera de alcance.
-> ADR-0005 decidió lo contrario y el owner lo confirmó: el teléfono es **autónomo**,
-> funciona sin instancia detrás y sincronizar es opcional. Eso no reordena las entregas
-> viejas, las invierte, así que se reemplazaron enteras. El contrato vigente está en
-> `docs/briefs/android-client-v2.md`; el brief v1 quedó marcado como reemplazado.
+> **Replanificada el 2026-09-07, segunda vez en el día.** El brief v1 arrancaba por el
+> login; ADR-0005 lo invirtió y el brief v2 escribió ese orden; y después el owner decidió
+> que **la aplicación requiere una cuenta creada en la web**, lo que vuelve a mover el
+> apareamiento al principio. El plan vigente es `docs/briefs/android-client-v3.md`, y
+> ADR-0005 quedó **enmendada** por la decisión de la cuenta (su sección de enmienda). Los
+> briefs v1 y v2 están marcados como reemplazados; no se borran porque su razonamiento
+> sostiene el actual.
 
-- **Alcance**: aplicación Android nativa (Kotlin + Compose) con **almacén local propio**.
-  Explorar, buscar, abrir una obra y editar estado personal sin red y sin cuenta. La
-  sincronización con una instancia es opt-in, la inicia una persona, se aparea por QR y
-  **nunca borra**.
-- **Criterio de cierre**: `assembleDebug` verde, la aplicación sirve sola sin servidor, y
-  la sincronización converge por fusión a tres bandas con resolución humana del conflicto.
-- **Depende de**: [A2.0] para el entorno; la sincronización además de [A1.4], ya cerrada.
+- **Alcance**: aplicación Android nativa (Kotlin + Compose) con almacén local propio. Se
+  aparea una vez contra una cuenta que ya existe en la instancia, y **desde ahí funciona sin
+  conexión**: explorar, buscar, editar estado personal y **dar de alta obras nuevas**. La
+  sincronización es bidireccional, la inicia una persona y **nunca borra**.
+- **Caso de uso que manda**, dicho por el owner: *guardar películas en la colección sin
+  estar frente a la computadora ni en casa*. Todo el orden de entrega sale de ahí.
+- **Criterio de cierre**: `assembleDebug` verde; el teléfono muestra y edita el catálogo
+  real sin conexión; y una obra dada de alta sin red llega al servidor por el camino de
+  importación y revisión que ya existe, sin decidir identidad por su cuenta.
+- **Depende de**: [A2.0] para el entorno; el apareamiento se apoya en [A1.2] y [A1.4], ya
+  cerradas.
 - **Modelo sugerido**: Grande. Es un proyecto cliente completo, no una pantalla más.
+- **Quién**: Claude, decidido el 2026-09-07. [B1] queda en espera mientras tanto.
+
+**La distinción que sostiene el diseño** —y que conviene no perder al leer las subtareas—:
+editar una obra que ya existe de los dos lados tiene **base compartida** y se resuelve por
+fusión a tres bandas; dar de alta una obra que no existe en ningún lado **no tiene base**, así
+que no es una fusión sino una **importación**, y va por el camino de revisión que ya existe.
+Confundirlas obligaría a inventar una base que no existe.
 
   - [ ] **[A2.0] Entorno.** JDK 17 o superior, Android SDK, Gradle Wrapper y un
     `assembleDebug` que compile. **Es la primera tarea y bloquea todo lo demás**: medido en
@@ -216,49 +228,55 @@ bloquean U3 ni reabren la recuperación aceptada.
     `ANDROID_SDK_ROOT` ni `ANDROID_HOME`, y el repositorio no contiene proyecto Android.
     Hasta que esto exista, el resto de [A2] es papel. Guía paso a paso en
     `docs/briefs/android-setup.md`.
-  - [ ] **[A2.1] Proyecto Android y almacén local.** Kotlin/Compose, Hilt con KSP,
-    coroutines y `StateFlow`; el repositorio es el límite de errores. Guarda la capa de
-    obra y la capa personal con la forma del contrato portable v9, **no** la capa operativa
-    —rutas, archivos, bibliotecas, Scanner, curaduría—, que además no significa nada en un
-    teléfono. Funciona **sin red y sin cuenta**: crear un catálogo local es una entrada
-    legítima, no un modo degradado. Una cuenta por instalación.
-  - [ ] **[A2.2] Leer y editar en local.** Explorar, buscar, abrir una obra y editar
-    estado, fecha, puntaje y review, todo sin red. Dar de alta sin conexión produce un
-    **borrador pendiente de enriquecimiento que no expira** —a diferencia de los de
-    importación, que mueren a las 48 h—; sólo lo cierra la persona.
-  - [ ] **[A2.3] Charadas.** Primer entregable con valor visible y el que valida el almacén
-    local: datos de sólo lectura, sin red, sin sincronización. El backend está entregado
-    ([G2]) y el contrato en `docs/briefs/charades-v1.md`. El generador es deliberadamente
-    portable —FNV-1a más un LCG documentado— para que el cliente produzca **el mismo mazo**
-    que el servidor; esa reimplementación en Kotlin es parte de esta entrega, con pruebas
-    contra vectores del servidor. La dificultad **no** se calcula en el teléfono: sale del
-    índice IMDb de ~1,1 GB y viaja resuelta como un campo por obra.
-  - [ ] **[A2.4] Apareamiento por QR.** El QR lleva origen, identidad técnica y un token de
-    un solo uso; **no** lleva el catálogo, que no entra ni cerca en los ~2953 bytes de un
-    QR. La transferencia va por HTTPS en la red local. Depende de [A1.4], ya cerrada.
-  - [ ] **[A2.5] Sincronización.** Fusión a tres bandas contra la base de la última
-    sincronización: lo que cambió de un solo lado se aplica, lo que cambió igual en los dos
-    converge, y **decide la persona** cuando ambos cambiaron distinto. Por campo, sin
-    depender de relojes confiables. Incluye interfaz de conflictos, que es trabajo real y
-    no un diálogo de dos botones. La sincronización **nunca borra**.
-  - [ ] **[A2.6] Imágenes.** Miniatura local y portada completa en segundo plano.
+  - [ ] **[A2.1] Esqueleto, apareamiento y lectura offline.** El primer hito pedido por el
+    owner: **aparear y ver el catálogo real en el teléfono**. Kotlin/Compose, Hilt con KSP,
+    coroutines y `StateFlow`; el repositorio es el límite de errores. Room como almacén
+    local con la forma del contrato portable v9 —capa de obra y capa personal, **nunca** la
+    operativa—. Escaneo del QR con ZXing embebido, para no arrastrar Play Services.
+    **Requiere trabajo servidor**: token de un solo uso, endpoint de canje y la pantalla que
+    dibuja el QR en `Administrar`.
+  - [ ] **[A2.2] Edición personal sin conexión y fusión a tres bandas.** Room guarda por
+    obra la **base** —el estado del servidor en la última sincronización exitosa— y la local
+    actual. La base **sólo avanza cuando una sincronización termina entera**: una cortada a
+    la mitad no puede dejar el teléfono creyendo que convergió. Incluye interfaz de
+    conflictos, que muestra los dos valores y deja elegir por campo.
+  - [ ] **[A2.3] Alta sin conexión.** El caso de uso central. Borrador local con id de
+    cliente, marcado como no enriquecido, que **no expira** —a diferencia de los de
+    importación, que mueren a las 48 h—. Al escribirlo, el teléfono avisa si se parece a algo
+    que ya tenés, usando la normalización del servidor portada a Kotlin con vectores de
+    prueba, igual que se hizo con el generador de charadas. Es un aviso, no una decisión.
+    **Requiere trabajo servidor**: endpoint que reciba el borrador, lo enriquezca y lo meta
+    por el camino de importación y revisión existente.
+  - [ ] **[A2.4] Charadas.** Backend entregado en [G2], contrato en
+    `docs/briefs/charades-v1.md`. El generador es portable a propósito —FNV-1a más un LCG
+    documentado— para que el cliente produzca **el mismo mazo** que el servidor; esa
+    reimplementación en Kotlin es parte de esta entrega, con pruebas contra vectores del
+    servidor. La dificultad **no** se calcula en el teléfono: sale del índice IMDb de
+    ~1,1 GB y viaja resuelta como un campo por obra.
+  - [ ] **[A2.5] Imágenes.** Miniatura local y portada completa en segundo plano.
+  - [ ] **[A2.6] Ampliar lo que viaja**, en el orden de prioridad del owner: colecciones
+    seguidas, después disponibilidad en streaming, después puntajes públicos. Cada escalón
+    es servidor más cliente. **Ojo con disponibilidad**: es dato de TMDb con tope
+    contractual de retención de 180 días, y ese tope viaja con el dato — el teléfono también
+    tiene que dejar de mostrarlo cuando vence.
 
-  **Lo que sobrevive del brief v1** y se conserva para cuando exista sincronización:
-  tokens en Android Keystore y nunca en preferencias sin cifrar, logs, analytics, URI,
-  portapapeles ni backups; HTTPS con certificado válido, con la excepción de
-  `http://10.0.2.2` sólo en `debug`; ignorar campos opcionales desconocidos; respetar
-  `X-Movie-Inbox-Api-Version`; y no usar el `/api/` histórico, cookies ni
-  `X-Movie-Inbox-Token`.
+  **Lo que sobrevive del brief v1** y sigue vigente: tokens en Android Keystore y nunca en
+  preferencias sin cifrar, logs, analytics, URI, portapapeles ni backups; HTTPS con
+  certificado válido, con la excepción de `http://10.0.2.2` sólo en `debug`; ignorar campos
+  opcionales desconocidos; respetar `X-Movie-Inbox-Api-Version`; y no usar el `/api/`
+  histórico, cookies ni `X-Movie-Inbox-Token`.
 
-  **Abierto y del owner:** quién escribe el cliente (el reparto vigente separa
-  infraestructura de visual, y una app Android es un tercer tipo de trabajo), si la
-  aplicación quiere PIN o biometría propia además de la pantalla de bloqueo del teléfono, y
-  qué se ofrece primero en el primer arranque: crear local o aparear.
+  **Certificado, medido el 2026-09-07:** `CertificatePinner` de OkHttp **no** sirve para
+  aceptar un certificado autofirmado — el pin se comprueba después de un handshake que ya
+  pasó por el trust manager, así que un certificado que la plataforma rechaza falla antes.
+  Para una instancia con certificado propio hace falta un **trust anchor construido en
+  tiempo de ejecución** desde la huella SPKI que trae el QR. Nunca un trust manager
+  permisivo ni deshabilitar la verificación de hostname.
 
-**Nota de arranque A2, 2026-09-02.** El checkout todavía no contiene un proyecto Android.
-La terminal disponible detecta Java 8 y no detecta Gradle ni `ANDROID_SDK_ROOT`; A2.1 debe
-ejecutarse en un entorno con JDK 17+ y Android SDK configurado antes de poder prometer un
-APK o una prueba de emulador reproducible.
+  **Abierto y del owner:** cómo llega el teléfono a la instancia desde la red de casa
+  (hairpinning o DNS de horizonte partido — cambia lo que el QR lleva); si la aplicación
+  quiere PIN o biometría propios además de la pantalla de bloqueo; y qué pasa con los datos
+  locales si se desaparea el teléfono.
 
 #### [I1] Evaluar Radarr, Sonarr y Letterboxd — **cerrada 2026-09-07**
 

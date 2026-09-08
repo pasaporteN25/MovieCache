@@ -1,5 +1,11 @@
 # Cliente Android v2 — reespecificación de [A2]
 
+> **Reemplazado el 2026-09-07 por `android-client-v3.md`.** El owner decidió que la
+> aplicación **requiere una cuenta creada en la web**, lo que convierte al apareamiento en
+> la primera entrega en vez de la cuarta, y puso el alta sin conexión como caso de uso
+> central. No se borra: su análisis de por qué v1 no servía, el bloqueo de entorno medido y
+> las decisiones de seguridad que sobreviven de v1 siguen siendo la base de v3.
+
 **Fecha:** 2026-09-07. **Reemplaza** `docs/briefs/android-client-v1.md`.
 **Motivo:** ADR-0005 fijó una dirección que v1 no contempla.
 

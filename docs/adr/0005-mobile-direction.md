@@ -236,14 +236,56 @@ La señal de notoriedad que la dificultad necesita sale del índice IMDb, que pe
 del servidor** y viaja como un campo chico por obra. Un teléfono nunca autónomo para
 *clasificar*, sí autónomo para *jugar*. [G1] tiene que fijar ese campo.
 
+## Enmienda del 2026-09-07: la cuenta es obligatoria
+
+**Esta enmienda revierte una parte de la decisión original y cierra el punto 2 de lo que
+quedaba abierto.** El owner decidió que **para usar la aplicación hay que tener una cuenta
+creada en la instancia web**. El teléfono sigue funcionando sin conexión —ese punto no se
+toca— pero ya no puede arrancar sin haber apareado al menos una vez.
+
+### Qué deja de ser cierto
+
+La sección 1 decía que crear un catálogo local sin instancia era "una entrada legítima, no
+un modo degradado". **Deja de serlo.** La única entrada es: crear la cuenta en la web,
+aparear por QR, y de ahí en adelante el teléfono se las arregla solo.
+
+### Por qué es mejor, y no una restricción caprichosa
+
+Elimina el problema más feo que arrastraba el diseño original: alguien crea datos en el
+teléfono, después aparea, y hay que fusionar dos historias **que nunca compartieron una
+base**. La fusión a tres bandas necesita una base común por definición; sin ella habría que
+inventar una, y eso es la clase de decisión silenciosa que este proyecto evita.
+
+Con cuenta obligatoria hay base común desde el primer minuto, y la sincronización pasa de
+problema abierto a problema acotado.
+
+### Qué reordena
+
+El apareamiento era la entrega A2.4, después del almacén local y del juego. Ahora es **lo
+primero**: sin aparear no hay cuenta, no hay datos y no hay aplicación. El plan de
+construcción con el orden nuevo está en `docs/briefs/android-client-v3.md`.
+
+### Qué no cambia
+
+Todo lo demás de esta ADR sigue en pie: el teléfono es autónomo **después** de aparear, la
+sincronización la inicia una persona y nunca borra, la convergencia es fusión a tres bandas
+sin depender de relojes, el QR aparea y no transporta, dar de alta sin conexión produce un
+borrador que no expira, y hay una cuenta por instalación.
+
 ## Qué queda abierto
 
-1. **Autenticación local.** Si la aplicación sirve sin servidor, ¿alcanza la pantalla de
-   bloqueo del teléfono, o quiere PIN/biometría propia? Las reviews y notas son datos
-   personales y hoy en la web los protege una sesión.
-2. **Primer arranque.** Hay dos entradas legítimas —crear un catálogo en el teléfono, o
-   escanear un QR y traerse uno— y ambas tienen que funcionar. Falta decidir cuál se
-   ofrece primero y qué pasa si alguien crea datos locales y después aparea.
+1. **Autenticación local.** Con la cuenta viniendo de la instancia la identidad está
+   resuelta, pero falta decidir si la aplicación quiere PIN o biometría propios además de la
+   pantalla de bloqueo del teléfono. Las reviews y notas son datos personales y hoy en la
+   web los protege una sesión.
+2. ~~**Primer arranque.**~~ **Cerrado por la enmienda de arriba:** la única entrada es
+   aparear contra una cuenta que ya existe. Queda como detalle menor qué pasa si alguien
+   desaparea el teléfono — conservar los datos de sólo lectura y permitir volver a aparear
+   es la respuesta razonable, pero conviene fijarla antes de A2.1.
 3. **Varios teléfonos contra la misma instancia.** Funciona por construcción, porque la
    base de la fusión es **por par**, pero conviene fijarlo explícitamente antes de
    implementar.
+4. **Llegar a la instancia desde la red local.** Si el certificado es de una CA pública para
+   un dominio público, el teléfono en casa resuelve la IP pública y el router puede no hacer
+   hairpinning. DNS de horizonte partido, o certificado autofirmado con su huella en el QR.
+   Cambia lo que el QR lleva, así que se decide antes de A2.1.
