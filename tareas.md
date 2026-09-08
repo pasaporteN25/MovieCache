@@ -24,10 +24,9 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U3] | Replantear Colección, búsqueda, filtros y alta | U2-P aceptada |
-| 2 | [B1] | Mejorar el algoritmo de búsqueda y de colecciones | diagnóstico 2026-08-26 |
-| 3 | [A2] | Cliente Android autónomo | A2.0 (entorno) + ADR-0005 |
-| 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 1 | [B1] | Mejorar el algoritmo de búsqueda y de colecciones | definir alcance con el owner |
+| 2 | [A2] | Cliente Android autónomo | A2.0 (entorno) + ADR-0005 |
+| 3 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 | — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
 
 **Reordenamiento del 2026-09-07, por decisión del owner.** Las integraciones externas
@@ -35,11 +34,11 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 La prioridad pasa a ser el algoritmo y la presentación de búsqueda y colecciones ([B1] del
 lado de infraestructura, [U3] del lado visual).
 
-- **Próxima accionable:** [U3.1], auditoría y contrato visual de Colección antes de
-  implementar su nueva arquitectura.
+- **Próxima accionable:** delimitar [B1] con el owner; no tiene subtareas todavía porque
+  ranking, composición de fuentes y armado de colecciones son alcances distintos.
 - **Cerrado recientemente:** [U2-R] cerró su gate técnico el 2026-09-06 y [U2-P]
   recibió aceptación visual el 2026-09-08;
-  [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2] conservan su historia en
+  [U3], [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2] conservan su historia en
   `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
@@ -83,34 +82,6 @@ bloquean U3 ni reabren la recuperación aceptada.
     investigar si archivos locales autorizados o una fuente con licencia permiten
     derivar waveform/espectro y marcas temporales reales. No bloquear la preview ni
     representar datos inventados como análisis de la película.
-
-### Frente: Colección, búsqueda y alta
-
-#### [U3] Replantear Colección como destino único de descubrimiento
-- **Alcance**: hacer que `Colección` reúna de manera comprensible examinar el catálogo,
-  buscar local/externo, comparar, filtrar y agregar, sin reproducir una barra de
-  utilidades separada en Inicio. Este frente rediseña flujo y presentación; no sustituye
-  los algoritmos multilingües, matching o fuentes ya entregados por Q/F.
-- **Criterio de cierre**: una persona distingue explorar, buscar y agregar sin perder
-  query, modo `Comparar`, filtros ni posición al volver; los filtros cotidianos son
-  visibles y los avanzados usan divulgación progresiva; URL/historial preservan estado.
-- **Depende de**: [U2-R] y aceptación de [U2-P], para estabilizar la Home antes de U3.1.
-- **Modelo sugerido**: Grande para U3.1; Medio para las implementaciones posteriores.
-
-  - [x] **[U3.1] Auditar y congelar la arquitectura de Colección.** Inventariar buscador,
-    alta, comparación, filtros, URL, estados vacíos y permisos; producir wireflow y
-    contrato de estados antes de tocar código. Incluir explícitamente los casos donde
-    editar la query no puede degradar `Comparar` a búsqueda común. Aprobada por el
-    usuario el 2026-09-08; brief, wireflow, contrato y evidencia congelados para U3.2
-    y U3.3. **Modelo: Grande.**
-  - [ ] **[U3.2] Rediseñar entrada de búsqueda/alta y filtros.** Implementar cabecera de
-    tarea unificada, intención clara de agregar, filtros cotidianos visibles, `Más
-    filtros` y chips activos; mantener endpoints y resultados existentes. Acotar a
-    `index.collection.html`, `css/catalog.css` y componentes de búsqueda necesarios.
-    **Modelo: Medio. Depende de U3.1.**
-  - [ ] **[U3.3] Preservar modos, URL e historial.** Alinear browse/search/compare con la
-    nueva UI, restaurar foco/scroll al volver y cubrir query, filtros y modo con pruebas
-    de navegador. **Modelo: Medio. Depende de U3.2.**
 
 ### Frente: Clientes, integraciones y nuevos medios
 
@@ -290,9 +261,26 @@ superficies es [U3], del frente visual, y las dos conviene que avancen conversan
 
 ## En curso
 
-[U3.2/U3.3] Autorizadas el 2026-09-08 sobre el contrato aprobado de U3.1.
+Sin implementación activa. [B1] es la próxima prioridad y requiere que el owner elija
+qué problema de calidad atacar primero.
 
 ## Hecho
+
+### Frente: Colección, búsqueda y alta
+
+#### [U3] Replantear Colección como destino único de descubrimiento
+
+**Cerrada el 2026-09-08.** Colección funciona como destino único con modos visibles
+`Explorar`, `Buscar`, `Agregar`, `Comparar` y `Vincular`; conserva query, filtros, ancla,
+posición y foco en URL/historial. Evidencia responsive en `docs/design/u3-23-evidence/`.
+
+- [x] **[U3.1] Arquitectura.** Brief, wireflow y contrato aprobados; commit `adbe319`.
+- [x] **[U3.2] Entrada y filtros.** Cabecera de tarea unificada, alta diferenciada,
+  filtros cotidianos visibles, divulgación avanzada, chips y vacíos contextuales.
+- [x] **[U3.3] Modos e historial.** Rutas canónicas para search/add/compare/link,
+  anclas estables, restauración de foco/scroll/cantidad visible y pruebas de navegador.
+  Cierre técnico: 36 pruebas de navegador y 7 de layout en verde, sin overflow en
+  1440/390/320 y sin hallazgos de layout en Impeccable.
 
 ### Frente: Inicio videoclub (afinación visual U2-P)
 

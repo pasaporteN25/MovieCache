@@ -669,7 +669,46 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         click_desktop_menu_action(page, "add")
         page.wait_for_selector("#collectionView:not([hidden])")
-        page.wait_for_function("document.activeElement.id === 'catalogTitle'")
+        page.wait_for_function("document.activeElement.id === 'query'")
+        self.assertEqual(page.locator("#collectionView").get_attribute("data-search-mode"), "add")
+
+    def test_collection_task_modes_and_history(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+        page.locator("#catalogButton").click()
+        collection = page.locator("#collectionView")
+        self.assertEqual(collection.get_attribute("data-search-mode"), "browse")
+        self.assertTrue(page.locator(".search-main").is_hidden())
+        self.assertNotIn("mode=", page.url)
+
+        first_status = page.locator("#statusQuickFilters button").first
+        first_status.click()
+        selected_status = first_status.get_attribute("data-value")
+        self.assertIn(f"status={selected_status}", page.url)
+
+        page.locator('[data-mode="search"]').click()
+        page.wait_for_function("document.activeElement.id === 'query'")
+        self.assertIn("mode=search", page.url)
+        page.locator("#query").fill("Heat")
+        page.evaluate("window.scrollTo(0, 180)")
+        page.locator("#searchButton").click()
+        page.wait_for_function("new URL(location.href).searchParams.get('q') === 'Heat'")
+        search_scroll = page.evaluate("window.scrollY")
+
+        page.locator('#collectionModeTabs [data-mode="add"]').click()
+        self.assertEqual(collection.get_attribute("data-search-mode"), "add")
+        self.assertIn("mode=add", page.url)
+        self.assertNotIn("status=", page.url)
+        page.wait_for_function("document.activeElement.id === 'query'")
+
+        page.go_back()
+        page.wait_for_function(
+            "document.querySelector('#collectionView').dataset.searchMode === 'search'"
+        )
+        self.assertEqual(page.locator("#query").input_value(), "Heat")
+        self.assertIn(f"status={selected_status}", page.url)
+        page.wait_for_function("document.activeElement.id === 'searchButton'")
+        self.assertAlmostEqual(page.evaluate("window.scrollY"), search_scroll, delta=2)
 
     def test_home_marquee_shows_the_available_billboard_label_and_decorative_ambience(
         self,
@@ -3030,6 +3069,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
 
         page.locator("#catalogButton").click()
+        page.locator('[data-mode="search"]').click()
         page.locator("#externalSource").check()
         page.locator("#query").fill("Heat")
         page.locator("#searchButton").click()
@@ -3039,6 +3079,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.wait_for_function(
             "(document.querySelector('#catalogMergeResults').textContent || '').includes('Heat')"
         )
+        self.assertIn("mode=compare", page.url)
+        self.assertIn("candidate_source=wikipedia", page.url)
+        self.assertIn("candidate_ref=", page.url)
+        self.assertIn("Heat", page.locator("#collectionAnchor").inner_text())
         external_before = page.locator("#manualSearchResults").inner_text()
         self.assertIn("Heat", external_before)
 
@@ -3061,6 +3105,13 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertFalse(page.locator("#backToCollection").is_hidden())
         merge_section_class = page.locator("#catalogMergeSection").get_attribute("class") or ""
         self.assertIn("active", merge_section_class)
+
+        page.reload()
+        page.wait_for_function(
+            "document.querySelector('#collectionView').dataset.searchMode === 'compare'"
+        )
+        self.assertIn("Heat", page.locator("#collectionAnchor").inner_text())
+        self.assertFalse(page.locator("#collectionAnchor").is_hidden())
 
     def test_catalog_can_search_and_add_a_jikan_result(self) -> None:
         page = self.page
@@ -3102,6 +3153,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.route("**/api/search?*", handle_search)
         page.route("**/api/add", handle_add)
         page.locator("#catalogButton").click()
+        page.locator('[data-mode="search"]').click()
         page.locator("#externalSource").check()
         page.locator("#query").fill("Your Name")
         page.locator("#searchButton").click()
@@ -3163,6 +3215,7 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/search?*", handle_search)
         page.locator("#catalogButton").click()
+        page.locator('[data-mode="search"]').click()
         page.locator("#externalSource").check()
         page.locator("#query").fill("Death Note")
         page.locator("#searchButton").click()
@@ -3202,6 +3255,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.get_by_text("Disponibilidad y fuentes").click()
         page.locator('[data-click="find-link"]').click()
         page.wait_for_selector("#catalogMergeSection.active")
+        self.assertIn("mode=link", page.url)
+        self.assertIn("link_id=heat", page.url)
+        self.assertIn("Heat", page.locator("#collectionAnchor").inner_text())
         local_before = page.locator("#catalogMergeResults").inner_text()
         self.assertIn("Heat", local_before)
 

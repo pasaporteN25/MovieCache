@@ -207,7 +207,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
           return;
         }
         resetCollectionFilters();
-        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
+        clearManualSearch({
+          focus: false,
+          updateHistory: false,
+          resetExternal: true,
+          forceModeChange: true
+        });
         applyCollectionFilterDescriptor(action.filters || {});
         render();
         showView("catalog", { updateHistory: false, focus: true });

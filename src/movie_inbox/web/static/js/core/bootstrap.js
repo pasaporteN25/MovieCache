@@ -4,13 +4,13 @@ import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChange
 import { fields } from "./fields.js";
 import { localDateOffset, todayLocalDate } from "./format.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
-import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, setInboxMode } from "./router.js";
+import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionAdd, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, setInboxMode } from "./router.js";
 import { CATALOG_PAGE_SIZE, inboxMode } from "./state.js";
 import { addLibraryExclusionRuleRow, browseManagedLibraryPath, checkManagedLibraryPath, closeLibraryDialog, handleLibraryAction, handleLibraryExclusionRuleRowClick, handleLibraryPathDirectory, openLibraryDialog, parentLibraryPath, saveManagedLibrary, toggleLibraryShareAvailabilityFields, useBrowsedLibraryPath } from "../surfaces/admin-libraries.js";
 import { archiveMemberAccount, closeArchiveMemberDialog, closeEditMemberDialog, closeMemberDialog, closePrivacyDialog, closeTemporaryPasswordDialog, copyTemporaryPassword, createMember, handleArchivedMemberAction, handleMemberAction, handleVisibilityChange, openMemberDialog, openPrivacyDialog, refreshAdminData, saveMemberProfile, savePrivacyPreferences, syncPrivacyControls } from "../surfaces/admin-members.js";
 import { createPublicPresentation, handlePublicPresentationAction, previewPublicPresentation } from "../surfaces/admin-public-presentations.js";
 import { addStreamingRegion, handleStreamingAction, loadStreamingConfiguration, saveStreamingPolicy } from "../surfaces/admin-streaming.js";
-import { applyCollectionYearRange, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
+import { applyCollectionYearRange, changeCollectionMode, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
 import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay } from "../surfaces/home.js";
@@ -53,7 +53,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "menu-club": () => { target.closest("details")?.removeAttribute("open"); goToClub(); },
           "menu-random": () => { target.closest("details")?.removeAttribute("open"); openRandomDetail(); },
           "menu-search": () => { target.closest("details")?.removeAttribute("open"); goToCollectionSearch(); },
-          "menu-add": () => { target.closest("details")?.removeAttribute("open"); goToCollectionRoot(); },
+          "menu-add": () => { target.closest("details")?.removeAttribute("open"); goToCollectionAdd(); },
           "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
           "focus-personal": editPersonalRecord,
           "edit-personal": editPersonalRecord,
@@ -76,7 +76,9 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "show-description": () => openSearchDescription(target.dataset.collection || "", target.dataset.key || ""),
           "force-add": () => forceAddSearchResult(index),
           "clear-filter": () => clearFilter(target.dataset.filter || "", target.dataset.value || ""),
+          "clear-all-collection-filters": clearFilters,
           "toggle-collection-filter": () => toggleCollectionFilter(target.dataset.filter || "", target.dataset.value || ""),
+          "collection-mode": () => changeCollectionMode(target.dataset.mode || "browse"),
           "run-search": runSearch
         };
         actions[target.dataset.click]?.();
@@ -115,7 +117,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.inboxButton.addEventListener("click", () => goToInbox());
       fields.clubButton.addEventListener("click", goToClub);
       fields.headerSearchButton.addEventListener("click", goToCollectionSearch);
-      fields.headerAddButton.addEventListener("click", goToCollectionRoot);
+      fields.headerAddButton.addEventListener("click", goToCollectionAdd);
       fields.adminButton.addEventListener("click", goToAdmin);
       fields.privacyButton.addEventListener("click", openPrivacyDialog);
       fields.logoutButton.addEventListener("click", logout);
@@ -243,7 +245,8 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.reviewPrevious.addEventListener("click", previousWikiReview);
       fields.reviewNext.addEventListener("click", nextWikiReview);
       fields.backToCollection.addEventListener("click", () => {
-        goToCollectionRoot();
+        if (history.length > 1) history.back();
+        else goToCollectionRoot();
       });
       fields.externalSource.addEventListener("change", renderDatabaseMenu);
       fields.clearFilters.addEventListener("click", clearFilters);
