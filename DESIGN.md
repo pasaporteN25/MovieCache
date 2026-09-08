@@ -262,6 +262,41 @@ viewport y permite llevar el último lomo completamente a la vista. No hay scrol
 horizontal de página. En móvil continúa la composición apilada sin este sobreancho.
 P.5 no reordena la consola ni cambia su contenido; esa composición pertenece a P.6.
 
+### Consola de ficha breve Home U2-P.6 (2026-09-07)
+
+La franja inferior se lee como una única consola funcional, no como una portada en
+miniatura seguida de varios paneles independientes. En escritorio mantiene cuatro
+zonas: acciones centradas en la placa izquierda; título/año, tipo, género y sinopsis;
+dos marcos de imagen; créditos y estado resumido. El antiguo panel lateral «Ficha
+detalle» desaparece y VHS queda como firma visual pequeña dentro del bloque de estado.
+
+Los marcos sólo muestran `backdrop_image` y `page_image` reales. Ante ausencia o error
+de carga conservan su lugar y muestran un fallback técnico «Sin imagen»; nunca se
+inventa una imagen factual. Créditos usan dirección, guion y reparto; estado resume
+acceso, estado personal y duración. Los valores extensos se eliden visualmente en la
+consola compacta, conservan el valor completo como `title` y siguen disponibles en la
+ficha. IBM Plex Mono gobierna todo este nivel.
+
+En móvil el orden pasa a título/datos/sinopsis, dos imágenes 16:9, créditos/estado y
+acciones. Los botones mantienen 44 px mínimos y el contenido no produce scroll
+horizontal de página. No reinstalar miniportada, carrusel o panel de formato separado.
+
+### Ajustes de aceptación Home U2-P.7 (elección del 2026-09-08)
+
+El usuario eligió **1A / 2A / 3A**. En móvil el preview compartido se acopla debajo
+de la categoría activa; al cambiar de estante se mueve con la selección y al volver a
+desktop regresa a la consola fija. No duplicar fichas, estado ni IDs. Los listeners del
+carril deben ignorar eventos que nacen dentro del preview acoplado.
+
+La consola desktop usa la mayor altura disponible dentro de su bahía material: comienza
+en 68,25 % y ocupa 21 % del mueble. La placa de acciones acompaña esa expansión. No se
+reduce ni reescala el estante de lomos. Créditos y estado suben a 11 px; a 860 px o menos
+usan 12 px y admiten salto de línea. A 360 px o menos pasan a una sola columna.
+
+La separación conceptual queda visible con los nombres `Cartelera disponible` y
+`Videoteca · Tu archivo por categoría`. La región inferior toma su nombre accesible de
+Videoteca y el rótulo desaparece junto con el mueble cuando no hay categorías.
+
 **Display Font:** Arial Narrow (con Trebuchet MS como fallback)
 **Body Font:** Space Grotesk (con Trebuchet MS, Verdana y system-ui como fallbacks)
 **Label/Mono Font:** Courier New

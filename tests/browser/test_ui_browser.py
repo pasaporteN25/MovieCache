@@ -259,7 +259,11 @@ class BrowserInterfaceTests(unittest.TestCase):
                         "Una historia extensa para verificar que la sinopsis conserve una "
                         "lectura cómoda, visible y ordenada en una pantalla móvil angosta."
                     ),
+                    "backdrop_image": "https://example.invalid/u2-p6-broken-backdrop.jpg",
                     "page_image": "https://example.invalid/u2-r6-broken-poster.jpg",
+                    "directors": ["Philip Kaufman"],
+                    "writers": ["Milan Kundera", "Jean-Claude Carrière"],
+                    "cast": ["Daniel Day-Lewis", "Juliette Binoche"],
                 }
             )
             payload["home"]["sections"] = [
@@ -284,11 +288,18 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
         preview = page.locator('[data-home-shelf-preview="available"]')
         preview.wait_for()
-        page.wait_for_function(
-            "document.querySelector('.home-shelf-preview-art img')?.hidden === true"
+        self.assertEqual(
+            page.locator("#homeShelfPreview").evaluate(
+                "element => element.parentElement?.dataset.homeSection"
+            ),
+            "available",
         )
-        poster = preview.locator(".home-shelf-preview-art img")
-        fallback = preview.locator(".home-shelf-preview-placeholder")
+        page.wait_for_function(
+            "[...document.querySelectorAll('.home-furniture-frame img')]"
+            ".every(image => image.hidden === true)"
+        )
+        poster = preview.locator(".home-furniture-frame img").nth(1)
+        fallback = preview.locator(".home-furniture-frame-fallback").nth(1)
         poster.dispatch_event("load")
         self.assertFalse(poster.is_hidden())
         self.assertFalse(fallback.is_visible())
@@ -304,8 +315,8 @@ class BrowserInterfaceTests(unittest.TestCase):
                 const title = box('h1');
                 const display = box('.home-furniture-display');
                 const body = box('.home-furniture-display-body');
-                const art = box('.home-shelf-preview-art');
-                const copy = box('.home-shelf-preview-copy');
+                const frame = box('.home-furniture-frame');
+                const credits = box('.home-furniture-credit-status');
                 const panel = box('.home-furniture-action-panel');
                 const summaryStyle = getComputedStyle(
                     document.querySelector('.home-shelf-preview-summary')
@@ -320,9 +331,9 @@ class BrowserInterfaceTests(unittest.TestCase):
                     bodyColumns: getComputedStyle(
                         document.querySelector('.home-furniture-display-body')
                     ).gridTemplateColumns,
-                    artWidth: art.width,
-                    artRatio: art.height / art.width,
-                    sameRow: Math.abs(art.top - copy.top),
+                    frameWidth: frame.width,
+                    frameRatio: frame.height / frame.width,
+                    creditsWidth: credits.width,
                     panelAfterDisplay: panel.top - display.bottom,
                     panelWidth: panel.width,
                     summaryFontSize: Number.parseFloat(summaryStyle.fontSize),
@@ -337,16 +348,20 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertGreater(geometry["titleWidth"], 300)
         self.assertLess(geometry["titleHeight"], 90)
         self.assertGreater(geometry["displayWidth"], 330)
-        self.assertIn("92px", geometry["bodyColumns"])
-        self.assertGreaterEqual(geometry["artWidth"], 90)
-        self.assertAlmostEqual(geometry["artRatio"], 1.5, delta=0.08)
-        self.assertLessEqual(geometry["sameRow"], 1)
+        self.assertNotIn(" ", geometry["bodyColumns"])
+        self.assertGreaterEqual(geometry["frameWidth"], 150)
+        self.assertAlmostEqual(geometry["frameRatio"], 9 / 16, delta=0.08)
+        self.assertGreater(geometry["creditsWidth"], 300)
         self.assertGreaterEqual(geometry["panelAfterDisplay"], 11)
         self.assertGreater(geometry["panelWidth"], 330)
         self.assertGreaterEqual(geometry["summaryFontSize"], 15)
         self.assertGreaterEqual(geometry["summaryLineHeight"], 21)
         self.assertIn(geometry["summaryDisplay"], ("flow-root", "-webkit-box"))
         self.assertTrue(fallback.is_visible())
+        self.assertEqual(preview.locator(".home-furniture-frame").count(), 2)
+        self.assertEqual(preview.locator(".home-furniture-credit-status").count(), 1)
+        self.assertEqual(preview.locator(".home-shelf-preview-art").count(), 0)
+        self.assertEqual(preview.locator(".home-furniture-format-panel").count(), 0)
         self.assertEqual(preview.locator(".home-shelf-preview-action").count(), 2)
         for action in preview.locator(".home-shelf-preview-action").all():
             action_box = action.bounding_box()
@@ -441,7 +456,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                 playback_before["carouselItemId"],
             )
 
-            furniture = touch_page.get_by_role("region", name="Mueble horizontal de estanterías")
+            furniture = touch_page.get_by_role("region", name="Videoteca")
             self.assertTrue(furniture.is_visible())
             memory_spine = touch_page.locator('[data-home-section="memory"] .home-shelf-tape').nth(
                 2
@@ -457,7 +472,13 @@ class BrowserInterfaceTests(unittest.TestCase):
             )
             self.assertEqual(memory_spine.get_attribute("aria-pressed"), "true")
             self.assertEqual(
-                touch_page.locator(".home-shelf-preview h3").text_content(),
+                touch_page.locator("#homeShelfPreview").evaluate(
+                    "element => element.parentElement?.dataset.homeSection"
+                ),
+                "memory",
+            )
+            self.assertEqual(
+                touch_page.locator(".home-shelf-preview h3 > span").text_content(),
                 "Memory obra 3",
             )
 
@@ -480,7 +501,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     touch_page.get_by_role(
-                        "region", name="Mueble horizontal de estanterías"
+                        "region", name="Videoteca"
                     ).is_visible(),
                     width,
                 )
@@ -614,11 +635,12 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(upper_fallback.is_visible())
 
         shelf_preview = page.locator('[data-home-shelf-preview="r7b-single"]')
-        shelf_image = shelf_preview.locator("[data-poster-image]")
-        shelf_fallback = shelf_preview.locator(".home-shelf-preview-placeholder")
-        shelf_image.dispatch_event("error")
-        self.assertTrue(shelf_image.is_hidden())
-        self.assertTrue(shelf_fallback.is_visible())
+        shelf_images = shelf_preview.locator(".home-furniture-frame [data-poster-image]")
+        shelf_fallbacks = shelf_preview.locator(".home-furniture-frame-fallback")
+        for index in range(shelf_images.count()):
+            shelf_images.nth(index).dispatch_event("error")
+            self.assertTrue(shelf_images.nth(index).is_hidden())
+        self.assertTrue(all(fallback.is_visible() for fallback in shelf_fallbacks.all()))
 
         for width, height in ((1440, 900), (1920, 1080)):
             page.set_viewport_size({"width": width, "height": height})
@@ -1423,15 +1445,11 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(shelf.nth(1).get_attribute("tabindex"), "-1")
         self.assertEqual(shelf.nth(0).get_attribute("data-vhs-state"), "selected")
         self.assertEqual(shelf.nth(1).get_attribute("data-vhs-state"), "closed")
-        # The row shows each work as a spine (title/meta only, no raster asset);
-        # the audited PNG frame now belongs to the opened preview instead.
-        preview_frame = page.locator(
-            '[data-home-shelf-preview="available"] .home-shelf-preview-frame'
-        )
-        self.assertIn(
-            "vhs-cassette-frame-v1.png",
-            preview_frame.evaluate("element => getComputedStyle(element).backgroundImage"),
-        )
+        # The row shows each work as a spine. P.6 gives the opened preview two
+        # data-backed image wells and removes the former decorative cassette frame.
+        preview_frames = page.locator('[data-home-shelf-preview="available"] .home-furniture-frame')
+        self.assertEqual(preview_frames.count(), 2)
+        self.assertEqual(page.locator(".home-shelf-preview-frame").count(), 0)
 
         shelf.nth(0).focus()
         page.keyboard.press("ArrowRight")
@@ -1442,7 +1460,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(shelf.nth(1).get_attribute("aria-pressed"), "true")
         self.assertEqual(shelf.nth(1).get_attribute("data-vhs-state"), "selected")
         self.assertEqual(
-            page.locator('[data-home-shelf-preview="available"] h3').text_content(), "Akira"
+            page.locator('[data-home-shelf-preview="available"] h3 > span').text_content(),
+            "Akira",
         )
         self.assertEqual(
             page.locator('[data-home-shelf-preview="available"]').get_attribute("data-vhs-state"),
@@ -1456,7 +1475,8 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         shelf.nth(0).click()
         self.assertEqual(
-            page.locator('[data-home-shelf-preview="available"] h3').text_content(), "Heat"
+            page.locator('[data-home-shelf-preview="available"] h3 > span').text_content(),
+            "Heat",
         )
         page.set_viewport_size({"width": 390, "height": 844})
         self.assertEqual(
@@ -1642,7 +1662,6 @@ class BrowserInterfaceTests(unittest.TestCase):
                 const panels = [
                     element.querySelector('.home-furniture-action-panel'),
                     element.querySelector('.home-furniture-display'),
-                    element.querySelector('.home-furniture-format-panel'),
                 ].map(node => node.getBoundingClientRect());
                 return {
                     shelfTop: (shelf.top - cabinet.top) / cabinet.height,
@@ -1656,8 +1675,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                         panel.left >= cabinet.left && panel.right <= cabinet.right
                         && panel.top >= cabinet.top && panel.bottom <= cabinet.bottom
                     ),
-                    panelsSeparated: panels[0].right <= panels[1].left
-                        && panels[1].right <= panels[2].left,
+                    panelsSeparated: panels[0].right <= panels[1].left,
                 };
             }"""
         )
@@ -1772,7 +1790,13 @@ class BrowserInterfaceTests(unittest.TestCase):
                     "description": synopsis,
                     "wikipedia_extract": "Este extracto no debe desplazar la descripción.",
                     "directors": ["Michael Mann"],
+                    "writers": ["Michael Mann"],
+                    "cast": ["Al Pacino", "Robert De Niro", "Val Kilmer"],
                     "genres": ["Policial"],
+                    "year": "1995",
+                    "duration_minutes": 170,
+                    "backdrop_image": "https://example.invalid/u2-p6-backdrop.jpg",
+                    "page_image": "https://example.invalid/u2-p6-page.jpg",
                 }
                 home["sections"] = [
                     {
@@ -1798,10 +1822,13 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
         preview = page.locator('[data-home-shelf-preview="console"]')
         self.assertEqual(preview.locator(".home-shelf-preview-summary").text_content(), synopsis)
-        self.assertIn(
-            "Dirección: Michael Mann",
-            preview.locator(".home-shelf-preview-meta").text_content(),
-        )
+        self.assertEqual(preview.locator(".home-furniture-frame").count(), 2)
+        self.assertEqual(preview.locator(".home-shelf-preview-art").count(), 0)
+        self.assertEqual(preview.locator(".home-furniture-format-panel").count(), 0)
+        self.assertIn("Michael Mann", preview.locator(".home-furniture-credits").text_content())
+        self.assertIn("Al Pacino", preview.locator(".home-furniture-credits").text_content())
+        self.assertIn("Disponible", preview.locator(".home-shelf-preview-facts").text_content())
+        self.assertEqual(preview.locator(".home-furniture-format-signature").text_content(), "VHS")
 
         for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
             with self.subTest(viewport=(width, height)):
@@ -1817,6 +1844,15 @@ class BrowserInterfaceTests(unittest.TestCase):
                         const panel = element.querySelector('.home-furniture-action-panel');
                         const panelRect = panel.getBoundingClientRect();
                         const actions = [...panel.querySelectorAll('button')];
+                        const body = element.querySelector('.home-furniture-display-body');
+                        const bodyRect = body.getBoundingClientRect();
+                        const frames = [...element.querySelectorAll('.home-furniture-frame')];
+                        const credits = element.querySelector('.home-furniture-credit-status');
+                        const bodyChildren = [
+                            copy,
+                            element.querySelector('.home-furniture-frame-strip'),
+                            credits,
+                        ];
                         return {
                             cabinetHeight: cabinet.getBoundingClientRect().height,
                             displayHeight: display.getBoundingClientRect().height,
@@ -1825,8 +1861,25 @@ class BrowserInterfaceTests(unittest.TestCase):
                             summaryFontSize: parseFloat(getComputedStyle(summary).fontSize),
                             summaryHeight: summary.getBoundingClientRect().height,
                             copyFits: copy.scrollHeight <= copy.clientHeight + 1,
+                            bodyColumns: getComputedStyle(body).gridTemplateColumns
+                                .split(' ').length,
+                            bodyChildrenContained: bodyChildren.every(child => {
+                                const rect = child.getBoundingClientRect();
+                                return rect.left >= bodyRect.left - 1
+                                    && rect.right <= bodyRect.right + 1
+                                    && rect.top >= bodyRect.top - 1
+                                    && rect.bottom <= bodyRect.bottom + 1;
+                            }),
+                            frameSizes: frames.map(frame => {
+                                const rect = frame.getBoundingClientRect();
+                                return [rect.width, rect.height];
+                            }),
+                            creditsFit: credits.scrollHeight <= credits.clientHeight + 1,
                             actionHeights: actions.map(
                                 action => action.getBoundingClientRect().height
+                            ),
+                            actionsCentered: actions.every(
+                                action => getComputedStyle(action).textAlign === 'center'
                             ),
                             actionsContained: actions.every(action => {
                                 const rect = action.getBoundingClientRect();
@@ -1839,18 +1892,29 @@ class BrowserInterfaceTests(unittest.TestCase):
                     }"""
                 )
                 self.assertGreaterEqual(metrics["cabinetHeight"], 639)
-                self.assertGreaterEqual(metrics["displayHeight"], 112)
+                self.assertGreaterEqual(metrics["displayHeight"], 130)
                 self.assertGreaterEqual(metrics["titleHeight"], 16)
                 self.assertGreaterEqual(metrics["metaFontSize"], 12)
                 self.assertGreaterEqual(metrics["summaryFontSize"], 12)
                 self.assertGreaterEqual(metrics["summaryHeight"], 16)
                 self.assertTrue(metrics["copyFits"])
+                self.assertEqual(metrics["bodyColumns"], 3)
+                self.assertTrue(metrics["bodyChildrenContained"])
+                self.assertTrue(metrics["creditsFit"])
+                self.assertTrue(
+                    all(width >= 60 and height >= 60 for width, height in metrics["frameSizes"])
+                )
                 self.assertTrue(metrics["actionsContained"])
+                self.assertTrue(metrics["actionsCentered"])
                 self.assertTrue(
                     all(action_height >= 36 for action_height in metrics["actionHeights"])
                 )
 
         page.set_viewport_size({"width": 1280, "height": 720})
+        self.assertEqual(
+            page.locator("#homeShelfPreview").evaluate("element => element.parentElement?.id"),
+            "homeFurniture",
+        )
         self.assertGreater(
             page.evaluate("document.documentElement.scrollHeight"),
             page.evaluate("window.innerHeight"),
@@ -1871,6 +1935,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
         self.assertEqual(page.locator(".home-shelf-bay").count(), 0)
         self.assertEqual(page.locator(".home-shelf-scroll-control").count(), 0)
+        self.assertTrue(page.locator(".home-videotheque-heading").is_hidden())
         self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "0")
         self.assertEqual(page.locator("#homeSections").get_attribute("tabindex"), "-1")
 

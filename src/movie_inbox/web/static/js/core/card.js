@@ -121,7 +121,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         image.hidden = false;
         image.classList.add("is-loaded");
         const fallback = image.nextElementSibling;
-        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .spotlight-preview-art-fallback")) {
+        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .home-furniture-frame-fallback, .spotlight-preview-art-fallback")) {
           fallback.hidden = true;
         }
       }
@@ -140,7 +140,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         image.classList.remove("is-loaded");
         image.hidden = true;
         const fallback = image.nextElementSibling;
-        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .spotlight-preview-art-fallback")) {
+        if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .home-furniture-frame-fallback, .spotlight-preview-art-fallback")) {
           fallback.hidden = false;
         }
       }

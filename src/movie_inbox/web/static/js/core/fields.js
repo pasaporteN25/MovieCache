@@ -73,6 +73,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         homeDate: document.querySelector("#homeDate"),
         homeDateToday: document.querySelector("#homeDateToday"),
         homeDateYesterday: document.querySelector("#homeDateYesterday"),
+        homeVideothequeHeading: document.querySelector(".home-videotheque-heading"),
         homeFurniture: document.querySelector("#homeFurniture"),
         homeSections: document.querySelector("#homeSections"),
         homeShelfPreview: document.querySelector("#homeShelfPreview"),

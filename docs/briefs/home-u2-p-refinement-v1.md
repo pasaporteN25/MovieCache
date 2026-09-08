@@ -103,12 +103,12 @@ preferentemente el código. Esta entrega respeta esa separación.
 | ID | Entrega | Dependencias y prueba de aceptación propuesta |
 | --- | --- | --- |
 | U2-P.0 | Relevar marcas, recibir nuevas observaciones y resolver dudas. | En curso. Cierra al confirmar el alcance y la composición objetivo. |
-| U2-P.1 | Corregir placa Hoy/Ayer y retirar indicadores. | Implementada y verificada, sin commit todavía. Centrado dentro del asset en los tres anchos desktop; selector temporal, teclado y autoplay conservados. Revisión del usuario pendiente. |
-| U2-P.2 | Comparar, elegir e integrar fuentes libres. | Opción B integrada en Home y verificada, sin commit todavía. WOFF2 locales, licencias empaquetadas, carga con CSP y fallback comprobados. |
-| U2-P.3 | Recuperar cuerpo, lectura y pie de los lomos. | Autorizada e implementada el 2026-09-07; cuerpo/encuadre, lectura inferior-superior, pie año/VHS y tipo real en ficha. Verificación visual y técnica realizadas; revisión del usuario y commit pendientes. |
-| U2-P.4 | Integrar placas de categoría. | Oswald 400 y material elegidos e integrados el 2026-09-07. Placas en travesaño desktop y antes de cada fila móvil, con nombres/conteos reales. Revisión final y commit pendientes. |
-| U2-P.5 | Prolongar el mueble fuera de pantalla y revisar proporciones. | Continuidad confirmada; coordinar con P.3/P.4. Material continuo y desplazamiento finito coherentes; revisar el asset si su borde está rasterizado. |
-| U2-P.6 | Recomponer consola, acciones, créditos y estado resumido. | P.2/P.5. Divisible luego en acciones, ficha/sinopsis, imágenes/créditos y tira de detalle. Campos y distribución fina todavía abiertos. |
+| U2-P.1 | Corregir placa Hoy/Ayer y retirar indicadores. | Implementada y verificada; incluida en `88eaa0d`. Centrado dentro del asset en los tres anchos desktop; selector temporal, teclado y autoplay conservados. Revisión del usuario pendiente. |
+| U2-P.2 | Comparar, elegir e integrar fuentes libres. | Opción B integrada y verificada; incluida en `88eaa0d`. WOFF2 locales, licencias empaquetadas, carga con CSP y fallback comprobados. |
+| U2-P.3 | Recuperar cuerpo, lectura y pie de los lomos. | Implementada y verificada; incluida en `88eaa0d`. Cuerpo/encuadre, lectura inferior-superior, pie año/VHS y tipo real en ficha. Revisión visual conjunta pendiente. |
+| U2-P.4 | Integrar placas de categoría. | Oswald 400 y material integrados; incluida en `88eaa0d`. Placas en travesaño desktop y antes de cada fila móvil, con nombres/conteos reales. Revisión visual conjunta pendiente. |
+| U2-P.5 | Prolongar el mueble fuera de pantalla y revisar proporciones. | Implementada y verificada; incluida en `88eaa0d`. Continuidad desktop, poste fuera de cuadro, desplazamiento finito y último lomo alcanzable. |
+| U2-P.6 | Recomponer consola, acciones, créditos y estado resumido. | Implementada y verificada el 2026-09-07, todavía sin commit. Sin miniportada ni panel lateral redundante; dos imágenes reales con fallback, créditos/estado y adaptación móvil. |
 | U2-P.7 | Aceptación visual conjunta y regresión focal. | P.1–P.6. Comparación lado a lado con las referencias, revisión del usuario y comprobaciones de teclado, responsive, permisos y contenido. |
 
 P.2 compara familias libres antes de adoptar ninguna. Una fuente completa propia
@@ -301,5 +301,60 @@ contenido y distribución siguen siendo P.6.
   Se añadió cobertura de recorte, sobreancho, último lomo visible y ausencia de
   scroll de página. Ruff, formato, diff check e Impeccable layout correctos.
 
-P.5 queda implementada y verificada; revisión visual y commit pendientes. Próxima
-parte: P.6. P.7 permanece abierta y las capturas no equivalen a aceptación.
+P.5 quedó incluida junto con P.1–P.4 en `88eaa0d`. P.7 permanece abierta y las
+capturas no equivalen a aceptación.
+
+## Entrega visual P.6 — 2026-09-07
+
+La consola inferior deja de repetir la portada y de fragmentar la información en un
+panel VHS independiente. La placa izquierda centra «Ver más» y «Editar mi ficha»; el
+display continuo distribuye título/año, tipo/género y sinopsis, dos imágenes y un
+bloque derecho de créditos más estado resumido. VHS permanece sólo como firma visual.
+
+- Los marcos consumen `backdrop_image` y `page_image`; si falta un dato o falla la
+  carga, sostienen la geometría con «Sin imagen». No se asigna arte inventado a obras.
+- Dirección, guion y reparto salen de datos existentes. Acceso, estado personal y
+  duración completan el resumen; los valores completos siguen en tooltip y ficha.
+- En móvil la consola se apila en orden de lectura, conserva ambos marcos 16:9 y pone
+  créditos/estado antes de las acciones. Los targets siguen midiendo al menos 44 px.
+- Evidencia: [consola 1440 px](../design/u2-p6-evidence/console-1440.png),
+  [fallback sin imágenes](../design/u2-p6-evidence/console-missing-images-1440.png) y
+  [móvil 390 px](../design/u2-p6-evidence/console-mobile-390.png). El fixture usa dos
+  fondos ambientales locales como ilustración de carga exitosa; no representan datos
+  persistidos ni se incorporan a ninguna ficha real.
+- La revisión de capturas corrigió la compresión del bloque derecho: créditos y estado
+  quedan paralelos en escritorio. Impeccable type/layout no reporta hallazgos en el
+  CSS nuevo.
+- Regresión final: **44/44 pruebas** (35 de navegador, 7 de empaquetado y 2 de
+  tokens). Incluye imágenes válidas/rotas, contenido largo, navegación, responsive,
+  permisos de edición y la geometría del mueble continuo.
+
+P.6 queda implementada, documentada y sin commit. El próximo paso es P.7: comparación
+visual con el usuario y regresión final; no se declara aceptación por las capturas.
+
+## Ajustes elegidos en P.7 — 2026-09-08
+
+La crítica independiente detectó dos P1: ficha móvil alejada de su lomo y consola
+desktop más densa que el boceto; además señaló como P2 la relación implícita entre
+cartelera/videoteca y los datos móviles truncados. El usuario eligió **1A, 2A y 3A**.
+
+- **1A:** el único `homeShelfPreview` se inserta debajo de la categoría activa en
+  móvil y vuelve a ser hijo del mueble al cruzar 861 px. Cambiar de categoría mueve
+  esa misma instancia; no hay estado duplicado. Teclado/rueda ignoran su subárbol.
+- **2A:** la consola desktop crece de 17,75 % a 21 % dentro de la bahía inferior,
+  sin cambiar altura, base o ancho de los lomos. La sinopsis gana una tercera línea
+  completa y créditos/estado pasan a 11 px.
+- **3A:** `Cartelera disponible` se complementa con el rótulo visible y semántico
+  `Videoteca · Tu archivo por categoría`. El encabezado se oculta en estado vacío.
+- Como parte de 1A, 390/320 dejan de depender de tooltip: datos de 12 px, wrap real
+  y una columna de créditos/estado a 320 px.
+- Evidencia: [Home 1440](../design/u2-p7-evidence/home-1440.png),
+  [consola 1440](../design/u2-p7-evidence/console-1440.png),
+  [categoría activa 390](../design/u2-p7-evidence/active-category-390.png) y
+  [preview 320](../design/u2-p7-evidence/preview-320.png).
+- Verificación: **44/44 pruebas** (35 navegador, 7 empaquetado, 2 tokens), más
+  captura reproducible en 1280/1440/1920/390/320. Cero overflow horizontal.
+
+Los ajustes de P.7 quedaron **aprobados por el usuario el 2026-09-08**. Con esa
+confirmación visual y la regresión completa, U2-P cumple su criterio de aceptación y
+queda lista para el commit de cierre.

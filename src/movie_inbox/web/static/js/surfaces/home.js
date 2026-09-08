@@ -32,6 +32,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
       let homeAutoplayTimer = 0;
       const HOME_AUTOPLAY_INTERVAL_MS = 6500;
       const HOME_SHELF_BAY_LIMIT = 4;
+      const HOME_MOBILE_MEDIA = "(max-width: 860px)";
 
       export let activeHomeSectionId = "";
       export let activeShelfId = "";
@@ -315,6 +316,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         renderEditorialSections();
         const hasSections = editorialHome.sections.some((section) => section.items?.length);
         fields.homeEmpty.hidden = Boolean(editorialHome.featured.length || hasSections);
+        fields.homeVideothequeHeading.hidden = !hasSections;
         fields.homeFurniture.hidden = !hasSections;
         fields.homeSections.hidden = !hasSections;
         syncHomeDateControl();
@@ -592,7 +594,8 @@ import { closeSharedDetail, openCollection } from "./club.js";
         fields.homeShelfCategories.innerHTML = ids.length > 1 ? homeFurnitureControls(ids.length) : "";
         fields.homeShelfCategories.hidden = ids.length <= 1;
         fields.homeSections.setAttribute("role", "region");
-        fields.homeSections.setAttribute("aria-label", "Mueble horizontal de estanterías");
+        fields.homeSections.setAttribute("aria-labelledby", "homeVideothequeTitle");
+        fields.homeSections.removeAttribute("aria-label");
         fields.homeSections.setAttribute("tabindex", ids.length ? "0" : "-1");
         fields.homeSections.dataset.bayCount = String(ids.length);
         fields.homeSections.innerHTML = sections
@@ -612,6 +615,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
       }
 
       export function syncHomeFurnitureControls() {
+        syncHomeShelfPreviewPlacement();
         const rail = homeShelfRail();
         const navigation = fields.homeShelfCategories;
         if (!rail || !navigation) return;
@@ -752,6 +756,20 @@ import { closeSharedDetail, openCollection } from "./club.js";
         return fields.homeSections;
       }
 
+      export function syncHomeShelfPreviewPlacement() {
+        const host = fields.homeShelfPreview;
+        if (!host || !fields.homeFurniture || !fields.homeSections) return;
+        const activeBay = activeHomeSectionId
+          ? fields.homeSections.querySelector(
+            `[data-home-section="${CSS.escape(activeHomeSectionId)}"]`
+          )
+          : null;
+        const mobile = typeof window !== "undefined"
+          && window.matchMedia?.(HOME_MOBILE_MEDIA).matches;
+        const target = mobile && activeBay ? activeBay : fields.homeFurniture;
+        if (host.parentElement !== target) target.append(host);
+      }
+
       function homeFurnitureScrollBehavior() {
         return typeof window !== "undefined"
           && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -768,7 +786,10 @@ import { closeSharedDetail, openCollection } from "./club.js";
       }
 
       export function moveHomeFurniture(event) {
-        if (!event.target.closest("#homeSections") || event.target.closest("[data-click='home-shelf-select']")) return;
+        if (
+          !event.target.closest("#homeSections")
+          || event.target.closest("[data-click='home-shelf-select'], .home-shelf-preview-host")
+        ) return;
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
         const rail = homeShelfRail();
@@ -783,7 +804,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
 
       export function handleHomeFurnitureWheel(event) {
         const rail = homeShelfRail();
-        if (!rail || !event.target.closest("#homeSections") || rail.scrollWidth <= rail.clientWidth) return;
+        if (
+          !rail
+          || !event.target.closest("#homeSections")
+          || event.target.closest(".home-shelf-preview-host")
+          || rail.scrollWidth <= rail.clientWidth
+        ) return;
         const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
         if (!delta) return;
         event.preventDefault();
@@ -805,21 +831,29 @@ import { closeSharedDetail, openCollection } from "./club.js";
         </button>`;
       }
 
+      function homeFurnitureFrame(imageUrl, title, label) {
+        const url = String(imageUrl || "").trim();
+        const fallback = `<span class="home-furniture-frame-fallback" role="img" aria-label="${escapeAttr(`${label} no disponible`)}"><b aria-hidden="true">SIN IMAGEN</b></span>`;
+        const image = url
+          ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(url))}" alt="${escapeAttr(`${label} de ${title}`)}" loading="lazy" decoding="async">${fallback}`
+          : fallback;
+        return `<span class="home-furniture-frame">${image}</span>`;
+      }
+
+      function homeFurnitureFact(label, value) {
+        const text = String(value || "Sin dato");
+        return `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeAttr(text)}">${escapeHtml(text)}</dd></div>`;
+      }
+
       export function homeShelfPreview(sectionId, entry) {
         const section = homeSectionById(sectionId) || {};
         const sectionAction = section.action || {};
         const item = entry?.item || {};
         const origin = entry?.origin || {};
         const title = displayTitle(item) || "Sin título";
-        const poster = String(item.page_image || "").trim();
         const reason = entry?.reason || {};
-        const director = firstListValue(item.directors);
         const genre = firstListValue(item.genres);
-        const metadata = [
-          item.year ? String(item.year) : "",
-          director ? `Dirección: ${director}` : "",
-          genre ? String(genre) : ""
-        ].filter(Boolean);
+        const metadata = [item.kind ? String(item.kind) : "", genre].filter(Boolean);
         const summary = String(
           item.description || item.wikipedia_extract || reason.detail || ""
         ).trim();
@@ -831,6 +865,11 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const duration = homeDurationLabel(item);
         const availability = availabilityState(item);
         const status = item.status === "watched" ? "Vista" : "Pendiente";
+        const credits = {
+          director: listText(item.directors, 2) || "Sin dato",
+          writers: listText(item.writers, 2) || "Sin dato",
+          cast: listText(item.cast, 3) || "Sin dato"
+        };
         const isCollection = origin.kind === "collection";
         const viewMoreAction = isCollection
           ? `<button type="button" class="home-shelf-preview-action" data-click="open-home-collection-detail" data-key="${escapeAttr(entry?.key || "")}">Ver ficha del Club</button>`
@@ -838,10 +877,10 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const editAction = isCollection
           ? ""
           : `<button type="button" class="quiet-action home-shelf-preview-action" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>`;
-        const artworkFallback = `<div class="home-shelf-preview-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Archivo personal</span><strong>${escapeHtml(title)}</strong></div>`;
-        const artwork = poster
-          ? `<img data-poster-image src="${escapeAttr(cachedImageSrc(poster))}" alt="Portada de ${escapeAttr(title)}" loading="lazy" decoding="async">${artworkFallback}`
-          : artworkFallback;
+        const frames = [
+          homeFurnitureFrame(item.backdrop_image, title, "Imagen panorámica"),
+          homeFurnitureFrame(item.page_image, title, "Imagen de portada")
+        ].join("");
         const categoryAction = sectionAction.kind
           ? `<button class="home-furniture-category-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(sectionAction.label || "Ver colección")}</button>`
           : "";
@@ -855,25 +894,27 @@ import { closeSharedDetail, openCollection } from "./club.js";
               ${categoryAction}
             </div>
             <div class="home-furniture-display-body">
-              <div class="home-shelf-preview-art"><span class="home-shelf-preview-frame" aria-hidden="true"></span>${artwork}</div>
               <div class="home-shelf-preview-copy">
                 ${isCollection ? `<span>En ${escapeHtml(origin.collection_title || "una colección seguida")}</span>` : ""}
-                <h3 id="home-shelf-preview-${escapeAttr(sectionId)}">${escapeHtml(title)}</h3>
+                <h3 id="home-shelf-preview-${escapeAttr(sectionId)}"><span>${escapeHtml(title)}</span>${item.year ? `<small>(${escapeHtml(String(item.year))})</small>` : ""}</h3>
                 ${metadataMarkup}
                 <p class="home-shelf-preview-summary">${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
               </div>
-              <div class="home-furniture-frame-strip" aria-hidden="true"><span></span><span></span></div>
-              <dl class="home-shelf-preview-facts">
-                <div><dt>Acceso</dt><dd>${availability.effective ? "Disponible" : "No disponible"}</dd></div>
-                <div><dt>Estado</dt><dd>${escapeHtml(status)}</dd></div>
-                <div><dt>Duración</dt><dd>${escapeHtml(duration)}</dd></div>
-              </dl>
+              <div class="home-furniture-frame-strip">${frames}</div>
+              <section class="home-furniture-credit-status" aria-label="Créditos y estado resumido">
+                <dl class="home-furniture-credits">
+                  ${homeFurnitureFact("Dirección", credits.director)}
+                  ${homeFurnitureFact("Guion", credits.writers)}
+                  ${homeFurnitureFact("Reparto", credits.cast)}
+                </dl>
+                <dl class="home-shelf-preview-facts">
+                  ${homeFurnitureFact("Acceso", availability.effective ? "Disponible" : "No disponible")}
+                  ${homeFurnitureFact("Estado", status)}
+                  ${homeFurnitureFact("Duración", duration)}
+                </dl>
+                <span class="home-furniture-format-signature" aria-hidden="true">VHS</span>
+              </section>
             </div>
-          </div>
-          <div class="home-furniture-format-panel" aria-hidden="true">
-            <span>Ficha<br>detalle</span>
-            <i></i>
-            <strong>VHS</strong>
           </div>
         </aside>`;
       }
@@ -886,6 +927,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
           ? homeShelfPreview(sectionId, entry)
           : "";
         fields.homeShelfPreview.hidden = !entry;
+        syncHomeShelfPreviewPlacement();
       }
 
       export function editorialPersonalIds() {

@@ -83,6 +83,8 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIsNotNone(static_asset("css/tokens.css"))
         self.assertIsNotNone(static_asset("css/home-plaques.css"))
         self.assertIsNotNone(static_asset("css/home-furniture-continuity.css"))
+        self.assertIsNotNone(static_asset("css/home-console.css"))
+        self.assertIsNotNone(static_asset("css/home-acceptance.css"))
         plaque = static_asset("img/home-category-plaque-v1.png")
         self.assertIsNotNone(plaque)
         self.assertEqual(plaque[0][:8], b"\x89PNG\r\n\x1a\n")

@@ -1,0 +1,297 @@
+/* U2-P.6 — Consola de ficha breve: datos reales, dos imágenes y créditos.
+   La miniportada y la caja lateral redundante desaparecen de este nivel. */
+@media (min-width: 861px) {
+  #homeView .home-furniture-action-panel {
+    left: 5.55%;
+    width: 15.32%;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-actions {
+    justify-items: stretch;
+    margin-inline: auto;
+    max-width: 168px;
+    width: min(88%, 168px);
+  }
+
+  #homeView .home-furniture .home-shelf-preview-action {
+    text-align: center;
+  }
+
+  #homeView .home-furniture-display {
+    left: 23.36%;
+    width: calc(75.64% - var(--home-furniture-overrun));
+  }
+
+  #homeView .home-furniture-display-body {
+    gap: clamp(8px, .7vw, 12px);
+    grid-template-columns: minmax(220px, 1.15fr) minmax(150px, .75fr) minmax(220px, 1.05fr);
+  }
+
+  #homeView .home-furniture .home-shelf-preview-copy {
+    align-content: start;
+    display: grid;
+    gap: 2px;
+    padding-right: 2px;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-copy > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-copy h3 {
+    align-items: baseline;
+    display: flex;
+    gap: 7px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-copy h3 > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-copy h3 > small {
+    color: #dfc28b;
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-meta {
+    margin-top: 0 !important;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-summary {
+    -webkit-line-clamp: 3;
+    margin-top: 2px !important;
+  }
+
+  #homeView .home-furniture-frame-strip {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-height: 0;
+  }
+
+  #homeView .home-furniture-frame {
+    background: #03080d;
+    border: 1px solid rgb(93 111 174 / 72%);
+    box-shadow: inset 0 0 14px rgb(34 216 229 / 7%);
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #homeView .home-furniture-frame > img {
+    display: block;
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    position: absolute;
+    width: 100%;
+    z-index: 1;
+  }
+
+  #homeView .home-furniture-frame-fallback {
+    align-content: center;
+    background:
+      linear-gradient(145deg, #071622 0 42%, #123342 43% 46%, #02070c 47% 100%);
+    color: #70aeb3;
+    display: grid;
+    font-size: 10px;
+    inset: 0;
+    justify-items: center;
+    letter-spacing: .08em;
+    position: absolute;
+  }
+
+  #homeView .home-furniture-frame + .home-furniture-frame .home-furniture-frame-fallback {
+    background:
+      linear-gradient(90deg, transparent 0 18%, rgb(34 216 229 / 12%) 19% 22%, transparent 23% 78%, rgb(120 92 255 / 16%) 79% 82%, transparent 83%),
+      linear-gradient(180deg, #07131a, #02070b 62%, #10272f);
+  }
+
+  #homeView .home-furniture-credit-status {
+    align-content: start;
+    border-left: 1px solid rgb(34 216 229 / 26%);
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(82px, .9fr);
+    min-height: 0;
+    padding-left: 8px;
+    position: relative;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) {
+    display: grid;
+    gap: 1px;
+    margin: 0;
+    min-width: 0;
+  }
+
+  #homeView .home-furniture-credits {
+    border-right: 1px solid rgb(34 216 229 / 18%);
+    padding-right: 8px;
+  }
+
+  #homeView .home-furniture-credit-status .home-shelf-preview-facts {
+    padding-bottom: 16px;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) > div {
+    display: grid;
+    gap: 5px;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) :is(dt, dd) {
+    font-size: 10px;
+    line-height: 1.15;
+    margin: 0;
+    min-width: 0;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) dt {
+    color: #70aeb3;
+    text-transform: uppercase;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) dd {
+    color: #b6e6e8;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #homeView .home-furniture-format-signature {
+    border: 1px solid rgb(34 216 229 / 66%);
+    bottom: 0;
+    color: #92dce1;
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 3px;
+    position: absolute;
+    right: 0;
+  }
+
+  #homeView .home-furniture-format-panel { display: none; }
+}
+
+@media (max-width: 860px) {
+  #homeView .home-furniture .home-shelf-preview-actions {
+    justify-items: stretch;
+    margin-inline: auto;
+    max-width: 360px;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-action { text-align: center; }
+
+  #homeView .home-furniture-display-body {
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #homeView .home-furniture .home-shelf-preview-copy h3 {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+
+  #homeView .home-furniture .home-shelf-preview-copy h3 > small {
+    color: #dfc28b;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  #homeView .home-furniture-frame-strip {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-height: 0;
+  }
+
+  #homeView .home-furniture-frame {
+    aspect-ratio: 16 / 9;
+    background: #03080d;
+    border: 1px solid rgb(93 111 174 / 72%);
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #homeView .home-furniture-frame > img {
+    display: block;
+    height: 100%;
+    inset: 0;
+    object-fit: cover;
+    position: absolute;
+    width: 100%;
+    z-index: 1;
+  }
+
+  #homeView .home-furniture-frame-fallback {
+    align-content: center;
+    background: linear-gradient(145deg, #071622 0 44%, #123342 45% 47%, #02070c 48%);
+    color: #70aeb3;
+    display: grid;
+    font-size: 10px;
+    inset: 0;
+    justify-items: center;
+    letter-spacing: .08em;
+    position: absolute;
+  }
+
+  #homeView .home-furniture-credit-status {
+    border-top: 1px solid rgb(34 216 229 / 26%);
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding-top: 10px;
+    position: relative;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    min-width: 0;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) > div {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) :is(dt, dd) {
+    font-size: 10px;
+    margin: 0;
+    min-width: 0;
+  }
+
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) dt { color: #70aeb3; }
+  #homeView :is(.home-furniture-credits, .home-shelf-preview-facts) dd {
+    color: #b6e6e8;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #homeView .home-furniture-format-signature {
+    border: 1px solid rgb(34 216 229 / 66%);
+    color: #92dce1;
+    font-size: 10px;
+    grid-column: 2;
+    justify-self: end;
+    line-height: 1;
+    padding: 3px 4px;
+  }
+}
