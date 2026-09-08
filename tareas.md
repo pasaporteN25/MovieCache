@@ -97,10 +97,12 @@ bloquean U3 ni reabren la recuperación aceptada.
 - **Depende de**: [U2-R] y aceptación de [U2-P], para estabilizar la Home antes de U3.1.
 - **Modelo sugerido**: Grande para U3.1; Medio para las implementaciones posteriores.
 
-  - [ ] **[U3.1] Auditar y congelar la arquitectura de Colección.** Inventariar buscador,
+  - [x] **[U3.1] Auditar y congelar la arquitectura de Colección.** Inventariar buscador,
     alta, comparación, filtros, URL, estados vacíos y permisos; producir wireflow y
     contrato de estados antes de tocar código. Incluir explícitamente los casos donde
-    editar la query no puede degradar `Comparar` a búsqueda común. **Modelo: Grande.**
+    editar la query no puede degradar `Comparar` a búsqueda común. Aprobada por el
+    usuario el 2026-09-08; brief, wireflow, contrato y evidencia congelados para U3.2
+    y U3.3. **Modelo: Grande.**
   - [ ] **[U3.2] Rediseñar entrada de búsqueda/alta y filtros.** Implementar cabecera de
     tarea unificada, intención clara de agregar, filtros cotidianos visibles, `Más
     filtros` y chips activos; mantener endpoints y resultados existentes. Acotar a
@@ -288,7 +290,7 @@ superficies es [U3], del frente visual, y las dos conviene que avancen conversan
 
 ## En curso
 
-Sin tarea abierta. La próxima accionable del backlog es [U3.1].
+[U3.2/U3.3] Autorizadas el 2026-09-08 sobre el contrato aprobado de U3.1.
 
 ## Hecho
 
