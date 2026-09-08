@@ -11,6 +11,7 @@ someone else's behalf -- which is exactly the authority this must not have.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -18,6 +19,7 @@ from fastapi.responses import JSONResponse
 
 from movie_inbox.application.identity_repository import IdentityRepositoryError
 from movie_inbox.domain.pairing import PairingError
+from movie_inbox.infrastructure.qr_code import QrCodeError, qr_data_uri
 from movie_inbox.web.dependencies import require_origin, require_ready_identity, require_token
 from movie_inbox.web.responses import error_response
 
@@ -38,19 +40,32 @@ def create_device_pairing(request: Request) -> JSONResponse:
         return error_response("pairing_not_configured", 409)
     except IdentityRepositoryError:
         return error_response("identity_store_unavailable", 503)
-    return JSONResponse(_public_ticket(ticket), status_code=201)
+    try:
+        image = qr_data_uri(json.dumps(ticket["payload"], separators=(",", ":")))
+    except QrCodeError:
+        # The ticket is already minted and perfectly usable; only the drawing
+        # failed. Returning the payload without the image lets the surface fall
+        # back to something a person can still act on, instead of losing both.
+        image = ""
+    return JSONResponse(_public_ticket(ticket, image), status_code=201)
 
 
-def _public_ticket(ticket: dict[str, Any]) -> dict[str, Any]:
+def _public_ticket(ticket: dict[str, Any], qr_image: str) -> dict[str, Any]:
     """The response the browser gets.
 
-    The plaintext ticket is inside `payload` because that is what has to reach
-    the QR, and it goes nowhere else -- not into a log, not into a header, not
-    into the URL. It expires in minutes and is good for exactly one use.
+    The plaintext ticket is inside `payload`, and inside `qr_image` drawn as a
+    QR, because those are what have to reach the phone. It goes nowhere else --
+    not into a log, not into a header, not into the URL. It expires in minutes
+    and is good for exactly one use.
+
+    `qr_image` is a `data:` URI meant for an `<img>`; the payload travels beside
+    it so a surface can offer a manual fallback, and so a test can read what the
+    QR actually encodes.
     """
 
     return {
         "payload": ticket["payload"],
+        "qr_image": qr_image,
         "expires_at": ticket["expires_at"],
         "expires_in": ticket["expires_in"],
     }

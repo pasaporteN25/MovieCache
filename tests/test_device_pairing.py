@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+import urllib.parse
+import xml.etree.ElementTree as ElementTree
 from dataclasses import replace
 from pathlib import Path
 
@@ -34,6 +36,12 @@ from movie_inbox.domain.pairing import (
 )
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
+from movie_inbox.infrastructure.qr_code import (
+    MAX_SCANNABLE_VERSION,
+    QR_BORDER_MODULES,
+    QrCodeError,
+    qr_data_uri,
+)
 from movie_inbox.web.app import create_app
 from movie_inbox.web.config import ViewerConfig
 
@@ -120,6 +128,68 @@ class PairingPayloadTests(unittest.TestCase):
         self.assertNotIn("un-secreto-de-instancia", first)
         with self.assertRaises(PairingError):
             instance_public_id("")
+
+
+def _svg_from_data_uri(uri: str) -> ElementTree.Element:
+    head, _, body = uri.partition(",")
+    if head != "data:image/svg+xml;charset=utf-8":
+        raise AssertionError(f"unexpected data uri header: {head!r}")
+    return ElementTree.fromstring(urllib.parse.unquote(body))
+
+
+class QrCodeTests(unittest.TestCase):
+    """What this file can honestly check, and what it cannot.
+
+    It checks that the encoder is fed the right thing and gives back a
+    well-formed SVG of a plausible size. It does **not** check that a phone
+    reads it: there is no decoder here, so the only real proof is a camera.
+    That check belongs to [A2.1] on a real device, and claiming it here would
+    be exactly the mistake [F5.4] taught -- code-complete is not verified.
+    """
+
+    def test_it_returns_a_data_uri_holding_a_real_svg(self) -> None:
+        root = _svg_from_data_uri(qr_data_uri("hola"))
+        self.assertTrue(root.tag.endswith("svg"))
+        self.assertTrue(list(root), "an empty SVG would scan as nothing")
+
+    def test_the_image_grows_with_the_payload_and_keeps_the_full_quiet_zone(self) -> None:
+        small = _svg_from_data_uri(qr_data_uri("hola"))
+        large = _svg_from_data_uri(qr_data_uri("x" * 400))
+        self.assertLess(int(small.attrib["width"]), int(large.attrib["width"]))
+        self.assertEqual(small.attrib["width"], small.attrib["height"])
+        # Two things this pins, both found by measuring rather than assuming.
+        # The quiet zone: segno defaults to two modules and the specification
+        # asks for four, and two usually scans and sometimes does not. And the
+        # symbol kind: left alone segno encodes "hola" as a Micro QR of 15
+        # modules, which many phone cameras do not read. With micro disabled it
+        # is a standard version 1 symbol, 21 modules.
+        self.assertEqual(int(small.attrib["width"]), (21 + 2 * QR_BORDER_MODULES) * 5)
+
+    def test_content_too_dense_to_scan_is_refused_rather_than_drawn(self) -> None:
+        # The failure mode of an over-dense QR is "my phone just does not read
+        # it", which is miserable to debug from a camera.
+        with self.assertRaises(QrCodeError):
+            qr_data_uri("x" * 3000)
+        with self.assertRaises(QrCodeError):
+            qr_data_uri("")
+
+    def test_a_real_pairing_payload_lands_well_inside_the_scannable_range(self) -> None:
+        payload = pairing_payload(
+            origin=_ORIGIN,
+            token="x" * 64,
+            expires_at=1_800_000_000,
+            instance_id="a" * 32,
+            account_username="lucas",
+            certificate_pin=_PIN,
+        )
+        root = _svg_from_data_uri(qr_data_uri(json.dumps(payload, separators=(",", ":"))))
+        modules = int(root.attrib["width"]) // 5 - 2 * QR_BORDER_MODULES
+        version = (modules - 17) // 4
+        self.assertEqual(
+            modules, 4 * version + 17, "el ancho tiene que cerrar con una version real"
+        )
+        self.assertLessEqual(version, MAX_SCANNABLE_VERSION)
+        self.assertGreater(version, 0)
 
 
 class PairingTicketStoreTests(unittest.TestCase):
@@ -409,6 +479,17 @@ class PairingApiTests(unittest.TestCase):
             response = client.post("/api/device-pairing", headers=headers)
             self.assertEqual(response.status_code, 409, response.content)
             self.assertEqual(response.json()["reason"], "pairing_not_configured")
+
+    def test_the_response_carries_the_qr_and_the_payload_it_encodes(self) -> None:
+        self._login()
+        body = self.client.post("/api/device-pairing", headers=self._headers()).json()
+        self.assertTrue(body["qr_image"].startswith("data:image/svg+xml"))
+        # The payload travels beside the image on purpose: a surface can offer a
+        # manual fallback, and this test can read what the QR encodes without a
+        # decoder.
+        self.assertEqual(body["payload"]["origin"], _ORIGIN)
+        root = _svg_from_data_uri(body["qr_image"])
+        self.assertTrue(root.tag.endswith("svg"))
 
     def test_the_ticket_never_appears_in_a_get(self) -> None:
         # Minting is a POST on purpose: a GET would put a bearer credential
