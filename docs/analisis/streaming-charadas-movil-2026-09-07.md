@@ -599,11 +599,33 @@ El backend está completo. Lo que falta es sólo mostrarlo.
   Los arreglos son del frente visual. La prueba con personas queda como protocolo escrito
   en el mismo documento.
 
-### Nota sobre [I1]
+### Frente: Integraciones externas
 
-[I1] (Radarr, Sonarr, Letterboxd) y [S2] son la misma clase de trabajo: evaluación de
-integraciones externas con matriz y ADR. Conviene usar la misma plantilla para no
-reinventarla dos veces.
+- **[I1] Evaluar Radarr, Sonarr y Letterboxd.** **Cerrada 2026-09-07 —
+  `docs/analisis/i1-radarr-sonarr-letterboxd-2026-09-07.md`** con la misma plantilla de
+  [S2], más un ADR por integración como pedía el criterio de cierre. Los tres resultaron
+  ser tres clases distintas de cosa: Radarr y Sonarr compiten con el Scanner, Letterboxd
+  con la capa personal.
+  - **Radarr — aceptada con condiciones (ADR-0006).** Entrega `tmdbId`, que es la identidad
+    fuerte que `decide_match` ya reconoce: empareja con `shared_tmdb_id` a 1.0. No acelera
+    al Scanner, **le evita adivinar**. No lo reemplaza: sólo conoce lo que administra él.
+    Queda una compuerta que no es técnica — si el owner no corre Radarr, esto vale cero.
+  - **Sonarr — rechazada por ahora (ADR-0007).** Misma API que Radarr, veredicto distinto, y
+    no por la fuente. Sonarr informa `episodeFileCount`/`totalEpisodeCount`; medido sobre un
+    caso realista da **3 de 86 episodios**, y `en_catalogo` es booleano: `true` y `false` son
+    las dos falsas. Reabre cuando se decida qué significa "tener" una serie parcial. De
+    yapa, TVDB —su clave primaria— es la única de las tres que el catálogo no sabe leer.
+  - **Letterboxd — rechazada como integración, aceptada como importación (ADR-0008).** La
+    API es por invitación y sin garantía; el export requiere Pro y **no trae ningún
+    identificador**, sólo título, año y un slug que habría que scrapear — el mismo criterio
+    por el que ADR-0004 descartó JustWatch. Pero el parser de importación existente ya lee
+    el archivo, y el emparejamiento por títulos alternativos funciona: `The Secret in Their
+    Eyes` encuentra `El secreto de sus ojos`. Camino aceptado: CSV con mapeo explícito y
+    persona revisando, sin adaptador ni credencial.
+
+  **Pendiente administrativo:** la entrada de [I1] en `tareas.md` sigue en Backlog. Ese
+  archivo tenía trabajo sin commitear del frente visual al cerrar esta tarea, así que no se
+  tocó para no arrastrarlo.
 
 ---
 
