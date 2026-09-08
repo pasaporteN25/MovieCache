@@ -168,6 +168,30 @@ class IdentityRepository(Protocol):
 
     def delete_device_session(self, access_token_hash: str) -> None: ...
 
+    def save_pairing_ticket(
+        self,
+        token_hash: str,
+        user_id: str,
+        created_at: int,
+        expires_at: int,
+    ) -> None: ...
+
+    def redeem_pairing_ticket(self, token_hash: str, now: int) -> str:
+        """Consume a ticket atomically; returns the user id, or "" when unusable."""
+        ...
+
+    def purge_pairing_tickets(self, before: int) -> int: ...
+
+    def instance_secret(self, name: str) -> str:
+        """Get-or-create a persistent per-instance secret ([A1.4]).
+
+        Declared here because more than one service depends on it now: the
+        device sync key derives item ids from it, and pairing derives the public
+        instance id. Reaching it through the concrete class kept it out of type
+        checking, which is exactly how a contract quietly stops being one.
+        """
+        ...
+
     def owner(self) -> UserAccount | None: ...
 
     def validate_owner_catalog(

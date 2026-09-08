@@ -47,6 +47,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="External origin, for example https://movies.example.com.",
     )
     parser.add_argument(
+        "--device-pairing-cert-pin",
+        default="",
+        help=(
+            "Base64 SHA-256 SPKI pin of the TLS certificate, for pairing a phone with a "
+            "self-signed certificate. Not needed behind a publicly trusted certificate."
+        ),
+    )
+    parser.add_argument(
         "--public-presentation-origin",
         default="",
         help=(
@@ -249,6 +257,7 @@ def main(argv: list[str] | None = None) -> int:
         session_ttl_seconds=args.session_days * 24 * 60 * 60,
         host=args.host,
         public_origin=public_origin,
+        device_pairing_certificate_pin=args.device_pairing_cert_pin,
         public_presentation_origin=public_presentation_origin,
         forwarded_allow_ips=args.forwarded_allow_ips,
         image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),

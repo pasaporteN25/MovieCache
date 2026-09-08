@@ -149,6 +149,31 @@ class AuthService:
             raise PasswordChangeRequiredError("password_change_required")
         return self._create_device_session(user, catalog, validate_device_name(device_name))
 
+    def create_paired_device_session(self, user_id: str, device_name: str) -> DeviceSession:
+        """Open a device session for an account whose authorization was already proven.
+
+        There are no credentials in this call because there is no password to
+        check: the caller must have redeemed a single-use pairing ticket that a
+        browser session minted for this same account. `PairingService.redeem` is
+        the only sanctioned caller, and it consumes the ticket **before** asking
+        for this.
+
+        The same three refusals login applies still apply here, because a ticket
+        minted minutes ago says nothing about the account's state now: an
+        account that was archived, deactivated, left without a catalogue or told
+        to change its password cannot get a session.
+        """
+
+        user = self.repository.account(user_id)
+        if user is None or not user.active:
+            raise ValueError("pairing_account_unavailable")
+        if user.must_change_password:
+            raise ValueError("pairing_password_change_required")
+        catalog = self.repository.default_catalog_for(user.id)
+        if catalog is None:
+            raise ValueError("pairing_account_unavailable")
+        return self._create_device_session(user, catalog, validate_device_name(device_name))
+
     def refresh_device_session(self, refresh_token: str) -> DeviceSession | None:
         if not refresh_token or len(refresh_token) > 512:
             return None

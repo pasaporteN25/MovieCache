@@ -24,6 +24,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/auth/login",
                 "/api/v1/auth/refresh",
                 "/api/v1/auth/session",
+                "/api/v1/pair",
                 "/api/v1/me",
                 "/api/v1/catalog/items",
                 "/api/v1/catalog/items/{itemId}",
@@ -31,6 +32,12 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/search",
             },
         )
+        # [A2.1]: pairing is additive -- a new path, no existing meaning changed --
+        # so it belongs inside v1 by ADR-0003's own versioning rule.
+        pair = document["paths"]["/api/v1/pair"]["post"]
+        self.assertEqual(pair["operationId"], "redeemPairingTicket")
+        self.assertEqual(pair["security"], [], "a device pairing has no session yet")
+        self.assertIn("429", pair["responses"], "redemption is rate limited like login")
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
 

@@ -58,6 +58,7 @@ class TmdbLiveSmokeTests(unittest.TestCase):
         detail = self.adapter.metadata(movie["url"])
         self.assertEqual(detail["imdb_url"], "https://www.imdb.com/title/tt0113277/")
         self.assertIn("alternative_titles", detail)
+
     def test_public_scores_come_back_as_a_number_and_a_vote_count(self) -> None:
         # [F6.2]: the score half of the API, which the offline tests can only
         # check against a payload we wrote ourselves. Heat is rated by enough

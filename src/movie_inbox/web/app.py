@@ -36,6 +36,7 @@ from movie_inbox.application.library_service import (
     ManagedLibraryService,
 )
 from movie_inbox.application.member_service import MemberService
+from movie_inbox.application.pairing_service import PairingService
 from movie_inbox.application.privacy_service import PrivacyService
 from movie_inbox.application.public_presentation_service import PublicPresentationService
 from movie_inbox.application.public_ratings_service import PublicRatingsService
@@ -112,6 +113,7 @@ from movie_inbox.web.routers import (
     home,
     imports,
     integrations,
+    pairing,
     public_presentations,
     ratings,
     scanner,
@@ -339,6 +341,12 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.tmdb_retirement_service = tmdb_retirement_service
     app.state.streaming_service = streaming_service
     app.state.public_ratings_service = public_ratings_service
+    app.state.pairing_service = PairingService(
+        identity_repository,
+        auth_service,
+        origin=config.public_origin,
+        certificate_pin=config.device_pairing_certificate_pin,
+    )
 
     def charades_catalog(identity: AuthenticatedIdentity) -> list[dict[str, Any]]:
         catalog = SessionCatalog.from_identity(config, identity)
@@ -556,6 +564,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(ratings.router)
     app.include_router(charades.router)
     app.include_router(search.router)
+    app.include_router(pairing.router)
     app.include_router(device_auth.router)
     app.include_router(device_catalog.router)
     app.include_router(public_presentations.router)
