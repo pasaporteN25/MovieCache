@@ -27,6 +27,8 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/pair",
                 "/api/v1/me",
                 "/api/v1/catalog/drafts",
+                "/api/v1/collections",
+                "/api/v1/collections/{collectionId}/items",
                 "/api/v1/catalog/items",
                 "/api/v1/catalog/items/{itemId}",
                 "/api/v1/catalog/items/{itemId}/personal",
@@ -47,6 +49,11 @@ class DeviceApiContractTests(unittest.TestCase):
         self.assertNotIn("201", drafts["responses"], "appending is not creating")
         item = document["components"]["schemas"]["OfflineDraftItem"]
         self.assertEqual(sorted(item["required"]), ["id", "title"])
+        # [A2.6]: a collection work carries identity and nothing personal --
+        # following a collection does not copy anything into your catalogue.
+        work = document["components"]["schemas"]["CollectionWork"]
+        for field in ("personal", "status", "rating", "review", "path", "local_files"):
+            self.assertNotIn(field, work["properties"])
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
 

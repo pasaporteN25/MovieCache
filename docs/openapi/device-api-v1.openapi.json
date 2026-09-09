@@ -68,6 +68,25 @@
         "responses": {"200": {"description": "What the server did with each work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
       }
     },
+    "/api/v1/collections": {
+      "get": {
+        "operationId": "listFollowedCollections",
+        "description": "Collections this account follows. Only followed ones: a device replica holds what its owner reads, not a directory of the instance. Items are fetched separately so a long collection cannot make this response unbounded.",
+        "responses": {"200": {"description": "Followed collections", "content": {"application/json": {"schema": {"type": "object", "properties": {"collections": {"type": "array", "items": {"$ref": "#/components/schemas/CollectionSummary"}}}}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/collections/{collectionId}/items": {
+      "get": {
+        "operationId": "listCollectionItems",
+        "description": "Works in one followed collection, paged. A collection item carries no personal state: following a collection does not copy its works into your catalogue, so there is no status, rating or review to report. Answers 404 once the account stops following it.",
+        "parameters": [
+          {"name": "collectionId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "cursor", "in": "query", "required": false, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}}
+        ],
+        "responses": {"200": {"description": "A page of works", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CollectionItemPage"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
     "/api/v1/search": {
       "get": {
         "operationId": "searchPersonalCatalog",
@@ -91,6 +110,9 @@
     },
     "schemas": {
       "LoginRequest": {"type": "object", "additionalProperties": false, "required": ["username", "password", "device_name"], "properties": {"username": {"type": "string", "minLength": 3, "maxLength": 64}, "password": {"type": "string", "minLength": 1, "maxLength": 1024, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
+      "CollectionSummary": {"type": "object", "properties": {"id": {"type": "string", "description": "Opaque and stable; reveals no internal id."}, "title": {"type": "string"}, "description": {"type": "string"}, "updated_at": {"type": "string"}, "count": {"type": "integer"}}},
+      "CollectionItemPage": {"type": "object", "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/CollectionWork"}}, "next_cursor": {"type": ["string", "null"]}}},
+      "CollectionWork": {"type": "object", "properties": {"id": {"type": "string"}, "position": {"type": "integer"}, "title": {"type": "string"}, "original_title": {"type": ["string", "null"]}, "year": {"type": ["string", "null"]}, "kind": {"type": "string"}, "description": {"type": ["string", "null"]}, "image_url": {"type": ["string", "null"]}, "genres": {"type": "array", "items": {"type": "string"}}, "runtime_minutes": {"type": ["integer", "null"]}}},
       "OfflineDraftRequest": {"type": "object", "additionalProperties": false, "required": ["items"], "properties": {"items": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/components/schemas/OfflineDraftItem"}}}},
       "OfflineDraftItem": {"type": "object", "additionalProperties": false, "required": ["id", "title"], "properties": {"id": {"type": "string", "minLength": 1, "maxLength": 64, "description": "Client-generated and stable, so a retry cannot duplicate the work."}, "title": {"type": "string", "minLength": 1, "maxLength": 400}, "year": {"type": "string", "maxLength": 8}, "kind": {"type": "string", "maxLength": 40}, "notes": {"type": "string", "maxLength": 2000}}},
       "OfflineDraftResult": {"type": "object", "properties": {"draft_id": {"type": "string"}, "accepted": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "string"}, "state": {"type": "string", "enum": ["new", "present", "review", "invalid"]}, "reason": {"type": "string"}}}}, "duplicates": {"type": "array", "items": {"type": "string"}, "description": "Ids already in the pile; the client can stop resending them."}, "counts": {"type": "object", "additionalProperties": {"type": "integer"}}}},

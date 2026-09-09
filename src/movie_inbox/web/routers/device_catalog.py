@@ -1,4 +1,8 @@
-"""Allowlisted personal-catalog resources for the versioned device API."""
+"""Allowlisted personal-catalog resources for the versioned device API.
+
+Covers the account's own works and, since [A2.6], the collections it follows.
+Both are served through allowlists rather than by handing over stored rows.
+"""
 
 from __future__ import annotations
 
@@ -37,6 +41,16 @@ from movie_inbox.web.responses import ApiRequestError, DeviceApiRequestError, id
 
 # Name of the persistent secret the device sync key is derived from.
 DEVICE_SYNC_SECRET = "device_sync_key"
+
+# Namespaces for collection ids, so an id minted for a collection can never be
+# mistaken for one minted for an item inside it.
+#
+# The catalogue keeps the derivation [A1.4] fixed, deliberately outside this
+# scheme. Its stability across restarts and token rotations is a decided
+# property of a paired replica, and folding a namespace into it would re-key
+# every work a device holds -- a real cost, to make two helpers look alike.
+COLLECTION_NAMESPACE = "collection"
+COLLECTION_ITEM_NAMESPACE = "collection-item"
 
 router = APIRouter()
 _DEVICE_PAGE_SIZE = 50
@@ -169,6 +183,100 @@ def add_offline_drafts(
     return JSONResponse(result)
 
 
+@router.get("/api/v1/collections")
+def list_followed_collections(
+    request: Request,
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+) -> JSONResponse:
+    """Collections this account follows ([A2.6], first step).
+
+    Only followed ones. A device replica is meant to hold what its owner reads,
+    not to become a directory of everything the instance can see.
+
+    Items are left out here on purpose: a collection can be long, and a summary
+    that grows without bound is the kind of endpoint that works until someone
+    follows a list of five hundred films.
+    """
+
+    try:
+        collections = request.app.state.collection_service.followed_collections(identity.user.id)
+    except (LibraryRepositoryError, IdentityRepositoryError) as error:
+        raise _catalog_error(error) from error
+    secret = _sync_secret(request)
+    return JSONResponse(
+        {
+            "collections": [
+                {
+                    "id": _opaque_id(secret, COLLECTION_NAMESPACE, collection.id),
+                    "title": collection.title,
+                    "description": collection.description,
+                    "updated_at": collection.updated_at,
+                    "count": len(collection.items),
+                }
+                for collection in collections
+            ]
+        }
+    )
+
+
+@router.get("/api/v1/collections/{collection_id}/items")
+def collection_items(
+    collection_id: str,
+    request: Request,
+    cursor: str = "",
+    limit: str = "50",
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+) -> JSONResponse:
+    """One followed collection's works, paged like the catalogue is.
+
+    A collection item carries no personal state, and that is not an omission:
+    following a collection does not copy its works into your catalogue, so there
+    is no status, rating or review to report. A phone that wants those looks the
+    work up in its own replica.
+    """
+
+    try:
+        collections = request.app.state.collection_service.followed_collections(identity.user.id)
+    except (LibraryRepositoryError, IdentityRepositoryError) as error:
+        raise _catalog_error(error) from error
+    secret = _sync_secret(request)
+    found = next(
+        (
+            collection
+            for collection in collections
+            if hmac.compare_digest(
+                _opaque_id(secret, COLLECTION_NAMESPACE, collection.id), collection_id
+            )
+        ),
+        None,
+    )
+    if found is None:
+        # Also the answer when the account stopped following it, which is the
+        # honest one: it is no longer a collection this device may read.
+        raise DeviceApiRequestError("collection_not_found", 404)
+    entries = [
+        {
+            "id": _opaque_id(secret, COLLECTION_ITEM_NAMESPACE, f"{found.id}\x1f{entry.id}"),
+            "position": entry.position,
+            **_collection_item_payload(entry.item),
+        }
+        for entry in found.items
+    ]
+    size = _page_size(limit)
+    context = f"collection:{_digest(found.id)}"
+    offset = _page_offset(request, cursor, context)
+    page = entries[offset : offset + size]
+    next_offset = offset + len(page)
+    return JSONResponse(
+        {
+            "items": page,
+            "next_cursor": _cursor(request, context, next_offset)
+            if next_offset < len(entries)
+            else None,
+        }
+    )
+
+
 @router.get("/api/v1/search")
 def search_catalog(
     request: Request,
@@ -214,9 +322,7 @@ def _device_catalog_entries(
     # from api_token, and from the source's position rather than its path.
     # Rotating the token or relocating a catalogue are both normal operations
     # and must not re-key every work in a paired client's local replica.
-    secret = request.app.state.identity_repository.instance_secret(DEVICE_SYNC_SECRET).encode(
-        "utf-8"
-    )
+    secret = _sync_secret(request)
     for row in rows:
         source_reference = str(row.get("_source_file") or "")
         catalog_item_id = str(row.get("id") or "")
@@ -359,6 +465,44 @@ def _opaque_item_id(secret: bytes, catalog_id: str, source_slot: str, item_id: s
     message = "\x1f".join((catalog_id, source_slot, item_id)).encode("utf-8")
     digest = hmac.new(secret, message, hashlib.sha256).digest()[:24]
     return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def _sync_secret(request: Request) -> bytes:
+    secret: str = request.app.state.identity_repository.instance_secret(DEVICE_SYNC_SECRET)
+    return secret.encode("utf-8")
+
+
+def _opaque_id(secret: bytes, namespace: str, value: str) -> str:
+    """Stable, opaque, and impossible to confuse across namespaces.
+
+    Stable because it comes from the durable instance secret [A1.4] created, so
+    a restart or a rotated api_token does not re-key a paired device's replica.
+    """
+
+    message = "\x1f".join((namespace, value)).encode("utf-8")
+    digest = hmac.new(secret, message, hashlib.sha256).digest()[:24]
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def _collection_item_payload(item: Mapping[str, Any]) -> dict[str, Any]:
+    """The identity of a work in a collection, and nothing else.
+
+    Collection rows are already restricted to shareable fields when they are
+    written (`COLLECTION_ITEM_FIELDS`), so this is a second allowlist over an
+    already narrow one. That is deliberate: invariant 4 does not get to depend
+    on a guarantee made somewhere else in the codebase.
+    """
+
+    return {
+        "title": str(item.get("title") or ""),
+        "original_title": _optional_text(item.get("original_title")),
+        "year": _optional_text(item.get("year")),
+        "kind": str(item.get("kind") or "pelicula"),
+        "description": _optional_text(item.get("description") or item.get("wikipedia_extract")),
+        "image_url": _optional_text(item.get("page_image") or item.get("backdrop_image")),
+        "genres": [str(value) for value in item.get("genres") or [] if str(value)],
+        "runtime_minutes": _optional_positive_int(item.get("duration_minutes")),
+    }
 
 
 def _title_key(row: Mapping[str, Any]) -> tuple[str, str]:
