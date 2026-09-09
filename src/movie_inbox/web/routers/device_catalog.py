@@ -16,11 +16,16 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from movie_inbox.application.identity_repository import IdentityRepositoryError
+from movie_inbox.application.import_service import (
+    DeviceDraftFull,
+    ImportDraftBusy,
+    ImportDraftLimit,
+)
 from movie_inbox.application.library_repository import LibraryRepositoryError
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.search_service import search_catalog_items
 from movie_inbox.domain.identity import AuthenticatedIdentity
-from movie_inbox.web.catalog_api import patch_item_personal
+from movie_inbox.web.catalog_api import load_items, patch_item_personal
 from movie_inbox.web.dependencies import (
     SessionCatalog,
     _resolved_path,
@@ -112,6 +117,56 @@ def patch_personal_item(
     if refreshed is None:
         raise DeviceApiRequestError("item_not_found", 404)
     return JSONResponse(_device_item_payload(refreshed))
+
+
+# 200 rather than 201: this appends to a pile that usually already exists,
+# and a retry creates nothing at all. What happened is in the body.
+@router.post("/api/v1/catalog/drafts")
+def add_offline_drafts(
+    request: Request,
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+    body: dict[str, Any] = Depends(device_json),
+) -> JSONResponse:
+    """Receive works a phone recorded with no connection ([A2.3]).
+
+    The use case this exists for, in the owner's words: saving a film to the
+    collection without being at the computer or at home.
+
+    Nothing reaches the catalogue here. Each work is classified against it and
+    parked in the account's pending pile, because an addition made offline has
+    no shared base to merge against -- it is an import, and imports go through
+    review. `state` says what the server found: `present` if the account already
+    has it, `review` if it might, `new` if it clearly does not.
+
+    Safe to retry. Works are keyed by the id the phone generated, so a sync that
+    succeeds here and fails on the way back does not duplicate anything: the
+    second attempt reports them under `duplicates`.
+    """
+
+    entries = body.get("items")
+    if not isinstance(entries, list) or not entries:
+        raise DeviceApiRequestError("invalid_request", 400)
+    rows: list[dict[str, Any]] = [row for row in entries if isinstance(row, dict)]
+    if len(rows) != len(entries):
+        raise DeviceApiRequestError("invalid_request", 400)
+    try:
+        catalog = SessionCatalog.from_identity(request.app.state.viewer_config, identity)
+        catalog_items = load_items(catalog.config.patterns)
+        result = request.app.state.import_service.append_device_items(
+            identity.user.id, rows, catalog_items
+        )
+    except DeviceDraftFull as error:
+        raise DeviceApiRequestError("device_draft_full", 409) from error
+    except ImportDraftBusy as error:
+        # Being applied in the browser right now. The phone keeps the works.
+        raise DeviceApiRequestError("draft_busy", 409) from error
+    except ImportDraftLimit as error:
+        raise DeviceApiRequestError("draft_limit_reached", 409) from error
+    except ValueError as error:
+        raise DeviceApiRequestError("invalid_request", 400) from error
+    except (CatalogRepositoryError, LibraryRepositoryError, IdentityRepositoryError) as error:
+        raise _catalog_error(error) from error
+    return JSONResponse(result)
 
 
 @router.get("/api/v1/search")

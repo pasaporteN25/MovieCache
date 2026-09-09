@@ -346,6 +346,7 @@ class IdentityTests(unittest.TestCase):
                     CREATE TABLE library_scan_runs (id TEXT PRIMARY KEY);
                     CREATE TABLE media_libraries (id TEXT PRIMARY KEY);
                     CREATE TABLE curated_collections (id TEXT PRIMARY KEY);
+                    CREATE TABLE import_drafts (id TEXT PRIMARY KEY);
                     """
                 )
                 connection.executemany(

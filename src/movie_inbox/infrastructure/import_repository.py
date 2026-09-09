@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from collections.abc import Sequence
 from contextlib import closing
 from pathlib import Path
 from typing import Any
@@ -36,8 +37,9 @@ class SqliteImportDraftRepository:
                     connection.execute(
                         """INSERT INTO import_drafts(
                             id, user_id, source_name, source_format, source_hash, status,
-                            created_at, updated_at, expires_at, applied_at, result_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            created_at, updated_at, expires_at, applied_at, result_json,
+                            origin
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             draft.id,
                             draft.user_id,
@@ -50,6 +52,7 @@ class SqliteImportDraftRepository:
                             draft.expires_at,
                             draft.applied_at,
                             _json_dump(draft.result),
+                            draft.origin,
                         ),
                     )
                     for entry in draft.items:
@@ -215,13 +218,76 @@ class SqliteImportDraftRepository:
                     f"Cannot delete import draft from: {self.path}"
                 ) from error
 
+    def append_items(
+        self,
+        user_id: str,
+        draft_id: str,
+        items: Sequence[ImportDraftItem],
+        now: int,
+    ) -> bool:
+        if not items:
+            return True
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    row = connection.execute(
+                        "SELECT status FROM import_drafts WHERE id = ? AND user_id = ?",
+                        (draft_id, user_id),
+                    ).fetchone()
+                    if row is None or str(row["status"]) != "ready":
+                        # Gone, or being applied right now. The caller reports
+                        # the works as not accepted so the phone keeps them and
+                        # tries again, rather than losing them quietly.
+                        connection.rollback()
+                        return False
+                    for entry in items:
+                        connection.execute(
+                            """INSERT INTO import_draft_items(
+                                draft_id, item_id, position, state, reason, label,
+                                item_json, candidates_json, collection_eligible
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                draft_id,
+                                entry.id,
+                                entry.position,
+                                entry.state,
+                                entry.reason,
+                                entry.label,
+                                _json_dump(entry.item or {}),
+                                _json_dump(list(entry.candidates)),
+                                int(entry.collection_eligible),
+                            ),
+                        )
+                    connection.execute(
+                        "UPDATE import_drafts SET updated_at = ? WHERE id = ?",
+                        (now, draft_id),
+                    )
+                    connection.commit()
+                    return True
+            except sqlite3.IntegrityError as error:
+                # The unique key is (draft_id, item_id): a retry that raced past
+                # the caller's own check lands here, and the safe answer is the
+                # same as any other "not stored now".
+                raise ImportRepositoryError(
+                    f"Cannot append import draft items in: {self.path}"
+                ) from error
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot append import draft items in: {self.path}"
+                ) from error
+
     def purge_expired(self, now: int) -> int:
         with self._thread_lock:
             try:
                 with closing(self._connect()) as connection:
                     cursor = connection.execute(
+                        # `expires_at > 0` is what keeps a device draft alive. A
+                        # work added on a phone with no connection may wait days
+                        # for a network, and sweeping it away would be the exact
+                        # loss ADR-0005 set out to prevent.
                         """DELETE FROM import_drafts
-                        WHERE expires_at <= ?
+                        WHERE expires_at > 0 AND expires_at <= ?
                           AND (status != 'applying' OR updated_at <= ?)""",
                         (now, now - STALE_APPLY_GRACE_SECONDS),
                     )
@@ -286,6 +352,7 @@ class SqliteImportDraftRepository:
                 "collection_eligible": int(counts["collection_eligible_count"] or 0),
             }
         return ImportDraft(
+            origin=str(row["origin"]),
             id=str(row["id"]),
             user_id=str(row["user_id"]),
             source_name=str(row["source_name"]),

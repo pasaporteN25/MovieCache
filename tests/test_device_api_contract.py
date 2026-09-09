@@ -26,6 +26,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/auth/session",
                 "/api/v1/pair",
                 "/api/v1/me",
+                "/api/v1/catalog/drafts",
                 "/api/v1/catalog/items",
                 "/api/v1/catalog/items/{itemId}",
                 "/api/v1/catalog/items/{itemId}/personal",
@@ -38,6 +39,14 @@ class DeviceApiContractTests(unittest.TestCase):
         self.assertEqual(pair["operationId"], "redeemPairingTicket")
         self.assertEqual(pair["security"], [], "a device pairing has no session yet")
         self.assertIn("429", pair["responses"], "redemption is rate limited like login")
+        # [A2.3]: adding offline is an import, not a merge, so the contract
+        # says plainly that nothing here reaches the catalogue.
+        drafts = document["paths"]["/api/v1/catalog/drafts"]["post"]
+        self.assertEqual(drafts["operationId"], "addOfflineDrafts")
+        self.assertIn("200", drafts["responses"])
+        self.assertNotIn("201", drafts["responses"], "appending is not creating")
+        item = document["components"]["schemas"]["OfflineDraftItem"]
+        self.assertEqual(sorted(item["required"]), ["id", "title"])
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
 

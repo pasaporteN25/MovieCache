@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 18
+INSTANCE_SCHEMA_VERSION = 19
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -460,6 +460,10 @@ CREATE TABLE device_pairing_tickets (
 CREATE INDEX ix_device_pairing_tickets_expiry ON device_pairing_tickets(expires_at);
 """
 
+INSTANCE_SCHEMA_V19 = """
+ALTER TABLE import_drafts ADD COLUMN origin TEXT NOT NULL DEFAULT 'web';
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -478,6 +482,7 @@ INSTANCE_MIGRATIONS = {
     16: ("persistent instance secrets for durable device keys", INSTANCE_SCHEMA_V16),
     17: ("dated public score snapshots", INSTANCE_SCHEMA_V17),
     18: ("single-use device pairing tickets", INSTANCE_SCHEMA_V18),
+    19: ("import drafts remember whether a phone or a browser made them", INSTANCE_SCHEMA_V19),
 }
 
 

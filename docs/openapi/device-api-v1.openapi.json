@@ -60,6 +60,14 @@
         "responses": {"200": {"description": "Updated item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogItem"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}}
       }
     },
+    "/api/v1/catalog/drafts": {
+      "post": {
+        "operationId": "addOfflineDrafts",
+        "description": "Submit works recorded on the device while it had no connection. Nothing reaches the catalogue: each work is classified against it and parked in the account's pending pile for review, because an addition made offline has no shared base to merge against. Safe to retry -- works are keyed by the id the client generated, and a repeat is reported under duplicates instead of being stored twice. Responds 200, not 201: it appends to a pile that usually already exists.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftRequest"}}}},
+        "responses": {"200": {"description": "What the server did with each work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
     "/api/v1/search": {
       "get": {
         "operationId": "searchPersonalCatalog",
@@ -83,6 +91,9 @@
     },
     "schemas": {
       "LoginRequest": {"type": "object", "additionalProperties": false, "required": ["username", "password", "device_name"], "properties": {"username": {"type": "string", "minLength": 3, "maxLength": 64}, "password": {"type": "string", "minLength": 1, "maxLength": 1024, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
+      "OfflineDraftRequest": {"type": "object", "additionalProperties": false, "required": ["items"], "properties": {"items": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/components/schemas/OfflineDraftItem"}}}},
+      "OfflineDraftItem": {"type": "object", "additionalProperties": false, "required": ["id", "title"], "properties": {"id": {"type": "string", "minLength": 1, "maxLength": 64, "description": "Client-generated and stable, so a retry cannot duplicate the work."}, "title": {"type": "string", "minLength": 1, "maxLength": 400}, "year": {"type": "string", "maxLength": 8}, "kind": {"type": "string", "maxLength": 40}, "notes": {"type": "string", "maxLength": 2000}}},
+      "OfflineDraftResult": {"type": "object", "properties": {"draft_id": {"type": "string"}, "accepted": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "string"}, "state": {"type": "string", "enum": ["new", "present", "review", "invalid"]}, "reason": {"type": "string"}}}}, "duplicates": {"type": "array", "items": {"type": "string"}, "description": "Ids already in the pile; the client can stop resending them."}, "counts": {"type": "object", "additionalProperties": {"type": "integer"}}}},
       "PairingRequest": {"type": "object", "additionalProperties": false, "required": ["pairing_token", "device_name"], "properties": {"pairing_token": {"type": "string", "minLength": 32, "maxLength": 512, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
       "RefreshRequest": {"type": "object", "additionalProperties": false, "required": ["refresh_token"], "properties": {"refresh_token": {"type": "string", "minLength": 32, "maxLength": 512, "writeOnly": true}}},
       "DeviceSession": {"type": "object", "additionalProperties": false, "required": ["access_token", "refresh_token", "token_type", "access_expires_at", "refresh_expires_at", "identity"], "properties": {"access_token": {"type": "string", "minLength": 32, "writeOnly": true}, "refresh_token": {"type": "string", "minLength": 32, "writeOnly": true}, "token_type": {"const": "Bearer"}, "access_expires_at": {"type": "string", "format": "date-time"}, "refresh_expires_at": {"type": "string", "format": "date-time"}, "identity": {"$ref": "#/components/schemas/Identity"}}},
