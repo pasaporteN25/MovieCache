@@ -14,6 +14,11 @@ import uvicorn
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.application.identity_repository import IdentityCatalogMismatch
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.pairing import (
+    PairingError,
+    certificate_pin_from_pem,
+    normalize_certificate_pin,
+)
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.web.app import create_app
@@ -47,11 +52,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="External origin, for example https://movies.example.com.",
     )
     parser.add_argument(
+        "--ssl-certfile",
+        default="",
+        help=(
+            "PEM certificate to serve HTTPS with, terminating TLS in this process. "
+            "For a local network without a domain; an instance published on the "
+            "internet should terminate TLS in a proxy instead (docs/deployment.md)."
+        ),
+    )
+    parser.add_argument(
+        "--ssl-keyfile",
+        default="",
+        help="Private key for --ssl-certfile.",
+    )
+    parser.add_argument(
         "--device-pairing-cert-pin",
         default="",
         help=(
             "Base64 SHA-256 SPKI pin of the TLS certificate, for pairing a phone with a "
-            "self-signed certificate. Not needed behind a publicly trusted certificate."
+            "self-signed certificate. Derived automatically from --ssl-certfile, so it "
+            "is only needed when a proxy terminates TLS. Not needed at all behind a "
+            "publicly trusted certificate."
         ),
     )
     parser.add_argument(
@@ -234,6 +255,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(error))
     if args.host.casefold() not in {"127.0.0.1", "localhost", "::1"} and not public_origin:
         parser.error("--public-origin is required when binding to a non-loopback host")
+    if bool(args.ssl_certfile) != bool(args.ssl_keyfile):
+        parser.error("--ssl-certfile and --ssl-keyfile go together")
+    try:
+        pairing_pin = resolve_pairing_pin(args.device_pairing_cert_pin, args.ssl_certfile)
+    except (OSError, PairingError) as error:
+        parser.error(str(error))
     write_catalog = args.write_catalog or first_catalog_file(args.inputs)
     ensure_catalog_exists(Path(write_catalog))
     instance_db = args.instance_db or (
@@ -257,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
         session_ttl_seconds=args.session_days * 24 * 60 * 60,
         host=args.host,
         public_origin=public_origin,
-        device_pairing_certificate_pin=args.device_pairing_cert_pin,
+        device_pairing_certificate_pin=pairing_pin,
         public_presentation_origin=public_presentation_origin,
         forwarded_allow_ips=args.forwarded_allow_ips,
         image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),
@@ -350,8 +377,32 @@ def main(argv: list[str] | None = None) -> int:
         forwarded_allow_ips=args.forwarded_allow_ips,
         workers=1,
         access_log=False,
+        ssl_certfile=args.ssl_certfile or None,
+        ssl_keyfile=args.ssl_keyfile or None,
     )
     return 0
+
+
+def resolve_pairing_pin(explicit_pin: str, certificate_path: str) -> str:
+    """The SPKI pin to advertise in a pairing QR, from a flag or the certificate.
+
+    Deriving it when this process serves TLS removes the step most likely to go
+    wrong by hand: the openssl pipeline that prints it is four commands long,
+    and a wrong pin fails as "my phone will not connect" with nothing on screen
+    to explain it.
+
+    An explicit pin still wins, because a proxy in front terminates TLS with a
+    certificate this process cannot see -- that is the whole reason the flag
+    exists.
+    """
+
+    pin = str(explicit_pin or "").strip()
+    if pin:
+        return normalize_certificate_pin(pin)
+    path = str(certificate_path or "").strip()
+    if not path:
+        return ""
+    return certificate_pin_from_pem(Path(path).read_text(encoding="utf-8"))
 
 
 def ensure_catalog_exists(path: Path) -> None:

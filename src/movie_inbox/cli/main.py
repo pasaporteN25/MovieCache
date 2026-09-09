@@ -16,6 +16,7 @@ from movie_inbox.cli import (
     import_catalog,
     match_external_links,
     migrate,
+    pairing_pin,
     scan_library,
     search_lab,
 )
@@ -38,6 +39,10 @@ COMMANDS: dict[str, tuple[Command, str]] = {
     "cache": (cache.main, "Inspect, prune or clear the image cache."),
     "backup": (backup.main, "Create and verify persistent instance backups."),
     "search-lab": (search_lab.main, "Measure search quality without changing a catalog."),
+    "pairing-pin": (
+        pairing_pin.main,
+        "Print the certificate pin a phone checks when pairing.",
+    ),
     "imdb-dataset": (
         imdb_dataset.main,
         "Prototype: download and index IMDb's non-commercial datasets.",

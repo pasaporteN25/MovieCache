@@ -41,6 +41,7 @@ class PackageLayoutTests(unittest.TestCase):
                 "import",
                 "match",
                 "migrate",
+                "pairing-pin",
                 "scan",
                 "search-lab",
                 "serve",

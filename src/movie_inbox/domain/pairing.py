@@ -117,6 +117,115 @@ def normalize_certificate_pin(value: Any) -> str:
     return pin
 
 
+# Where the SubjectPublicKeyInfo sits among the children of tbsCertificate, once
+# the optional [0] EXPLICIT version has been skipped: serialNumber, signature,
+# issuer, validity, subject, subjectPublicKeyInfo.
+_SPKI_FIELD_INDEX = 5
+_DER_CONTEXT_ZERO = 0xA0
+_PEM_BEGIN = "-----BEGIN CERTIFICATE-----"
+_PEM_END = "-----END CERTIFICATE-----"
+
+
+def _first_pem_body(pem: str) -> str:
+    """Base64 of the first certificate in a PEM file.
+
+    The **first** matters: a `fullchain.pem` puts the leaf before the issuers,
+    and the pin a phone checks is the leaf's.
+
+    Text outside the armour is ignored rather than treated as an error, because
+    `openssl x509 -text` prints a human-readable dump above the block and people
+    do paste that. A file with no armour at all is taken as bare base64, which
+    is what `-----`-stripped copies from a terminal look like.
+    """
+
+    start = pem.find(_PEM_BEGIN)
+    if start >= 0:
+        after = start + len(_PEM_BEGIN)
+        end = pem.find(_PEM_END, after)
+        pem = pem[after:end] if end >= 0 else pem[after:]
+    return "".join(
+        line.strip() for line in pem.splitlines() if line.strip() and not line.startswith("-----")
+    )
+
+
+def certificate_pin_from_pem(pem: Any) -> str:
+    """Derive the SPKI pin a phone will check, from a PEM certificate.
+
+    Written against the standard library rather than pulling in a certificate
+    library, because the walk it needs is small and fully specified: an X.509
+    ``Certificate`` is a SEQUENCE whose first element is ``tbsCertificate``, and
+    ``subjectPublicKeyInfo`` is a fixed position inside that. The pin is the
+    SHA-256 of that whole substructure, base64 -- the same value
+    ``openssl x509 -pubkey | openssl pkey -pubin -outform der | openssl dgst
+    -sha256 -binary | openssl enc -base64`` prints, which is what
+    ``tests/test_device_pairing.py`` pins it against.
+
+    Deriving it beats asking a person to paste it: that pipeline is four
+    commands long, and a wrong pin fails as "my phone will not connect", with
+    nothing on screen to say why.
+    """
+
+    body = _first_pem_body(str(pem or ""))
+    if not body:
+        raise PairingError("No PEM certificate found")
+    try:
+        certificate = base64.b64decode(body, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise PairingError("Certificate is not valid base64") from error
+    digest = hashlib.sha256(_subject_public_key_info(certificate)).digest()
+    return base64.b64encode(digest).decode("ascii")
+
+
+def _subject_public_key_info(certificate: bytes) -> bytes:
+    try:
+        _, outer_start, outer_end = _der_value(certificate, 0)
+        _, tbs_start, tbs_end = _der_value(certificate, outer_start)
+        fields: list[tuple[int, int]] = []
+        for tag, tlv_start, value_end in _der_children(certificate, tbs_start, tbs_end):
+            # The version is optional and, when present, comes first. Skipping
+            # it here is what keeps the field index below correct for both v1
+            # and v3 certificates.
+            if tag == _DER_CONTEXT_ZERO and not fields:
+                continue
+            fields.append((tlv_start, value_end))
+            if len(fields) > _SPKI_FIELD_INDEX:
+                break
+        start, end = fields[_SPKI_FIELD_INDEX]
+    except (IndexError, ValueError) as error:
+        raise PairingError("Certificate is not a readable X.509 structure") from error
+    if outer_end < tbs_end:
+        raise PairingError("Certificate is not a readable X.509 structure")
+    return certificate[start:end]
+
+
+def _der_value(data: bytes, offset: int) -> tuple[int, int, int]:
+    """Return (tag, value start, value end) of one DER element."""
+
+    tag = data[offset]
+    length_byte = data[offset + 1]
+    if length_byte < 0x80:
+        length, header = length_byte, 2
+    else:
+        count = length_byte & 0x7F
+        if not 0 < count <= 4:
+            raise ValueError("Unsupported DER length")
+        length = int.from_bytes(data[offset + 2 : offset + 2 + count], "big")
+        header = 2 + count
+    start = offset + header
+    end = start + length
+    if end > len(data):
+        raise ValueError("DER element runs past the end of the certificate")
+    return tag, start, end
+
+
+def _der_children(data: bytes, start: int, end: int) -> Any:
+    offset = start
+    while offset < end:
+        tag, value_start, value_end = _der_value(data, offset)
+        yield tag, offset, value_end
+        offset = value_end
+
+
 def normalize_pairing_origin(value: Any) -> str:
     """The origin the phone will talk to, HTTPS only.
 
@@ -182,6 +291,7 @@ __all__ = [
     "PAIRING_TICKET_TTL_SECONDS",
     "PairingError",
     "PairingTicket",
+    "certificate_pin_from_pem",
     "instance_public_id",
     "normalize_certificate_pin",
     "normalize_pairing_origin",

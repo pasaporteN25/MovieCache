@@ -151,11 +151,11 @@ Dos opciones, y conviene la segunda para lo que querés:
 
 ## Lo que falta decidir antes de [A2.1], y es tuyo
 
-1. **Cómo llega el teléfono a la instancia desde la red de casa.** Si el certificado es de
-   una CA pública para un dominio público, el teléfono resuelve la IP pública y el router
-   puede no hacer *hairpinning*. Las salidas son DNS de horizonte partido, o servir también
-   por IP local con certificado autofirmado y su huella en el QR. **Cambia lo que el QR
-   lleva**, así que conviene resolverlo antes de escribir el apareamiento.
+1. ~~**Cómo llega el teléfono a la instancia desde la red de casa.**~~ **Resuelto el
+   2026-09-09:** la instancia está en la red local sin dominio ni certificado, así que el
+   camino es TLS en el propio proceso con un certificado autofirmado, y el QR lleva su
+   huella. La receta está en [`docs/deployment.md`](../deployment.md), sección
+   "HTTPS en la red local, sin dominio". El pin lo deriva el servidor solo.
 2. **Autenticación local.** Con la cuenta viniendo de la instancia la identidad ya está
    resuelta, pero falta decidir si querés PIN o biometría propios además de la pantalla de
    bloqueo del teléfono. Las reviews y las notas son datos personales.
