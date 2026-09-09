@@ -48,6 +48,14 @@ STALE_AFTER_DAYS = 30
 # performance tuning knob, so it is enforced here rather than left to a caller.
 MAX_RETENTION_DAYS = 180
 
+# Required wherever availability is shown, and not a nicety: TMDb's terms say
+# "In order to use this data you must attribute the source of the data as
+# JustWatch. If we find any usage not complying with these terms we will revoke
+# access to the API." That puts the whole integration at risk, not just this
+# feature, so the notice travels with the data instead of waiting for each
+# surface to remember it. Separate from the TMDb notice [F5.3] already carries.
+JUSTWATCH_ATTRIBUTION_NOTICE = "Datos de disponibilidad provistos por JustWatch."
+
 
 class StreamingConfigurationError(ValueError):
     """Raised when a region or platform definition is not usable."""
@@ -233,6 +241,34 @@ def platform_availability(
         link=snapshot.link,
         known=True,
     )
+
+
+def retention_expires_at(checked_at: str) -> str:
+    """When a copy of this answer must stop being shown, contractually.
+
+    Sent to clients that keep their own copy -- a phone, above all. Without it
+    the retention ceiling would only be enforced on the server, and a replica
+    would happily go on showing an answer that TMDb's terms say may no longer be
+    kept. Handing over the deadline rather than the rule also means the rule can
+    change without every installed client being wrong.
+
+    Empty when there is nothing to expire, which is the same shape `checked_at`
+    already uses for an unknown answer.
+    """
+
+    stamp = str(checked_at or "").strip()
+    if not stamp:
+        return ""
+    try:
+        moment = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        # Unreadable means we cannot show it is inside the window, so it is
+        # already over: the same direction `_age` takes for the same reason.
+        return stamp
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    expires = moment + timedelta(days=MAX_RETENTION_DAYS)
+    return expires.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def snapshot_is_stale(snapshot: AvailabilitySnapshot, *, now: datetime | None = None) -> bool:

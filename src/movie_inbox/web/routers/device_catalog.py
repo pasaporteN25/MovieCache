@@ -28,7 +28,12 @@ from movie_inbox.application.import_service import (
 from movie_inbox.application.library_repository import LibraryRepositoryError
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.search_service import search_catalog_items
+from movie_inbox.application.streaming_repository import StreamingRepositoryError
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.domain.streaming import (
+    JUSTWATCH_ATTRIBUTION_NOTICE,
+    retention_expires_at,
+)
 from movie_inbox.web.catalog_api import load_items, patch_item_personal
 from movie_inbox.web.dependencies import (
     SessionCatalog,
@@ -273,6 +278,63 @@ def collection_items(
             "next_cursor": _cursor(request, context, next_offset)
             if next_offset < len(entries)
             else None,
+        }
+    )
+
+
+@router.get("/api/v1/availability")
+def device_availability(
+    request: Request,
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+) -> JSONResponse:
+    """Where the account's works can be watched ([A2.6], second step).
+
+    Keyed by the same opaque id the catalogue endpoints use, so a phone can join
+    this onto the replica it already holds without ever seeing an internal id.
+
+    Three things this response is careful about.
+
+    `known: false` is not "not available". It means nobody asked, or the answer
+    aged out. A client that renders it as "not on any platform" states something
+    that was never checked, and ADR-0004 is explicit that the two are different
+    answers.
+
+    `expires_at` is when the client must stop showing the row. TMDb's terms cap
+    how long anything obtained from them may be kept, and a replica that ignored
+    that would be the instance breaking the terms by proxy. Sending the deadline
+    rather than the rule also means the rule can change without every installed
+    client being wrong.
+
+    The JustWatch notice travels with the data because ADR-0004 accepted this
+    source on that condition, with access to the whole API at stake.
+    """
+
+    entries = _device_catalog_entries(request, identity)
+    service = request.app.state.streaming_service
+    try:
+        resolved = service.availability_for(identity, [entry.row for entry in entries])
+    except StreamingRepositoryError as error:
+        raise DeviceApiRequestError("availability_unavailable", 503) from error
+    availability: dict[str, Any] = {}
+    for entry in entries:
+        found = resolved.get(entry.catalog_item_id)
+        if found is None or not found.known:
+            # Left out rather than sent as a false negative. An absent key is
+            # "we did not check"; a present one is an answer.
+            continue
+        availability[entry.device_id] = {
+            "en_plataforma": found.en_plataforma,
+            "available_on": [offer.to_dict() for offer in found.available_on],
+            "acquire_on": [offer.to_dict() for offer in found.acquire_on],
+            "region_code": found.region_code,
+            "checked_at": found.checked_at,
+            "expires_at": retention_expires_at(found.checked_at),
+            "link": found.link,
+        }
+    return JSONResponse(
+        {
+            "availability": availability,
+            "attribution": {"justwatch": JUSTWATCH_ATTRIBUTION_NOTICE},
         }
     )
 

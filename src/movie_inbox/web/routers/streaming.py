@@ -20,7 +20,10 @@ from movie_inbox.application.streaming_service import (
     StreamingAuthorizationError,
     StreamingSourceUnavailable,
 )
-from movie_inbox.domain.streaming import StreamingConfigurationError
+from movie_inbox.domain.streaming import (
+    JUSTWATCH_ATTRIBUTION_NOTICE,
+    StreamingConfigurationError,
+)
 from movie_inbox.web.catalog_api import load_items
 from movie_inbox.web.dependencies import (
     SessionCatalog,
@@ -141,7 +144,14 @@ def streaming_availability(request: Request) -> JSONResponse:
     except StreamingRepositoryError:
         return error_response("streaming_unavailable", 503)
     return JSONResponse(
-        {"availability": {item_id: row.to_dict() for item_id, row in resolved.items()}}
+        {
+            "availability": {item_id: row.to_dict() for item_id, row in resolved.items()},
+            # ADR-0004 accepted TMDb on the condition that JustWatch is named
+            # wherever this data is shown, with access to the whole API at stake
+            # if it is not. The API carries the notice so no surface has to
+            # remember it.
+            "attribution": {"justwatch": JUSTWATCH_ATTRIBUTION_NOTICE},
+        }
     )
 
 

@@ -68,6 +68,13 @@
         "responses": {"200": {"description": "What the server did with each work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
       }
     },
+    "/api/v1/availability": {
+      "get": {
+        "operationId": "getAvailability",
+        "description": "Where the account's works can be watched, keyed by the same opaque id the catalogue endpoints use. A work that is absent was not checked -- that is not the same as not being available anywhere, and a client must not render it as such. Every row carries expires_at: the moment the client must stop showing it, because the upstream terms cap how long anything obtained from them may be kept. Naming JustWatch wherever this is shown is a condition of the source and is returned with the data.",
+        "responses": {"200": {"description": "Availability by work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AvailabilityResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "503": {"$ref": "#/components/responses/Unavailable"}}
+      }
+    },
     "/api/v1/collections": {
       "get": {
         "operationId": "listFollowedCollections",
@@ -106,10 +113,14 @@
       "Unauthorized": {"description": "Missing, invalid, expired or revoked device session", "headers": {"WWW-Authenticate": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "RateLimited": {"description": "Login rate limit", "headers": {"Retry-After": {"schema": {"type": "integer", "minimum": 1}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "InvalidRequest": {"description": "Invalid request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "Unavailable": {"description": "A dependency this reads from is not answering", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "NotFound": {"description": "No accessible item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
     },
     "schemas": {
       "LoginRequest": {"type": "object", "additionalProperties": false, "required": ["username", "password", "device_name"], "properties": {"username": {"type": "string", "minLength": 3, "maxLength": 64}, "password": {"type": "string", "minLength": 1, "maxLength": 1024, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
+      "AvailabilityResult": {"type": "object", "required": ["availability", "attribution"], "properties": {"availability": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/WorkAvailability"}, "description": "Keyed by device work id. An absent key means not checked."}, "attribution": {"type": "object", "required": ["justwatch"], "properties": {"justwatch": {"type": "string", "description": "Must be shown wherever this data is."}}}}},
+      "WorkAvailability": {"type": "object", "properties": {"en_plataforma": {"type": "boolean", "description": "True only for offers watchable with a subscription, free or ad-supported."}, "available_on": {"type": "array", "items": {"$ref": "#/components/schemas/PlatformOffer"}}, "acquire_on": {"type": "array", "items": {"$ref": "#/components/schemas/PlatformOffer"}, "description": "Rent or buy. Not the same as being available."}, "region_code": {"type": "string"}, "checked_at": {"type": "string"}, "expires_at": {"type": "string", "description": "Stop showing this row after this moment."}, "link": {"type": "string"}}},
+      "PlatformOffer": {"type": "object", "properties": {"provider_id": {"type": "string"}, "provider_name": {"type": "string"}, "kind": {"type": "string", "enum": ["flatrate", "free", "ads", "rent", "buy"]}}},
       "CollectionSummary": {"type": "object", "properties": {"id": {"type": "string", "description": "Opaque and stable; reveals no internal id."}, "title": {"type": "string"}, "description": {"type": "string"}, "updated_at": {"type": "string"}, "count": {"type": "integer"}}},
       "CollectionItemPage": {"type": "object", "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/CollectionWork"}}, "next_cursor": {"type": ["string", "null"]}}},
       "CollectionWork": {"type": "object", "properties": {"id": {"type": "string"}, "position": {"type": "integer"}, "title": {"type": "string"}, "original_title": {"type": ["string", "null"]}, "year": {"type": ["string", "null"]}, "kind": {"type": "string"}, "description": {"type": ["string", "null"]}, "image_url": {"type": ["string", "null"]}, "genres": {"type": "array", "items": {"type": "string"}}, "runtime_minutes": {"type": ["integer", "null"]}}},

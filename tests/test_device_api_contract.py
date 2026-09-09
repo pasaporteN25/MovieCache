@@ -26,6 +26,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/auth/session",
                 "/api/v1/pair",
                 "/api/v1/me",
+                "/api/v1/availability",
                 "/api/v1/catalog/drafts",
                 "/api/v1/collections",
                 "/api/v1/collections/{collectionId}/items",
@@ -54,6 +55,13 @@ class DeviceApiContractTests(unittest.TestCase):
         work = document["components"]["schemas"]["CollectionWork"]
         for field in ("personal", "status", "rating", "review", "path", "local_files"):
             self.assertNotIn(field, work["properties"])
+        # [A2.6]: the two conditions ADR-0004 attached to this source have to
+        # survive on the wire, not just in a document.
+        result = document["components"]["schemas"]["AvailabilityResult"]
+        self.assertIn("attribution", result["required"])
+        self.assertIn("justwatch", result["properties"]["attribution"]["required"])
+        row = document["components"]["schemas"]["WorkAvailability"]["properties"]
+        self.assertIn("expires_at", row, "a replica has to know when to stop showing it")
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
 
