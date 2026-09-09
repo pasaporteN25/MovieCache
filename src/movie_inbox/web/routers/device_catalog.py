@@ -30,10 +30,12 @@ from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.search_service import search_catalog_items
 from movie_inbox.application.streaming_repository import StreamingRepositoryError
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.domain.imdb_dataset import IMDB_ATTRIBUTION_NOTICE
 from movie_inbox.domain.streaming import (
     JUSTWATCH_ATTRIBUTION_NOTICE,
     retention_expires_at,
 )
+from movie_inbox.external.tmdb import TMDB_ATTRIBUTION_NOTICE
 from movie_inbox.web.catalog_api import load_items, patch_item_personal
 from movie_inbox.web.dependencies import (
     SessionCatalog,
@@ -337,6 +339,48 @@ def device_availability(
             "attribution": {"justwatch": JUSTWATCH_ATTRIBUTION_NOTICE},
         }
     )
+
+
+@router.get("/api/v1/ratings")
+def device_ratings(
+    request: Request,
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+) -> JSONResponse:
+    """Public scores beside the viewer's own ([A2.6], last step).
+
+    Several sources at once rather than one chosen for the reader, which was the
+    owner's decision: the point is to compare, with your own rating next to
+    them. Ordered most-supported first, so the sturdiest opinion leads -- never
+    by source, because ranking the sources would be picking for the reader after
+    all.
+
+    These are other people's opinions and they never touch the personal
+    `rating`. This endpoint only reads ([F3.2]).
+
+    A TMDb row carries `checked_at` and `expires_at`; an IMDb row carries
+    neither, and that is right rather than missing. IMDb scores come out of the
+    local index the owner re-syncs on their own schedule, with nothing upstream
+    capping how long they may be kept.
+    """
+
+    service = request.app.state.public_ratings_service
+    if not service.sources_configured:
+        # Nothing configured is not an error: public scores are supplementary,
+        # and a phone simply shows the viewer's own.
+        return JSONResponse({"ratings": {}, "attribution": {}})
+    entries = _device_catalog_entries(request, identity)
+    found = service.ratings_for([entry.row for entry in entries])
+    ratings: dict[str, Any] = {}
+    for entry in entries:
+        rows = found.get(entry.catalog_item_id)
+        if rows:
+            ratings[entry.device_id] = [row.to_dict() for row in rows]
+    attribution: dict[str, str] = {}
+    if service.imdb_lookup is not None:
+        attribution["imdb"] = IMDB_ATTRIBUTION_NOTICE
+    if service.tmdb_loader is not None:
+        attribution["tmdb"] = TMDB_ATTRIBUTION_NOTICE
+    return JSONResponse({"ratings": ratings, "attribution": attribution})
 
 
 @router.get("/api/v1/search")

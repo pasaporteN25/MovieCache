@@ -28,6 +28,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/me",
                 "/api/v1/availability",
                 "/api/v1/catalog/drafts",
+                "/api/v1/ratings",
                 "/api/v1/collections",
                 "/api/v1/collections/{collectionId}/items",
                 "/api/v1/catalog/items",
@@ -62,6 +63,11 @@ class DeviceApiContractTests(unittest.TestCase):
         self.assertIn("justwatch", result["properties"]["attribution"]["required"])
         row = document["components"]["schemas"]["WorkAvailability"]["properties"]
         self.assertIn("expires_at", row, "a replica has to know when to stop showing it")
+        # [F3.2] on the wire: a public score is somebody else's opinion, so
+        # the shape has no room for the viewer's own rating to be written into.
+        rating = document["components"]["schemas"]["PublicRating"]["properties"]
+        self.assertIn("source", rating)
+        self.assertNotIn("personal", rating)
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
 

@@ -75,6 +75,13 @@
         "responses": {"200": {"description": "Availability by work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AvailabilityResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "503": {"$ref": "#/components/responses/Unavailable"}}
       }
     },
+    "/api/v1/ratings": {
+      "get": {
+        "operationId": "getPublicRatings",
+        "description": "Public scores for the account's works, keyed by the same opaque id the catalogue endpoints use. Several sources at once rather than one chosen for the reader, ordered most-supported first. These are other people's opinions and are shown beside the viewer's own rating, never merged into it. A TMDb row carries checked_at and expires_at because it ages under that source's terms; an IMDb row carries neither, since it comes from a local index with no such clause. A work with no score is absent rather than present with an empty list.",
+        "responses": {"200": {"description": "Scores by work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RatingsResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
     "/api/v1/collections": {
       "get": {
         "operationId": "listFollowedCollections",
@@ -118,6 +125,8 @@
     },
     "schemas": {
       "LoginRequest": {"type": "object", "additionalProperties": false, "required": ["username", "password", "device_name"], "properties": {"username": {"type": "string", "minLength": 3, "maxLength": 64}, "password": {"type": "string", "minLength": 1, "maxLength": 1024, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
+      "RatingsResult": {"type": "object", "required": ["ratings", "attribution"], "properties": {"ratings": {"type": "object", "additionalProperties": {"type": "array", "items": {"$ref": "#/components/schemas/PublicRating"}}, "description": "Keyed by device work id. An absent key means no score at all."}, "attribution": {"type": "object", "properties": {"imdb": {"type": "string"}, "tmdb": {"type": "string"}}, "description": "Only sources this instance has configured. Show what is present."}}},
+      "PublicRating": {"type": "object", "properties": {"source": {"type": "string", "enum": ["imdb", "tmdb"]}, "average": {"type": "number"}, "votes": {"type": "integer"}, "scale": {"type": "number"}, "is_meaningful": {"type": "boolean", "description": "False under 50 votes: a number without an opinion behind it."}, "checked_at": {"type": "string", "description": "TMDb only."}, "expires_at": {"type": "string", "description": "TMDb only. Stop showing this row after this moment."}}},
       "AvailabilityResult": {"type": "object", "required": ["availability", "attribution"], "properties": {"availability": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/WorkAvailability"}, "description": "Keyed by device work id. An absent key means not checked."}, "attribution": {"type": "object", "required": ["justwatch"], "properties": {"justwatch": {"type": "string", "description": "Must be shown wherever this data is."}}}}},
       "WorkAvailability": {"type": "object", "properties": {"en_plataforma": {"type": "boolean", "description": "True only for offers watchable with a subscription, free or ad-supported."}, "available_on": {"type": "array", "items": {"$ref": "#/components/schemas/PlatformOffer"}}, "acquire_on": {"type": "array", "items": {"$ref": "#/components/schemas/PlatformOffer"}, "description": "Rent or buy. Not the same as being available."}, "region_code": {"type": "string"}, "checked_at": {"type": "string"}, "expires_at": {"type": "string", "description": "Stop showing this row after this moment."}, "link": {"type": "string"}}},
       "PlatformOffer": {"type": "object", "properties": {"provider_id": {"type": "string"}, "provider_name": {"type": "string"}, "kind": {"type": "string", "enum": ["flatrate", "free", "ads", "rent", "buy"]}}},

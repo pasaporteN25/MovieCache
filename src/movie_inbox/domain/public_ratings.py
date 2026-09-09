@@ -53,6 +53,9 @@ class PublicRating:
     average: float
     votes: int
     scale: float = 10.0
+    # When this number was read, for a score that ages. Empty for IMDb, whose
+    # scores come out of a local index with no upstream retention clause.
+    checked_at: str = ""
 
     @property
     def is_meaningful(self) -> bool:
@@ -66,16 +69,27 @@ class PublicRating:
         return self.votes >= MEANINGFUL_VOTES
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "source": self.source,
             "average": self.average,
             "votes": self.votes,
             "scale": self.scale,
             "is_meaningful": self.is_meaningful,
         }
+        if self.checked_at:
+            # Only a score that ages carries a date, and only then does an
+            # expiry mean anything.
+            payload["checked_at"] = self.checked_at
+            payload["expires_at"] = rating_expires_at(self.checked_at)
+        return payload
 
 
-def public_rating(source: Any, average: Any, votes: Any) -> PublicRating | None:
+def public_rating(
+    source: Any,
+    average: Any,
+    votes: Any,
+    checked_at: Any = "",
+) -> PublicRating | None:
     """Build a rating, or nothing when the numbers cannot be trusted."""
 
     name = str(source or "").strip().casefold()
@@ -89,7 +103,41 @@ def public_rating(source: Any, average: Any, votes: Any) -> PublicRating | None:
     scale = _SCALES[name]
     if count <= 0 or not 0.0 < score <= scale:
         return None
-    return PublicRating(source=name, average=round(score, 1), votes=count, scale=scale)
+    return PublicRating(
+        source=name,
+        average=round(score, 1),
+        votes=count,
+        scale=scale,
+        checked_at=str(checked_at or "").strip(),
+    )
+
+
+def rating_expires_at(checked_at: str) -> str:
+    """When a copy of a TMDb score must stop being shown, contractually.
+
+    The same clause `domain/streaming.py` enforces for availability, and the
+    same reason it is sent rather than kept: a phone holds its own copy, so the
+    ceiling has to travel with the row or it only binds the server.
+
+    Deliberately implemented here rather than imported from the streaming
+    module. Public scores and streaming availability are separate concerns that
+    happen to share one upstream's terms, and `tests/test_public_ratings.py`
+    pins the two against each other so they cannot drift apart in silence.
+    """
+
+    stamp = str(checked_at or "").strip()
+    if not stamp:
+        return ""
+    try:
+        moment = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        # Unreadable cannot be shown to be inside the window, so it is already
+        # over -- the direction `_age` takes, for the same reason.
+        return stamp
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    expires = moment + timedelta(days=RATING_MAX_RETENTION_DAYS)
+    return expires.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 @dataclass(frozen=True)
@@ -168,7 +216,7 @@ def visible_rating(
 
     if snapshot is None or rating_snapshot_is_expired(snapshot, now=now):
         return None
-    return public_rating(snapshot.source, snapshot.average, snapshot.votes)
+    return public_rating(snapshot.source, snapshot.average, snapshot.votes, snapshot.checked_at)
 
 
 def tmdb_work_key(tmdb_id: Any, media_type: Any) -> str:
@@ -242,6 +290,7 @@ __all__ = [
     "PublicRating",
     "PublicRatingSnapshot",
     "public_rating",
+    "rating_expires_at",
     "rating_snapshot",
     "rating_snapshot_is_expired",
     "rating_snapshot_is_stale",
