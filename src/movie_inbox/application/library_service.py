@@ -26,6 +26,7 @@ from movie_inbox.application.library_repository import (
 from movie_inbox.domain.catalog import external_urls, title_match_key, title_match_keys_for_item
 from movie_inbox.domain.collections import (
     collection_item_from_availability_record,
+    collection_items_in_reading_order,
     normalize_club_collection_description,
     normalize_club_collection_title,
 )
@@ -237,15 +238,15 @@ class ManagedLibraryService:
             for record in self.repository.availability_records()
             if str(record.get("library_id") or "") == library_id
         ]
-        items = [
+        items = collection_items_in_reading_order(
             collection_item_from_availability_record(record, position)
             for position, record in enumerate(records)
-        ]
+        )
         self.collection_repository.upsert_derived_collection(
             library_id=library_id,
             owner_user_id=library.created_by_user_id,
             default_title=library.name,
-            items=items,
+            items=list(items),
         )
 
     def set_share_availability(

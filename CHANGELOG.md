@@ -16,6 +16,18 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   antes la consulta se descartaba entera. Nada de esto habilita un auto-match nuevo: la
   aceptacion se sigue decidiendo con la misma evidencia de identidad de siempre.
 
+### Corregido
+
+- Compartir la disponibilidad de una biblioteca dejaba de funcionar en silencio si la
+  biblioteca tenia dos copias de la misma pelicula y una se habia escaneado antes de que
+  su ficha se enriqueciera: la obra se reportaba dos veces, la coleccion no se llegaba a
+  crear y la unica senal era que el interruptor volvia sin publicar nada. Ahora las copias
+  se cuentan juntas, como siempre debieron.
+- La coleccion que publica una biblioteca ya no sale ordenada por un identificador
+  interno. Se lee alfabeticamente por el titulo que se muestra, igual que la grilla del
+  catalogo, y una pelicula ya no cambia de lugar en una coleccion que otros estan mirando
+  solo porque el enriquecimiento le encontro un id.
+
 ## [0.8.0] - 2026-09-02
 
 ### Agregado
