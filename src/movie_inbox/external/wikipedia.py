@@ -26,7 +26,11 @@ from movie_inbox.external.common import (
     object_list,
     result_index,
 )
-from movie_inbox.external.query_variants import VARIANT_RETRY_TIMEOUT_SECONDS, alias_variants
+from movie_inbox.external.query_variants import (
+    VARIANT_RETRY_TIMEOUT_SECONDS,
+    alias_variants,
+    with_alias_identity,
+)
 from movie_inbox.external.wikidata import (
     fetch_wikidata_article_url,
     fetch_wikidata_metadata,
@@ -84,11 +88,16 @@ class WikipediaAdapter:
         # direct check, not a second fuzzy pass.
         for variant in alias_variants(self.name, search_title):
             try:
-                direct = self._resolve_title(variant, "en", timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
+                direct = self._resolve_title(
+                    variant.title, "en", timeout=VARIANT_RETRY_TIMEOUT_SECONDS
+                )
             except Exception:
                 continue
             if direct:
-                return dedupe_results(direct)
+                # Same reason as FilmAffinity's retry: an article found under
+                # an alias has to arrive carrying the alias, or it is scored
+                # against a query it no longer resembles.
+                return dedupe_results(with_alias_identity(direct, variant))
         return results
 
     def _search_language(self, query: str, language: str) -> list[dict[str, Any]]:

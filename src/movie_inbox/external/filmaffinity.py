@@ -10,7 +10,11 @@ from movie_inbox.domain.catalog import external_source_name
 from movie_inbox.domain.search import parse_search_query
 from movie_inbox.domain.titles import infer_year
 from movie_inbox.external.common import clean_text, fetch_text
-from movie_inbox.external.query_variants import VARIANT_RETRY_TIMEOUT_SECONDS, alias_variants
+from movie_inbox.external.query_variants import (
+    VARIANT_RETRY_TIMEOUT_SECONDS,
+    alias_variants,
+    with_alias_identity,
+)
 
 
 class FilmAffinityAdapter:
@@ -30,11 +34,14 @@ class FilmAffinityAdapter:
         # title, see query_variants._priority_order) gets one retry each.
         for variant in alias_variants(self.name, search_text):
             try:
-                results = self._fetch(variant, timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
+                results = self._fetch(variant.title, timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
             except Exception:
                 continue
             if results:
-                return results
+                # The row comes back titled in Spanish and is about to be
+                # scored against a query that is not: carry the alias across
+                # or the retry finds the film and the floor throws it away.
+                return with_alias_identity(results, variant)
         return results
 
     def _fetch(self, text: str, timeout: float = 8.0) -> list[dict[str, Any]]:

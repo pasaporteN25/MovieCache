@@ -7,6 +7,7 @@ from urllib.error import URLError
 from movie_inbox.external.filmaffinity import FilmAffinityAdapter
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.metadata import fetch_metadata_by_title
+from movie_inbox.external.query_variants import AliasVariant
 from movie_inbox.external.registry import ExternalSourceService
 from movie_inbox.external.wikidata import (
     fetch_wikidata_metadata,
@@ -47,6 +48,14 @@ _SPANISH_ARTICLE_EXTRACT_WITH_NESTED_SUBSECTION = (
     "== Reparto ==\n"
     "Marlon Brando como Vito Corleone\nAl Pacino como Michael Corleone\n"
 )
+
+
+_ESTIU = {
+    "original_title": "Estiu 1993",
+    "spanish_title": "Verano 1993",
+    "english_title": "Summer 1993",
+    "alternative_titles": [],
+}
 
 
 class ExternalMetadataTests(unittest.TestCase):
@@ -507,7 +516,7 @@ class ExternalMetadataTests(unittest.TestCase):
             return empty_query_result
 
         fetch_json.side_effect = response
-        variants.return_value = ["Estiu 1993"]
+        variants.return_value = [AliasVariant(title="Estiu 1993", identity=_ESTIU)]
 
         results = WikipediaAdapter().search("Verano 1993")
 
@@ -526,11 +535,18 @@ class ExternalMetadataTests(unittest.TestCase):
             return "<html>no results</html>"
 
         fetch_text.side_effect = response
-        variants.return_value = ["Estiu 1993"]
+        variants.return_value = [AliasVariant(title="Estiu 1993", identity=_ESTIU)]
 
         results = FilmAffinityAdapter().search("Verano 1993")
 
         self.assertEqual(results[0]["title"], "Estiu 1993")
+        # The row arrives carrying what the alias confirmed, so it is scored
+        # against the query that actually found it rather than against a title
+        # in another language. Only the gaps: FilmAffinity labels every title
+        # it returns as the Spanish one, and what the source states stands.
+        self.assertEqual(results[0]["original_title"], "Estiu 1993")
+        self.assertEqual(results[0]["english_title"], "Summer 1993")
+        self.assertEqual(results[0]["spanish_title"], "Estiu 1993")
         variants.assert_called_once_with("filmaffinity", "Verano")
 
     @patch("movie_inbox.external.filmaffinity.alias_variants")
@@ -539,7 +555,10 @@ class ExternalMetadataTests(unittest.TestCase):
         self, fetch_text, variants
     ) -> None:
         fetch_text.return_value = "<html>no results</html>"
-        variants.return_value = ["Estiu 1993", "Summer 1993"]
+        variants.return_value = [
+            AliasVariant(title="Estiu 1993", identity=_ESTIU),
+            AliasVariant(title="Summer 1993", identity=_ESTIU),
+        ]
 
         results = FilmAffinityAdapter().search("Verano 1993")
 

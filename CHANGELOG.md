@@ -23,6 +23,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   su ficha se enriqueciera: la obra se reportaba dos veces, la coleccion no se llegaba a
   crear y la unica senal era que el interruptor volvia sin publicar nada. Ahora las copias
   se cuentan juntas, como siempre debieron.
+- Buscar una pelicula por su titulo original en otro idioma vuelve a encontrarla en
+  Wikipedia y en FilmAffinity. El reintento con un alias confirmado por Wikidata ya
+  existia, pero la fila que encontraba llegaba sin rastro de la consulta que la habia
+  encontrado, asi que el puntaje la descartaba salvo que el titulo de mercado se
+  pareciera al original. "Der Untergang" contra "El hundimiento" daba 13.9 sobre un piso
+  de 28; ahora la fila viaja con el titulo original que la encontro.
 - La coleccion que publica una biblioteca ya no sale ordenada por un identificador
   interno. Se lee alfabeticamente por el titulo que se muestra, igual que la grilla del
   catalogo, y una pelicula ya no cambia de lugar en una coleccion que otros estan mirando

@@ -12,14 +12,18 @@ query, via the same `fetch_wikidata_title_matches()` IMDb's own bridge uses.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
+from movie_inbox.domain.catalog import merge_lists
 from movie_inbox.domain.search import (
     EXTERNAL_RELEVANCE_THRESHOLD,
     external_result_score,
+    parse_search_query,
     search_key,
 )
+from movie_inbox.external.common import string_list
 from movie_inbox.external.wikidata import fetch_wikidata_title_matches
 
 MAX_ALIAS_VARIANTS = 2
@@ -37,7 +41,29 @@ VARIANT_RETRY_TIMEOUT_SECONDS = 4.0
 PREFERRED_ALIAS_LANGUAGES: tuple[str, ...] = ("es", "en")
 
 
-def alias_variants(source_name: str, query: str) -> list[str]:
+# Fields the alias carries onto the row it found. Titles only: nothing here
+# decides identity, and nothing here comes from anywhere but the entity that
+# already matched the query above EXTERNAL_RELEVANCE_THRESHOLD.
+ALIAS_IDENTITY_FIELDS = ("original_title", "spanish_title", "english_title")
+
+
+@dataclass(frozen=True)
+class AliasVariant:
+    """A title to retry a search with, and the entity that vouched for it.
+
+    The two travel together because a row found under a translated title
+    otherwise arrives with no trace of what was actually being looked for.
+    "Der Untergang" retried as "El hundimiento" finds the right film and then
+    scores 13.9 against the query that found it -- below the relevance floor,
+    so the retry buys nothing exactly when it was needed most. Carrying the
+    alias across turns that into 100.
+    """
+
+    title: str
+    identity: Mapping[str, Any] = field(default_factory=dict)
+
+
+def alias_variants(source_name: str, query: str) -> list[AliasVariant]:
     """Up to MAX_ALIAS_VARIANTS Wikidata-confirmed alias titles for
     `source_name` to retry `query` with, when its own search came back
     empty. [] if no confident Wikidata match exists for `query`."""
@@ -49,17 +75,63 @@ def alias_variants(source_name: str, query: str) -> list[str]:
         return []
 
     seen = {search_key(query)}
-    variants: list[str] = []
+    variants: list[AliasVariant] = []
     for candidate in _priority_order(source_name, metadata):
         candidate = str(candidate or "").strip()
         key = search_key(candidate)
         if not candidate or not key or key in seen:
             continue
         seen.add(key)
-        variants.append(candidate)
+        variants.append(AliasVariant(title=candidate, identity=metadata))
         if len(variants) >= MAX_ALIAS_VARIANTS:
             break
     return variants
+
+
+def with_alias_identity(
+    results: Sequence[Mapping[str, Any]], variant: AliasVariant
+) -> list[dict[str, Any]]:
+    """Carry the alias's confirmed titles onto the row it actually found.
+
+    Only onto that row. A search for the alias title can come back with a
+    whole page of films, and stamping a confirmed identity on all of them
+    would be inventing one -- so a row is only annotated when its own title
+    *is* the title we retried with. Every other row is returned untouched, to
+    be scored on what it says about itself.
+
+    Both sides are parsed the same way before comparing, because a year is
+    written into the title on both: FilmAffinity appends it ("El hundimiento
+    (2004)") and a title can simply contain one ("Estiu 1993"). Comparing a
+    parsed key against a raw one silently never matches. When both sides do
+    name a year they have to agree, so a series told apart only by its year
+    cannot borrow its sibling's identity.
+
+    Fields already filled by the source win: this fills gaps, it does not
+    overwrite what the source stated.
+    """
+
+    expected = parse_search_query(variant.title)
+    annotated: list[dict[str, Any]] = []
+    for result in results:
+        row = dict(result)
+        if _is_the_alias(str(row.get("title") or ""), expected):
+            for field_name in ALIAS_IDENTITY_FIELDS:
+                if not str(row.get(field_name) or "").strip():
+                    row[field_name] = str(variant.identity.get(field_name) or "")
+            row["alternative_titles"] = merge_lists(
+                string_list(row.get("alternative_titles")),
+                string_list(variant.identity.get("alternative_titles")),
+            )
+        annotated.append(row)
+    return annotated
+
+
+def _is_the_alias(title: str, expected: Any) -> bool:
+    found = parse_search_query(title)
+    key = expected.title_key or search_key(expected.raw)
+    if not key or (found.title_key or search_key(title)) != key:
+        return False
+    return not (expected.year and found.year) or expected.year == found.year
 
 
 def _best_matching_entity(
@@ -93,8 +165,11 @@ def _priority_order(source_name: str, metadata: Mapping[str, Any]) -> list[str]:
 
 
 __all__ = [
+    "ALIAS_IDENTITY_FIELDS",
     "MAX_ALIAS_VARIANTS",
     "PREFERRED_ALIAS_LANGUAGES",
     "VARIANT_RETRY_TIMEOUT_SECONDS",
+    "AliasVariant",
     "alias_variants",
+    "with_alias_identity",
 ]

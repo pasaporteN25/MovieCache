@@ -40,14 +40,27 @@ _ADAPTERS: dict[str, Callable[[], Any]] = {
     "filmaffinity": FilmAffinityAdapter,
 }
 
+def _asked_wikidata(urls: Sequence[str]) -> bool:
+    return any("wikidata.org" in url for url in urls)
+
+
+def _resolved_a_title(urls: Sequence[str]) -> bool:
+    return any("redirects=1" in url and "titles=" in url for url in urls)
+
+
 # One recognizer per source: does this list of actually-requested URLs show
 # evidence the source's own fallback path fired? Reads the adapters' real
-# behavior (imdb.py:71-78, wikipedia.py:100-117) -- never the adapters
-# themselves, which stay untouched.
+# behavior -- never the adapters themselves, which stay untouched.
+#
+# FilmAffinity's used to be a flat False, on the grounds that it had no
+# fallback of its own. [Q3] gave it one and this was never updated, so the
+# report said "fallback used: 0" for a retry that had in fact fired. Wikipedia
+# now has two -- its exact-title resolve and the same [Q3] alias retry -- and
+# only the first was recognised.
 _FALLBACK_SIGNATURES: dict[str, Callable[[Sequence[str]], bool]] = {
-    "imdb": lambda urls: any("wikidata.org" in url for url in urls),
-    "wikipedia": lambda urls: any("redirects=1" in url and "titles=" in url for url in urls),
-    "filmaffinity": lambda urls: False,
+    "imdb": _asked_wikidata,
+    "wikipedia": lambda urls: _resolved_a_title(urls) or _asked_wikidata(urls),
+    "filmaffinity": _asked_wikidata,
 }
 
 
