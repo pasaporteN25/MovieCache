@@ -277,11 +277,32 @@ hits prohibidos y precisión de auto-match 1.000. **Ninguno de los cinco abre un
 auto-match nuevo**: la aceptación se decide en `decide_match`, que `rank_catalog_candidates`
 corre sobre todo el catálogo sin leer el gate de búsqueda. Se midió, no se supuso.
 
-- **Lo que queda del diagnóstico y no se tocó**: la mitad de **colecciones** de [B1] sigue
-  sin empezar — todo lo hecho hasta acá es ranking de búsqueda—; las tres fuentes externas
-  reciben casi la misma consulta; y el puente de aliases de Wikidata no se activa cuando
-  IMDb devuelve vacío, sólo cuando devuelve filas bajo el umbral. Ninguna de las tres tiene
-  hoy un caso en el corpus que la mida.
+**Colecciones, 2026-09-10.** El commit `5bdf32e` arregla dos defectos independientes de la
+colección [P2] que una biblioteca publica en Club, encontrados sondeando esa superficie y
+reproducidos de punta a punta antes de tocarlos.
+
+- **Publicación que fallaba en silencio.** Un archivo emparejado conserva la identidad con
+  la que se emparejó hasta que cambia su huella, así que una biblioteca con dos copias de
+  la misma película —una escaneada antes de que su ficha se enriqueciera— reportaba la obra
+  **dos veces**. Dos items de colección con la misma clave primaria: el insert fallaba, la
+  colección no se creaba nunca y la única señal era `set_share_availability` devolviendo
+  `synced=False`, que está documentado como un tropiezo transitorio que el próximo escaneo
+  arregla. Este era permanente. De paso corregía mal la cuenta de disponibilidad en la
+  ficha: informaba una copia donde había dos.
+- **Orden publicado tomado de un id interno.** La colección se numeraba por `work_key`, así
+  que un estante se leía Casablanca, Alien, Blade Runner, Dune —ids de TMDb comparados como
+  texto, 78 cae entre 348 y 841— y una película sin id de TMDb quedaba después de todas las
+  que sí lo tenían. Peor que arbitrario: se movía, porque la clave pasa de `work:<hash>` a
+  `tmdb:movie:<id>` en cuanto el enriquecimiento la encuentra, y el título saltaba de lugar
+  en una colección que otros ya estaban mirando. Ahora se lee alfabéticamente por el título
+  que se muestra, igual que la grilla del catálogo. **Sólo para colecciones que nadie
+  ordenó**: el orden de una colección curada es la declaración de quien la armó y no se
+  toca.
+
+- **Lo que queda del diagnóstico y no se tocó**: las tres fuentes externas reciben casi la
+  misma consulta, y el puente de aliases de Wikidata no se activa cuando IMDb devuelve
+  vacío, sólo cuando devuelve filas bajo el umbral. Ninguna de las dos tiene hoy un caso en
+  el corpus que la mida.
 - **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
   a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
   palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
