@@ -30,7 +30,11 @@ class SearchLabTests(unittest.TestCase):
         report = evaluate_search_corpus(corpus)
 
         self.assertEqual(report["algorithm"], "production-baseline")
-        self.assertEqual(report["corpus"]["case_count"], 29)
+        # 30 since [B1] added "catalog-short-term-in-longer-title": every
+        # short-title case the corpus had queried with a year, which lands on
+        # the exact-title path, so it could not see a two-letter term failing
+        # to match an identical one.
+        self.assertEqual(report["corpus"]["case_count"], 30)
         self.assertEqual(
             set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"}
         )

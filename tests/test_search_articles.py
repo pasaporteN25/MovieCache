@@ -92,6 +92,37 @@ class SearchScoreArticleTests(unittest.TestCase):
         self.assertEqual(_score("Heat", "Heat"), 100.0)
 
 
+class ShortTermEqualityTests(unittest.TestCase):
+    """A two-letter term used to match nothing, not even an identical one.
+
+    `_term_matches` had only substring tests, gated on three characters. "Ed"
+    found nothing at all in a catalogue holding "Ed Wood". The golden corpus
+    could not see it: every short-title case it had queried with a year, which
+    lands on the exact-title path, so a case was added alongside the fix --
+    without it 29/30 and Recall@5 0.967, with it 30/30 and 1.000.
+    """
+
+    def test_a_two_letter_term_finds_the_longer_title_it_belongs_to(self) -> None:
+        floor = PRODUCTION_BASELINE.catalog_admission_threshold
+        self.assertGreaterEqual(_score("Ed", "Ed Wood"), floor)
+        self.assertGreaterEqual(_score("Up", "Up in the Air"), floor)
+
+    def test_it_does_not_reach_inside_another_word(self) -> None:
+        # "Up" is not "Setup", and the corpus has kept that distinction since
+        # v0.3.0. Equality does not loosen it: only whole terms compare.
+        floor = PRODUCTION_BASELINE.catalog_admission_threshold
+        self.assertLess(_score("Up", "Setup"), floor)
+        self.assertLess(_score("Ed", "Edge of Tomorrow"), floor)
+
+    def test_an_article_is_still_not_a_way_in(self) -> None:
+        # Coverage of 1 takes a fast path well above the floor, so letting "la"
+        # match "la" would let a two-letter query pull in every title starting
+        # with it -- the noise just removed, arriving by another door.
+        floor = PRODUCTION_BASELINE.catalog_admission_threshold
+        self.assertLess(_score("La", "La La Land"), floor)
+        self.assertLess(_score("El", "El angel exterminador"), floor)
+
+
 class FunctionWordListTests(unittest.TestCase):
     def test_it_holds_articles_and_leaves_the_ambiguous_words_alone(self) -> None:
         for article in ("the", "a", "an", "el", "la", "los", "das", "il", "o"):

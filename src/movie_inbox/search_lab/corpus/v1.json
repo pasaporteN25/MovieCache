@@ -183,6 +183,18 @@
       "original_title": "アキラ",
       "year": "1988",
       "kind": "anime"
+    },
+    {
+      "id": "ed-wood-1994",
+      "title": "Ed Wood",
+      "year": "1994",
+      "kind": "pelicula"
+    },
+    {
+      "id": "edge-of-tomorrow-2014",
+      "title": "Edge of Tomorrow",
+      "year": "2014",
+      "kind": "pelicula"
     }
   ],
   "cases": [
@@ -201,6 +213,14 @@
       "query": "It 2017",
       "relevant_ids": ["it-2017"],
       "forbidden_ids": ["it-1990", "different-film"]
+    },
+    {
+      "id": "catalog-short-term-in-longer-title",
+      "label": "Un termino corto encuentra el titulo largo al que pertenece",
+      "context": "catalog",
+      "query": "Ed",
+      "relevant_ids": ["ed-wood-1994"],
+      "forbidden_ids": ["edge-of-tomorrow-2014"]
     },
     {
       "id": "catalog-up-substring",

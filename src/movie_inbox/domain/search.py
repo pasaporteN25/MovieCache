@@ -273,8 +273,23 @@ def _title_from_url(value: str, source: str) -> str:
 
 
 def _term_matches(term: str, values: list[str]) -> bool:
+    """Whether one query term is present among a title's terms.
+
+    The equality test is not redundant with the substring tests below it: those
+    are gated on three characters, so without it a two-letter term never
+    matched even an identical one. "Ed" found nothing at all in a catalogue
+    holding "Ed Wood", and "Up" could not see "Up in the Air".
+
+    Equality does not count for an article, though. Term coverage of 1 takes a
+    fast path well above the admission floor, so letting "la" match "la" would
+    make a two-letter query pull in every title that merely starts with it --
+    the same noise `title_similarity` was just cleared of, arriving by another
+    door.
+    """
+
     return any(
-        (len(term) >= _MIN_SUBSTRING_LENGTH and term in value)
+        (term == value and term not in FUNCTION_WORDS)
+        or (len(term) >= _MIN_SUBSTRING_LENGTH and term in value)
         or (len(value) >= _MIN_SUBSTRING_LENGTH and value in term)
         or (len(term) >= 5 and SequenceMatcher(None, term, value).ratio() >= 0.82)
         for value in values
