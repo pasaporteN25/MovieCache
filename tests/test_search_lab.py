@@ -30,12 +30,13 @@ class SearchLabTests(unittest.TestCase):
         report = evaluate_search_corpus(corpus)
 
         self.assertEqual(report["algorithm"], "production-baseline")
-        # 31 since [B1] added "catalog-short-term-in-longer-title" and
-        # "catalog-single-letter-title": every short-title case the corpus had
-        # queried with a year, which lands on the exact-title path, so it could
-        # see neither a two-letter term failing to match an identical one nor a
-        # one-letter title being refused outright.
-        self.assertEqual(report["corpus"]["case_count"], 31)
+        # 32 since [B1] added "catalog-short-term-in-longer-title",
+        # "catalog-single-letter-title" and "catalog-word-inside-a-word": every
+        # short-title case the corpus had queried with a year, which lands on
+        # the exact-title path, so it could see none of a two-letter term
+        # failing to match an identical one, a one-letter title being refused
+        # outright, or a fragment matching inside a longer word.
+        self.assertEqual(report["corpus"]["case_count"], 32)
         self.assertEqual(
             set(report["metrics"]["by_context"]), {"catalog", "external", "identity", "scanner"}
         )

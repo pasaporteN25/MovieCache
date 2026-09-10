@@ -244,6 +244,14 @@
       "forbidden_ids": ["moonlight-2016"]
     },
     {
+      "id": "catalog-word-inside-a-word",
+      "label": "Un fragmento adentro de una palabra no es la palabra",
+      "context": "catalog",
+      "query": "Fly",
+      "relevant_ids": ["the-fly-1958", "the-fly-1986"],
+      "forbidden_ids": ["m-butterfly-1993"]
+    },
+    {
       "id": "catalog-up-substring",
       "label": "Titulo corto no es sufijo",
       "context": "catalog",

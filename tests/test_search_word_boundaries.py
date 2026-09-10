@@ -70,5 +70,48 @@ class ContentWordFallbackTests(unittest.TestCase):
         self.assertEqual(_score("El", "El"), 100.0)
 
 
+class WholeQuerySubstringTests(unittest.TestCase):
+    """The same anchor, on the rule that compares the query against the title.
+
+    _term_matches was anchored first; this rule was left alone at the time
+    because it serves a real purpose -- finding a whole word inside a phrase --
+    and no corpus case demanded it. One does now. Unanchored, searching the
+    catalogue for "Fly" ranked "M. Butterfly" above both films actually called
+    "The Fly", which the golden corpus states as a forbidden id: without the
+    anchor the quality gate FAILS with one forbidden hit, 31 of 32 strict cases
+    and MRR 0.984.
+    """
+
+    def test_a_fragment_inside_a_word_is_not_a_match(self) -> None:
+        for query, candidate in (("Man", "Spiderman"), ("Age", "Carnage"), ("Pool", "Deadpool")):
+            with self.subTest(query=query, candidate=candidate):
+                self.assertEqual(_score(query, candidate), 0.0)
+
+    def test_a_whole_word_inside_a_phrase_still_matches(self) -> None:
+        self.assertEqual(_score("Fly", "The Fly"), 82.0)
+        self.assertEqual(_score("Dead", "Evil Dead Rise"), 82.0)
+
+    def test_typing_the_beginning_of_a_word_still_matches(self) -> None:
+        # The prefix test above it is untouched, and a later word can be
+        # reached by its own beginning.
+        self.assertEqual(_score("Moon", "Moonlight"), 88.0)
+        self.assertEqual(_score("Fly", "The Flying Dutchman"), 82.0)
+
+    def test_an_external_id_inside_a_url_still_matches(self) -> None:
+        # The rule's other job, and the one that would have broken quietly.
+        self.assertEqual(_score("tt1263778", "https://www.imdb.com/title/tt1263778/"), 82.0)
+
+    def test_the_real_titles_now_outrank_the_coincidence(self) -> None:
+        self.assertGreater(_score("Fly", "The Fly"), _score("Fly", "M. Butterfly"))
+
+    def test_character_similarity_can_still_surface_a_close_word(self) -> None:
+        # Deliberate, and a different claim: "Light" and "Moonlight" are 71%
+        # the same string, so the fallback still offers it for review at 41.4 --
+        # far below the 82 the substring rule used to assert.
+        score = _score("Light", "Moonlight")
+        self.assertGreaterEqual(score, _FLOOR)
+        self.assertLess(score, 82.0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -126,7 +126,18 @@ def text_match_score(value: str, query: str, query_terms: tuple[str, ...] | list
     if len(query) >= _MIN_SUBSTRING_LENGTH:
         if value.startswith(query):
             return 88.0
-        if query in value:
+        # Anchored at the start of a word, for the same reason _term_matches is:
+        # what this rule is for is finding a word inside a phrase -- "Fly" in
+        # "The Fly", an external id inside a URL -- not a fragment inside a
+        # word. Unanchored it scored "Man" 82 against "Spiderman" and "Age" 82
+        # against "Carnage", and searching the catalogue for "Fly" put "M.
+        # Butterfly" above both films actually called "The Fly".
+        #
+        # Typing the beginning of a word is still a match: the prefix test above
+        # covers "Moon" finding "Moonlight", and " fly" covers "Fly" finding
+        # "The Flying Dutchman". What is gone is arriving at the middle of a
+        # word from nowhere.
+        if f" {query}" in value:
             return 82.0
     value_terms = value.split()
     covered_terms = [term for term in query_terms if _term_matches(term, value_terms)]
