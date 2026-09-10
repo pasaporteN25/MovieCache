@@ -56,6 +56,13 @@ agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb
 Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
 consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
 
+> **Corrección del 2026-09-10.** Dos de esas afirmaciones ya no son ciertas y conviene no
+> volver a salir a arreglarlas: el puente de aliases de IMDb **sí** se activa con una
+> respuesta vacía desde [Q3] (`imdb.py`, rama `is_empty`), y Wikipedia y FilmAffinity
+> tienen desde entonces su propio reintento por alias confirmado. El contexto de
+> `Comparar` lo cerró [U3]. Lo que queda en pie del párrafo es que las tres fuentes
+> reciben una consulta muy parecida.
+
 ### Frente: Fuentes externas y especializacion de anime
 
 La epica [F2] quedo cerrada en tres entregas: contrato de composicion [F2.1], fuente
@@ -299,10 +306,44 @@ reproducidos de punta a punta antes de tocarlos.
   ordenó**: el orden de una colección curada es la declaración de quien la armó y no se
   toca.
 
-- **Lo que queda del diagnóstico y no se tocó**: las tres fuentes externas reciben casi la
-  misma consulta, y el puente de aliases de Wikidata no se activa cuando IMDb devuelve
-  vacío, sólo cuando devuelve filas bajo el umbral. Ninguna de las dos tiene hoy un caso en
-  el corpus que la mida.
+**Fuentes externas, 2026-09-10.** El commit `07e12be`. Lo primero que apareció al ir a
+buscar los dos defectos que el diagnóstico del 2026-08-26 nombraba: **los dos ya estaban
+arreglados** por [Q2] y [Q3], y la nota nunca se actualizó. Lo que seguía siendo cierto es
+que nadie medía si [Q3] había servido — el corpus de diagnóstico tenía tres casos, los tres
+de IMDb, así que el reintento por alias que [Q3] le dio a Wikipedia y a FilmAffinity nunca
+se ejercitó.
+
+Servía a medias. El reintento encuentra la película y después el piso de relevancia la
+descarta, porque la fila vuelve titulada en el idioma del mercado y se puntúa contra una
+consulta que está en otro. Medido contra la consulta de la que salió cada reintento, con
+el piso en 28:
+
+| Consulta | Fila que encuentra | Puntaje |
+| --- | --- | --- |
+| Der Untergang | El hundimiento (2004) | 13.9 |
+| Kimi no na wa | Your Name. (2016) | 21.5 |
+| Sen to Chihiro no kamikakushi | El viaje de Chihiro (2001) | 25.5 |
+| Les quatre cents coups | Los cuatrocientos golpes (1959) | 35.1 |
+| Addio zio Tom | Adiós, tío Tom (1971) | 41.2 |
+
+Sólo pasaban los cognados: el reintento rendía justo donde menos falta hacía. IMDb nunca
+tuvo el problema porque su propio puente arma la fila desde la entidad de Wikidata, que se
+lleva el título original con ella. Ahora un `AliasVariant` viaja con la entidad que lo
+respalda y `with_alias_identity()` copia sus títulos confirmados **sólo sobre la fila cuyo
+título es el que se reintentó** — una búsqueda por el alias puede devolver una página
+entera, y estampar identidad sobre toda ella sería inventarla. Los tres primeros pasan a
+100.
+
+El instrumento también estaba mal: `_FALLBACK_SIGNATURES` decía que FilmAffinity no tenía
+fallback propio —cierto cuando se escribió, falso desde [Q3]— así que un reintento que
+disparaba se reportaba como ninguno, y de los dos fallbacks de Wikipedia reconocía uno.
+
+- **Sigue sin medirse, escrito en vez de darlo por cerrado**: FilmAffinity no tiene ningún
+  caso de diagnóstico, y agregarlo implica grabar respuestas reales. El caso nuevo de
+  Wikipedia sí discrimina: sin el arreglo el gate **falla** con `it/wikipedia` Recall@5 en
+  0.000 y el motivo nombrado como el instrumento fue construido para nombrarlo —
+  `discarded_by_threshold: score=23.2`, que es "la fuente la devolvió y la tiramos" y no
+  "la fuente nunca la tuvo".
 - **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
   a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
   palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
