@@ -195,6 +195,12 @@
       "title": "Edge of Tomorrow",
       "year": "2014",
       "kind": "pelicula"
+    },
+    {
+      "id": "m-butterfly-1993",
+      "title": "M. Butterfly",
+      "year": "1993",
+      "kind": "pelicula"
     }
   ],
   "cases": [
@@ -320,7 +326,7 @@
       "context": "identity",
       "candidate": {"title": "The Fly", "year": "", "kind": "pelicula"},
       "relevant_ids": ["the-fly-1958", "the-fly-1986"],
-      "forbidden_ids": [],
+      "forbidden_ids": ["m-butterfly-1993"],
       "expected_acceptance": {"the-fly-1958": false, "the-fly-1986": false},
       "required_reasons": {
         "the-fly-1958": ["exact_title_missing_year"],

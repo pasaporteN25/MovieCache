@@ -140,17 +140,21 @@ def text_match_score(value: str, query: str, query_terms: tuple[str, ...] | list
         return _content_word_score(query, value)
     if len(query) < _MIN_FUZZY_QUERY_LENGTH:
         return coverage * 62.0
-    ratio = SequenceMatcher(None, query, value).ratio()
-    return max(coverage * 62.0, ratio * 58.0)
+    # Nothing whole matched, so all that is left is character similarity -- but
+    # over the words that carry meaning, not over the raw strings. Comparing
+    # the raw strings scored "The Fly" against "M. Butterfly" at 32.2, above
+    # the 29.0 it gave "The Flies", on the strength of letters shared between
+    # "the" and "butterfly".
+    return max(coverage * 62.0, _content_word_score(query, value))
 
 
 def _content_word_score(query: str, value: str) -> float:
-    """Similarity with the articles taken out of both sides.
+    """Character similarity with the articles taken out of both sides.
 
-    Only ever reached when articles were the *sole* overlap, and it can only
-    lower a score: with no content word in common, term coverage is zero by
-    definition, so what is left is the character-level ratio over the words that
-    actually carry meaning.
+    Two branches reach it and for the same reason: what is left of a title once
+    the articles are gone is what the person was actually looking for. It is
+    the answer when articles were the only words in common, and the fallback
+    when no whole word matched at all.
 
     A title that is nothing but an article is a real thing -- Bunuel's "El" --
     so when either side has no content left, the original comparison stands
@@ -285,12 +289,21 @@ def _term_matches(term: str, values: list[str]) -> bool:
     make a two-letter query pull in every title that merely starts with it --
     the same noise `title_similarity` was just cleared of, arriving by another
     door.
+
+    The substring tests are anchored at the start of a word. A short word
+    buried inside a longer one is a coincidence of spelling, not a shared word:
+    "Fly" is not "Butterfly", which the golden corpus now states outright --
+    without the anchor, searching the catalogue for "The Fly" ranked "M.
+    Butterfly" (32.2) above "The Flies" (29.0). The anchored form keeps what
+    the test was for, which is compounds and plurals reaching their root, and
+    terms of five characters or more still have the fuzzy test underneath, so
+    "terminator" still finds "exterminator".
     """
 
     return any(
         (term == value and term not in FUNCTION_WORDS)
-        or (len(term) >= _MIN_SUBSTRING_LENGTH and term in value)
-        or (len(value) >= _MIN_SUBSTRING_LENGTH and value in term)
+        or (len(term) >= _MIN_SUBSTRING_LENGTH and value.startswith(term))
+        or (len(value) >= _MIN_SUBSTRING_LENGTH and term.startswith(value))
         or (len(term) >= 5 and SequenceMatcher(None, term, value).ratio() >= 0.82)
         for value in values
     )
