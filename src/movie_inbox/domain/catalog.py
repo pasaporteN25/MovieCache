@@ -435,12 +435,85 @@ def title_match_keys_for_item(item: Mapping[str, Any]) -> list[str]:
     )
 
 
+# Articles and determiners, in the languages this catalogue actually holds.
+# Two titles that share only one of these have nothing in common: "The Fly" and
+# "The Gift" are not related by "the", and "Los siete samurais" and "Los
+# olvidados" are not related by "los".
+#
+# Deliberately only articles and determiners. Prepositions and conjunctions --
+# "de", "of", "and" -- are left out because they carry more weight in a title
+# than they look like they do ("Dawn of the Dead"), and the point here is to
+# remove noise, not to start ruling on which words matter.
+FUNCTION_WORDS = frozenset(
+    {
+        # English
+        "the",
+        "a",
+        "an",
+        # Spanish
+        "el",
+        "la",
+        "los",
+        "las",
+        "lo",
+        "un",
+        "una",
+        "unos",
+        "unas",
+        # French
+        "le",
+        "les",
+        "une",
+        "des",
+        "du",
+        # Italian
+        "il",
+        "i",
+        "gli",
+        "uno",
+        # German
+        "der",
+        "die",
+        "das",
+        "ein",
+        "eine",
+        "den",
+        "dem",
+        # Portuguese
+        "o",
+        "os",
+        "as",
+        "um",
+        "uma",
+    }
+)
+
+
 def title_similarity(left: str, right: str) -> float:
+    """How much two normalised titles overlap, ignoring articles.
+
+    Articles used to count as shared terms, which made "The Fly" and "The Gift"
+    50% similar on the strength of "the" alone -- the same score it gave "The
+    Fly" and "The Flies". Measured on the golden corpus, that was what dragged
+    unrelated films into the ranked results for every homonym query.
+
+    Dropping them can only ever lower a score, so it cannot turn a non-match
+    into a match: no auto-match this did not already make is possible after it.
+
+    A title that is nothing but an article is a real thing -- Bunuel's "El" --
+    so when either side has no content words left, the plain comparison stands
+    rather than being replaced by an empty one.
+    """
+
     left_terms = set(left.split())
     right_terms = set(right.split())
     if not left_terms or not right_terms:
         return 0.0
-    return len(left_terms & right_terms) / max(len(left_terms), len(right_terms))
+    left_content = left_terms - FUNCTION_WORDS
+    right_content = right_terms - FUNCTION_WORDS
+    if not left_content or not right_content:
+        return len(left_terms & right_terms) / max(len(left_terms), len(right_terms))
+    return len(left_content & right_content) / max(len(left_content), len(right_content))
 
 
 def same_catalog_item(
