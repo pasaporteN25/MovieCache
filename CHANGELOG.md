@@ -2,6 +2,20 @@
 
 Los cambios relevantes del proyecto se documentan en este archivo.
 
+## [Sin publicar]
+
+### Cambiado
+
+- La busqueda del catalogo dejo de leer una coincidencia de letras como si fuera una
+  palabra compartida. Un articulo en comun ya no acerca dos titulos, una palabra corta
+  metida adentro de otra mas larga ya no cuenta, y la comparacion de respaldo mide las
+  palabras con contenido en vez de las cadenas crudas: buscar "The Fly" ya no trae
+  "M. Butterfly" por encima de "The Flies".
+- Un termino corto encuentra el titulo al que pertenece. "Ed" llega a "Ed Wood", y un
+  titulo de una sola letra como "M" se puede buscar por su propio titulo, con o sin ano;
+  antes la consulta se descartaba entera. Nada de esto habilita un auto-match nuevo: la
+  aceptacion se sigue decidiendo con la misma evidencia de identidad de siempre.
+
 ## [0.8.0] - 2026-09-02
 
 ### Agregado

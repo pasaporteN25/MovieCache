@@ -197,6 +197,13 @@
       "kind": "pelicula"
     },
     {
+      "id": "m-1931",
+      "title": "M",
+      "original_title": "M - Eine Stadt sucht einen Morder",
+      "year": "1931",
+      "kind": "pelicula"
+    },
+    {
       "id": "m-butterfly-1993",
       "title": "M. Butterfly",
       "year": "1993",
@@ -227,6 +234,14 @@
       "query": "Ed",
       "relevant_ids": ["ed-wood-1994"],
       "forbidden_ids": ["edge-of-tomorrow-2014"]
+    },
+    {
+      "id": "catalog-single-letter-title",
+      "label": "Un titulo de una sola letra se encuentra por su propio titulo",
+      "context": "catalog",
+      "query": "M",
+      "relevant_ids": ["m-1931", "m-butterfly-1993"],
+      "forbidden_ids": ["moonlight-2016"]
     },
     {
       "id": "catalog-up-substring",

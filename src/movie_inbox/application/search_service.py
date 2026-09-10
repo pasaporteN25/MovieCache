@@ -53,7 +53,18 @@ def search_catalog_items(
     intent = parse_search_query(query)
     if intent.director_query_key:
         return _search_by_director(items, intent, limit, strategy)
-    if len(intent.title_key or intent.external_id or intent.key) < 2:
+    # A one-character query is a real query: "M", "Z" and "9" are films, and
+    # this cut made them unfindable by their own title -- with or without a
+    # year, since only the title key is measured here.
+    #
+    # It is safe to let through because the scorer refuses to over-reach on a
+    # single character on its own: no substring or fuzzy test is open under
+    # three, so a one-letter term only matches a standalone one-letter term.
+    # "m" finds "M" (100) and "M. Butterfly" (71) and leaves "Moonlight" at
+    # zero. And it cannot invent an identity -- rank_catalog_candidates runs
+    # decide_match over every item regardless of what this function returns, so
+    # no auto-match becomes possible that was not possible before.
+    if not (intent.title_key or intent.external_id or intent.key):
         return []
     ranked: list[tuple[float, str, dict[str, Any]]] = []
     for position in _catalog_search_positions(items, intent):
