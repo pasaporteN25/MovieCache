@@ -249,6 +249,39 @@ superficies es [U3], del frente visual, y las dos conviene que avancen conversan
   conocidos en auto-match. Un ranking más generoso que gane recall rompiendo eso no es una
   mejora.
 
+**Avances del 2026-09-09 (lado infraestructura).** Cuatro arreglos de ranking, cada uno
+medido con `search-lab run` antes y después, y cada uno con un caso propio en el corpus
+dorado que falla si se revierte el arreglo. Un caso que pasa igual con y sin el arreglo es
+decoración, así que se verificó uno por uno.
+
+- `ad3e1e7` — un artículo compartido dejó de ser evidencia de identidad. "The Fly" y "The
+  Gift" valían 0.5 de similitud por culpa de "the". Precision@5 0.933 → 1.000, casos
+  estrictos 26/29 → 29/29.
+- `1d38c6a` — un término de dos letras no coincidía ni con uno idéntico, porque las dos
+  pruebas de subcadena arrancaban en tres caracteres y no había prueba de igualdad. "Ed"
+  no encontraba nada en un catálogo con "Ed Wood". El corpus estaba ciego a esto: todos
+  sus casos de título corto consultaban con año, que cae en la ruta de título exacto.
+- `32461b0` — una palabra corta metida adentro de otra más larga dejó de contar como
+  palabra compartida, y la comparación de respaldo pasó a medir palabras con contenido en
+  vez de cadenas crudas. Buscar "The Fly" traía "M. Butterfly" (32.2) por encima de "The
+  Flies" (29.0).
+- `57ad234` — una consulta de una sola letra es una consulta real. "M" no se podía buscar
+  por su propio título, ni siquiera agregando el año.
+
+Corpus al cierre: 30 items, 31 casos, 31/31 estrictos, todas las métricas en 1.000, cero
+hits prohibidos y precisión de auto-match 1.000. **Ninguno de los cuatro abre un
+auto-match nuevo**: la aceptación se decide en `decide_match`, que `rank_catalog_candidates`
+corre sobre todo el catálogo sin leer el gate de búsqueda. Se midió, no se supuso.
+
+- **Próximo candidato, con el número ya medido**: la regla de subcadena de la consulta
+  completa sigue entrando adentro de una palabra — "Man" puntúa 82 contra "Spiderman" —.
+  Es una regla distinta a la que se acaba de anclar y tiene un uso legítimo (encontrar una
+  palabra dentro de una frase, "fly" en "the fly"), así que separar los dos usos necesita
+  su propia evidencia. Ningún caso del corpus la exige hoy.
+- **Dependencia del frente visual**: `catalog-search.js` descarta las consultas de menos de
+  dos caracteres antes de salir del navegador. Mientras eso siga, la consulta de una letra
+  funciona por API y por CLI pero no desde la caja de búsqueda.
+
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
   valores a `kind` ni reciclar campos audiovisuales antes de la decision.
