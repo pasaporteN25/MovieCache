@@ -267,17 +267,25 @@ decoración, así que se verificó uno por uno.
   Flies" (29.0).
 - `57ad234` — una consulta de una sola letra es una consulta real. "M" no se podía buscar
   por su propio título, ni siquiera agregando el año.
+- `13e9aab` — la misma ancla, sobre la regla que compara la consulta entera contra el
+  título entero. Era peor de lo anotado: "Age" puntuaba 82 contra "Carnage" y buscar
+  "Fly" ponía "M. Butterfly" **arriba de las dos películas llamadas "The Fly"**, porque
+  empataba en puntaje y ganaba el desempate alfabético.
 
-Corpus al cierre: 30 items, 31 casos, 31/31 estrictos, todas las métricas en 1.000, cero
-hits prohibidos y precisión de auto-match 1.000. **Ninguno de los cuatro abre un
+Corpus al cierre: 30 items, 32 casos, 32/32 estrictos, todas las métricas en 1.000, cero
+hits prohibidos y precisión de auto-match 1.000. **Ninguno de los cinco abre un
 auto-match nuevo**: la aceptación se decide en `decide_match`, que `rank_catalog_candidates`
 corre sobre todo el catálogo sin leer el gate de búsqueda. Se midió, no se supuso.
 
-- **Próximo candidato, con el número ya medido**: la regla de subcadena de la consulta
-  completa sigue entrando adentro de una palabra — "Man" puntúa 82 contra "Spiderman" —.
-  Es una regla distinta a la que se acaba de anclar y tiene un uso legítimo (encontrar una
-  palabra dentro de una frase, "fly" en "the fly"), así que separar los dos usos necesita
-  su propia evidencia. Ningún caso del corpus la exige hoy.
+- **Lo que queda del diagnóstico y no se tocó**: la mitad de **colecciones** de [B1] sigue
+  sin empezar — todo lo hecho hasta acá es ranking de búsqueda—; las tres fuentes externas
+  reciben casi la misma consulta; y el puente de aliases de Wikidata no se activa cuando
+  IMDb devuelve vacío, sólo cuando devuelve filas bajo el umbral. Ninguna de las tres tiene
+  hoy un caso en el corpus que la mida.
+- **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
+  a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
+  palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
+  deshonesta a 82.
 - **Dependencia del frente visual**: `catalog-search.js` descarta las consultas de menos de
   dos caracteres antes de salir del navegador. Mientras eso siga, la consulta de una letra
   funciona por API y por CLI pero no desde la caja de búsqueda.
