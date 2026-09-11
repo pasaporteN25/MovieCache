@@ -248,11 +248,9 @@ superficies es [U3], del frente visual, y las dos conviene que avancen conversan
   vacía desde [Q3], y el contexto de `Comparar` lo cerró [U3]. Se anota acá porque salir a
   arreglarlas de nuevo fue el costo real de no haberlo actualizado a tiempo.
 - **Lo único que queda en pie de aquel diagnóstico**: las tres fuentes externas reciben una
-  consulta muy parecida, y sigue sin medirse. Encadenado con la cobertura que falta (ver la
-  nota de fuentes externas más abajo): tocar la construcción de la consulta antes de que
-  FilmAffinity tenga un caso de diagnóstico sería cambiar a ciegas la única de las tres sin
-  fallback propio y la única en español. `docs/search-quality.md` está al día y no necesita
-  corrección.
+  consulta muy parecida. **Medido el 2026-09-11 y resultó ser mucho menos de lo que el
+  diagnóstico sugería** — ver la nota de medición al final de la ficha.
+  `docs/search-quality.md` está al día y no necesita corrección.
 - **Herramienta que ya existe**: `movie-inbox search-lab run --enforce` mide el ranking
   productivo sin cambiarlo y es gate en CI desde v0.3.0. Cualquier cambio de algoritmo se
   mide contra él **antes y después**, o no se sabe si mejoró.
@@ -410,6 +408,27 @@ también lee.
 - **Dependencia del frente visual**: `catalog-search.js` descarta las consultas de menos de
   dos caracteres antes de salir del navegador. Mientras eso siga, la consulta de una letra
   funciona por API y por CLI pero no desde la caja de búsqueda.
+
+**Medición de la consulta por fuente, 2026-09-11.** Seis títulos cuyo original no está en
+español, corriendo los adaptadores de verdad contra los sitios de verdad.
+
+- **FilmAffinity: no hay headroom.** La primera consulta supera el piso en **5 de 6**, la
+  respuesta final en **6 de 6**, con 11 peticiones en total. El único que falla —
+  `Der Untergang` — lo recupera el reintento por piso a un costo de 5 peticiones extra.
+  FilmAffinity indexa bien los títulos originales; mandarle a propósito el título en
+  español como primera consulta no compraría corrección, sólo cambiaría de lugar el gasto.
+  **No se cambia la construcción de la consulta: se midió y no rendía.**
+- **Wikipedia: medición inválida, no se reporta.** Devolvió `429 Too Many Requests` y los
+  dos supuestos fallos de búsqueda eran eso. Vale la pena anotar por qué: el script llamaba
+  a los adaptadores **directo**, salteando `ExternalSourceService`, que es justamente quien
+  maneja el 429 —`rate_limited` más un cooldown leído del header `Retry-After`
+  (`registry.py::_source_error_state`)—. El sistema hace lo correcto; la medición no. Y el
+  abanico paralelo en/es de Wikipedia duplica el ritmo de pedidos, así que llega al límite
+  antes que las otras dos.
+- **Si esto se retoma**: medir Wikipedia con el registry en el medio y a ritmo bajo, o no
+  medirlo. [Q3] ya le da a Wikipedia el título original como primer alias, que es
+  exactamente lo que su cobertura en/es no cubre, así que la hipótesis a refutar es que ya
+  esté resuelto.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
