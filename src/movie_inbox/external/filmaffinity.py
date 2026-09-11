@@ -14,6 +14,7 @@ from movie_inbox.external.common import clean_text, fetch_text
 from movie_inbox.external.query_variants import (
     VARIANT_RETRY_TIMEOUT_SECONDS,
     alias_variants,
+    needs_alias_retry,
     with_alias_identity,
 )
 
@@ -28,21 +29,22 @@ class FilmAffinityAdapter:
             return []
         search_text = intent.title or intent.director_query or query
         results = self._fetch(search_text)
-        if results:
+        if not needs_alias_retry(intent, results):
             return results
         # [Q3] tareas.md: the only source with no fallback of its own -- a
         # Wikidata-confirmed alias (prioritized towards its Spanish market
         # title, see query_variants._priority_order) gets one retry each.
         for variant in alias_variants(self.name, search_text):
             try:
-                results = self._fetch(variant.title, timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
+                found = self._fetch(variant.title, timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
             except Exception:
                 continue
-            if results:
-                # The row comes back titled in Spanish and is about to be
-                # scored against a query that is not: carry the alias across
-                # or the retry finds the film and the floor throws it away.
-                return with_alias_identity(results, variant)
+            # The row comes back titled in Spanish and is about to be scored
+            # against a query that is not: carry the alias across or the retry
+            # finds the film and the floor throws it away.
+            annotated = with_alias_identity(found, variant)
+            if not needs_alias_retry(intent, annotated):
+                return annotated
         return results
 
     def _fetch(self, text: str, timeout: float = 8.0) -> list[dict[str, Any]]:

@@ -551,6 +551,41 @@ class ExternalMetadataTests(unittest.TestCase):
 
     @patch("movie_inbox.external.filmaffinity.alias_variants")
     @patch("movie_inbox.external.filmaffinity.fetch_text")
+    def test_filmaffinity_retries_when_its_own_listing_stays_under_the_floor(
+        self, fetch_text, variants
+    ) -> None:
+        # [B1]: an answer is not the same as a usable answer. A listing whose
+        # rows all miss the relevance floor has told us as little as an empty
+        # one, and only the empty case used to trigger the retry.
+        def response(url: str, **_kwargs: object) -> str:
+            if "stext=Estiu" in url:
+                return '<a href="/film123456.html">Estiu 1993</a>'
+            return '<a href="/film999999.html">Una pelicula sin relacion</a>'
+
+        fetch_text.side_effect = response
+        variants.return_value = [AliasVariant(title="Estiu 1993", identity=_ESTIU)]
+
+        results = FilmAffinityAdapter().search("Verano 1993")
+
+        self.assertEqual(results[0]["title"], "Estiu 1993")
+        variants.assert_called_once_with("filmaffinity", "Verano")
+
+    @patch("movie_inbox.external.filmaffinity.alias_variants")
+    @patch("movie_inbox.external.filmaffinity.fetch_text")
+    def test_filmaffinity_keeps_its_own_answer_when_something_clears_the_floor(
+        self, fetch_text, variants
+    ) -> None:
+        # The other half of the rule: a source that did find the work is not
+        # asked again just because it also returned noise alongside it.
+        fetch_text.return_value = '<a href="/film123456.html">Verano 1993</a>'
+
+        results = FilmAffinityAdapter().search("Verano 1993")
+
+        self.assertEqual(results[0]["title"], "Verano 1993")
+        variants.assert_not_called()
+
+    @patch("movie_inbox.external.filmaffinity.alias_variants")
+    @patch("movie_inbox.external.filmaffinity.fetch_text")
     def test_filmaffinity_reports_nothing_when_every_alias_variant_also_fails(
         self, fetch_text, variants
     ) -> None:

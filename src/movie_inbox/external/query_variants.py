@@ -47,6 +47,27 @@ PREFERRED_ALIAS_LANGUAGES: tuple[str, ...] = ("es", "en")
 ALIAS_IDENTITY_FIELDS = ("original_title", "spanish_title", "english_title")
 
 
+def needs_alias_retry(query: str | Any, results: Sequence[Mapping[str, Any]]) -> bool:
+    """Whether a source's own answer is worth retrying under a confirmed alias.
+
+    Not "did it answer" but "did it answer anything usable". A source that
+    comes back with a page of rows none of which clears the relevance floor has
+    told us as little as one that came back empty, and until now only the empty
+    case triggered the retry: a FilmAffinity listing for "Der Untergang" scores
+    17.4 on "El hundimiento", under the 28.0 floor, and the retry that would
+    have recovered it never ran because the listing was not empty.
+
+    IMDb's own bridge has fired on this condition since [Q3] (`imdb.py`,
+    `is_empty or all(...)`). This is the same rule, for the two sources that
+    only got half of it.
+    """
+
+    return not any(
+        external_result_score(query, result) >= EXTERNAL_RELEVANCE_THRESHOLD
+        for result in results
+    )
+
+
 @dataclass(frozen=True)
 class AliasVariant:
     """A title to retry a search with, and the entity that vouched for it.
@@ -107,7 +128,13 @@ def with_alias_identity(
     cannot borrow its sibling's identity.
 
     Fields already filled by the source win: this fills gaps, it does not
-    overwrite what the source stated.
+    overwrite what the source stated. What it does not do is drop the alias's
+    value for a field the source already claimed -- that goes to
+    `alternative_titles`, where the scorer reads it too. FilmAffinity labels
+    every title it returns as the Spanish one, so without that the confirmed
+    Spanish title of a work whose FilmAffinity row is titled in Catalan or
+    Basque would have nowhere to land, and the row the alias found would still
+    be unreachable from the query that found it.
     """
 
     expected = parse_search_query(variant.title)
@@ -115,12 +142,16 @@ def with_alias_identity(
     for result in results:
         row = dict(result)
         if _is_the_alias(str(row.get("title") or ""), expected):
+            spare: list[str] = []
             for field_name in ALIAS_IDENTITY_FIELDS:
+                confirmed = str(variant.identity.get(field_name) or "").strip()
                 if not str(row.get(field_name) or "").strip():
-                    row[field_name] = str(variant.identity.get(field_name) or "")
+                    row[field_name] = confirmed
+                elif confirmed:
+                    spare.append(confirmed)
             row["alternative_titles"] = merge_lists(
                 string_list(row.get("alternative_titles")),
-                string_list(variant.identity.get("alternative_titles")),
+                [*string_list(variant.identity.get("alternative_titles")), *spare],
             )
         annotated.append(row)
     return annotated
@@ -171,5 +202,6 @@ __all__ = [
     "VARIANT_RETRY_TIMEOUT_SECONDS",
     "AliasVariant",
     "alias_variants",
+    "needs_alias_retry",
     "with_alias_identity",
 ]

@@ -23,6 +23,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   su ficha se enriqueciera: la obra se reportaba dos veces, la coleccion no se llegaba a
   crear y la unica senal era que el interruptor volvia sin publicar nada. Ahora las copias
   se cuentan juntas, como siempre debieron.
+- Cuando una fuente externa contesta pero nada de lo que trae sirve, Movie Inbox vuelve a
+  intentar con un titulo alternativo confirmado, igual que hacia cuando la respuesta venia
+  vacia. Antes bastaba con que la fuente devolviera cualquier cosa para que no se
+  reintentara: buscar "Der Untergang" en FilmAffinity traia cinco peliculas y ninguna era
+  la buscada, y el reintento que la encuentra no llegaba a correr.
 - FilmAffinity vuelve a encontrar una pelicula buscada por su titulo original. Cuando la
   busqueda resuelve a una sola pelicula el sitio no devuelve un listado sino la ficha, y
   Movie Inbox la leia como si fuera un listado: devolvia los enlaces de navegacion de la

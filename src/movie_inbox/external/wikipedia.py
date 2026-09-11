@@ -29,6 +29,7 @@ from movie_inbox.external.common import (
 from movie_inbox.external.query_variants import (
     VARIANT_RETRY_TIMEOUT_SECONDS,
     alias_variants,
+    needs_alias_retry,
     with_alias_identity,
 )
 from movie_inbox.external.wikidata import (
@@ -79,7 +80,7 @@ class WikipediaAdapter:
         if not completed and errors:
             raise errors[0]
         results = dedupe_results(interleave_batches([batches[language] for language in languages]))
-        if results or intent.source:
+        if intent.source or not needs_alias_retry(intent, results):
             return results
         # [Q3] tareas.md: en/es cover a lot, but not every work's Wikipedia
         # article uses one of those two titles. A Wikidata-confirmed alias
@@ -93,11 +94,12 @@ class WikipediaAdapter:
                 )
             except Exception:
                 continue
-            if direct:
-                # Same reason as FilmAffinity's retry: an article found under
-                # an alias has to arrive carrying the alias, or it is scored
-                # against a query it no longer resembles.
-                return dedupe_results(with_alias_identity(direct, variant))
+            # Same reason as FilmAffinity's retry: an article found under
+            # an alias has to arrive carrying the alias, or it is scored
+            # against a query it no longer resembles.
+            annotated = dedupe_results(with_alias_identity(direct, variant))
+            if annotated and not needs_alias_retry(intent, annotated):
+                return annotated
         return results
 
     def _search_language(self, query: str, language: str) -> list[dict[str, Any]]:

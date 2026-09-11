@@ -7,6 +7,7 @@ from movie_inbox.external.query_variants import (
     MAX_ALIAS_VARIANTS,
     AliasVariant,
     alias_variants,
+    needs_alias_retry,
     with_alias_identity,
 )
 
@@ -174,6 +175,19 @@ class AliasIdentityTests(unittest.TestCase):
 
         self.assertEqual(row["alternative_titles"], ["Propio", "A Different Alias"])
 
+    def test_a_title_the_source_already_claimed_is_kept_as_an_alternative(self) -> None:
+        # FilmAffinity labels every title it returns as the Spanish one, so a
+        # film whose FilmAffinity row is titled in Catalan blocks the confirmed
+        # Spanish title from its own field. Dropping it there would leave the
+        # row unreachable from the query that found it, so it lands where the
+        # scorer still reads it.
+        [row] = with_alias_identity(
+            [self._row("El hundimiento", spanish_title="El hundimiento")], self.VARIANT
+        )
+
+        self.assertEqual(row["spanish_title"], "El hundimiento")
+        self.assertIn("Verano 1993", row["alternative_titles"])
+
     def test_the_annotated_row_clears_the_relevance_floor(self) -> None:
         # The point of the whole thing, stated as the number it moves.
         from movie_inbox.domain.search import EXTERNAL_RELEVANCE_THRESHOLD, external_result_score
@@ -188,6 +202,35 @@ class AliasIdentityTests(unittest.TestCase):
         self.assertGreaterEqual(
             external_result_score("Der Untergang", annotated), EXTERNAL_RELEVANCE_THRESHOLD
         )
+
+
+class RetryConditionTests(unittest.TestCase):
+    """[B1]: "did it answer" is not the same question as "did it answer usefully".
+
+    Only an empty response triggered the retry, so a FilmAffinity listing for
+    "Der Untergang" -- five rows, best one 17.4 against a floor of 28.0 -- never
+    got one, even though searching its Spanish title finds the film at 100.
+    IMDb's own bridge has fired on this condition since [Q3]; this is the same
+    rule for the two sources that only got half of it.
+    """
+
+    def _row(self, title: str) -> dict[str, object]:
+        return {"source": "filmaffinity", "title": title, "url": "u"}
+
+    def test_an_empty_answer_still_triggers_a_retry(self) -> None:
+        self.assertTrue(needs_alias_retry("Der Untergang", []))
+
+    def test_rows_that_all_miss_the_floor_trigger_one_too(self) -> None:
+        listing = [self._row("El hundimiento"), self._row("El hundimiento del Titanic")]
+
+        self.assertTrue(needs_alias_retry("Der Untergang", listing))
+
+    def test_one_row_over_the_floor_is_enough_to_stop_it(self) -> None:
+        # The bar is one usable answer, not a good average: a source that found
+        # the work must not be asked again just because it also returned noise.
+        listing = [self._row("Der Untergang"), self._row("El hundimiento del Titanic")]
+
+        self.assertFalse(needs_alias_retry("Der Untergang", listing))
 
 
 if __name__ == "__main__":
