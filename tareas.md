@@ -310,6 +310,37 @@ reproducidos de punta a punta antes de tocarlos.
   ordenó**: el orden de una colección curada es la declaración de quien la armó y no se
   toca.
 
+**Colecciones curadas, 2026-09-11.** El commit `a82927e`. La mitad que faltaba de
+colecciones: no la derivada de una biblioteca sino las que arma una persona.
+
+- **Lo que se revisó y está bien**, dicho para que nadie lo vuelva a mirar: el camino de
+  importación arma los items con el id normalizado —no con el crudo, que puede venir
+  vacío— y los deja en el orden del archivo de origen. Ese orden **es** la declaración de
+  quien importó la lista, así que se respeta, igual que la regla que quedó escrita con
+  [P2]. El corte por duplicados dentro de una misma importación ya existía
+  (`collection_eligible`), así que el choque de clave primaria que rompía la colección
+  derivada no puede pasar por acá. Verificado corriendo el servicio de verdad.
+- **Lo que estaba roto es el costo de armarla.** `possible_duplicate_candidates` compara
+  una ficha contra todo el catálogo y, mientras lo hace, vuelve a calcular las claves de
+  título de cada ficha del catálogo. Una vez no es nada; una vez por cada elemento de una
+  lista es **todo** el costo. Perfilado sobre un catálogo de 5000 y una colección de 200:
+  normalizar el catálogo una vez son 0.124 s, y la página lo hacía 200 veces — **24.9 s de
+  los 28 que tardaba**, contra 2.3 s de comparación real. El 92% del tiempo era recalcular
+  lo mismo.
+- **Tres pantallas hacían exactamente eso**: abrir una colección, refrescar un borrador de
+  importación y armar Inicio a partir de las colecciones seguidas. Inicio es la peor de las
+  tres, porque las fichas de una colección seguida están mayormente **ausentes** del
+  catálogo y una ficha ausente no puede cortar temprano: recorre el catálogo entero.
+  Preparado una vez: **39.7 s → 2.8 s**.
+- **El detalle que vale releer**: el índice es perezoso a propósito. La primera versión
+  preparaba todo por adelantado y hacía más lento el caso contrario —`catalog_membership`
+  devuelve apenas reconoce un id, así que quien pregunta una sola vez por una ficha que
+  está en la posición 3 de 5000 habría pagado por preparar las 5000—. Las filas se calculan
+  a medida que se llega a ellas y quedan cacheadas, así que el corte temprano sobrevive:
+  medido en 0.2 ms, sin cambio.
+- Las pruebas cuentan llamadas en vez de segundos, porque una aserción de tiempo en una
+  suite mide la máquina que la corre.
+
 **Fuentes externas, 2026-09-10.** El commit `07e12be`. Lo primero que apareció al ir a
 buscar los dos defectos que el diagnóstico del 2026-08-26 nombraba: **los dos ya estaban
 arreglados** por [Q2] y [Q3], y la nota nunca se actualizó. Lo que seguía siendo cierto es
