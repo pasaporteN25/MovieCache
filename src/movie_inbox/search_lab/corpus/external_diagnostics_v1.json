@@ -209,6 +209,24 @@
           }
         }
       }
+    },
+    {
+      "id": "external-filmaffinity-single-match-page",
+      "label": "Una busqueda que resuelve a una ficha se lee como ficha y no como listado (HTML real capturado el 2026-09-10 y recortado a las etiquetas que el parser lee)",
+      "language": "ja",
+      "stage": "alias_expansion",
+      "top_k": 5,
+      "queries": [
+        "Sen to Chihiro no kamikakushi"
+      ],
+      "sources": {
+        "filmaffinity": {
+          "expected_key": "https://www.filmaffinity.com/es/film759533.html",
+          "recorded_responses": {
+            "https://www.filmaffinity.com/es/search.php?stext=Sen%20to%20Chihiro%20no%20kamikakushi": "<html><head><meta property=\"og:type\" content=\"video.\" ><meta property=\"og:url\" content=\"https://www.filmaffinity.com/es/film759533.html\" ></head><body><h1 id=\"main-title\">\n        <span itemprop=\"name\">El viaje de Chihiro</span>\n        \n        <span class=\"movie-type\"><span class=\"type\">Animación</span></span>\n        \n    </h1><dt>Título original</dt>\n            <dd>\n                Sen to Chihiro no kamikakushi<span class=\"show-akas ui-corner-all\" >aka <i class=\"fa-solid fa-caret-down\"></i></span>             </dd><dd itemprop=\"datePublished\">2001</dd><dd class=\"\" itemprop=\"description\">Chihiro es una niña de diez años que viaja en coche con sus padres. Después de atravesar un túnel, llegan a un mundo fantástico, en el que no hay lugar para los seres humanos, sólo para los dioses de primera y segunda clase. Cuando descubre que sus padres han sido convertidos en cerdos, Chihiro se siente muy sola y asustada. (FILMAFFINITY)</dd><a class=\"active\" href=\"https://www.filmaffinity.com/es/film759533.html\">\n\n                                <span class=\"icon d-md-none\"><i class=\"fa-light fa-film\"></i></span>\n\n                                <span class=\"d-none d-md-block\">Ficha&nbsp;</span>\n\n                            </a><a  href=\"https://www.filmaffinity.com/es/filmimages.php?movie_id=759533\">\n\n                                <span class=\"icon d-md-none\"><i class=\"fa-light fa-images\"></i></span>\n\n                                <span class=\"d-none d-md-block\">Imágenes&nbsp;<em>[113]</em></span>\n\n                            </a></body></html>"
+          }
+        }
+      }
     }
   ]
 }

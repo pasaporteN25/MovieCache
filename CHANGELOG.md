@@ -23,6 +23,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   su ficha se enriqueciera: la obra se reportaba dos veces, la coleccion no se llegaba a
   crear y la unica senal era que el interruptor volvia sin publicar nada. Ahora las copias
   se cuentan juntas, como siempre debieron.
+- FilmAffinity vuelve a encontrar una pelicula buscada por su titulo original. Cuando la
+  busqueda resuelve a una sola pelicula el sitio no devuelve un listado sino la ficha, y
+  Movie Inbox la leia como si fuera un listado: devolvia los enlaces de navegacion de la
+  propia pagina ("Ficha", "Imagenes") como si fueran peliculas, y la que se estaba buscando
+  quedaba afuera. Buscar "Sen to Chihiro no kamikakushi" devolvia ocho filas y ninguna era
+  El viaje de Chihiro, que estaba arriba de todo en la respuesta.
 - Buscar una pelicula por su titulo original en otro idioma vuelve a encontrarla en
   Wikipedia y en FilmAffinity. El reintento con un alias confirmado por Wikidata ya
   existia, pero la fila que encontraba llegaba sin rastro de la consulta que la habia

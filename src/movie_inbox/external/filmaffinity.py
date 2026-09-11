@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import quote
@@ -45,13 +46,15 @@ class FilmAffinityAdapter:
         return results
 
     def _fetch(self, text: str, timeout: float = 8.0) -> list[dict[str, Any]]:
-        parser = FilmAffinityParser()
-        parser.feed(
-            fetch_text(
-                f"https://www.filmaffinity.com/es/search.php?stext={quote(text)}",
-                timeout=timeout,
-            )
+        body = fetch_text(
+            f"https://www.filmaffinity.com/es/search.php?stext={quote(text)}",
+            timeout=timeout,
         )
+        single = _result_from_film_page(body)
+        if single is not None:
+            return [single]
+        parser = FilmAffinityParser()
+        parser.feed(body)
         return parser.results[:8]
 
 
@@ -101,6 +104,43 @@ class FilmAffinityParser(HTMLParser):
         return href if href.startswith("http") else "https://www.filmaffinity.com" + href
 
 
+def _result_from_film_page(body: str) -> dict[str, Any] | None:
+    """One result from a search that resolved straight to a film's own page.
+
+    Measured against the live site, not assumed: searching "Sen to Chihiro no
+    kamikakushi" or "Addio zio Tom" does not return a listing at all -- the
+    site serves the film's page. Reading that page with the listing parser
+    produced its navigation ("Ficha", "Imagenes") and its related-films rail
+    as if they were search results, so the film Movie Inbox was looking for
+    arrived titled "Ficha" and scored 10.2, under the 28.0 relevance floor.
+    Every other row was a different Ghibli film. The source had the answer at
+    the top of the response and contributed nothing.
+
+    The page says what it is, so this reads it with the parser that already
+    exists for it, which recovers the original title -- the one field that
+    makes such a row score at all against a query in its own language.
+    """
+
+    parser = FilmAffinityMetadataParser()
+    parser.feed(body)
+    if not parser.is_film_page:
+        return None
+    title = parser.display_title or parser.original_title
+    if not title:
+        return None
+    return {
+        "source": "filmaffinity",
+        "title": title,
+        "original_title": parser.original_title,
+        "spanish_title": parser.display_title,
+        "english_title": "",
+        "alternative_titles": [],
+        "year": parser.year or infer_year(title),
+        "url": parser.canonical_film_url,
+        "description": parser.description,
+    }
+
+
 class FilmAffinityMetadataParser(HTMLParser):
     """Reads the schema.org microdata on a FilmAffinity film detail page.
 
@@ -111,10 +151,18 @@ class FilmAffinityMetadataParser(HTMLParser):
 
     _NAME_TARGETS = {"director": "directors", "actor": "cast"}
 
+    # A search that resolves to a single film does not return a listing: the
+    # site serves the film's own page, which says so in its Open Graph tags
+    # (og:type "video.", og:url the film's canonical address). Capturing them
+    # is what lets a caller tell the two responses apart.
+    _FILM_PAGE_URL = re.compile(r"^https://www\.filmaffinity\.com/[a-z]{2}/film\d+\.html$")
+
     def __init__(self) -> None:
         super().__init__()
         self.display_title = ""
         self.original_title = ""
+        self.canonical_film_url = ""
+        self._og_type = ""
         self.year = ""
         self.description = ""
         self.genres: list[str] = []
@@ -130,6 +178,8 @@ class FilmAffinityMetadataParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = {key.lower(): value or "" for key, value in attrs}
         itemprop = attributes.get("itemprop", "")
+        if tag == "meta":
+            self._read_open_graph(attributes)
         # Tag-shaped state (dt/dd pairing, the h1 title, writer links) and
         # itemprop-shaped state are independent -- a tag can carry both (a
         # <dd itemprop="datePublished"> must update _pending from the second
@@ -157,6 +207,22 @@ class FilmAffinityMetadataParser(HTMLParser):
             self._name_target = self._NAME_TARGETS[itemprop]
         elif itemprop == "name" and self._name_target:
             self._pending = self._name_target
+
+    def _read_open_graph(self, attributes: dict[str, str]) -> None:
+        name = attributes.get("property", "")
+        content = attributes.get("content", "").strip()
+        if name == "og:type":
+            self._og_type = content
+        elif name == "og:url" and self._FILM_PAGE_URL.match(content):
+            self.canonical_film_url = content
+
+    @property
+    def is_film_page(self) -> bool:
+        """Whether the body parsed is a film's own page rather than a listing.
+
+        A listing declares og:type "website" and points og:url back at the
+        search; a film page declares "video." and points at itself."""
+        return bool(self.canonical_film_url and self._og_type.startswith("video"))
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "dt":
