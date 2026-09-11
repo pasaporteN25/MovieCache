@@ -375,11 +375,34 @@ y recortada, y el recorte se verificó por partida doble en vez de mirarlo a ojo
 arreglo produce un resultado idéntico al del cuerpo completo de 117 KB, y sin el arreglo
 sigue reproduciendo la falla original, así que el caso discrimina por el motivo correcto.
 
-- **Sigue abierto, con el número**: cuando FilmAffinity **sí** contesta con un listado, sus
-  filas no traen título original, así que `Der Untergang` puntúa 17.4 contra "El
-  hundimiento" y queda bajo el piso. El reintento por alias no puede ayudar porque sólo se
-  dispara con resultado vacío y un listado no está vacío — el puente de IMDb ya dispara con
-  "nada superó el piso" desde [Q3] y a FilmAffinity nunca le llegó esa mitad.
+**Reintento por piso, 2026-09-11.** El commit `c4382da` cierra el punto anterior. La
+condición era *"¿la fuente contestó?"* y tenía que ser *"¿contestó algo que sirva?"*. Un
+listado de FilmAffinity para `Der Untergang` devuelve cinco películas, la mejor "El
+hundimiento" a 17.4 contra un piso de 28.0 — la fuente no aportó nada y el reintento que la
+recupera no corría, porque un listado no está vacío. El puente de IMDb dispara con esa
+condición desde [Q3]; a las otras dos fuentes les llegó sólo la mitad.
+
+Lo que más vale la pena anotar es de dónde salió. `docs/search-quality.md` tenía archivada
+como *"limitación conocida"* la falta de casos de corpus para Wikipedia y FilmAffinity, con
+el motivo: encontrar una búsqueda que volviera genuinamente vacía *"resultó más difícil de
+lo esperado"* porque `gsrsearch` casi siempre devuelve algo. **Esa dificultad no era un
+problema del corpus: era el defecto, escrito y no reconocido.** Una búsqueda casi nunca
+vuelve vacía y vuelve inútil todo el tiempo. La nota quedó marcada como resuelta con lo que
+resultó ser.
+
+Verificado en vivo antes de escribir nada: grabar FilmAffinity para `Der Untergang` hace
+seis peticiones —el listado, las cuatro de Wikidata y un reintento sobre "El hundimiento"—
+y devuelve la película a **100.0** llevando "Der Untergang" como título original.
+
+De paso, `with_alias_identity` dejó de tirar un título confirmado cuando la fuente ya había
+ocupado ese campo: FilmAffinity etiqueta como español todo título que devuelve, así que una
+película cuya fila viene titulada en catalán bloqueaba el título español confirmado fuera de
+su propio campo. Ahora el valor desplazado cae en `alternative_titles`, que el puntaje
+también lee.
+
+- **El costo, escrito en vez de dejarlo implícito**: el reintento no cambió por disparo,
+  pero ahora se dispara cada vez que una respuesta es mala en vez de sólo cuando falta. El
+  presupuesto de `docs/search-quality.md` quedó actualizado con eso.
 - **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
   a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
   palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
