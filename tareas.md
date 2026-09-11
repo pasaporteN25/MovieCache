@@ -440,6 +440,35 @@ también lee.
   dos caracteres antes de salir del navegador. Mientras eso siga, la consulta de una letra
   funciona por API y por CLI pero no desde la caja de búsqueda.
 
+**Composición entre fuentes, 2026-09-11.** El commit `bc8a2ba`. Último punto del alcance
+declarado de [B1].
+
+- **Lo que es a propósito y quedó con prueba que lo cuida**: la composición es **por
+  fuente**. Cada una conserva su estante y la misma obra encontrada por dos de ellas se
+  muestra dos veces, porque son dos registros de la obra y no uno. Colapsarlas tiraría el
+  que haya contestado segundo. Hay una prueba que lo fija para que nadie lo "arregle" en un
+  dedupe entre fuentes.
+- **Lo que estaba mal es la misma obra dos veces dentro de un mismo estante.** A un
+  artículo de Wikipedia se llega por dos caminos: su buscador, y una resolución por título
+  exacto cuando el buscador no devolvió el título pedido. La resolución contesta con la
+  `canonicalurl` del artículo; el buscador no la pedía, así que la URL se **construía** a
+  partir del título — y una URL construida escribe los paréntesis de "The Fly (1986 film)"
+  escapados, mientras Wikipedia los escribe literales. Dos cadenas, un artículo, y el
+  dedupe las comparaba como texto. Casi toda ficha de cine está desambiguada así, y la
+  resolución se dispara justo cuando la consulta está en otro idioma que el artículo.
+- **Arreglado por los dos lados**: el buscador ahora pide `inprop=url`, así que la
+  dirección la da Wikipedia en vez de adivinarse —confirmado contra la API en vivo, que
+  devuelve los paréntesis literales—, y la clave de dedupe dejó de ser sensible a cómo está
+  escapada una URL.
+- **El hueco del instrumento, que es el hallazgo más útil**: `UnrecordedRequestError`
+  heredaba de `Exception`, y todos los adaptadores capturan `Exception` alrededor de sus
+  propias llamadas —así es como una fuente caída se convierte en un estante vacío—, o sea
+  que **un fixture faltante era indistinguible de una fuente que no contestó nada**. Ya
+  había costado algo: al cambiar la URL de búsqueda, el caso de Wikipedia quedó apuntando a
+  una grabación que ya no coincidía y **siguió pasando**, por un camino que no fue escrito
+  para ejercitar. Ahora hereda de `BaseException` para que llegue al harness, que lo captura
+  por nombre. Apenas se cambió, encontró un segundo fixture viejo en las pruebas de replay.
+
 **Medición de la consulta por fuente, 2026-09-11.** Seis títulos cuyo original no está en
 español, corriendo los adaptadores de verdad contra los sitios de verdad.
 
