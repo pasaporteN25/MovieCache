@@ -24,7 +24,7 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [B1] | Mejorar el algoritmo de búsqueda y de colecciones | definir alcance con el owner |
+| — | [B1] | **Cerrada 2026-09-11.** Alcance cubierto, medido y con gates en CI | criterio de cierre acordado con el owner |
 | 2 | [A2] | Cliente Android autónomo | A2.0 (entorno) + ADR-0005 |
 | 3 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 | — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
@@ -233,7 +233,7 @@ evaluación queda como trabajo hecho para cuando haga falta.
 importación de Letterboxd: armar el `column_map` solo, decidir qué se hace con `Rewatch` y
 `Tags` —que no tienen destino— y convertir la escala de estrellas a 1–10.
 
-#### [B1] Mejorar el algoritmo de búsqueda y de colecciones
+#### [B1] Mejorar el algoritmo de búsqueda y de colecciones — **cerrada 2026-09-11**
 
 **Abierto el 2026-09-07 por decisión del owner**, que pidió priorizar esto por encima de
 las integraciones externas. Es el lado de infraestructura; la presentación de las mismas
@@ -489,6 +489,62 @@ español, corriendo los adaptadores de verdad contra los sitios de verdad.
   medirlo. [Q3] ya le da a Wikipedia el título original como primer alias, que es
   exactamente lo que su cobertura en/es no cubre, así que la hipótesis a refutar es que ya
   esté resuelto.
+
+**Cerrada el 2026-09-11, con el criterio acordado con el owner.** Once arreglos, 23
+commits y cinco archivos de prueba nuevos.
+
+El criterio no podía ser *"la búsqueda está bien"*: la calidad de búsqueda no tiene fondo y
+siempre hay un defecto más si se lo busca. Es un criterio sobre **los instrumentos** — que
+cualquier defecto futuro llegue necesariamente con evidencia en vez de con una opinión:
+
+1. **Las cuatro superficies del alcance tienen al menos un caso que falla si se revierte su
+   arreglo**, verificado uno por uno y no asumido. Ranking: 32 casos del corpus dorado.
+   Fuentes externas: 6 casos de diagnóstico, las tres fuentes, cuatro idiomas. Colecciones:
+   19 pruebas. Composición: 7 pruebas.
+2. **El gate de v0.3.0 intacto**: cero falsos positivos conocidos en auto-match, precisión
+   1.000. Ninguno de los once arreglos abre un auto-match nuevo; la aceptación se decide en
+   `decide_match`, que corre sobre todo el catálogo sin leer el gate de búsqueda.
+3. **Los dos instrumentos corren en CI**: `search-lab run --enforce` y `search-lab
+   external-diagnostics --enforce`, en `.github/workflows/tests.yml`.
+4. **Lo que queda sin hacer está escrito con su número y con dueño**, no implícito: ver
+   [B2].
+
+**La regla que deja escrita**, que es lo que encontró los once defectos y vale más que
+cualquiera de ellos:
+
+> Todo cambio de algoritmo se mide antes y después, y llega con un caso que **falla si se
+> revierte el arreglo**. Un caso que pasa igual con y sin el arreglo es decoración.
+
+Dos veces esa regla encontró que la documentación **ya tenía escrito el defecto sin
+reconocerlo**: la "limitación conocida" de [Q3] sobre lo difícil que era hallar una
+búsqueda genuinamente vacía era, en realidad, el defecto —una búsqueda casi nunca vuelve
+vacía y vuelve inútil todo el tiempo—, y el diagnóstico del 2026-08-26 seguía listando como
+abiertos dos puntos que [Q3] y [U3] ya habían cerrado.
+
+**Decisión tomada a propósito, que no es deuda**: `"Light"` sigue trayendo `"Moonlight"`,
+pero a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
+palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
+deshonesta a 82.
+
+#### [B2] Los dos pendientes que deja [B1]
+
+Abierta el 2026-09-11 al cerrar [B1], para que lo que quedó afuera tenga número y dueño en
+vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
+
+- [ ] **[B2.1] El corte de dos caracteres en la caja de búsqueda.** `catalog-search.js`
+  descarta las consultas de menos de dos caracteres **antes de salir del navegador**, así
+  que el arreglo de servidor de `57ad234` —una consulta de una sola letra es una consulta
+  real: `M`, `Z`, `9` son películas— funciona hoy por API y por CLI pero no desde la caja.
+  **Es del frente visual**, se anota acá sólo para que no se pierda la dependencia.
+- [ ] **[B2.2] La consulta por fuente de Wikipedia, sin medir.** La medición del
+  2026-09-11 cerró el punto para FilmAffinity con número —primera consulta 5/6, final
+  6/6— pero la mitad de Wikipedia salió **inválida**: devolvió `429 Too Many Requests` y
+  los supuestos fallos de búsqueda eran eso. Si se retoma, medir **con
+  `ExternalSourceService` en el medio** —que es quien maneja el 429 con cooldown leído de
+  `Retry-After`— y a ritmo bajo. La hipótesis a refutar es que ya esté resuelto: [Q3] le da
+  a Wikipedia el título original como primer alias, que es exactamente lo que su cobertura
+  en/es no cubre.
+- **Modelo sugerido**: Chico. Son dos puntas acotadas, no un frente.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
