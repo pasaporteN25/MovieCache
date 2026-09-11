@@ -344,12 +344,42 @@ El instrumento también estaba mal: `_FALLBACK_SIGNATURES` decía que FilmAffini
 fallback propio —cierto cuando se escribió, falso desde [Q3]— así que un reintento que
 disparaba se reportaba como ninguno, y de los dos fallbacks de Wikipedia reconocía uno.
 
-- **Sigue sin medirse, escrito en vez de darlo por cerrado**: FilmAffinity no tiene ningún
-  caso de diagnóstico, y agregarlo implica grabar respuestas reales. El caso nuevo de
-  Wikipedia sí discrimina: sin el arreglo el gate **falla** con `it/wikipedia` Recall@5 en
-  0.000 y el motivo nombrado como el instrumento fue construido para nombrarlo —
-  `discarded_by_threshold: score=23.2`, que es "la fuente la devolvió y la tiramos" y no
-  "la fuente nunca la tuvo".
+- El caso nuevo de Wikipedia discrimina: sin el arreglo el gate **falla** con
+  `it/wikipedia` Recall@5 en 0.000 y el motivo nombrado como el instrumento fue construido
+  para nombrarlo — `discarded_by_threshold: score=23.2`, que es "la fuente la devolvió y la
+  tiramos" y no "la fuente nunca la tuvo".
+
+**FilmAffinity, 2026-09-11.** El commit `5ad2f52`, a pedido del owner: grabar las
+respuestas reales para el caso de diagnóstico que faltaba. **La grabación contradijo de
+entrada el escenario que estaba por escribir de memoria.** FilmAffinity no falla con los
+títulos originales; lo que hace es contestar una búsqueda que resuelve a una sola película
+con **la ficha de esa película en vez de un listado** — dos de los cuatro títulos que sondeé,
+así que no es un caso de borde — y Movie Inbox leía esa ficha con el parser escrito para
+listados.
+
+Buscar `Sen to Chihiro no kamikakushi` devolvía ocho filas y **ninguna era la película**. Las
+dos primeras eran la navegación de la propia página, tituladas "Ficha" e "Imágenes"; el
+resto eran otras películas de Ghibli del carrusel de relacionadas. "Ficha" puntuaba 10.2
+contra un piso de 28.0, así que FilmAffinity no aportaba nada para una consulta cuya
+respuesta era lo primero que venía en lo que el sitio había mandado. `Addio zio Tom` se
+comportaba igual.
+
+La página dice de qué tipo es (`og:type` `video.` y un `og:url` que apunta a sí misma en vez
+de a la búsqueda), así que ahora la lee el parser de ficha que ya existía, que recupera el
+título original — el único campo que hace que una fila así puntúe contra una consulta en su
+propio idioma. Medido sobre los cuerpos capturados: 10.2 → **100.0**.
+
+El corpus gana el caso de FilmAffinity que le faltaba, así que **las tres fuentes están
+medidas**. Su cuerpo es la respuesta real capturada por el `fetch_text` del propio adaptador
+y recortada, y el recorte se verificó por partida doble en vez de mirarlo a ojo: con el
+arreglo produce un resultado idéntico al del cuerpo completo de 117 KB, y sin el arreglo
+sigue reproduciendo la falla original, así que el caso discrimina por el motivo correcto.
+
+- **Sigue abierto, con el número**: cuando FilmAffinity **sí** contesta con un listado, sus
+  filas no traen título original, así que `Der Untergang` puntúa 17.4 contra "El
+  hundimiento" y queda bajo el piso. El reintento por alias no puede ayudar porque sólo se
+  dispara con resultado vacío y un listado no está vacío — el puente de IMDb ya dispara con
+  "nada superó el piso" desde [Q3] y a FilmAffinity nunca le llegó esa mitad.
 - **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
   a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
   palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
