@@ -242,11 +242,17 @@ superficies es [U3], del frente visual, y las dos conviene que avancen conversan
 - **Alcance**: la calidad del resultado, no su dibujo. Ranking, evidencia de identidad,
   composición entre fuentes y cómo se arma y ordena una colección.
 - **Punto de partida ya escrito**: el diagnóstico del 2026-08-26 en este mismo archivo
-  (frente de búsqueda) y `docs/search-quality.md`. Ese diagnóstico ya nombra tres cosas
-  concretas: las tres fuentes externas reciben casi la misma consulta, el puente de aliases
-  de Wikidata **no** se activa cuando IMDb devuelve vacío —sólo cuando devuelve filas bajo
-  el umbral—, y `runSearch()` restablece el modo `browse`, así que editar la consulta
-  durante `Comparar` pierde el contexto.
+  (frente de búsqueda) y `docs/search-quality.md`. De las tres cosas concretas que ese
+  diagnóstico nombraba, **dos ya están cerradas** y quedaron marcadas allá con una
+  corrección fechada el 2026-09-10: el puente de aliases de IMDb sí dispara con respuesta
+  vacía desde [Q3], y el contexto de `Comparar` lo cerró [U3]. Se anota acá porque salir a
+  arreglarlas de nuevo fue el costo real de no haberlo actualizado a tiempo.
+- **Lo único que queda en pie de aquel diagnóstico**: las tres fuentes externas reciben una
+  consulta muy parecida, y sigue sin medirse. Encadenado con la cobertura que falta (ver la
+  nota de fuentes externas más abajo): tocar la construcción de la consulta antes de que
+  FilmAffinity tenga un caso de diagnóstico sería cambiar a ciegas la única de las tres sin
+  fallback propio y la única en español. `docs/search-quality.md` está al día y no necesita
+  corrección.
 - **Herramienta que ya existe**: `movie-inbox search-lab run --enforce` mide el ranking
   productivo sin cambiarlo y es gate en CI desde v0.3.0. Cualquier cambio de algoritmo se
   mide contra él **antes y después**, o no se sabe si mejoró.
