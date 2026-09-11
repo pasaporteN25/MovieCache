@@ -108,7 +108,11 @@ class WikipediaAdapter:
             f"https://{language}.wikipedia.org/w/api.php"
             f"?action=query&generator=search&gsrsearch={quote(query + ' ' + film_word)}"
             "&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1"
-            "&prop=extracts%7Cpageimages%7Cpageprops&exintro=1&explaintext=1&pithumbsize=480"
+            # inprop=url so the search answers with the article's own address.
+            # Without it the URL had to be built from the title, and a built one
+            # spells "(1986 film)" differently than Wikipedia does.
+            "&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url"
+            "&exintro=1&explaintext=1&pithumbsize=480"
             "&format=json&formatversion=2"
         )
         search_error: Exception | None = None

@@ -28,6 +28,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   su ficha se enriqueciera: la obra se reportaba dos veces, la coleccion no se llegaba a
   crear y la unica senal era que el interruptor volvia sin publicar nada. Ahora las copias
   se cuentan juntas, como siempre debieron.
+- Un mismo articulo de Wikipedia dejo de aparecer dos veces en su estante. Wikipedia se
+  alcanza por dos caminos —su buscador y una resolucion por titulo exacto— y las dos filas
+  traian el mismo articulo con direcciones que solo se diferenciaban en como estaban
+  escapados los parentesis de "The Fly (1986 film)". Como casi toda ficha de cine esta
+  desambiguada asi, pasaba seguido, y justo cuando la consulta estaba en otro idioma que el
+  articulo.
 - Cuando una fuente externa contesta pero nada de lo que trae sirve, Movie Inbox vuelve a
   intentar con un titulo alternativo confirmado, igual que hacia cuando la respuesta venia
   vacia. Antes bastaba con que la fuente devolviera cualquier cosa para que no se

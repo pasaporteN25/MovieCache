@@ -111,7 +111,7 @@
         "wikipedia": {
           "expected_key": "https://en.wikipedia.org/wiki/goodbye_uncle_tom",
           "recorded_responses": {
-            "https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=Addio%20zio%20Tom%20film&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1&prop=extracts%7Cpageimages%7Cpageprops&exintro=1&explaintext=1&pithumbsize=480&format=json&formatversion=2": {
+            "https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=Addio%20zio%20Tom%20film&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url&exintro=1&explaintext=1&pithumbsize=480&format=json&formatversion=2": {
               "query": {
                 "pages": []
               }
@@ -121,7 +121,7 @@
                 "pages": []
               }
             },
-            "https://es.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=Addio%20zio%20Tom%20pelicula&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1&prop=extracts%7Cpageimages%7Cpageprops&exintro=1&explaintext=1&pithumbsize=480&format=json&formatversion=2": {
+            "https://es.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=Addio%20zio%20Tom%20pelicula&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url&exintro=1&explaintext=1&pithumbsize=480&format=json&formatversion=2": {
               "query": {
                 "pages": []
               }
