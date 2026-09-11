@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, MutableMapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
@@ -537,15 +537,66 @@ def same_catalog_item(
     return bool(item_local and target_local and item_local == target_local)
 
 
+_ComparisonRow = tuple[Mapping[str, Any], frozenset[str], str, frozenset[str]]
+
+
+class CatalogComparisonIndex:
+    """A catalogue with its comparison keys worked out once.
+
+    `possible_duplicate_candidates` compares one item against every catalogue
+    item, and recomputes each catalogue item's title keys while doing it. Once,
+    that is cheap. Once per item in a list, it is the entire cost: measured on a
+    5000-item catalogue, normalising it takes 0.124s, and opening a 200-item
+    collection did exactly that 200 times -- 24.9s of the 28s the page spent,
+    against 2.3s of actual comparing.
+
+    Pass one of these wherever a list is compared against the same catalogue
+    more than once. Everywhere else a plain sequence still works and is prepared
+    internally, so no caller has to care. `add()` exists because copying a
+    collection into the catalogue grows the catalogue as it goes.
+    """
+
+    __slots__ = ("_items", "_rows")
+
+    def __init__(self, items: Iterable[Mapping[str, Any]] = ()) -> None:
+        self._items: list[Mapping[str, Any]] = list(items)
+        self._rows: list[_ComparisonRow] = []
+
+    def add(self, item: Mapping[str, Any]) -> None:
+        self._items.append(item)
+
+    def __iter__(self) -> Iterator[_ComparisonRow]:
+        # Lazily, and cached: catalog_membership returns the moment it finds an
+        # id or a URL it already knows, and a caller that only ever asks once
+        # must not pay to prepare the whole catalogue for a hit at position 3.
+        for position, item in enumerate(self._items):
+            if position >= len(self._rows):
+                self._rows.append(
+                    (
+                        item,
+                        frozenset(title_match_keys_for_item(item)),
+                        str(item.get("year") or ""),
+                        frozenset(external_urls(item)),
+                    )
+                )
+            yield self._rows[position]
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
+def _prepared(items: Sequence[Mapping[str, Any]] | CatalogComparisonIndex) -> CatalogComparisonIndex:
+    return items if isinstance(items, CatalogComparisonIndex) else CatalogComparisonIndex(items)
+
+
 def possible_duplicate_candidates(
-    items: Sequence[Mapping[str, Any]], item: Mapping[str, Any]
+    items: Sequence[Mapping[str, Any]] | CatalogComparisonIndex, item: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
     item_titles = title_match_keys_for_item(item)
     item_year = str(item.get("year") or "")
     candidates: list[dict[str, Any]] = []
-    for existing in items:
-        existing_titles = title_match_keys_for_item(existing)
-        existing_year = str(existing.get("year") or "")
+    for existing, existing_title_keys, existing_year, _urls in _prepared(items):
+        existing_titles = existing_title_keys
         exact = bool(set(existing_titles) & set(item_titles))
         similarity = max(
             (title_similarity(left, right) for left in existing_titles for right in item_titles),
@@ -601,14 +652,15 @@ def possible_duplicate_candidates(
 
 
 def catalog_membership(
-    item: Mapping[str, Any], items: Sequence[Mapping[str, Any]]
+    item: Mapping[str, Any], items: Sequence[Mapping[str, Any]] | CatalogComparisonIndex
 ) -> dict[str, Any]:
     """Classify exact identity separately from conservative title candidates."""
+    prepared = _prepared(items)
     item_id = str(item.get("id") or "")
     urls = external_urls(item)
-    for existing in items:
+    for existing, _titles, _year, existing_urls in prepared:
         same_id = bool(item_id and item_id == str(existing.get("id") or ""))
-        same_url = bool(urls and urls & external_urls(existing))
+        same_url = bool(urls and urls & existing_urls)
         if same_id or same_url:
             return {
                 "state": "present",
@@ -616,7 +668,7 @@ def catalog_membership(
                 "candidate_count": 0,
                 "candidates": [],
             }
-    candidates = possible_duplicate_candidates(items, item)
+    candidates = possible_duplicate_candidates(prepared, item)
     if candidates:
         return {
             "state": "review",

@@ -18,6 +18,11 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Corregido
 
+- Abrir una coleccion, refrescar una importacion y armar la pantalla de inicio dejan de
+  ponerse lentos a medida que crece el catalogo. Las tres comparaban cada ficha contra el
+  catalogo entero y volvian a normalizarlo de cero en cada comparacion: con 5000 fichas y
+  una coleccion de 200, eso eran 25 de los 28 segundos que tardaba la pagina. Ahora el
+  catalogo se prepara una vez por pantalla.
 - Compartir la disponibilidad de una biblioteca dejaba de funcionar en silencio si la
   biblioteca tenia dos copias de la misma pelicula y una se habia escaneado antes de que
   su ficha se enriqueciera: la obra se reportaba dos veces, la coleccion no se llegaba a

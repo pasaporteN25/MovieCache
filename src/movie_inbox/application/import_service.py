@@ -15,7 +15,7 @@ from typing import Any
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
 from movie_inbox.application.import_repository import ImportDraftRepository
-from movie_inbox.domain.catalog import catalog_membership, normalize_item
+from movie_inbox.domain.catalog import CatalogComparisonIndex, catalog_membership, normalize_item
 from movie_inbox.domain.collections import (
     CollectionItem,
     CuratedCollection,
@@ -488,7 +488,11 @@ class ImportService:
         parsed: ParsedImport,
         catalog_items: list[Mapping[str, Any]],
     ) -> tuple[ImportDraftItem, ...]:
-        source_items: list[Mapping[str, Any]] = []
+        # Both comparisons below run once per parsed row against the same two
+        # lists, so both lists are prepared once. The source one grows as rows
+        # are accepted, which is what add() is for.
+        source_items = CatalogComparisonIndex()
+        prepared_catalog = CatalogComparisonIndex(catalog_items)
         classified: list[ImportDraftItem] = []
         for parsed_entry in parsed.items:
             if parsed_entry.item is None:
@@ -520,8 +524,8 @@ class ImportService:
                     )
                 )
                 continue
-            source_items.append(parsed_entry.item)
-            membership = catalog_membership(parsed_entry.item, catalog_items)
+            source_items.add(parsed_entry.item)
+            membership = catalog_membership(parsed_entry.item, prepared_catalog)
             state = "new" if membership["state"] == "missing" else membership["state"]
             classified.append(
                 ImportDraftItem(
@@ -543,11 +547,12 @@ class ImportService:
         catalog_items: list[Mapping[str, Any]],
     ) -> ImportDraft:
         refreshed: list[ImportDraftItem] = []
+        prepared = CatalogComparisonIndex(catalog_items)
         for entry in draft.items:
             if entry.state == "invalid" or not entry.collection_eligible:
                 refreshed.append(entry)
                 continue
-            membership = catalog_membership(entry.item or {}, catalog_items)
+            membership = catalog_membership(entry.item or {}, prepared)
             state = "new" if membership["state"] == "missing" else membership["state"]
             refreshed.append(
                 replace(
