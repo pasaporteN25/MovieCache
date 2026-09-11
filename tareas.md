@@ -29,6 +29,28 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | 3 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 | — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
 
+**Aviso entre frentes, 2026-09-11 — del lado lógica.** Este archivo lo escriben los dos
+frentes y conviene decir en voz alta quién movió qué, porque durante esta semana se
+desincronizó.
+
+- **Lo que movió lógica**: [B1] quedó **cerrada** con el criterio acordado con el owner, y
+  se abrió [B2] con los dos pendientes que deja. **[B2.1] es del frente visual**: el corte
+  de dos caracteres en `catalog-search.js` es lo único que hoy impide que una consulta de
+  una sola letra —`M`, `Z`, `9` son películas— funcione desde la caja de búsqueda; por API
+  y por CLI ya funciona desde `57ad234`.
+- **Cómo se editó, para que nadie pierda trabajo**: cada commit de lógica se prepara contra
+  `HEAD` y toca **sólo sus propias secciones**, y después se vuelve a aplicar sobre el árbol
+  de trabajo. Por eso ninguno de esos commits arrastró las líneas sin commitear del otro
+  frente, y por eso la fila de [B1] en la tabla se escribió resistente a las dos formas que
+  la tabla tiene ahora mismo.
+- **Lo que conviene mirar**: al 2026-09-11 este archivo tiene ~118 líneas sin commitear del
+  frente visual, entre ellas un párrafo que sigue diciendo que *"[B1] queda en espera por
+  ser un frente de lógica"*. Eso ya no es cierto y va a contradecir la fila de la tabla
+  cuando se commitee. **La cura no es coordinar mejor: es commitear más seguido.** Mientras
+  un frente retiene cambios en un archivo compartido, el otro está escribiendo sobre una
+  versión que no ve.
+
+
 **Reordenamiento del 2026-09-07, por decisión del owner.** Las integraciones externas
 ([I1]) quedaron evaluadas y **explícitamente postergadas**: hay problemas mejores adelante.
 La prioridad pasa a ser el algoritmo y la presentación de búsqueda y colecciones ([B1] del
