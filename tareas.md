@@ -67,34 +67,27 @@ lado de infraestructura, [U3] del lado visual).
 
 ### Frente: Busqueda, comparacion y composicion de fuentes
 
-Diagnostico del 2026-08-26: la busqueda local principal usa titulos, aliases, IDs y
-archivos; `directors` existe en el modelo pero se excluye deliberadamente de la
-evidencia de identidad. Las tres fuentes externas reciben hoy casi la misma consulta:
-IMDb hace una sola llamada al endpoint de sugerencias, Wikipedia busca en ingles y
-espanol agregando `film`/`pelicula`, y FilmAffinity envia el texto literal. El puente de
-aliases de Wikidata para IMDb se activa solo si IMDb devolvio filas pero todas quedaron
-debajo del umbral; no se activa cuando la sugerencia vino vacia. Esto explica por que
-agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb o
-Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
-consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
+#### [B2] Los dos pendientes que deja [B1]
 
-> **Corrección del 2026-09-10.** Dos de esas afirmaciones ya no son ciertas y conviene no
-> volver a salir a arreglarlas: el puente de aliases de IMDb **sí** se activa con una
-> respuesta vacía desde [Q3] (`imdb.py`, rama `is_empty`), y Wikipedia y FilmAffinity
-> tienen desde entonces su propio reintento por alias confirmado. El contexto de
-> `Comparar` lo cerró [U3]. Lo que queda en pie del párrafo es que las tres fuentes
-> reciben una consulta muy parecida.
+Abierta el 2026-09-11 al cerrar [B1], para que lo que quedó afuera tenga número y dueño en
+vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
+
+- [ ] **[B2.1] El corte de dos caracteres en la caja de búsqueda.** `catalog-search.js`
+  descarta las consultas de menos de dos caracteres **antes de salir del navegador**, así
+  que el arreglo de servidor de `57ad234` —una consulta de una sola letra es una consulta
+  real: `M`, `Z`, `9` son películas— funciona hoy por API y por CLI pero no desde la caja.
+  **Es del frente visual**, se anota acá sólo para que no se pierda la dependencia.
+- [ ] **[B2.2] La consulta por fuente de Wikipedia, sin medir.** La medición del
+  2026-09-11 cerró el punto para FilmAffinity con número —primera consulta 5/6, final
+  6/6— pero la mitad de Wikipedia salió **inválida**: devolvió `429 Too Many Requests` y
+  los supuestos fallos de búsqueda eran eso. Si se retoma, medir **con
+  `ExternalSourceService` en el medio** —que es quien maneja el 429 con cooldown leído de
+  `Retry-After`— y a ritmo bajo. La hipótesis a refutar es que ya esté resuelto: [Q3] le da
+  a Wikipedia el título original como primer alias, que es exactamente lo que su cobertura
+  en/es no cubre.
+- **Modelo sugerido**: Chico. Son dos puntas acotadas, no un frente.
 
 ### Frente: Fuentes externas y especializacion de anime
-
-La epica [F2] quedo cerrada en tres entregas: contrato de composicion [F2.1], fuente
-en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
-en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
-queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
-ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
-de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
-consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres cerradas).
-[F5] queda completo.
 
 - [ ] **Dos verificaciones en vivo que esperan un entorno**, colas de frentes cerrados.
   Ninguna bloquea nada; se anotan para que no dependan de la memoria de nadie.
@@ -104,8 +97,6 @@ consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres ce
   - **Puntajes de TMDb contra la API real** (cola de [F6.2]): es lo único de [F6.2] que no
     se verificó en vivo, porque el archivo del token no estaba en la máquina. Queda como
     `tests/test_external_tmdb_live_smoke.py`, que se salta solo sin token.
-
-### Frente: Superficie publica y despliegue
 
 ### Frente: Inicio videoclub (exploraciones posteriores)
 
@@ -122,37 +113,6 @@ bloquean U3 ni reabren la recuperación aceptada.
     representar datos inventados como análisis de la película.
 
 ### Frente: Clientes, integraciones y nuevos medios
-
-#### [A1] Definir API versionada y sesiones para dispositivos — **cerrada 2026-09-07**
-- **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
-  busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
-- **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
-  servidor-cliente antes de iniciar una app.
-- **Depende de**: [T4], [D1].
-- **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
-
-  - [x] **[A1.1] Congelar contrato de dispositivo v1.** ADR y OpenAPI estático para
-    HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
-    patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
-    prueba de que la superficie y la serialización no heredan rutas o paths internos.
-  - [x] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
-    access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
-    dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
-    desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
-  - [x] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
-    paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
-    estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
-    expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
-  - [x] **[A1.4] Clave de sincronización durable.** Cerrada 2026-09-07, commit `609f56e`.
-    Nació de los tres huecos que midió ADR-0005 para un cliente con réplica local. Sólo
-    uno era un problema de corrección y se arregló: el id opaco se derivaba del
-    `api_token` rotable más la ruta del archivo, así que rotar el token o mover el
-    catálogo re-clavaba todas las obras. Ahora sale de un secreto de instancia persistente
-    (migración v16, tabla `instance_secrets`) más la *posición* de la fuente, que no lleva
-    ruta. Los otros dos huecos —marcas de tiempo y feed de cambios— se dejaron sin hacer a
-    propósito, con el motivo escrito en la sección 6.1 de `docs/adr/0005-mobile-direction.md`:
-    ningún timestamp registra hoy una edición personal, y la fusión a tres bandas no
-    necesita un feed para ser correcta.
 
 #### [A2] Cliente Android autónomo
 
@@ -287,343 +247,6 @@ Confundirlas obligaría a inventar una base que no existe.
   en el QR. Lo que queda de eso es del owner y hace falta recién para probar [A2.1] de
   punta a punta: emitir el certificado con la receta de `docs/deployment.md`, "HTTPS en la
   red local, sin dominio".
-
-#### [I1] Evaluar Radarr, Sonarr y Letterboxd — **cerrada 2026-09-07**
-
-Criterio de cierre cumplido: matriz en
-`docs/analisis/i1-radarr-sonarr-letterboxd-2026-09-07.md` y un ADR por integración.
-**Ninguna se construyó, y por decisión del owner ninguna se construye por ahora**: la
-evaluación queda como trabajo hecho para cuando haga falta.
-
-- **Radarr — aceptada con condiciones (ADR-0006).** Entrega `tmdbId`, la identidad fuerte
-  que `decide_match` ya reconoce: empareja con `shared_tmdb_id` a 1.0. No acelera al
-  Scanner, **le evita adivinar**. Compuerta que no es técnica: si el owner no corre Radarr,
-  vale cero.
-- **Sonarr — rechazada por ahora (ADR-0007).** Misma API, veredicto distinto, y no por la
-  fuente. Informa `episodeFileCount`/`totalEpisodeCount`; medido, 3 de 86 episodios, y
-  `en_catalogo` es booleano: `true` y `false` son las dos falsas. Reabre cuando se decida
-  qué significa "tener" una serie parcial.
-- **Letterboxd — rechazada como integración, aceptada como importación (ADR-0008).** API
-  por invitación sin garantía, export con Pro, y el CSV **no trae ningún identificador**.
-  El parser existente ya lee el archivo y el emparejamiento por títulos alternativos
-  funciona; el homónimo es el techo, así que la persona se queda en el medio.
-
-**Si esto se retoma**, la tarea más chica y con mejor relación valor/costo es el preset de
-importación de Letterboxd: armar el `column_map` solo, decidir qué se hace con `Rewatch` y
-`Tags` —que no tienen destino— y convertir la escala de estrellas a 1–10.
-
-#### [B1] Mejorar el algoritmo de búsqueda y de colecciones — **cerrada 2026-09-11**
-
-**Abierto el 2026-09-07 por decisión del owner**, que pidió priorizar esto por encima de
-las integraciones externas. Es el lado de infraestructura; la presentación de las mismas
-superficies es [U3], del frente visual, y las dos conviene que avancen conversando.
-
-- **Alcance**: la calidad del resultado, no su dibujo. Ranking, evidencia de identidad,
-  composición entre fuentes y cómo se arma y ordena una colección.
-- **Punto de partida ya escrito**: el diagnóstico del 2026-08-26 en este mismo archivo
-  (frente de búsqueda) y `docs/search-quality.md`. De las tres cosas concretas que ese
-  diagnóstico nombraba, **dos ya están cerradas** y quedaron marcadas allá con una
-  corrección fechada el 2026-09-10: el puente de aliases de IMDb sí dispara con respuesta
-  vacía desde [Q3], y el contexto de `Comparar` lo cerró [U3]. Se anota acá porque salir a
-  arreglarlas de nuevo fue el costo real de no haberlo actualizado a tiempo.
-- **Lo único que queda en pie de aquel diagnóstico**: las tres fuentes externas reciben una
-  consulta muy parecida. **Medido el 2026-09-11 y resultó ser mucho menos de lo que el
-  diagnóstico sugería** — ver la nota de medición al final de la ficha.
-  `docs/search-quality.md` está al día y no necesita corrección.
-- **Herramienta que ya existe**: `movie-inbox search-lab run --enforce` mide el ranking
-  productivo sin cambiarlo y es gate en CI desde v0.3.0. Cualquier cambio de algoritmo se
-  mide contra él **antes y después**, o no se sabe si mejoró.
-- **Criterio de cierre**: pendiente de acotar con el owner. No se abren subtareas todavía
-  para no inventar alcance.
-- **Invariante que no se negocia**: el gate de v0.3.0 sigue en pie — cero falsos positivos
-  conocidos en auto-match. Un ranking más generoso que gane recall rompiendo eso no es una
-  mejora.
-
-**Avances del 2026-09-09 (lado infraestructura).** Cuatro arreglos de ranking, cada uno
-medido con `search-lab run` antes y después, y cada uno con un caso propio en el corpus
-dorado que falla si se revierte el arreglo. Un caso que pasa igual con y sin el arreglo es
-decoración, así que se verificó uno por uno.
-
-- `ad3e1e7` — un artículo compartido dejó de ser evidencia de identidad. "The Fly" y "The
-  Gift" valían 0.5 de similitud por culpa de "the". Precision@5 0.933 → 1.000, casos
-  estrictos 26/29 → 29/29.
-- `1d38c6a` — un término de dos letras no coincidía ni con uno idéntico, porque las dos
-  pruebas de subcadena arrancaban en tres caracteres y no había prueba de igualdad. "Ed"
-  no encontraba nada en un catálogo con "Ed Wood". El corpus estaba ciego a esto: todos
-  sus casos de título corto consultaban con año, que cae en la ruta de título exacto.
-- `32461b0` — una palabra corta metida adentro de otra más larga dejó de contar como
-  palabra compartida, y la comparación de respaldo pasó a medir palabras con contenido en
-  vez de cadenas crudas. Buscar "The Fly" traía "M. Butterfly" (32.2) por encima de "The
-  Flies" (29.0).
-- `57ad234` — una consulta de una sola letra es una consulta real. "M" no se podía buscar
-  por su propio título, ni siquiera agregando el año.
-- `13e9aab` — la misma ancla, sobre la regla que compara la consulta entera contra el
-  título entero. Era peor de lo anotado: "Age" puntuaba 82 contra "Carnage" y buscar
-  "Fly" ponía "M. Butterfly" **arriba de las dos películas llamadas "The Fly"**, porque
-  empataba en puntaje y ganaba el desempate alfabético.
-
-Corpus al cierre: 30 items, 32 casos, 32/32 estrictos, todas las métricas en 1.000, cero
-hits prohibidos y precisión de auto-match 1.000. **Ninguno de los cinco abre un
-auto-match nuevo**: la aceptación se decide en `decide_match`, que `rank_catalog_candidates`
-corre sobre todo el catálogo sin leer el gate de búsqueda. Se midió, no se supuso.
-
-**Colecciones, 2026-09-10.** El commit `5bdf32e` arregla dos defectos independientes de la
-colección [P2] que una biblioteca publica en Club, encontrados sondeando esa superficie y
-reproducidos de punta a punta antes de tocarlos.
-
-- **Publicación que fallaba en silencio.** Un archivo emparejado conserva la identidad con
-  la que se emparejó hasta que cambia su huella, así que una biblioteca con dos copias de
-  la misma película —una escaneada antes de que su ficha se enriqueciera— reportaba la obra
-  **dos veces**. Dos items de colección con la misma clave primaria: el insert fallaba, la
-  colección no se creaba nunca y la única señal era `set_share_availability` devolviendo
-  `synced=False`, que está documentado como un tropiezo transitorio que el próximo escaneo
-  arregla. Este era permanente. De paso corregía mal la cuenta de disponibilidad en la
-  ficha: informaba una copia donde había dos.
-- **Orden publicado tomado de un id interno.** La colección se numeraba por `work_key`, así
-  que un estante se leía Casablanca, Alien, Blade Runner, Dune —ids de TMDb comparados como
-  texto, 78 cae entre 348 y 841— y una película sin id de TMDb quedaba después de todas las
-  que sí lo tenían. Peor que arbitrario: se movía, porque la clave pasa de `work:<hash>` a
-  `tmdb:movie:<id>` en cuanto el enriquecimiento la encuentra, y el título saltaba de lugar
-  en una colección que otros ya estaban mirando. Ahora se lee alfabéticamente por el título
-  que se muestra, igual que la grilla del catálogo. **Sólo para colecciones que nadie
-  ordenó**: el orden de una colección curada es la declaración de quien la armó y no se
-  toca.
-
-**Colecciones curadas, 2026-09-11.** El commit `a82927e`. La mitad que faltaba de
-colecciones: no la derivada de una biblioteca sino las que arma una persona.
-
-- **Lo que se revisó y está bien**, dicho para que nadie lo vuelva a mirar: el camino de
-  importación arma los items con el id normalizado —no con el crudo, que puede venir
-  vacío— y los deja en el orden del archivo de origen. Ese orden **es** la declaración de
-  quien importó la lista, así que se respeta, igual que la regla que quedó escrita con
-  [P2]. El corte por duplicados dentro de una misma importación ya existía
-  (`collection_eligible`), así que el choque de clave primaria que rompía la colección
-  derivada no puede pasar por acá. Verificado corriendo el servicio de verdad.
-- **Lo que estaba roto es el costo de armarla.** `possible_duplicate_candidates` compara
-  una ficha contra todo el catálogo y, mientras lo hace, vuelve a calcular las claves de
-  título de cada ficha del catálogo. Una vez no es nada; una vez por cada elemento de una
-  lista es **todo** el costo. Perfilado sobre un catálogo de 5000 y una colección de 200:
-  normalizar el catálogo una vez son 0.124 s, y la página lo hacía 200 veces — **24.9 s de
-  los 28 que tardaba**, contra 2.3 s de comparación real. El 92% del tiempo era recalcular
-  lo mismo.
-- **Tres pantallas hacían exactamente eso**: abrir una colección, refrescar un borrador de
-  importación y armar Inicio a partir de las colecciones seguidas. Inicio es la peor de las
-  tres, porque las fichas de una colección seguida están mayormente **ausentes** del
-  catálogo y una ficha ausente no puede cortar temprano: recorre el catálogo entero.
-  Preparado una vez: **39.7 s → 2.8 s**.
-- **El detalle que vale releer**: el índice es perezoso a propósito. La primera versión
-  preparaba todo por adelantado y hacía más lento el caso contrario —`catalog_membership`
-  devuelve apenas reconoce un id, así que quien pregunta una sola vez por una ficha que
-  está en la posición 3 de 5000 habría pagado por preparar las 5000—. Las filas se calculan
-  a medida que se llega a ellas y quedan cacheadas, así que el corte temprano sobrevive:
-  medido en 0.2 ms, sin cambio.
-- Las pruebas cuentan llamadas en vez de segundos, porque una aserción de tiempo en una
-  suite mide la máquina que la corre.
-
-**Fuentes externas, 2026-09-10.** El commit `07e12be`. Lo primero que apareció al ir a
-buscar los dos defectos que el diagnóstico del 2026-08-26 nombraba: **los dos ya estaban
-arreglados** por [Q2] y [Q3], y la nota nunca se actualizó. Lo que seguía siendo cierto es
-que nadie medía si [Q3] había servido — el corpus de diagnóstico tenía tres casos, los tres
-de IMDb, así que el reintento por alias que [Q3] le dio a Wikipedia y a FilmAffinity nunca
-se ejercitó.
-
-Servía a medias. El reintento encuentra la película y después el piso de relevancia la
-descarta, porque la fila vuelve titulada en el idioma del mercado y se puntúa contra una
-consulta que está en otro. Medido contra la consulta de la que salió cada reintento, con
-el piso en 28:
-
-| Consulta | Fila que encuentra | Puntaje |
-| --- | --- | --- |
-| Der Untergang | El hundimiento (2004) | 13.9 |
-| Kimi no na wa | Your Name. (2016) | 21.5 |
-| Sen to Chihiro no kamikakushi | El viaje de Chihiro (2001) | 25.5 |
-| Les quatre cents coups | Los cuatrocientos golpes (1959) | 35.1 |
-| Addio zio Tom | Adiós, tío Tom (1971) | 41.2 |
-
-Sólo pasaban los cognados: el reintento rendía justo donde menos falta hacía. IMDb nunca
-tuvo el problema porque su propio puente arma la fila desde la entidad de Wikidata, que se
-lleva el título original con ella. Ahora un `AliasVariant` viaja con la entidad que lo
-respalda y `with_alias_identity()` copia sus títulos confirmados **sólo sobre la fila cuyo
-título es el que se reintentó** — una búsqueda por el alias puede devolver una página
-entera, y estampar identidad sobre toda ella sería inventarla. Los tres primeros pasan a
-100.
-
-El instrumento también estaba mal: `_FALLBACK_SIGNATURES` decía que FilmAffinity no tenía
-fallback propio —cierto cuando se escribió, falso desde [Q3]— así que un reintento que
-disparaba se reportaba como ninguno, y de los dos fallbacks de Wikipedia reconocía uno.
-
-- El caso nuevo de Wikipedia discrimina: sin el arreglo el gate **falla** con
-  `it/wikipedia` Recall@5 en 0.000 y el motivo nombrado como el instrumento fue construido
-  para nombrarlo — `discarded_by_threshold: score=23.2`, que es "la fuente la devolvió y la
-  tiramos" y no "la fuente nunca la tuvo".
-
-**FilmAffinity, 2026-09-11.** El commit `5ad2f52`, a pedido del owner: grabar las
-respuestas reales para el caso de diagnóstico que faltaba. **La grabación contradijo de
-entrada el escenario que estaba por escribir de memoria.** FilmAffinity no falla con los
-títulos originales; lo que hace es contestar una búsqueda que resuelve a una sola película
-con **la ficha de esa película en vez de un listado** — dos de los cuatro títulos que sondeé,
-así que no es un caso de borde — y Movie Inbox leía esa ficha con el parser escrito para
-listados.
-
-Buscar `Sen to Chihiro no kamikakushi` devolvía ocho filas y **ninguna era la película**. Las
-dos primeras eran la navegación de la propia página, tituladas "Ficha" e "Imágenes"; el
-resto eran otras películas de Ghibli del carrusel de relacionadas. "Ficha" puntuaba 10.2
-contra un piso de 28.0, así que FilmAffinity no aportaba nada para una consulta cuya
-respuesta era lo primero que venía en lo que el sitio había mandado. `Addio zio Tom` se
-comportaba igual.
-
-La página dice de qué tipo es (`og:type` `video.` y un `og:url` que apunta a sí misma en vez
-de a la búsqueda), así que ahora la lee el parser de ficha que ya existía, que recupera el
-título original — el único campo que hace que una fila así puntúe contra una consulta en su
-propio idioma. Medido sobre los cuerpos capturados: 10.2 → **100.0**.
-
-El corpus gana el caso de FilmAffinity que le faltaba, así que **las tres fuentes están
-medidas**. Su cuerpo es la respuesta real capturada por el `fetch_text` del propio adaptador
-y recortada, y el recorte se verificó por partida doble en vez de mirarlo a ojo: con el
-arreglo produce un resultado idéntico al del cuerpo completo de 117 KB, y sin el arreglo
-sigue reproduciendo la falla original, así que el caso discrimina por el motivo correcto.
-
-**Reintento por piso, 2026-09-11.** El commit `c4382da` cierra el punto anterior. La
-condición era *"¿la fuente contestó?"* y tenía que ser *"¿contestó algo que sirva?"*. Un
-listado de FilmAffinity para `Der Untergang` devuelve cinco películas, la mejor "El
-hundimiento" a 17.4 contra un piso de 28.0 — la fuente no aportó nada y el reintento que la
-recupera no corría, porque un listado no está vacío. El puente de IMDb dispara con esa
-condición desde [Q3]; a las otras dos fuentes les llegó sólo la mitad.
-
-Lo que más vale la pena anotar es de dónde salió. `docs/search-quality.md` tenía archivada
-como *"limitación conocida"* la falta de casos de corpus para Wikipedia y FilmAffinity, con
-el motivo: encontrar una búsqueda que volviera genuinamente vacía *"resultó más difícil de
-lo esperado"* porque `gsrsearch` casi siempre devuelve algo. **Esa dificultad no era un
-problema del corpus: era el defecto, escrito y no reconocido.** Una búsqueda casi nunca
-vuelve vacía y vuelve inútil todo el tiempo. La nota quedó marcada como resuelta con lo que
-resultó ser.
-
-Verificado en vivo antes de escribir nada: grabar FilmAffinity para `Der Untergang` hace
-seis peticiones —el listado, las cuatro de Wikidata y un reintento sobre "El hundimiento"—
-y devuelve la película a **100.0** llevando "Der Untergang" como título original.
-
-De paso, `with_alias_identity` dejó de tirar un título confirmado cuando la fuente ya había
-ocupado ese campo: FilmAffinity etiqueta como español todo título que devuelve, así que una
-película cuya fila viene titulada en catalán bloqueaba el título español confirmado fuera de
-su propio campo. Ahora el valor desplazado cae en `alternative_titles`, que el puntaje
-también lee.
-
-- **El costo, escrito en vez de dejarlo implícito**: el reintento no cambió por disparo,
-  pero ahora se dispara cada vez que una respuesta es mala en vez de sólo cuando falta. El
-  presupuesto de `docs/search-quality.md` quedó actualizado con eso.
-- **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
-  a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
-  palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
-  deshonesta a 82.
-- **Dependencia del frente visual**: `catalog-search.js` descarta las consultas de menos de
-  dos caracteres antes de salir del navegador. Mientras eso siga, la consulta de una letra
-  funciona por API y por CLI pero no desde la caja de búsqueda.
-
-**Composición entre fuentes, 2026-09-11.** El commit `bc8a2ba`. Último punto del alcance
-declarado de [B1].
-
-- **Lo que es a propósito y quedó con prueba que lo cuida**: la composición es **por
-  fuente**. Cada una conserva su estante y la misma obra encontrada por dos de ellas se
-  muestra dos veces, porque son dos registros de la obra y no uno. Colapsarlas tiraría el
-  que haya contestado segundo. Hay una prueba que lo fija para que nadie lo "arregle" en un
-  dedupe entre fuentes.
-- **Lo que estaba mal es la misma obra dos veces dentro de un mismo estante.** A un
-  artículo de Wikipedia se llega por dos caminos: su buscador, y una resolución por título
-  exacto cuando el buscador no devolvió el título pedido. La resolución contesta con la
-  `canonicalurl` del artículo; el buscador no la pedía, así que la URL se **construía** a
-  partir del título — y una URL construida escribe los paréntesis de "The Fly (1986 film)"
-  escapados, mientras Wikipedia los escribe literales. Dos cadenas, un artículo, y el
-  dedupe las comparaba como texto. Casi toda ficha de cine está desambiguada así, y la
-  resolución se dispara justo cuando la consulta está en otro idioma que el artículo.
-- **Arreglado por los dos lados**: el buscador ahora pide `inprop=url`, así que la
-  dirección la da Wikipedia en vez de adivinarse —confirmado contra la API en vivo, que
-  devuelve los paréntesis literales—, y la clave de dedupe dejó de ser sensible a cómo está
-  escapada una URL.
-- **El hueco del instrumento, que es el hallazgo más útil**: `UnrecordedRequestError`
-  heredaba de `Exception`, y todos los adaptadores capturan `Exception` alrededor de sus
-  propias llamadas —así es como una fuente caída se convierte en un estante vacío—, o sea
-  que **un fixture faltante era indistinguible de una fuente que no contestó nada**. Ya
-  había costado algo: al cambiar la URL de búsqueda, el caso de Wikipedia quedó apuntando a
-  una grabación que ya no coincidía y **siguió pasando**, por un camino que no fue escrito
-  para ejercitar. Ahora hereda de `BaseException` para que llegue al harness, que lo captura
-  por nombre. Apenas se cambió, encontró un segundo fixture viejo en las pruebas de replay.
-
-**Medición de la consulta por fuente, 2026-09-11.** Seis títulos cuyo original no está en
-español, corriendo los adaptadores de verdad contra los sitios de verdad.
-
-- **FilmAffinity: no hay headroom.** La primera consulta supera el piso en **5 de 6**, la
-  respuesta final en **6 de 6**, con 11 peticiones en total. El único que falla —
-  `Der Untergang` — lo recupera el reintento por piso a un costo de 5 peticiones extra.
-  FilmAffinity indexa bien los títulos originales; mandarle a propósito el título en
-  español como primera consulta no compraría corrección, sólo cambiaría de lugar el gasto.
-  **No se cambia la construcción de la consulta: se midió y no rendía.**
-- **Wikipedia: medición inválida, no se reporta.** Devolvió `429 Too Many Requests` y los
-  dos supuestos fallos de búsqueda eran eso. Vale la pena anotar por qué: el script llamaba
-  a los adaptadores **directo**, salteando `ExternalSourceService`, que es justamente quien
-  maneja el 429 —`rate_limited` más un cooldown leído del header `Retry-After`
-  (`registry.py::_source_error_state`)—. El sistema hace lo correcto; la medición no. Y el
-  abanico paralelo en/es de Wikipedia duplica el ritmo de pedidos, así que llega al límite
-  antes que las otras dos.
-- **Si esto se retoma**: medir Wikipedia con el registry en el medio y a ritmo bajo, o no
-  medirlo. [Q3] ya le da a Wikipedia el título original como primer alias, que es
-  exactamente lo que su cobertura en/es no cubre, así que la hipótesis a refutar es que ya
-  esté resuelto.
-
-**Cerrada el 2026-09-11, con el criterio acordado con el owner.** Once arreglos, 23
-commits y cinco archivos de prueba nuevos.
-
-El criterio no podía ser *"la búsqueda está bien"*: la calidad de búsqueda no tiene fondo y
-siempre hay un defecto más si se lo busca. Es un criterio sobre **los instrumentos** — que
-cualquier defecto futuro llegue necesariamente con evidencia en vez de con una opinión:
-
-1. **Las cuatro superficies del alcance tienen al menos un caso que falla si se revierte su
-   arreglo**, verificado uno por uno y no asumido. Ranking: 32 casos del corpus dorado.
-   Fuentes externas: 6 casos de diagnóstico, las tres fuentes, cuatro idiomas. Colecciones:
-   19 pruebas. Composición: 7 pruebas.
-2. **El gate de v0.3.0 intacto**: cero falsos positivos conocidos en auto-match, precisión
-   1.000. Ninguno de los once arreglos abre un auto-match nuevo; la aceptación se decide en
-   `decide_match`, que corre sobre todo el catálogo sin leer el gate de búsqueda.
-3. **Los dos instrumentos corren en CI**: `search-lab run --enforce` y `search-lab
-   external-diagnostics --enforce`, en `.github/workflows/tests.yml`.
-4. **Lo que queda sin hacer está escrito con su número y con dueño**, no implícito: ver
-   [B2].
-
-**La regla que deja escrita**, que es lo que encontró los once defectos y vale más que
-cualquiera de ellos:
-
-> Todo cambio de algoritmo se mide antes y después, y llega con un caso que **falla si se
-> revierte el arreglo**. Un caso que pasa igual con y sin el arreglo es decoración.
-
-Dos veces esa regla encontró que la documentación **ya tenía escrito el defecto sin
-reconocerlo**: la "limitación conocida" de [Q3] sobre lo difícil que era hallar una
-búsqueda genuinamente vacía era, en realidad, el defecto —una búsqueda casi nunca vuelve
-vacía y vuelve inútil todo el tiempo—, y el diagnóstico del 2026-08-26 seguía listando como
-abiertos dos puntos que [Q3] y [U3] ya habían cerrado.
-
-**Decisión tomada a propósito, que no es deuda**: `"Light"` sigue trayendo `"Moonlight"`,
-pero a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
-palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
-deshonesta a 82.
-
-#### [B2] Los dos pendientes que deja [B1]
-
-Abierta el 2026-09-11 al cerrar [B1], para que lo que quedó afuera tenga número y dueño en
-vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
-
-- [ ] **[B2.1] El corte de dos caracteres en la caja de búsqueda.** `catalog-search.js`
-  descarta las consultas de menos de dos caracteres **antes de salir del navegador**, así
-  que el arreglo de servidor de `57ad234` —una consulta de una sola letra es una consulta
-  real: `M`, `Z`, `9` son películas— funciona hoy por API y por CLI pero no desde la caja.
-  **Es del frente visual**, se anota acá sólo para que no se pierda la dependencia.
-- [ ] **[B2.2] La consulta por fuente de Wikipedia, sin medir.** La medición del
-  2026-09-11 cerró el punto para FilmAffinity con número —primera consulta 5/6, final
-  6/6— pero la mitad de Wikipedia salió **inválida**: devolvió `429 Too Many Requests` y
-  los supuestos fallos de búsqueda eran eso. Si se retoma, medir **con
-  `ExternalSourceService` en el medio** —que es quien maneja el 429 con cooldown leído de
-  `Retry-After`— y a ritmo bajo. La hipótesis a refutar es que ya esté resuelto: [Q3] le da
-  a Wikipedia el título original como primer alias, que es exactamente lo que su cobertura
-  en/es no cubre.
-- **Modelo sugerido**: Chico. Son dos puntas acotadas, no un frente.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
@@ -1181,6 +804,63 @@ procedencia C2PA y prompt están auditados en `docs/assets/vhs-cassette-frame-v1
 cubre los tres estados, teclado, móvil y movimiento reducido; el asset se sirve desde la
 misma instancia. La cartelera pública y su payload v1 no se tocaron.
 
+### Frente: Clientes, integraciones y nuevos medios
+
+#### [A1] Definir API versionada y sesiones para dispositivos — **cerrada 2026-09-07**
+- **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
+  busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
+- **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
+  servidor-cliente antes de iniciar una app.
+- **Depende de**: [T4], [D1].
+- **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
+
+  - [x] **[A1.1] Congelar contrato de dispositivo v1.** ADR y OpenAPI estático para
+    HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
+    patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
+    prueba de que la superficie y la serialización no heredan rutas o paths internos.
+  - [x] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
+    access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
+    dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
+    desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
+  - [x] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
+    paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
+    estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
+    expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
+  - [x] **[A1.4] Clave de sincronización durable.** Cerrada 2026-09-07, commit `609f56e`.
+    Nació de los tres huecos que midió ADR-0005 para un cliente con réplica local. Sólo
+    uno era un problema de corrección y se arregló: el id opaco se derivaba del
+    `api_token` rotable más la ruta del archivo, así que rotar el token o mover el
+    catálogo re-clavaba todas las obras. Ahora sale de un secreto de instancia persistente
+    (migración v16, tabla `instance_secrets`) más la *posición* de la fuente, que no lleva
+    ruta. Los otros dos huecos —marcas de tiempo y feed de cambios— se dejaron sin hacer a
+    propósito, con el motivo escrito en la sección 6.1 de `docs/adr/0005-mobile-direction.md`:
+    ningún timestamp registra hoy una edición personal, y la fusión a tres bandas no
+    necesita un feed para ser correcta.
+
+#### [I1] Evaluar Radarr, Sonarr y Letterboxd — **cerrada 2026-09-07**
+
+Criterio de cierre cumplido: matriz en
+`docs/analisis/i1-radarr-sonarr-letterboxd-2026-09-07.md` y un ADR por integración.
+**Ninguna se construyó, y por decisión del owner ninguna se construye por ahora**: la
+evaluación queda como trabajo hecho para cuando haga falta.
+
+- **Radarr — aceptada con condiciones (ADR-0006).** Entrega `tmdbId`, la identidad fuerte
+  que `decide_match` ya reconoce: empareja con `shared_tmdb_id` a 1.0. No acelera al
+  Scanner, **le evita adivinar**. Compuerta que no es técnica: si el owner no corre Radarr,
+  vale cero.
+- **Sonarr — rechazada por ahora (ADR-0007).** Misma API, veredicto distinto, y no por la
+  fuente. Informa `episodeFileCount`/`totalEpisodeCount`; medido, 3 de 86 episodios, y
+  `en_catalogo` es booleano: `true` y `false` son las dos falsas. Reabre cuando se decida
+  qué significa "tener" una serie parcial.
+- **Letterboxd — rechazada como integración, aceptada como importación (ADR-0008).** API
+  por invitación sin garantía, export con Pro, y el CSV **no trae ningún identificador**.
+  El parser existente ya lee el archivo y el emparejamiento por títulos alternativos
+  funciona; el homónimo es el techo, así que la persona se queda en el medio.
+
+**Si esto se retoma**, la tarea más chica y con mejor relación valor/costo es el preset de
+importación de Letterboxd: armar el `column_map` solo, decidir qué se hace con `Rewatch` y
+`Tags` —que no tienen destino— y convertir la escala de estrellas a 1–10.
+
 ### Frente: Streaming, charadas, puntajes públicos y TMDb en vivo
 
 Los frentes que abrió el análisis del 2026-09-07
@@ -1346,6 +1026,317 @@ hoja de ruta reflejan que [W2]/[W3] dependen de estas tres partes. No se modific
 comportamiento de la instancia: hoy continua completamente privada por defecto.
 
 ### Frente: Busqueda, comparacion y composicion de fuentes
+
+Diagnostico del 2026-08-26: la busqueda local principal usa titulos, aliases, IDs y
+archivos; `directors` existe en el modelo pero se excluye deliberadamente de la
+evidencia de identidad. Las tres fuentes externas reciben hoy casi la misma consulta:
+IMDb hace una sola llamada al endpoint de sugerencias, Wikipedia busca en ingles y
+espanol agregando `film`/`pelicula`, y FilmAffinity envia el texto literal. El puente de
+aliases de Wikidata para IMDb se activa solo si IMDb devolvio filas pero todas quedaron
+debajo del umbral; no se activa cuando la sugerencia vino vacia. Esto explica por que
+agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb o
+Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
+consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
+
+> **Corrección del 2026-09-10.** Dos de esas afirmaciones ya no son ciertas y conviene no
+> volver a salir a arreglarlas: el puente de aliases de IMDb **sí** se activa con una
+> respuesta vacía desde [Q3] (`imdb.py`, rama `is_empty`), y Wikipedia y FilmAffinity
+> tienen desde entonces su propio reintento por alias confirmado. El contexto de
+> `Comparar` lo cerró [U3]. Lo que queda en pie del párrafo es que las tres fuentes
+> reciben una consulta muy parecida.
+
+#### [B1] Mejorar el algoritmo de búsqueda y de colecciones — **cerrada 2026-09-11**
+
+**Abierto el 2026-09-07 por decisión del owner**, que pidió priorizar esto por encima de
+las integraciones externas. Es el lado de infraestructura; la presentación de las mismas
+superficies es [U3], del frente visual, y las dos conviene que avancen conversando.
+
+- **Alcance**: la calidad del resultado, no su dibujo. Ranking, evidencia de identidad,
+  composición entre fuentes y cómo se arma y ordena una colección.
+- **Punto de partida ya escrito**: el diagnóstico del 2026-08-26 en este mismo archivo
+  (frente de búsqueda) y `docs/search-quality.md`. De las tres cosas concretas que ese
+  diagnóstico nombraba, **dos ya están cerradas** y quedaron marcadas allá con una
+  corrección fechada el 2026-09-10: el puente de aliases de IMDb sí dispara con respuesta
+  vacía desde [Q3], y el contexto de `Comparar` lo cerró [U3]. Se anota acá porque salir a
+  arreglarlas de nuevo fue el costo real de no haberlo actualizado a tiempo.
+- **Lo único que queda en pie de aquel diagnóstico**: las tres fuentes externas reciben una
+  consulta muy parecida. **Medido el 2026-09-11 y resultó ser mucho menos de lo que el
+  diagnóstico sugería** — ver la nota de medición al final de la ficha.
+  `docs/search-quality.md` está al día y no necesita corrección.
+- **Herramienta que ya existe**: `movie-inbox search-lab run --enforce` mide el ranking
+  productivo sin cambiarlo y es gate en CI desde v0.3.0. Cualquier cambio de algoritmo se
+  mide contra él **antes y después**, o no se sabe si mejoró.
+- **Criterio de cierre**: pendiente de acotar con el owner. No se abren subtareas todavía
+  para no inventar alcance.
+- **Invariante que no se negocia**: el gate de v0.3.0 sigue en pie — cero falsos positivos
+  conocidos en auto-match. Un ranking más generoso que gane recall rompiendo eso no es una
+  mejora.
+
+**Avances del 2026-09-09 (lado infraestructura).** Cuatro arreglos de ranking, cada uno
+medido con `search-lab run` antes y después, y cada uno con un caso propio en el corpus
+dorado que falla si se revierte el arreglo. Un caso que pasa igual con y sin el arreglo es
+decoración, así que se verificó uno por uno.
+
+- `ad3e1e7` — un artículo compartido dejó de ser evidencia de identidad. "The Fly" y "The
+  Gift" valían 0.5 de similitud por culpa de "the". Precision@5 0.933 → 1.000, casos
+  estrictos 26/29 → 29/29.
+- `1d38c6a` — un término de dos letras no coincidía ni con uno idéntico, porque las dos
+  pruebas de subcadena arrancaban en tres caracteres y no había prueba de igualdad. "Ed"
+  no encontraba nada en un catálogo con "Ed Wood". El corpus estaba ciego a esto: todos
+  sus casos de título corto consultaban con año, que cae en la ruta de título exacto.
+- `32461b0` — una palabra corta metida adentro de otra más larga dejó de contar como
+  palabra compartida, y la comparación de respaldo pasó a medir palabras con contenido en
+  vez de cadenas crudas. Buscar "The Fly" traía "M. Butterfly" (32.2) por encima de "The
+  Flies" (29.0).
+- `57ad234` — una consulta de una sola letra es una consulta real. "M" no se podía buscar
+  por su propio título, ni siquiera agregando el año.
+- `13e9aab` — la misma ancla, sobre la regla que compara la consulta entera contra el
+  título entero. Era peor de lo anotado: "Age" puntuaba 82 contra "Carnage" y buscar
+  "Fly" ponía "M. Butterfly" **arriba de las dos películas llamadas "The Fly"**, porque
+  empataba en puntaje y ganaba el desempate alfabético.
+
+Corpus al cierre: 30 items, 32 casos, 32/32 estrictos, todas las métricas en 1.000, cero
+hits prohibidos y precisión de auto-match 1.000. **Ninguno de los cinco abre un
+auto-match nuevo**: la aceptación se decide en `decide_match`, que `rank_catalog_candidates`
+corre sobre todo el catálogo sin leer el gate de búsqueda. Se midió, no se supuso.
+
+**Colecciones, 2026-09-10.** El commit `5bdf32e` arregla dos defectos independientes de la
+colección [P2] que una biblioteca publica en Club, encontrados sondeando esa superficie y
+reproducidos de punta a punta antes de tocarlos.
+
+- **Publicación que fallaba en silencio.** Un archivo emparejado conserva la identidad con
+  la que se emparejó hasta que cambia su huella, así que una biblioteca con dos copias de
+  la misma película —una escaneada antes de que su ficha se enriqueciera— reportaba la obra
+  **dos veces**. Dos items de colección con la misma clave primaria: el insert fallaba, la
+  colección no se creaba nunca y la única señal era `set_share_availability` devolviendo
+  `synced=False`, que está documentado como un tropiezo transitorio que el próximo escaneo
+  arregla. Este era permanente. De paso corregía mal la cuenta de disponibilidad en la
+  ficha: informaba una copia donde había dos.
+- **Orden publicado tomado de un id interno.** La colección se numeraba por `work_key`, así
+  que un estante se leía Casablanca, Alien, Blade Runner, Dune —ids de TMDb comparados como
+  texto, 78 cae entre 348 y 841— y una película sin id de TMDb quedaba después de todas las
+  que sí lo tenían. Peor que arbitrario: se movía, porque la clave pasa de `work:<hash>` a
+  `tmdb:movie:<id>` en cuanto el enriquecimiento la encuentra, y el título saltaba de lugar
+  en una colección que otros ya estaban mirando. Ahora se lee alfabéticamente por el título
+  que se muestra, igual que la grilla del catálogo. **Sólo para colecciones que nadie
+  ordenó**: el orden de una colección curada es la declaración de quien la armó y no se
+  toca.
+
+**Colecciones curadas, 2026-09-11.** El commit `a82927e`. La mitad que faltaba de
+colecciones: no la derivada de una biblioteca sino las que arma una persona.
+
+- **Lo que se revisó y está bien**, dicho para que nadie lo vuelva a mirar: el camino de
+  importación arma los items con el id normalizado —no con el crudo, que puede venir
+  vacío— y los deja en el orden del archivo de origen. Ese orden **es** la declaración de
+  quien importó la lista, así que se respeta, igual que la regla que quedó escrita con
+  [P2]. El corte por duplicados dentro de una misma importación ya existía
+  (`collection_eligible`), así que el choque de clave primaria que rompía la colección
+  derivada no puede pasar por acá. Verificado corriendo el servicio de verdad.
+- **Lo que estaba roto es el costo de armarla.** `possible_duplicate_candidates` compara
+  una ficha contra todo el catálogo y, mientras lo hace, vuelve a calcular las claves de
+  título de cada ficha del catálogo. Una vez no es nada; una vez por cada elemento de una
+  lista es **todo** el costo. Perfilado sobre un catálogo de 5000 y una colección de 200:
+  normalizar el catálogo una vez son 0.124 s, y la página lo hacía 200 veces — **24.9 s de
+  los 28 que tardaba**, contra 2.3 s de comparación real. El 92% del tiempo era recalcular
+  lo mismo.
+- **Tres pantallas hacían exactamente eso**: abrir una colección, refrescar un borrador de
+  importación y armar Inicio a partir de las colecciones seguidas. Inicio es la peor de las
+  tres, porque las fichas de una colección seguida están mayormente **ausentes** del
+  catálogo y una ficha ausente no puede cortar temprano: recorre el catálogo entero.
+  Preparado una vez: **39.7 s → 2.8 s**.
+- **El detalle que vale releer**: el índice es perezoso a propósito. La primera versión
+  preparaba todo por adelantado y hacía más lento el caso contrario —`catalog_membership`
+  devuelve apenas reconoce un id, así que quien pregunta una sola vez por una ficha que
+  está en la posición 3 de 5000 habría pagado por preparar las 5000—. Las filas se calculan
+  a medida que se llega a ellas y quedan cacheadas, así que el corte temprano sobrevive:
+  medido en 0.2 ms, sin cambio.
+- Las pruebas cuentan llamadas en vez de segundos, porque una aserción de tiempo en una
+  suite mide la máquina que la corre.
+
+**Fuentes externas, 2026-09-10.** El commit `07e12be`. Lo primero que apareció al ir a
+buscar los dos defectos que el diagnóstico del 2026-08-26 nombraba: **los dos ya estaban
+arreglados** por [Q2] y [Q3], y la nota nunca se actualizó. Lo que seguía siendo cierto es
+que nadie medía si [Q3] había servido — el corpus de diagnóstico tenía tres casos, los tres
+de IMDb, así que el reintento por alias que [Q3] le dio a Wikipedia y a FilmAffinity nunca
+se ejercitó.
+
+Servía a medias. El reintento encuentra la película y después el piso de relevancia la
+descarta, porque la fila vuelve titulada en el idioma del mercado y se puntúa contra una
+consulta que está en otro. Medido contra la consulta de la que salió cada reintento, con
+el piso en 28:
+
+| Consulta | Fila que encuentra | Puntaje |
+| --- | --- | --- |
+| Der Untergang | El hundimiento (2004) | 13.9 |
+| Kimi no na wa | Your Name. (2016) | 21.5 |
+| Sen to Chihiro no kamikakushi | El viaje de Chihiro (2001) | 25.5 |
+| Les quatre cents coups | Los cuatrocientos golpes (1959) | 35.1 |
+| Addio zio Tom | Adiós, tío Tom (1971) | 41.2 |
+
+Sólo pasaban los cognados: el reintento rendía justo donde menos falta hacía. IMDb nunca
+tuvo el problema porque su propio puente arma la fila desde la entidad de Wikidata, que se
+lleva el título original con ella. Ahora un `AliasVariant` viaja con la entidad que lo
+respalda y `with_alias_identity()` copia sus títulos confirmados **sólo sobre la fila cuyo
+título es el que se reintentó** — una búsqueda por el alias puede devolver una página
+entera, y estampar identidad sobre toda ella sería inventarla. Los tres primeros pasan a
+100.
+
+El instrumento también estaba mal: `_FALLBACK_SIGNATURES` decía que FilmAffinity no tenía
+fallback propio —cierto cuando se escribió, falso desde [Q3]— así que un reintento que
+disparaba se reportaba como ninguno, y de los dos fallbacks de Wikipedia reconocía uno.
+
+- El caso nuevo de Wikipedia discrimina: sin el arreglo el gate **falla** con
+  `it/wikipedia` Recall@5 en 0.000 y el motivo nombrado como el instrumento fue construido
+  para nombrarlo — `discarded_by_threshold: score=23.2`, que es "la fuente la devolvió y la
+  tiramos" y no "la fuente nunca la tuvo".
+
+**FilmAffinity, 2026-09-11.** El commit `5ad2f52`, a pedido del owner: grabar las
+respuestas reales para el caso de diagnóstico que faltaba. **La grabación contradijo de
+entrada el escenario que estaba por escribir de memoria.** FilmAffinity no falla con los
+títulos originales; lo que hace es contestar una búsqueda que resuelve a una sola película
+con **la ficha de esa película en vez de un listado** — dos de los cuatro títulos que sondeé,
+así que no es un caso de borde — y Movie Inbox leía esa ficha con el parser escrito para
+listados.
+
+Buscar `Sen to Chihiro no kamikakushi` devolvía ocho filas y **ninguna era la película**. Las
+dos primeras eran la navegación de la propia página, tituladas "Ficha" e "Imágenes"; el
+resto eran otras películas de Ghibli del carrusel de relacionadas. "Ficha" puntuaba 10.2
+contra un piso de 28.0, así que FilmAffinity no aportaba nada para una consulta cuya
+respuesta era lo primero que venía en lo que el sitio había mandado. `Addio zio Tom` se
+comportaba igual.
+
+La página dice de qué tipo es (`og:type` `video.` y un `og:url` que apunta a sí misma en vez
+de a la búsqueda), así que ahora la lee el parser de ficha que ya existía, que recupera el
+título original — el único campo que hace que una fila así puntúe contra una consulta en su
+propio idioma. Medido sobre los cuerpos capturados: 10.2 → **100.0**.
+
+El corpus gana el caso de FilmAffinity que le faltaba, así que **las tres fuentes están
+medidas**. Su cuerpo es la respuesta real capturada por el `fetch_text` del propio adaptador
+y recortada, y el recorte se verificó por partida doble en vez de mirarlo a ojo: con el
+arreglo produce un resultado idéntico al del cuerpo completo de 117 KB, y sin el arreglo
+sigue reproduciendo la falla original, así que el caso discrimina por el motivo correcto.
+
+**Reintento por piso, 2026-09-11.** El commit `c4382da` cierra el punto anterior. La
+condición era *"¿la fuente contestó?"* y tenía que ser *"¿contestó algo que sirva?"*. Un
+listado de FilmAffinity para `Der Untergang` devuelve cinco películas, la mejor "El
+hundimiento" a 17.4 contra un piso de 28.0 — la fuente no aportó nada y el reintento que la
+recupera no corría, porque un listado no está vacío. El puente de IMDb dispara con esa
+condición desde [Q3]; a las otras dos fuentes les llegó sólo la mitad.
+
+Lo que más vale la pena anotar es de dónde salió. `docs/search-quality.md` tenía archivada
+como *"limitación conocida"* la falta de casos de corpus para Wikipedia y FilmAffinity, con
+el motivo: encontrar una búsqueda que volviera genuinamente vacía *"resultó más difícil de
+lo esperado"* porque `gsrsearch` casi siempre devuelve algo. **Esa dificultad no era un
+problema del corpus: era el defecto, escrito y no reconocido.** Una búsqueda casi nunca
+vuelve vacía y vuelve inútil todo el tiempo. La nota quedó marcada como resuelta con lo que
+resultó ser.
+
+Verificado en vivo antes de escribir nada: grabar FilmAffinity para `Der Untergang` hace
+seis peticiones —el listado, las cuatro de Wikidata y un reintento sobre "El hundimiento"—
+y devuelve la película a **100.0** llevando "Der Untergang" como título original.
+
+De paso, `with_alias_identity` dejó de tirar un título confirmado cuando la fuente ya había
+ocupado ese campo: FilmAffinity etiqueta como español todo título que devuelve, así que una
+película cuya fila viene titulada en catalán bloqueaba el título español confirmado fuera de
+su propio campo. Ahora el valor desplazado cae en `alternative_titles`, que el puntaje
+también lee.
+
+- **El costo, escrito en vez de dejarlo implícito**: el reintento no cambió por disparo,
+  pero ahora se dispara cada vez que una respuesta es mala en vez de sólo cuando falta. El
+  presupuesto de `docs/search-quality.md` quedó actualizado con eso.
+- **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
+  a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
+  palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
+  deshonesta a 82.
+- **Dependencia del frente visual**: `catalog-search.js` descarta las consultas de menos de
+  dos caracteres antes de salir del navegador. Mientras eso siga, la consulta de una letra
+  funciona por API y por CLI pero no desde la caja de búsqueda.
+
+**Composición entre fuentes, 2026-09-11.** El commit `bc8a2ba`. Último punto del alcance
+declarado de [B1].
+
+- **Lo que es a propósito y quedó con prueba que lo cuida**: la composición es **por
+  fuente**. Cada una conserva su estante y la misma obra encontrada por dos de ellas se
+  muestra dos veces, porque son dos registros de la obra y no uno. Colapsarlas tiraría el
+  que haya contestado segundo. Hay una prueba que lo fija para que nadie lo "arregle" en un
+  dedupe entre fuentes.
+- **Lo que estaba mal es la misma obra dos veces dentro de un mismo estante.** A un
+  artículo de Wikipedia se llega por dos caminos: su buscador, y una resolución por título
+  exacto cuando el buscador no devolvió el título pedido. La resolución contesta con la
+  `canonicalurl` del artículo; el buscador no la pedía, así que la URL se **construía** a
+  partir del título — y una URL construida escribe los paréntesis de "The Fly (1986 film)"
+  escapados, mientras Wikipedia los escribe literales. Dos cadenas, un artículo, y el
+  dedupe las comparaba como texto. Casi toda ficha de cine está desambiguada así, y la
+  resolución se dispara justo cuando la consulta está en otro idioma que el artículo.
+- **Arreglado por los dos lados**: el buscador ahora pide `inprop=url`, así que la
+  dirección la da Wikipedia en vez de adivinarse —confirmado contra la API en vivo, que
+  devuelve los paréntesis literales—, y la clave de dedupe dejó de ser sensible a cómo está
+  escapada una URL.
+- **El hueco del instrumento, que es el hallazgo más útil**: `UnrecordedRequestError`
+  heredaba de `Exception`, y todos los adaptadores capturan `Exception` alrededor de sus
+  propias llamadas —así es como una fuente caída se convierte en un estante vacío—, o sea
+  que **un fixture faltante era indistinguible de una fuente que no contestó nada**. Ya
+  había costado algo: al cambiar la URL de búsqueda, el caso de Wikipedia quedó apuntando a
+  una grabación que ya no coincidía y **siguió pasando**, por un camino que no fue escrito
+  para ejercitar. Ahora hereda de `BaseException` para que llegue al harness, que lo captura
+  por nombre. Apenas se cambió, encontró un segundo fixture viejo en las pruebas de replay.
+
+**Medición de la consulta por fuente, 2026-09-11.** Seis títulos cuyo original no está en
+español, corriendo los adaptadores de verdad contra los sitios de verdad.
+
+- **FilmAffinity: no hay headroom.** La primera consulta supera el piso en **5 de 6**, la
+  respuesta final en **6 de 6**, con 11 peticiones en total. El único que falla —
+  `Der Untergang` — lo recupera el reintento por piso a un costo de 5 peticiones extra.
+  FilmAffinity indexa bien los títulos originales; mandarle a propósito el título en
+  español como primera consulta no compraría corrección, sólo cambiaría de lugar el gasto.
+  **No se cambia la construcción de la consulta: se midió y no rendía.**
+- **Wikipedia: medición inválida, no se reporta.** Devolvió `429 Too Many Requests` y los
+  dos supuestos fallos de búsqueda eran eso. Vale la pena anotar por qué: el script llamaba
+  a los adaptadores **directo**, salteando `ExternalSourceService`, que es justamente quien
+  maneja el 429 —`rate_limited` más un cooldown leído del header `Retry-After`
+  (`registry.py::_source_error_state`)—. El sistema hace lo correcto; la medición no. Y el
+  abanico paralelo en/es de Wikipedia duplica el ritmo de pedidos, así que llega al límite
+  antes que las otras dos.
+- **Si esto se retoma**: medir Wikipedia con el registry en el medio y a ritmo bajo, o no
+  medirlo. [Q3] ya le da a Wikipedia el título original como primer alias, que es
+  exactamente lo que su cobertura en/es no cubre, así que la hipótesis a refutar es que ya
+  esté resuelto.
+
+**Cerrada el 2026-09-11, con el criterio acordado con el owner.** Once arreglos, 23
+commits y cinco archivos de prueba nuevos.
+
+El criterio no podía ser *"la búsqueda está bien"*: la calidad de búsqueda no tiene fondo y
+siempre hay un defecto más si se lo busca. Es un criterio sobre **los instrumentos** — que
+cualquier defecto futuro llegue necesariamente con evidencia en vez de con una opinión:
+
+1. **Las cuatro superficies del alcance tienen al menos un caso que falla si se revierte su
+   arreglo**, verificado uno por uno y no asumido. Ranking: 32 casos del corpus dorado.
+   Fuentes externas: 6 casos de diagnóstico, las tres fuentes, cuatro idiomas. Colecciones:
+   19 pruebas. Composición: 7 pruebas.
+2. **El gate de v0.3.0 intacto**: cero falsos positivos conocidos en auto-match, precisión
+   1.000. Ninguno de los once arreglos abre un auto-match nuevo; la aceptación se decide en
+   `decide_match`, que corre sobre todo el catálogo sin leer el gate de búsqueda.
+3. **Los dos instrumentos corren en CI**: `search-lab run --enforce` y `search-lab
+   external-diagnostics --enforce`, en `.github/workflows/tests.yml`.
+4. **Lo que queda sin hacer está escrito con su número y con dueño**, no implícito: ver
+   [B2].
+
+**La regla que deja escrita**, que es lo que encontró los once defectos y vale más que
+cualquiera de ellos:
+
+> Todo cambio de algoritmo se mide antes y después, y llega con un caso que **falla si se
+> revierte el arreglo**. Un caso que pasa igual con y sin el arreglo es decoración.
+
+Dos veces esa regla encontró que la documentación **ya tenía escrito el defecto sin
+reconocerlo**: la "limitación conocida" de [Q3] sobre lo difícil que era hallar una
+búsqueda genuinamente vacía era, en realidad, el defecto —una búsqueda casi nunca vuelve
+vacía y vuelve inútil todo el tiempo—, y el diagnóstico del 2026-08-26 seguía listando como
+abiertos dos puntos que [Q3] y [U3] ya habían cerrado.
+
+**Decisión tomada a propósito, que no es deuda**: `"Light"` sigue trayendo `"Moonlight"`,
+pero a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
+palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
+deshonesta a 82.
 
 #### [F2.1] Definir composicion, identidad y autoridad para anime
 La decision del owner del 2026-08-29 se conserva: Jikan es la opcion primaria aceptada
@@ -2616,6 +2607,15 @@ detector Impeccable y `git diff --check`. 2026-09-01, commit `1d5ebc8`.
 ---
 
 ### Frente: Fuentes externas y especializacion de anime
+
+La epica [F2] quedo cerrada en tres entregas: contrato de composicion [F2.1], fuente
+en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
+en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
+queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
+ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
+de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
+consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres cerradas).
+[F5] queda completo.
 
 #### [F1] Prototipo del indice no comercial de IMDb
 Comando nuevo `movie-inbox imdb-dataset sync/stats/lookup` que descarga
