@@ -96,6 +96,15 @@ de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo d
 consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres cerradas).
 [F5] queda completo.
 
+- [ ] **Dos verificaciones en vivo que esperan un entorno**, colas de frentes cerrados.
+  Ninguna bloquea nada; se anotan para que no dependan de la memoria de nadie.
+  - **Overlay de Docker de TMDb** (cola de [F5.4]): el smoke de
+    `compose.tmdb.example.yaml` nunca corrió porque la máquina de trabajo no tiene Docker;
+    re-medido el 2026-09-11, sigue sin tenerlo. Espera un host con Compose.
+  - **Puntajes de TMDb contra la API real** (cola de [F6.2]): es lo único de [F6.2] que no
+    se verificó en vivo, porque el archivo del token no estaba en la máquina. Queda como
+    `tests/test_external_tmdb_live_smoke.py`, que se salta solo sin token.
+
 ### Frente: Superficie publica y despliegue
 
 ### Frente: Inicio videoclub (exploraciones posteriores)
@@ -114,7 +123,7 @@ bloquean U3 ni reabren la recuperación aceptada.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
-#### [A1] Definir API versionada y sesiones para dispositivos
+#### [A1] Definir API versionada y sesiones para dispositivos — **cerrada 2026-09-07**
 - **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
   busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
 - **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
@@ -167,7 +176,15 @@ bloquean U3 ni reabren la recuperación aceptada.
 - **Depende de**: [A2.0] para el entorno; el apareamiento se apoya en [A1.2] y [A1.4], ya
   cerradas.
 - **Modelo sugerido**: Grande. Es un proyecto cliente completo, no una pantalla más.
-- **Quién**: Claude, decidido el 2026-09-07. [B1] queda en espera mientras tanto.
+- **Quién**: Claude, decidido el 2026-09-07. [B1] esperó mientras tanto y se cerró el
+  2026-09-11.
+
+**Estado al 2026-09-11: la mitad servidor está casi entera y el cliente no empezó.** Entre
+el 08 y el 09/09 se construyó lo que el servidor tenía que poner para [A2.1], [A2.3] y
+[A2.6]; cada subtarea dice qué y con qué commit. Falta **una pieza de servidor**, en
+[A2.4]. Y el entorno de [A2.0] ya está instalado, así que lo que queda para cerrarla es
+trabajo de este frente y no una instalación del owner. Las subtareas siguen sin tildar
+porque cada una se cierra con el cliente.
 
 **La distinción que sostiene el diseño** —y que conviene no perder al leer las subtareas—:
 editar una obra que ya existe de los dos lados tiene **base compartida** y se resuelve por
@@ -181,6 +198,13 @@ Confundirlas obligaría a inventar una base que no existe.
     `ANDROID_SDK_ROOT` ni `ANDROID_HOME`, y el repositorio no contiene proyecto Android.
     Hasta que esto exista, el resto de [A2] es papel. Guía paso a paso en
     `docs/briefs/android-setup.md`.
+    **Re-medido el 2026-09-11: el entorno ya está instalado.** Android Studio 2025.3.3 con
+    su propio JDK (JBR 21.0.10); el SDK con las plataformas 35, 36 y 36.1, build-tools hasta
+    37.0.0, `adb`, emulador e imágenes de sistema. El `java` del `PATH` sigue siendo 1.8 y
+    no hay variables definidas: no bloquea, pero para correr `gradlew` desde una terminal
+    hay que apuntar `JAVA_HOME` al JDK de Android Studio. **Falta la parte que no es
+    instalación**: el proyecto en el repositorio, con Gradle Wrapper, y un `assembleDebug`
+    verde. La primera corrida descarga Gradle y las dependencias.
   - [ ] **[A2.1] Esqueleto, apareamiento y lectura offline.** El primer hito pedido por el
     owner: **aparear y ver el catálogo real en el teléfono**. Kotlin/Compose, Hilt con KSP,
     coroutines y `StateFlow`; el repositorio es el límite de errores. Room como almacén
@@ -188,6 +212,15 @@ Confundirlas obligaría a inventar una base que no existe.
     operativa—. Escaneo del QR con ZXing embebido, para no arrastrar Play Services.
     **Requiere trabajo servidor**: token de un solo uso, endpoint de canje y la pantalla que
     dibuja el QR en `Administrar`.
+    **Servidor: hecho, salvo la pantalla**, que además **no va en `Administrar`**: cada
+    cuenta aparea su propio teléfono, así que no puede ser sólo del owner. `334f4fe`
+    (2026-09-08): ticket de un solo uso que una sesión web emite para su propia cuenta,
+    canjeado en `POST /api/v1/pair` por una sesión de dispositivo sin que viaje una
+    contraseña; el uso único se cumple dentro de un solo `UPDATE`. `e9bcaab` (2026-09-08):
+    el QR se dibuja en el servidor con segno y vuelve como `data:` URI en el mismo `POST
+    /api/device-pairing` que emite el ticket. `11dbe0b` (2026-09-09): `serve` termina TLS
+    por su cuenta y deriva el pin de su certificado; `movie-inbox pairing-pin` queda para
+    cuando TLS lo termina un proxy. La pantalla está entre los traspasos al frente visual.
   - [ ] **[A2.2] Edición personal sin conexión y fusión a tres bandas.** Room guarda por
     obra la **base** —el estado del servidor en la última sincronización exitosa— y la local
     actual. La base **sólo avanza cuando una sincronización termina entera**: una cortada a
@@ -200,18 +233,38 @@ Confundirlas obligaría a inventar una base que no existe.
     prueba, igual que se hizo con el generador de charadas. Es un aviso, no una decisión.
     **Requiere trabajo servidor**: endpoint que reciba el borrador, lo enriquezca y lo meta
     por el camino de importación y revisión existente.
+    **Servidor: hecho** (`f6e36e1`, 2026-09-09), con una corrección a la línea de arriba:
+    `POST /api/v1/catalog/drafts` **no enriquece** al recibir, a propósito. Sería una
+    llamada de red que haría esperar —o fallar— a un teléfono que acaba de recuperar señal;
+    el borrador lleva lo que la persona escribió y el enriquecimiento de siempre lo completa
+    al revisar. Todo lo del teléfono cae en un borrador por cuenta que no vence, el alta es
+    idempotente por el id del cliente, y una obra que el catálogo ya tiene vuelve como
+    `review` y no como "ya la tenés": un parecido de título no es identidad.
   - [ ] **[A2.4] Charadas.** Backend entregado en [G2], contrato en
     `docs/briefs/charades-v1.md`. El generador es portable a propósito —FNV-1a más un LCG
     documentado— para que el cliente produzca **el mismo mazo** que el servidor; esa
     reimplementación en Kotlin es parte de esta entrega, con pruebas contra vectores del
     servidor. La dificultad **no** se calcula en el teléfono: sale del índice IMDb de
     ~1,1 GB y viaja resuelta como un campo por obra.
+    **Servidor: falta una pieza**, verificado el 2026-09-11. Ni la dificultad ni la clave de
+    obra con la que el generador calcula la huella del mazo (`work_key` en
+    `domain/charades.py`) viajan por la API de dispositivo: `_device_item_payload` no las
+    incluye, ni tampoco los identificadores externos de los que esa clave sale. Sin eso el
+    teléfono no puede producir el mismo mazo que el servidor. Es de este frente y va antes
+    del cliente de [A2.4]; la forma tiene que respetar que los ids expuestos sean opacos.
   - [ ] **[A2.5] Imágenes.** Miniatura local y portada completa en segundo plano.
   - [ ] **[A2.6] Ampliar lo que viaja**, en el orden de prioridad del owner: colecciones
     seguidas, después disponibilidad en streaming, después puntajes públicos. Cada escalón
     es servidor más cliente. **Ojo con disponibilidad**: es dato de TMDb con tope
     contractual de retención de 180 días, y ese tope viaja con el dato — el teléfono también
     tiene que dejar de mostrarlo cuando vence.
+    **Servidor: hecho** (2026-09-09): `9ff3ccd` colecciones —sólo las que la cuenta sigue,
+    con sus obras en un endpoint paginado aparte—, `7f24895` disponibilidad y `417f6d3`
+    puntajes públicos. El vencimiento viaja con el dato: cada fila de disponibilidad y cada
+    puntaje de TMDb llevan `expires_at`; los de IMDb no, porque salen del índice local y
+    ningún término externo limita cuánto se guardan. Construirlo destapó una deuda que ya
+    estaba en la web: la atribución a JustWatch que exige ADR-0004 no aparecía en ningún
+    lado del código; ahora viaja en la respuesta de los dos endpoints.
 
   **Lo que sobrevive del brief v1** y sigue vigente: tokens en Android Keystore y nunca en
   preferencias sin cifrar, logs, analytics, URI, portapapeles ni backups; HTTPS con
@@ -226,10 +279,14 @@ Confundirlas obligaría a inventar una base que no existe.
   tiempo de ejecución** desde la huella SPKI que trae el QR. Nunca un trust manager
   permisivo ni deshabilitar la verificación de hostname.
 
-  **Abierto y del owner:** cómo llega el teléfono a la instancia desde la red de casa
-  (hairpinning o DNS de horizonte partido — cambia lo que el QR lleva); si la aplicación
-  quiere PIN o biometría propios además de la pantalla de bloqueo; y qué pasa con los datos
-  locales si se desaparea el teléfono.
+  **Abierto y del owner:** si la aplicación quiere PIN o biometría propios además de la
+  pantalla de bloqueo, y qué pasa con los datos locales si se desaparea el teléfono —la
+  recomendación escrita es conservarlos y permitir volver a aparear—. La tercera pregunta,
+  cómo llega el teléfono a la instancia desde la red de casa, **se resolvió el
+  2026-09-09**: TLS en el propio proceso con un certificado autofirmado, y la huella viaja
+  en el QR. Lo que queda de eso es del owner y hace falta recién para probar [A2.1] de
+  punta a punta: emitir el certificado con la receta de `docs/deployment.md`, "HTTPS en la
+  red local, sin dominio".
 
 #### [I1] Evaluar Radarr, Sonarr y Letterboxd — **cerrada 2026-09-07**
 
@@ -575,6 +632,52 @@ vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
   independiente si se aprueba.
 - **Depende de**: despues de estabilizar los frentes anteriores.
 - **Modelo sugerido**: Grande. Descubrimiento de producto, no un cambio de enum.
+
+### Frente: Traspasos del lado lógica al frente visual
+
+Anotado el 2026-09-11 por el frente lógico, al poner el tablero al día. Son superficies
+con el backend entregado y probado que **ninguna pantalla muestra todavía**. Se habían
+asignado en `docs/analisis/streaming-charadas-movil-2026-09-07.md` y nunca llegaron a este
+tablero, que es el que el frente visual lee: es la causa más probable de que no avanzaran.
+Cuándo y en qué orden se toman lo deciden el frente visual y el owner; lo que sigue es qué
+consumir y qué reglas no se pueden romper.
+
+- [ ] **Disponibilidad en streaming en la ficha** (el [S4] del análisis; no confundir con
+  [S1]/[S2] de la purga del historial, que comparten número). Consume `GET
+  /api/streaming/availability` y `GET`/`POST /api/streaming/preferences`. Tres reglas: una
+  obra ausente del mapa es "no lo consultamos", nunca "no está disponible"; sólo
+  `available_on` es "Disponible en X", y `acquire_on` —alquiler o compra— necesita otro
+  verbo; y la atribución a JustWatch, que viene en la respuesta, es obligatoria donde se
+  muestre, porque sus términos incluyen revocar el acceso a toda la API. La ficha no lleva
+  fecha; `checked_at` se informa en `Administrar`. Traspaso completo en el análisis, §7.
+- [ ] **Puntajes públicos en la ficha, junto al propio** (la mitad de presentación de
+  [F6.2]). Consume `GET /api/ratings`: IMDb y TMDb juntos, ordenados por cantidad de votos
+  y no por fuente. Lleva las atribuciones que vienen en la respuesta, y un puntaje marcado
+  `is_meaningful: false` —menos de 50 votos— tiene que verse distinto. Nunca se presenta
+  como valoración propia.
+- [ ] **La pantalla que genera el QR de apareamiento** (de [A2.1]). `POST
+  /api/device-pairing` devuelve el QR como `data:` URI junto con su contenido, que
+  conviene ofrecer también como texto para aparear a mano. **No va en `Administrar`**:
+  cada cuenta aparea su propio teléfono, así que tiene que estar al alcance de cualquier
+  cuenta. El ticket vive cinco minutos, y sin HTTPS configurado el endpoint responde
+  `pairing_not_configured`: la pantalla tiene que decirlo en vez de fallar muda.
+- [ ] **La pasada de revisión de dificultad de charadas** (de [G2]). Consume `GET
+  /api/charades/review` y `POST /api/charades/difficulty`. La banda intermedia es casi
+  todo el catálogo, así que esta revisión es el camino principal y no un plan B: "repartí
+  estas obras en cuatro categorías", rápida y reanudable, no un formulario por obra
+  (`docs/briefs/charades-v1.md`). Las pantallas de juego y el temporizador van en el
+  teléfono, dentro de [A2.4].
+- [ ] **Bandeja en el teléfono** (de [MB2]). Medido el 2026-09-07: desborda 317 px a 390
+  de ancho y 387 px a 320, con 53 nodos de contenido por debajo de 12 px; es la única
+  superficie con problemas reales (`docs/design/mb2-mobile-audit-2026-09-07.md`). Conviene
+  volver a medir antes de tomarlo, porque la web cambió desde entonces.
+- [ ] **`duplicateSignalsCollide()` compara etiquetas y no fuentes** (hallazgo de [F5.4]).
+  En `js/surfaces/inbox-curation.js` compara `sourceLabel()` de cada lado, así que dos
+  fuentes distintas sin etiqueta colapsan en una sola señal. La prueba estructural de
+  `40cd9b8` cubre a los adaptadores; cualquier otra fuente sin etiqueta lo reabre. Es una
+  línea de lógica, pero vive en código del frente visual.
+- **[B2.1]**, el corte de dos caracteres en la caja de búsqueda, es otro traspaso y ya
+  está anotado en [B2].
 
 ---
 
@@ -1077,6 +1180,53 @@ procedencia C2PA y prompt están auditados en `docs/assets/vhs-cassette-frame-v1
 `pyproject.toml`/el servidor declaran y sirven PNG estático. La prueba de navegador
 cubre los tres estados, teclado, móvil y movimiento reducido; el asset se sirve desde la
 misma instancia. La cartelera pública y su payload v1 no se tocaron.
+
+### Frente: Streaming, charadas, puntajes públicos y TMDb en vivo
+
+Los frentes que abrió el análisis del 2026-09-07
+(`docs/analisis/streaming-charadas-movil-2026-09-07.md`), anotados en este tablero recién
+el 2026-09-11: se cerraron mientras el archivo tenía trabajo sin commitear del frente
+visual, así que quedaron registrados sólo en el análisis, que sigue siendo donde está el
+razonamiento completo. Las [S1]–[S3] de streaming son las que citan sus commits y **no
+son** las [S1]/[S2] de la purga del historial, más abajo; no se renumeran para no romper
+esas referencias.
+
+- [x] **[F5.4] Activar y validar TMDb contra la API real.** 2026-09-07, `a08298c` y
+  `40cd9b8`. Smoke en vivo 4/4, verificación en navegador con token válido y un alta real
+  entrando por enriquecimiento. La corrida real encontró dos cosas: la relajación de TLS
+  de [F1] culpaba a la cadena de Amazon por lo que hacía un antivirus local —se revirtió—,
+  y TMDb no tenía etiqueta en el frontend. Quedó sin correr el overlay de Docker; está en
+  `Backlog`.
+- [x] **[F6.1] Conectar el índice local de IMDb.** 2026-09-07, `7fe6966`; índice liviano
+  en `f90d764`. La política de [Q5] nombraba como primera fuente a un índice que
+  producción no podía consultar; ahora puede. Busca sólo por id de IMDb, es opt-in, y una
+  instalación sin índice enriquece igual que antes. El índice bajó de ~8,1 GB a ~1,1 GB
+  estimados.
+- [x] **[F6.2] Puntajes públicos, lado de datos.** 2026-09-07, `1f17507` y `bad682f`. IMDb
+  sale del índice y se lee al mostrar; TMDb se guarda como snapshot fechado, con 30 días
+  de refresco y 180 de tope contractual. Que un puntaje público nunca llegue al `rating`
+  personal ahora es estructural. La presentación está entre los traspasos al frente
+  visual.
+- [x] **[S1] Back office de regiones y plataformas.** 2026-09-07, `63c3253` y `6ea04c7`.
+  El owner decide qué mercados consulta la instancia y si los miembros pueden elegir; un
+  miembro elige sólo entre los habilitados.
+- [x] **[S2] Elegir la fuente de disponibilidad.** 2026-09-07, `3de406e` y ADR-0004. TMDb,
+  con dos condiciones: atribución obligatoria a JustWatch y el tope de retención aplicado
+  al snapshot.
+- [x] **[S3] Consulta, persistencia y procedencia.** 2026-09-07, `1e0b2b7`. Snapshot
+  fechado en tabla propia; `en_catalogo` no se toca y `en_plataforma` se deriva al leer.
+  "No lo consultamos" nunca se presenta como "no está disponible".
+- [x] **[G1] Contrato de charadas.** 2026-09-07, `ff91867`, `5f40b8c` y `2d23b39`;
+  `docs/briefs/charades-v1.md`. El conteo de votos no sirve para clasificar la banda
+  media, así que se automatizan sólo los extremos y el resto lo decide una persona.
+- [x] **[G2] Generador y dificultad.** 2026-09-07, `72d1f31`. Generador portable —FNV-1a
+  más un LCG documentado— para que el teléfono arme el mismo mazo; una dificultad puesta
+  por una persona sobrevive a cualquier recálculo. La pasada de revisión está entre los
+  traspasos; el juego va en [A2.4].
+- [x] **[MB1] Dirección móvil.** 2026-09-07, `a8f5a32` y `50e86a7`; ADR-0005. Cliente
+  autónomo, sincronización que inicia una persona y nunca borra, fusión a tres bandas.
+- [x] **[MB2] Auditoría móvil, mitad medible.** 2026-09-07, `2bd43ca`. Bandeja es la única
+  superficie con problemas reales; el arreglo está entre los traspasos.
 
 ### Frente: Superficie publica y despliegue
 

@@ -3,6 +3,8 @@
 **Fecha:** 2026-09-07. **Reemplaza** `android-client-v2.md`.
 **Motivo:** el owner fijó cuatro decisiones que v2 no contemplaba, y una de ellas cambia
 la puerta de entrada del producto.
+**Actualizado el 2026-09-11:** las notas fechadas de abajo marcan qué quedó construido del
+lado servidor y qué no. El estado vive en `tareas.md`, [A2].
 
 ## Qué cambió respecto de v2
 
@@ -93,6 +95,14 @@ enriquecer. Y ahí decide el matching que ya existe:
 El invariante 3 se respeta sin esfuerzo: **el teléfono nunca decide identidad**. Avisa, y el
 servidor enriquece cuando puede, y lo dudoso lo mira una persona.
 
+> **Cómo quedó construido, 2026-09-09 (`f6e36e1`).** El servidor **no** enriquece al
+> recibir: sería una llamada de red que haría esperar —o fallar— a un teléfono que acaba de
+> recuperar señal. Guarda lo que la persona escribió en un borrador por cuenta, que no
+> vence, y el enriquecimiento corre al revisar. Y como el teléfono manda título y año, no
+> una identidad fuerte, una obra que ya tenés no se une sola: vuelve como `review`, porque
+> un parecido de título no es identidad. El invariante 3 queda igual de respetado, con un
+> paso más en manos de la persona.
+
 ---
 
 ## Apareamiento: qué lleva el QR y por qué
@@ -141,6 +151,10 @@ casa, el teléfono resuelve la IP pública y **puede que el router no haga hairp
 salidas son DNS de horizonte partido, o servir también por IP local con certificado
 autofirmado y pin. Conviene decidirlo antes de A2.1 porque cambia lo que va en el QR.
 
+> **Resuelta el 2026-09-09.** La instancia está en la red local y no tiene dominio, así
+> que sirve HTTPS en su propio proceso con un certificado autofirmado y el pin viaja en el
+> QR. Receta en `docs/deployment.md`, "HTTPS en la red local, sin dominio".
+
 La VPN, como dijiste, es del usuario: si el teléfono llega a la instancia, la app no
 necesita saber cómo.
 
@@ -153,12 +167,14 @@ Cambia respecto de v2 porque tu primer hito es ver tu catálogo real.
 | Parte | Entrega | Servidor que hace falta |
 | --- | --- | --- |
 | **A2.0** | Entorno: JDK 17+, SDK, Gradle, `assembleDebug` verde | — |
-| **A2.1** | Esqueleto, apareamiento por QR, descarga completa, **lectura offline** | **apareamiento** |
+| **A2.1** | Esqueleto, apareamiento por QR, descarga completa, **lectura offline** | **apareamiento** — hecho, falta la pantalla |
 | **A2.2** | Edición personal offline y fusión a tres bandas | — (el `PATCH` ya existe) |
-| **A2.3** | **Alta offline** con borradores que no expiran | **alta desde dispositivo** |
-| **A2.4** | Charadas | — (entregado en [G2]) |
+| **A2.3** | **Alta offline** con borradores que no expiran | **alta desde dispositivo** — hecho |
+| **A2.4** | Charadas | **dificultad y clave de obra por la API de dispositivo** — falta |
 | **A2.5** | Imágenes: miniatura local y portada en segundo plano | — |
-| **A2.6** | Ampliar lo que viaja, en tu orden de prioridad | **colecciones, disponibilidad, puntajes** |
+| **A2.6** | Ampliar lo que viaja, en tu orden de prioridad | **colecciones, disponibilidad, puntajes** — hecho |
+
+La columna de servidor dice cómo está al 2026-09-11, con sus commits en `tareas.md`, [A2].
 
 ### A2.1 — lo primero que vas a tener en la mano
 
@@ -197,25 +213,34 @@ los dos valores, de cuándo es cada uno y dejarte elegir por campo.
 Tal como pediste, y cada escalón es servidor más cliente:
 
 1. **Catálogo y estado personal** — ya expuesto por la API v1.
-2. **Colecciones seguidas** — hoy la API de dispositivo no las expone.
+2. **Colecciones seguidas** — expuestas desde el 2026-09-09.
 3. **Disponibilidad en streaming** — ojo: es dato de TMDb con tope contractual de retención
    de 180 días. Ese tope **viaja con el dato**: el teléfono también tiene que dejar de
    mostrarlo cuando vence, o la copia local se convierte en la forma de incumplir los
-   términos.
-4. **Puntajes públicos** — lo que ya sirve `/api/ratings`.
+   términos. Expuesta desde el 2026-09-09, y cada fila lleva su `expires_at`.
+4. **Puntajes públicos** — lo que ya sirve `/api/ratings`; expuestos desde el 2026-09-09.
 
 ---
 
 ## Lo que hay que construir del lado servidor
 
-Es mi mitad del trabajo y no existe todavía:
+Es mi mitad del trabajo. **Al 2026-09-11 está hecha salvo dos piezas**, marcadas abajo; el
+detalle y los commits están en `tareas.md`, [A2].
 
 - **Apareamiento.** Token de un solo uso con vida corta, endpoint de canje, y la pantalla
   que dibuja el QR en `Administrar`. Se apoya en las sesiones opacas revocables de [A1.2] y
   en la clave de sincronización durable de [A1.4], ya cerradas.
+  **Hecho** (`334f4fe`, `e9bcaab`, `11dbe0b`), **salvo la pantalla**, que además no va en
+  `Administrar`: cada cuenta aparea su propio teléfono.
 - **Alta desde dispositivo.** Endpoint que recibe un borrador, lo enriquece y lo mete por el
   camino de importación y revisión que ya existe. Sin atajos que salteen la revisión.
+  **Hecho** (`f6e36e1`), sin enriquecer al recibir: ver el paso 3 del alta, más arriba.
 - **Exposición progresiva** de colecciones, disponibilidad y puntajes, en ese orden.
+  **Hecho** (`9ff3ccd`, `7f24895`, `417f6d3`).
+- **Dificultad de charadas por la API de dispositivo — falta.** Ni la dificultad ni la clave
+  de obra con la que el generador calcula la huella del mazo viajan hoy al teléfono, así que
+  no puede producir el mismo mazo que el servidor. Encontrado el 2026-09-11 al poner el
+  tablero al día.
 
 Todo aditivo —rutas y campos nuevos, sin cambiar el significado de ninguno existente—, así
 que cabe en la v1 de la API según la regla de versionado de ADR-0003.
@@ -240,7 +265,8 @@ respetar `X-Movie-Inbox-Api-Version`; y no usar el `/api/` histórico, cookies n
 
 ## Lo que sigue abierto
 
-1. **Hairpinning o DNS partido** para llegar a la instancia desde la red local (arriba).
+1. ~~**Hairpinning o DNS partido** para llegar a la instancia desde la red local.~~
+   **Resuelto el 2026-09-09**, ver arriba.
 2. **Autenticación local en el teléfono.** Con la cuenta viniendo de la instancia, la
    identidad está resuelta, pero falta decidir si la aplicación quiere PIN o biometría
    propios además de la pantalla de bloqueo. Las reviews y las notas son datos personales.

@@ -67,6 +67,13 @@ proyecto Android en el repositorio           ->  no existe
 **Ninguna parte de [A2] es ejecutable acá hoy.** Esto no es un detalle que se resuelve al
 pasar: es literalmente la tarea [A2.0].
 
+**Re-medido el 2026-09-11: los pasos 1 y 2 están hechos.** Android Studio 2025.3.3 está
+instalado con su propio JDK (JBR 21.0.10), y el SDK en `%LOCALAPPDATA%\Android\Sdk` tiene
+las plataformas 35, 36 y 36.1, build-tools hasta 37.0.0, `adb`, emulador e imágenes de
+sistema. El `java` del `PATH` sigue siendo 1.8 y no hay variables definidas: dentro de
+Android Studio no importa, pero para correr `gradlew` desde una terminal hay que apuntar
+`JAVA_HOME` a `C:\Program Files\Android\Android Studio\jbr`. Falta el paso 3.
+
 ### Dónde corre cada cosa
 
 Conviene fijarlo antes de copiar comandos, porque el proyecto tiene dos entornos:

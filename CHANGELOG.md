@@ -4,57 +4,103 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Agregado
+
+- La instancia puede decir dónde se ve en streaming cada obra del catálogo propio. El
+  owner elige en Administrar qué mercados se consultan, cuál es el predeterminado y si
+  los miembros pueden elegir el suyo; las plataformas se traen de TMDb, con la
+  atribución a JustWatch que exigen sus términos. Cada consulta se guarda como una
+  observación fechada: se refresca a los 30 días y deja de servirse a los 180. Tener el
+  archivo y estar en una plataforma siguen siendo cosas distintas, y "no lo consultamos"
+  nunca se presenta como "no está disponible". La ficha todavía no lo muestra.
+- Los puntajes públicos de IMDb y de TMDb se sirven al lado del puntaje propio, nunca en
+  su lugar: ningún camino lleva un puntaje público al puntaje personal. Los de IMDb
+  salen del índice local; los de TMDb se guardan con fecha, igual que la disponibilidad.
+  Un puntaje con menos de 50 votos llega marcado como poco representativo. La ficha
+  todavía no los muestra.
+- Con el índice local de IMDb configurado, la instancia lo usa como primera fuente para
+  el tipo de obra, el año y los títulos alternativos, como ya indicaba la política de
+  autoridad. Se consulta sólo por identificador de IMDb, nunca por título, y una
+  instalación sin índice enriquece igual que antes.
+- Mazos de charadas deterministas sobre el catálogo propio y las colecciones seguidas:
+  las mismas opciones sobre las mismas obras dan el mismo mazo, con un código corto para
+  que dos jugadores comprueben que tienen el mismo. La dificultad se sugiere sólo en los
+  extremos; el resto lo decide una persona, y esa decisión sobrevive a cualquier
+  recálculo. Todavía no tiene pantalla.
+- Un teléfono puede aparearse con una cuenta escaneando un QR de un solo uso, sin que
+  viaje una contraseña. `serve` puede servir HTTPS por su cuenta con un certificado
+  propio (`--ssl-certfile`, `--ssl-keyfile`) y calcula por su cuenta la huella que el QR
+  le lleva al teléfono; `movie-inbox pairing-pin` la imprime para cuando HTTPS lo
+  termina un proxy.
+- La API de dispositivo suma el alta sin conexión —lo que un teléfono agrega sin red
+  entra en un borrador que no vence y pasa por la revisión de siempre—, las colecciones
+  seguidas, la disponibilidad en streaming y los puntajes públicos. La disponibilidad y
+  los puntajes de TMDb llegan con la fecha en que el teléfono tiene que dejar de
+  mostrarlos.
+
 ### Cambiado
 
-- La busqueda del catalogo dejo de leer una coincidencia de letras como si fuera una
-  palabra compartida. Un articulo en comun ya no acerca dos titulos, una palabra corta
-  metida adentro de otra mas larga ya no cuenta, y la comparacion de respaldo mide las
+- La búsqueda del catálogo dejó de leer una coincidencia de letras como si fuera una
+  palabra compartida. Un artículo en común ya no acerca dos títulos, una palabra corta
+  metida adentro de otra más larga ya no cuenta, y la comparación de respaldo mide las
   palabras con contenido en vez de las cadenas crudas: buscar "The Fly" ya no trae
   "M. Butterfly" por encima de "The Flies".
-- Un termino corto encuentra el titulo al que pertenece. "Ed" llega a "Ed Wood", y un
-  titulo de una sola letra como "M" se puede buscar por su propio titulo, con o sin ano;
+- Un término corto encuentra el título al que pertenece. "Ed" llega a "Ed Wood", y un
+  título de una sola letra como "M" se puede buscar por su propio título, con o sin año;
   antes la consulta se descartaba entera. Nada de esto habilita un auto-match nuevo: la
-  aceptacion se sigue decidiendo con la misma evidencia de identidad de siempre.
+  aceptación se sigue decidiendo con la misma evidencia de identidad de siempre.
+- El índice local de IMDb ocupa unas siete veces menos: guarda sólo los tipos de obra y
+  las regiones que el catálogo usa. Un índice construido antes se detecta como viejo y
+  pide volver a sincronizarse.
+- Los identificadores que ve un dispositivo ya no cambian al rotar el token de la API ni
+  al mover el archivo del catálogo.
 
 ### Corregido
 
-- Abrir una coleccion, refrescar una importacion y armar la pantalla de inicio dejan de
-  ponerse lentos a medida que crece el catalogo. Las tres comparaban cada ficha contra el
-  catalogo entero y volvian a normalizarlo de cero en cada comparacion: con 5000 fichas y
-  una coleccion de 200, eso eran 25 de los 28 segundos que tardaba la pagina. Ahora el
-  catalogo se prepara una vez por pantalla.
+- Abrir una colección, refrescar una importación y armar la pantalla de inicio dejan de
+  ponerse lentos a medida que crece el catálogo. Las tres comparaban cada ficha contra
+  el catálogo entero y volvían a normalizarlo de cero en cada comparación: con 5000
+  fichas y una colección de 200, eso eran 25 de los 28 segundos que tardaba la página.
+  Ahora el catálogo se prepara una vez por pantalla.
 - Compartir la disponibilidad de una biblioteca dejaba de funcionar en silencio si la
-  biblioteca tenia dos copias de la misma pelicula y una se habia escaneado antes de que
-  su ficha se enriqueciera: la obra se reportaba dos veces, la coleccion no se llegaba a
-  crear y la unica senal era que el interruptor volvia sin publicar nada. Ahora las copias
-  se cuentan juntas, como siempre debieron.
-- Un mismo articulo de Wikipedia dejo de aparecer dos veces en su estante. Wikipedia se
-  alcanza por dos caminos —su buscador y una resolucion por titulo exacto— y las dos filas
-  traian el mismo articulo con direcciones que solo se diferenciaban en como estaban
-  escapados los parentesis de "The Fly (1986 film)". Como casi toda ficha de cine esta
-  desambiguada asi, pasaba seguido, y justo cuando la consulta estaba en otro idioma que el
-  articulo.
-- Cuando una fuente externa contesta pero nada de lo que trae sirve, Movie Inbox vuelve a
-  intentar con un titulo alternativo confirmado, igual que hacia cuando la respuesta venia
-  vacia. Antes bastaba con que la fuente devolviera cualquier cosa para que no se
-  reintentara: buscar "Der Untergang" en FilmAffinity traia cinco peliculas y ninguna era
-  la buscada, y el reintento que la encuentra no llegaba a correr.
-- FilmAffinity vuelve a encontrar una pelicula buscada por su titulo original. Cuando la
-  busqueda resuelve a una sola pelicula el sitio no devuelve un listado sino la ficha, y
-  Movie Inbox la leia como si fuera un listado: devolvia los enlaces de navegacion de la
-  propia pagina ("Ficha", "Imagenes") como si fueran peliculas, y la que se estaba buscando
-  quedaba afuera. Buscar "Sen to Chihiro no kamikakushi" devolvia ocho filas y ninguna era
-  El viaje de Chihiro, que estaba arriba de todo en la respuesta.
-- Buscar una pelicula por su titulo original en otro idioma vuelve a encontrarla en
+  biblioteca tenía dos copias de la misma película y una se había escaneado antes de que
+  su ficha se enriqueciera: la obra se reportaba dos veces, la colección no se llegaba a
+  crear y la única señal era que el interruptor volvía sin publicar nada. Ahora las
+  copias se cuentan juntas, como siempre debieron.
+- Un mismo artículo de Wikipedia dejó de aparecer dos veces en su estante. Wikipedia se
+  alcanza por dos caminos —su buscador y una resolución por título exacto— y las dos
+  filas traían el mismo artículo con direcciones que sólo se diferenciaban en cómo
+  estaban escapados los paréntesis de "The Fly (1986 film)". Como casi toda ficha de
+  cine está desambiguada así, pasaba seguido, y justo cuando la consulta estaba en otro
+  idioma que el artículo.
+- Cuando una fuente externa contesta pero nada de lo que trae sirve, Movie Inbox vuelve
+  a intentar con un título alternativo confirmado, igual que hacía cuando la respuesta
+  venía vacía. Antes bastaba con que la fuente devolviera cualquier cosa para que no se
+  reintentara: buscar "Der Untergang" en FilmAffinity traía cinco películas y ninguna
+  era la buscada, y el reintento que la encuentra no llegaba a correr.
+- FilmAffinity vuelve a encontrar una película buscada por su título original. Cuando la
+  búsqueda resuelve a una sola película el sitio no devuelve un listado sino la ficha, y
+  Movie Inbox la leía como si fuera un listado: devolvía los enlaces de navegación de la
+  propia página ("Ficha", "Imágenes") como si fueran películas, y la que se estaba
+  buscando quedaba afuera. Buscar "Sen to Chihiro no kamikakushi" devolvía ocho filas y
+  ninguna era El viaje de Chihiro, que estaba arriba de todo en la respuesta.
+- Buscar una película por su título original en otro idioma vuelve a encontrarla en
   Wikipedia y en FilmAffinity. El reintento con un alias confirmado por Wikidata ya
-  existia, pero la fila que encontraba llegaba sin rastro de la consulta que la habia
-  encontrado, asi que el puntaje la descartaba salvo que el titulo de mercado se
+  existía, pero la fila que encontraba llegaba sin rastro de la consulta que la había
+  encontrado, así que el puntaje la descartaba salvo que el título de mercado se
   pareciera al original. "Der Untergang" contra "El hundimiento" daba 13.9 sobre un piso
-  de 28; ahora la fila viaja con el titulo original que la encontro.
-- La coleccion que publica una biblioteca ya no sale ordenada por un identificador
-  interno. Se lee alfabeticamente por el titulo que se muestra, igual que la grilla del
-  catalogo, y una pelicula ya no cambia de lugar en una coleccion que otros estan mirando
-  solo porque el enriquecimiento le encontro un id.
+  de 28; ahora la fila viaja con el título original que la encontró.
+- La colección que publica una biblioteca ya no sale ordenada por un identificador
+  interno. Se lee alfabéticamente por el título que se muestra, igual que la grilla del
+  catálogo, y una película ya no cambia de lugar en una colección que otros están
+  mirando sólo porque el enriquecimiento le encontró un id.
+- La descarga de los datasets de IMDb vuelve a verificar el certificado en modo
+  estricto. La excepción que se había agregado culpaba a la cadena de Amazon por lo que
+  en realidad hacía un antivirus que intercepta HTTPS; sin él, la cadena verifica sin
+  relajar nada.
+- Los resultados de TMDb dejan de mostrarse como "Sin fuente". La etiqueta faltaba en el
+  frontend desde que la fuente existe, y además de verse mal le quitaba un dato real a
+  la desambiguación de duplicados, que compara etiquetas.
 
 ## [0.8.0] - 2026-09-02
 

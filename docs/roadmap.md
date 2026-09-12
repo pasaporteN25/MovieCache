@@ -285,9 +285,11 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 
 ### 4. Clientes e integraciones
 
-1. [A1] API versionada y sesiones revocables para dispositivos.
-2. [A2] Cliente Android basico, candidato a un hito posterior una vez cerrado [A1].
-3. [I1] Evaluar Radarr, Sonarr y Letterboxd sobre contratos ya estables.
+1. **Cerrado 2026-09-07.** [A1] API versionada y sesiones revocables para dispositivos.
+2. [A2] Cliente Android autonomo, con almacen propio y sincronizacion que inicia una
+   persona (ADR-0005), en lugar del cliente basico que se preveia aca.
+3. **Cerrado 2026-09-07.** [I1] Evaluar Radarr, Sonarr y Letterboxd: evaluacion hecha y
+   construccion postergada por decision del owner (ADR-0006, ADR-0007 y ADR-0008).
 4. [M1] Investigar juegos y musica como verticales propias, nunca como simples valores
    nuevos de `kind`.
 

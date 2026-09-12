@@ -1,6 +1,8 @@
 # Análisis: disponibilidad en streaming, charadas y dirección móvil
 
-**Fecha:** 2026-09-07. **Estado:** análisis aceptado por el owner, sin código escrito.
+**Fecha:** 2026-09-07. **Estado:** análisis aceptado por el owner e implementado entre el
+07 y el 09/09, salvo lo que la sección 7 marca como pendiente. Desde el 2026-09-11 el
+estado vive en `tareas.md`; acá queda el razonamiento.
 **Alcance:** tres ejes nuevos planteados por el owner más una revisión del estado móvil.
 No modifica ningún contrato vigente; propone frentes para `tareas.md`.
 
@@ -470,10 +472,13 @@ con el trabajo visual**, salvo donde se indica.
   si hay host con Compose. Corregir lo que la corrida real encuentre. *Medio en código,
   Grande en criterio si aparecen bugs de contrato.* **Sin dependencias — se toma primero.
   Prerrequisito de [S2].**
+  **Cerrada 2026-09-07** (ver 6.1), salvo el smoke del overlay de Docker, anotado en
+  `tareas.md`.
 - **[F6.1] Conectar el índice de [F1] a búsqueda y matching.** Cerrar el hueco entre la
   matriz de autoridad de [Q5] y el prototipo desconectado. Opt-in, sin volverse
   obligatorio para una instalación que no lo indexó. *Grande. Sin dependencias, pero va
   después de F5.4 por decisión de prioridad.*
+  **Cerrada 2026-09-07 — commit `7fe6966`**; el índice liviano, en `f90d764`.
 - **[F6.2] Señal de notoriedad y puntajes públicos.** **Cerrada del lado de datos
   2026-09-07.** El owner decidió **tomar las dos fuentes en vez de elegir una**, para que
   el lector compare en lugar de que se le imponga una vara, con su propio puntaje al lado.
@@ -504,6 +509,7 @@ con el trabajo visual**, salvo donde se indica.
     configurada. Un puntaje con menos de 50 votos llega marcado `is_meaningful: false` —
     merece verse distinto, porque un 9,9 de tres personas al lado de un 8,3 de setecientas
     mil invita una comparación que no existe.
+    **Anotado en `tareas.md` como traspaso el 2026-09-11.**
   - **Lo único que no se verificó contra la API real** es la lectura de puntajes de TMDb:
     el archivo del token no está en la máquina en este momento. Queda como smoke
     voluntario en `tests/test_external_tmdb_live_smoke.py`, que se salta solo sin token.
@@ -513,6 +519,7 @@ con el trabajo visual**, salvo donde se indica.
 - **[S1] Back office de regiones y plataformas.** Tablas dedicadas, migración, servicio,
   endpoints solo-owner, sección de admin. Región por usuario con habilitación del admin y
   default de instancia. *Grande.*
+  **Cerrada 2026-09-07 — commits `63c3253` y `6ea04c7`.**
 - **[S2] Evaluar fuentes de disponibilidad.** **Cerrada 2026-09-07 —
   `docs/adr/0004-streaming-availability-source.md`.** TMDb elegida, medida contra la API
   real: AR soportada entre 139 regiones, 59 proveedores, las seis plataformas pedidas
@@ -528,6 +535,8 @@ con el trabajo visual**, salvo donde se indica.
   2026-09-07** por decisión del owner: es trabajo de presentación y encaja con el
   rediseño de Colección de [U3]. El backend ya está entregado y probado; ver el traspaso
   más abajo.
+  **Anotada en `tareas.md` como traspaso el 2026-09-11**: hasta entonces no figuraba en el
+  tablero, que es el que el otro frente lee.
 
 #### Traspaso de [S4] a Codex
 
@@ -574,6 +583,9 @@ El backend está completo. Lo que falta es sólo mostrarlo.
   Se calcula en el servidor y viaja como un campo chico.
 - **[G2] Implementar generador y temporizador.** *Medio. Depende de G1 y de la decisión
   móvil de MB1.*
+  **Cerrada 2026-09-07 — commit `72d1f31`.** Los valores del temporizador viven en el
+  dominio. La pasada de revisión de dificultad quedó como traspaso al frente visual en
+  `tareas.md`, y el juego va en el teléfono, dentro de [A2.4].
 
 ### Frente: Dirección móvil
 
@@ -623,20 +635,23 @@ El backend está completo. Lo que falta es sólo mostrarlo.
     Eyes` encuentra `El secreto de sus ojos`. Camino aceptado: CSV con mapeo explícito y
     persona revisando, sin adaptador ni credencial.
 
-  **Pendiente administrativo:** la entrada de [I1] en `tareas.md` sigue en Backlog. Ese
-  archivo tenía trabajo sin commitear del frente visual al cerrar esta tarea, así que no se
-  tocó para no arrastrarlo.
+  **Pendiente administrativo, resuelto el 2026-09-11:** la entrada de [I1] en `tareas.md`
+  se quedó en Backlog porque ese archivo tenía trabajo sin commitear del frente visual al
+  cerrar esta tarea y no se tocó para no arrastrarlo. Ya está en `Hecho`.
 
 ---
 
 ## 8. Decisiones abiertas
 
-1. **[F5.4]** — el owner tiene que crear el API Read Access Token en su cuenta de TMDb y
-   dejarlo en un archivo del servidor. El token no pasa por el chat. Bloquea el arranque.
+1. ~~**[F5.4]** — el owner tiene que crear el API Read Access Token en su cuenta de TMDb
+   y dejarlo en un archivo del servidor.~~ **Resuelta:** el token se creó y [F5.4] cerró
+   el 2026-09-07 contra la API real.
 2. ~~**[F6.2] / [G1]** — usar un conteo de votos público como señal de notoriedad para
    dificultad de juego.~~ **Resuelta.** [G1] midió que el conteo de votos no sirve como
    clasificador de dificultad, así que se automatizan sólo los extremos; y [F6.2] dejó los
    puntajes públicos servidos aparte del `rating` personal, nunca como valoración propia.
 3. **[G1]** — criterio de dificultad definitivo, y si se acepta una fuente de títulos
    populares además del catálogo curado, para que los baldes fáciles existan.
-4. **[MB1]** — convergencia de estado personal editado sin conexión en dos réplicas.
+4. ~~**[MB1]** — convergencia de estado personal editado sin conexión en dos réplicas.~~
+   **Resuelta** en [MB1]: fusión a tres bandas contra la base de la última
+   sincronización, sin depender de relojes.
