@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Movie Inbox: gestor self-hosted de catálogo audiovisual. Python + FastAPI + SQLite,
-frontend vanilla sin build step. Estable v0.6.0.
+frontend vanilla sin build step. Estable v0.8.0; la 0.9.0 está abierta, ver "Versiones".
 
 Antes de trabajar, leé los contratos vigentes: `PRODUCT.md`, `DESIGN.md`,
 `docs/roadmap.md`, `CHANGELOG.md` (`[Sin publicar]`), `tests/test_layering.py`.
@@ -80,6 +80,14 @@ El cliente Android es otro repositorio, `../movieIndexAndroid`, con su propio ta
 `tareas.md` es compartido: cada frente agrega su sección y no reescribe las ajenas. Antes
 de commitear, comprobar que el árbol no arrastra trabajo sin commitear del otro frente en
 los mismos archivos.
+
+## Versiones
+
+La 0.9.0 está abierta en la rama `release/0.9.0` y se cierra al fusionar su PR contra
+`master`. Mientras tanto se trabaja y se commitea en esa rama: todo lo que se commitea en
+este checkout entra en la versión. `master` no recibe commits directos, sólo esa fusión, y
+con merge commit, porque los documentos citan hashes de la rama. Lo que falta para cerrarla
+está en [V9] de `tareas.md`; el gate y los pasos de cierre, en `docs/release-checklist.md`.
 
 ## Archivos personales — no tocar, no leer como fixture
 

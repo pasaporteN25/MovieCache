@@ -4,6 +4,12 @@ Este gate valida una release candidate combinando pruebas automaticas con una
 aceptacion manual sobre una biblioteca descartable. Nunca se ejecuta por primera vez
 contra la unica copia de un catalogo o un disco sin backup.
 
+Desde la 0.9.0, una versión se arma abierta: vive en una rama `release/X.Y.Z` con un PR
+borrador contra `master`, y mientras el PR siga abierto se le pueden sumar cambios. El
+paquete declara `X.Y.Z.dev0` y el changelog sigue en `[Sin publicar]`, con una nota que
+dice qué versión va a ser. `master` no recibe commits directos, sólo la fusión de ese PR.
+Este gate decide cuándo se cierra, y la sección 8 dice cómo.
+
 Para el despliegue Docker, ejecutar esta aceptacion dentro del contenedor siguiendo
 `docker.md`; la primera ruta visible por la aplicacion sera `/media/library/disco1`.
 
@@ -103,3 +109,23 @@ Usar siempre la biblioteca descartable preparada para este gate.
 - Changelog, version de paquete y version runtime sincronizados.
 
 Una candidata que no cumple cualquiera de estos puntos no se etiqueta ni se despliega.
+
+## 8. Cierre
+
+Con el criterio de salida cumplido:
+
+1. Último commit en la rama de la versión: `X.Y.Z` en `pyproject.toml` y en
+   `src/movie_inbox/__init__.py`; `[Sin publicar]` pasa a `[X.Y.Z] - AAAA-MM-DD`, sin la
+   nota de versión abierta y con un `[Sin publicar]` vacío arriba; la versión estable al
+   día en `README.md`, `CLAUDE.md` y `docs/roadmap.md`.
+2. Marcar el PR como listo y esperar CI en verde sobre ese commit.
+3. Fusionar con **merge commit**, nunca con squash ni rebase: los documentos citan hashes
+   de commits de la rama, y esos dos caminos los reescriben o los dejan fuera de `master`.
+4. Etiquetar la fusión y subir la etiqueta:
+
+   ```bash
+   git switch master
+   git pull --ff-only
+   git tag -a vX.Y.Z -m vX.Y.Z
+   git push origin vX.Y.Z
+   ```

@@ -152,10 +152,20 @@ usuarios al frontend.
 Gate de salida: 554 pruebas unitarias (4 omitidas), 20 pruebas de navegador, Ruff,
 formato, mypy estricto, compileall y `git diff --check` en verde.
 
+### v0.9.0: API de dispositivo, datos en vivo y afinación de Inicio — abierta
+
+Abierta el 2026-09-13 en la rama `release/0.9.0`; se cierra al fusionar su PR contra
+`master`, y hasta entonces se le suman cambios. Trae la API de dispositivo `/api/v1/`
+—sesiones por dispositivo, apareamiento por QR, alta sin conexión y lo que un teléfono
+necesita para repartir charadas—, disponibilidad en streaming y puntajes públicos, mazos de
+charadas deterministas, el índice local de IMDb como primera fuente, arreglos de búsqueda y
+de rendimiento del catálogo, y el trabajo visual de Inicio desde la 0.8.0. No está pulida:
+varias de esas capacidades todavía no tienen pantalla. Lo que falta para cerrarla está en
+[V9] de `tareas.md`.
+
 ### Próximos incrementos propuestos
 
-- **v0.9.0** comienza con [A1], una API versionada y sesiones revocables por
-  dispositivo para habilitar un cliente Android sin reutilizar cookies del navegador.
+- Se proponen al cerrar la 0.9.0.
 
 ## Implementado en el incremento de descubrimiento y scanner
 

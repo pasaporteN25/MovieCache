@@ -4,6 +4,24 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+Va a ser la **0.9.0**. La versión está abierta en la rama `release/0.9.0` y se cierra al
+fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios. Todavía no está
+pulida: varias capacidades nuevas del servidor no tienen pantalla —cada entrada lo dice— y
+el trabajo visual de Inicio sigue en curso.
+
+### Antes de actualizar
+
+- **Hacé un backup: la base de la instancia no vuelve atrás.** La 0.9.0 migra `instance.db`
+  del esquema v11 al v19 apenas abre la instancia, y la 0.8.0 se niega a abrir una base
+  v19: volver a la 0.8.0 exige restaurar el backup (`movie-inbox backup` o, en Docker,
+  `bash scripts/docker-backup.sh`).
+- **Si usás el índice local de IMDb, regeneralo** con `movie-inbox imdb-dataset sync`. Su
+  formato cambió, y hasta regenerarlo la instancia enriquece como si no lo tuviera y no
+  muestra puntajes de IMDb.
+- `pip install` y la imagen de Docker instalan solos `segno`, la dependencia nueva.
+- No se retira nada: subcomandos, opciones de la CLI, rutas web, variables de entorno, el
+  esquema de la base del catálogo y el JSON portable siguen como en la 0.8.0.
+
 ### Agregado
 
 - La instancia puede decir dónde se ve en streaming cada obra del catálogo propio. El

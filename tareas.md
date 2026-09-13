@@ -226,6 +226,29 @@ consumir y qué reglas no se pueden romper.
 Sin implementación activa. [B1] es la próxima prioridad y requiere que el owner elija
 qué problema de calidad atacar primero.
 
+### Frente: Versión 0.9.0
+
+#### [V9] Cerrar la 0.9.0 — **abierta desde el 2026-09-13**
+
+La 0.9.0 vive en la rama `release/0.9.0` y se cierra al fusionar su PR contra `master`, por
+decisión del owner: todavía no está pulida y se le siguen sumando cambios. Todo lo que se
+commitea en este checkout entra en la versión; lo que no tenga que entrar, va en otra rama.
+El gate es `docs/release-checklist.md`, y los pasos de cierre están en su sección 8.
+
+| Falta | Quién | Estado |
+| --- | --- | --- |
+| Lint en verde en lo propio: orden de imports en `home_service.py`, formato de siete archivos y un tipo en `tests/test_catalog_comparison_index.py` | Frente lógico | **Hecho**, `6ff639b` |
+| Lint en verde en lo propio: formato de `scripts/capture_u2_p6_review.py`, `scripts/capture_u2_p7_review.py`, `scripts/capture_u3_1_audit.py` y `tests/browser/test_ui_browser.py`, y tres errores de mypy en `tests/test_package_layout.py` | Frente visual | Pendiente |
+| Si el trabajo de Inicio que todavía no está commiteado ([U4] y derivados) entra en la 0.9.0 | Owner | Abierta |
+| Changelog: las entradas del trabajo visual desde la 0.8.0 | Frente visual | Pendiente |
+| Changelog: "Antes de actualizar" | Frente lógico | **Hecho** (2026-09-13) |
+| Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup | Owner, o el frente lógico con su autorización | Pendiente |
+| El gate de `docs/release-checklist.md`, con el CI del PR en verde | Todos | Pendiente |
+| Último commit: versión `0.9.0`, changelog, `README.md`, `CLAUDE.md` y roadmap | Frente lógico | Pendiente |
+| Fusionar con merge commit y etiquetar `v0.9.0` | Owner | Pendiente |
+
+- **Modelo sugerido**: Grande para coordinar el cierre; cada fila, por separado, es chica.
+
 ## Hecho
 
 ### Frente: Colección, búsqueda y alta
