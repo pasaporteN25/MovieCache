@@ -19,24 +19,38 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   Un puntaje con menos de 50 votos llega marcado como poco representativo. La ficha
   todavía no los muestra.
 - Con el índice local de IMDb configurado, la instancia lo usa como primera fuente para
-  el tipo de obra, el año y los títulos alternativos, como ya indicaba la política de
-  autoridad. Se consulta sólo por identificador de IMDb, nunca por título, y una
-  instalación sin índice enriquece igual que antes.
+  siete campos —título, título original, títulos alternativos, tipo de obra, año,
+  duración y géneros—, como ya indicaba la política de autoridad; los títulos
+  alternativos se suman a los que ya había en vez de reemplazarlos. Se consulta sólo por
+  identificador de IMDb, nunca por título, y una instalación sin índice enriquece igual
+  que antes.
 - Mazos de charadas deterministas sobre el catálogo propio y las colecciones seguidas:
   las mismas opciones sobre las mismas obras dan el mismo mazo, con un código corto para
   que dos jugadores comprueben que tienen el mismo. La dificultad se sugiere sólo en los
   extremos; el resto lo decide una persona, y esa decisión sobrevive a cualquier
   recálculo. Todavía no tiene pantalla.
-- Un teléfono puede aparearse con una cuenta escaneando un QR de un solo uso, sin que
-  viaje una contraseña. `serve` puede servir HTTPS por su cuenta con un certificado
-  propio (`--ssl-certfile`, `--ssl-keyfile`) y calcula por su cuenta la huella que el QR
-  le lleva al teléfono; `movie-inbox pairing-pin` la imprime para cuando HTTPS lo
-  termina un proxy.
-- La API de dispositivo suma el alta sin conexión —lo que un teléfono agrega sin red
-  entra en un borrador que no vence y pasa por la revisión de siempre—, las colecciones
-  seguidas, la disponibilidad en streaming y los puntajes públicos. La disponibilidad y
-  los puntajes de TMDb llegan con la fecha en que el teléfono tiene que dejar de
-  mostrarlos.
+- Una API versionada para clientes de dispositivo, bajo `/api/v1/`, con su contrato
+  publicado en `docs/openapi/device-api-v1.openapi.json`. Cubre lo que necesita un
+  teléfono: iniciar, renovar y cerrar su sesión, listar, buscar y leer el catálogo
+  propio, y editar estado, fecha de visionado, puntaje y review. Las sesiones son por
+  dispositivo: el acceso vence a los 15 minutos y la renovación a los 30 días, viajan
+  sólo en el encabezado `Authorization` —nunca en una cookie ni en la URL—, se guardan
+  como hashes y se invalidan al cambiar la contraseña o al desactivar o archivar la
+  cuenta; el inicio de sesión tiene límite de intentos. Cada obra se identifica con un
+  id opaco que no revela rutas ni archivos, y que no cambia al rotar el token de la API
+  ni al mover el archivo del catálogo. Scanner, administración y Curaduría quedan
+  afuera. Todavía no hay aplicación que la use.
+- Un dispositivo se puede aparear con una cuenta mediante un ticket de un solo uso, sin
+  que viaje una contraseña: una sesión web lo emite para su propia cuenta y el servidor
+  lo dibuja como QR. `serve` puede servir HTTPS por su cuenta con un certificado propio
+  (`--ssl-certfile`, `--ssl-keyfile`) y calcula la huella que el QR le lleva al
+  teléfono; `movie-inbox pairing-pin` la imprime para cuando HTTPS lo termina un proxy.
+  Todavía no hay pantalla que muestre el QR ni aplicación que lo escanee.
+- La API de dispositivo también recibe el alta sin conexión —lo que un teléfono agrega
+  sin red entra en un borrador que no vence y pasa por la revisión de siempre— y sirve
+  las colecciones seguidas, la disponibilidad en streaming y los puntajes públicos. La
+  disponibilidad y los puntajes de TMDb llegan con la fecha en que el teléfono tiene que
+  dejar de mostrarlos.
 
 ### Cambiado
 
@@ -52,8 +66,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - El índice local de IMDb ocupa unas siete veces menos: guarda sólo los tipos de obra y
   las regiones que el catálogo usa. Un índice construido antes se detecta como viejo y
   pide volver a sincronizarse.
-- Los identificadores que ve un dispositivo ya no cambian al rotar el token de la API ni
-  al mover el archivo del catálogo.
+- La instalación suma una dependencia, `segno`, que dibuja en el servidor el QR de
+  apareamiento. Es Python puro y no trae dependencias propias.
 
 ### Corregido
 
