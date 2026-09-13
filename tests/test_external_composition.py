@@ -93,7 +93,9 @@ class WikipediaArticleReachedTwiceTests(unittest.TestCase):
             if not url.startswith("https://en."):
                 return json.dumps({"query": {"pages": []}})
             if "generator=search" in url:
-                page = dict(ARTICLE, canonicalurl=CANONICAL) if search_has_canonical else dict(ARTICLE)
+                page = (
+                    dict(ARTICLE, canonicalurl=CANONICAL) if search_has_canonical else dict(ARTICLE)
+                )
                 return json.dumps({"query": {"pages": [page]}})
             if "titles=" in url:
                 return json.dumps({"query": {"pages": [dict(ARTICLE, canonicalurl=CANONICAL)]}})
@@ -148,7 +150,9 @@ class PerSourceShelfTests(unittest.TestCase):
         results, _ = service.search("Heat")
         shelves = {name: rows for name, rows in group_external_results(results).items() if rows}
 
-        self.assertEqual({name: len(rows) for name, rows in shelves.items()}, {"imdb": 1, "wikipedia": 1})
+        self.assertEqual(
+            {name: len(rows) for name, rows in shelves.items()}, {"imdb": 1, "wikipedia": 1}
+        )
 
 
 if __name__ == "__main__":

@@ -9,7 +9,12 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date
 from typing import Any
 
-from movie_inbox.domain.catalog import CatalogComparisonIndex, catalog_membership, external_urls, title_match_key
+from movie_inbox.domain.catalog import (
+    CatalogComparisonIndex,
+    catalog_membership,
+    external_urls,
+    title_match_key,
+)
 from movie_inbox.domain.collections import CuratedCollection
 from movie_inbox.domain.normalization import normalize_bool, normalize_rating
 from movie_inbox.domain.releases import normalize_release_dates

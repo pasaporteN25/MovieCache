@@ -585,7 +585,9 @@ class CatalogComparisonIndex:
         return len(self._items)
 
 
-def _prepared(items: Sequence[Mapping[str, Any]] | CatalogComparisonIndex) -> CatalogComparisonIndex:
+def _prepared(
+    items: Sequence[Mapping[str, Any]] | CatalogComparisonIndex,
+) -> CatalogComparisonIndex:
     return items if isinstance(items, CatalogComparisonIndex) else CatalogComparisonIndex(items)
 
 

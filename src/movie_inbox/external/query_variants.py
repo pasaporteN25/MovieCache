@@ -63,8 +63,7 @@ def needs_alias_retry(query: str | Any, results: Sequence[Mapping[str, Any]]) ->
     """
 
     return not any(
-        external_result_score(query, result) >= EXTERNAL_RELEVANCE_THRESHOLD
-        for result in results
+        external_result_score(query, result) >= EXTERNAL_RELEVANCE_THRESHOLD for result in results
     )
 
 

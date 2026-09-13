@@ -118,9 +118,7 @@ def collection_items_in_reading_order(
     """
 
     ordered = sorted(items, key=_reading_order_key)
-    return tuple(
-        replace(entry, position=position) for position, entry in enumerate(ordered)
-    )
+    return tuple(replace(entry, position=position) for position, entry in enumerate(ordered))
 
 
 def _reading_order_key(entry: CollectionItem) -> tuple[str, str, str]:

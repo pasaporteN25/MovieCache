@@ -18,6 +18,7 @@ in a test suite measures the machine that runs it.
 from __future__ import annotations
 
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 from movie_inbox.domain import catalog as catalog_module
@@ -29,7 +30,7 @@ from movie_inbox.domain.catalog import (
 )
 
 
-def _catalog(count: int) -> list[dict]:
+def _catalog(count: int) -> list[dict[str, Any]]:
     return [
         normalize_item(
             {"id": f"cat-{index}", "title": f"Pelicula numero {index}", "year": "1999"}

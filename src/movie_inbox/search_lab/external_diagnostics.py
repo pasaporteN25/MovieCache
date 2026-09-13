@@ -40,6 +40,7 @@ _ADAPTERS: dict[str, Callable[[], Any]] = {
     "filmaffinity": FilmAffinityAdapter,
 }
 
+
 def _asked_wikidata(urls: Sequence[str]) -> bool:
     return any("wikidata.org" in url for url in urls)
 

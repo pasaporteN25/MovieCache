@@ -144,9 +144,7 @@ class AliasIdentityTests(unittest.TestCase):
         # comparing titles alone would let "Estiu 1994" answer for it.
         variant = AliasVariant(title="Estiu 1993", identity=dict(_METADATA))
 
-        rows = with_alias_identity(
-            [self._row("Estiu 1994"), self._row("Estiu 1993")], variant
-        )
+        rows = with_alias_identity([self._row("Estiu 1994"), self._row("Estiu 1993")], variant)
 
         self.assertEqual(rows[0].get("original_title"), None)
         self.assertEqual(rows[1]["original_title"], "Estiu 1993")
@@ -192,9 +190,7 @@ class AliasIdentityTests(unittest.TestCase):
         # The point of the whole thing, stated as the number it moves.
         from movie_inbox.domain.search import EXTERNAL_RELEVANCE_THRESHOLD, external_result_score
 
-        variant = AliasVariant(
-            title="El hundimiento", identity={"original_title": "Der Untergang"}
-        )
+        variant = AliasVariant(title="El hundimiento", identity={"original_title": "Der Untergang"})
         plain = self._row("El hundimiento (2004)")
         [annotated] = with_alias_identity([plain], variant)
 
