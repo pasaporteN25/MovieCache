@@ -237,7 +237,7 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 
 | Falta | Quién | Estado |
 | --- | --- | --- |
-| Lint en verde en lo propio: orden de imports en `home_service.py`, formato de siete archivos y un tipo en `tests/test_catalog_comparison_index.py` | Frente lógico | **Hecho**, `6ff639b` |
+| Lint en verde en lo propio: orden de imports en `home_service.py`, formato de seis archivos, un tipo en `tests/test_catalog_comparison_index.py` y las líneas largas del HTML capturado en `tests/test_external_filmaffinity.py` | Frente lógico | **Hecho** (2026-09-13) |
 | Lint en verde en lo propio: formato de `scripts/capture_u2_p6_review.py`, `scripts/capture_u2_p7_review.py`, `scripts/capture_u3_1_audit.py` y `tests/browser/test_ui_browser.py`, y tres errores de mypy en `tests/test_package_layout.py` | Frente visual | Pendiente |
 | Si el trabajo de Inicio que todavía no está commiteado ([U4] y derivados) entra en la 0.9.0 | Owner | Abierta |
 | Changelog: las entradas del trabajo visual desde la 0.8.0 | Frente visual | Pendiente |

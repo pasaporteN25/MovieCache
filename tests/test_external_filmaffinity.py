@@ -226,7 +226,7 @@ SPIRITED_AWAY_SEARCH_HTML = """<html><head><meta property="og:type" content="vid
 
                                 <span class="d-none d-md-block">Imágenes&nbsp;<em>[113]</em></span>
 
-                            </a></body></html>"""
+                            </a></body></html>"""  # noqa: E501
 
 # The same search endpoint answering with an actual listing, for the same query
 # shape. Two result cards, verbatim, from the response to "Der Untergang".
@@ -242,7 +242,7 @@ LISTING_SEARCH_HTML = """<html><head><meta property="og:type" content="website" 
 
                     <a class="d-md-none stretched-link" href="https://www.filmaffinity.com/es/film592705.html">Stalingrado: el ataque, el cerco y la caída</a>
 
-                </div></body></html>"""
+                </div></body></html>"""  # noqa: E501
 
 
 class SearchResolvingToAFilmPageTests(unittest.TestCase):
