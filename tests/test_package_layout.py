@@ -37,6 +37,7 @@ class PackageLayoutTests(unittest.TestCase):
                 "cache",
                 "db",
                 "enrich",
+                "images",
                 "imdb-dataset",
                 "import",
                 "match",

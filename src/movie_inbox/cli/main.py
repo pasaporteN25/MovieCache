@@ -12,6 +12,7 @@ from movie_inbox.cli import (
     cache,
     database,
     enrich_catalog,
+    images,
     imdb_dataset,
     import_catalog,
     match_external_links,
@@ -37,6 +38,7 @@ COMMANDS: dict[str, tuple[Command, str]] = {
     "match": (match_external_links.main, "Attach trusted external links."),
     "db": (database.main, "Import, export and inspect SQLite catalogs."),
     "cache": (cache.main, "Inspect, prune or clear the image cache."),
+    "images": (images.main, "Diagnose image coverage by cause, without downloading."),
     "backup": (backup.main, "Create and verify persistent instance backups."),
     "search-lab": (search_lab.main, "Measure search quality without changing a catalog."),
     "pairing-pin": (

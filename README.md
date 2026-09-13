@@ -143,6 +143,7 @@ movie-inbox match catalog.json --json catalog-con-links.json
 movie-inbox db import catalog.json --db data/movie-inbox.db
 movie-inbox db export data/movie-inbox.db --json backups/catalog.json
 movie-inbox cache info --dir .catalog-cache/images
+movie-inbox images coverage catalog.json --instance-db .movie-inbox/instance.db
 movie-inbox backup create data --output-dir backups --retention-days 14
 movie-inbox backup verify backups/movie-inbox-instance-20260811-033000Z.tar.gz
 movie-inbox search-lab run --json reports/search-baseline.json --html reports/search-baseline.html

@@ -51,6 +51,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   las colecciones seguidas, la disponibilidad en streaming y los puntajes públicos. La
   disponibilidad y los puntajes de TMDb llegan con la fecha en que el teléfono tiene que
   dejar de mostrarlos.
+- `movie-inbox images coverage` cuenta, por causa, por qué las obras no llenan las dos
+  ventanas de imágenes de la consola: campo vacío, dirección que el proxy rechazaría o
+  imagen todavía sin caché, y cuántas imágenes distintas tiene cada obra —dos tamaños de
+  la misma imagen cuentan como una—. Lo separa por tipo, por origen —catálogo o Club— y
+  por identidad. No descarga nada ni consulta proveedores, y sólo imprime totales: no
+  nombra títulos, direcciones ni rutas.
 
 ### Cambiado
 
