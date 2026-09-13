@@ -170,11 +170,11 @@ Cambia respecto de v2 porque tu primer hito es ver tu catálogo real.
 | **A2.1** | Esqueleto, apareamiento por QR, descarga completa, **lectura offline** | **apareamiento** — hecho, falta la pantalla |
 | **A2.2** | Edición personal offline y fusión a tres bandas | — (el `PATCH` ya existe) |
 | **A2.3** | **Alta offline** con borradores que no expiran | **alta desde dispositivo** — hecho |
-| **A2.4** | Charadas | **dificultad y clave de obra por la API de dispositivo** — falta |
+| **A2.4** | Charadas | **dificultad y clave de obra por la API de dispositivo** — hecho |
 | **A2.5** | Imágenes: miniatura local y portada en segundo plano | — |
 | **A2.6** | Ampliar lo que viaja, en tu orden de prioridad | **colecciones, disponibilidad, puntajes** — hecho |
 
-La columna de servidor dice cómo está al 2026-09-11, con sus commits en `tareas.md`, [A2].
+La columna de servidor dice cómo está al 2026-09-12, con sus commits en `tareas.md`, [A2].
 
 ### A2.1 — lo primero que vas a tener en la mano
 
@@ -224,8 +224,8 @@ Tal como pediste, y cada escalón es servidor más cliente:
 
 ## Lo que hay que construir del lado servidor
 
-Es mi mitad del trabajo. **Al 2026-09-11 está hecha salvo dos piezas**, marcadas abajo; el
-detalle y los commits están en `tareas.md`, [A2].
+Es mi mitad del trabajo. **Al 2026-09-12 está hecha salvo una pieza**, la pantalla del QR,
+marcada abajo; el detalle y los commits están en `tareas.md`, [A2].
 
 - **Apareamiento.** Token de un solo uso con vida corta, endpoint de canje, y la pantalla
   que dibuja el QR en `Administrar`. Se apoya en las sesiones opacas revocables de [A1.2] y
@@ -237,10 +237,10 @@ detalle y los commits están en `tareas.md`, [A2].
   **Hecho** (`f6e36e1`), sin enriquecer al recibir: ver el paso 3 del alta, más arriba.
 - **Exposición progresiva** de colecciones, disponibilidad y puntajes, en ese orden.
   **Hecho** (`9ff3ccd`, `7f24895`, `417f6d3`).
-- **Dificultad de charadas por la API de dispositivo — falta.** Ni la dificultad ni la clave
-  de obra con la que el generador calcula la huella del mazo viajan hoy al teléfono, así que
-  no puede producir el mismo mazo que el servidor. Encontrado el 2026-09-11 al poner el
-  tablero al día.
+- **Dificultad de charadas por la API de dispositivo.** Encontrada como faltante el
+  2026-09-11 y **hecha el 2026-09-12**: `GET /api/v1/charades` sirve el insumo completo del
+  mazo, y `docs/briefs/charades-v1-vectors.json` fija el generador que el teléfono tiene que
+  portar.
 
 Todo aditivo —rutas y campos nuevos, sin cambiar el significado de ninguno existente—, así
 que cabe en la v1 de la API según la regla de versionado de ADR-0003.

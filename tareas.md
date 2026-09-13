@@ -139,12 +139,12 @@ bloquean U3 ni reabren la recuperación aceptada.
 - **Quién**: Claude, decidido el 2026-09-07. [B1] esperó mientras tanto y se cerró el
   2026-09-11.
 
-**Estado al 2026-09-11: la mitad servidor está casi entera y el cliente no empezó.** Entre
-el 08 y el 09/09 se construyó lo que el servidor tenía que poner para [A2.1], [A2.3] y
-[A2.6]; cada subtarea dice qué y con qué commit. Falta **una pieza de servidor**, en
-[A2.4]. Y el entorno de [A2.0] ya está instalado, así que lo que queda para cerrarla es
-trabajo de este frente y no una instalación del owner. Las subtareas siguen sin tildar
-porque cada una se cierra con el cliente.
+**Estado al 2026-09-12: la mitad servidor está entera salvo la pantalla del QR, que es del
+frente visual, y el cliente no empezó.** Entre el 08 y el 09/09 se construyó lo que el
+servidor tenía que poner para [A2.1], [A2.3] y [A2.6], y el 2026-09-12 lo de [A2.4]; cada
+subtarea dice qué y con qué commit. El entorno de [A2.0] ya está instalado, así que lo que
+queda para cerrarla es trabajo de este frente y no una instalación del owner. Las
+subtareas siguen sin tildar porque cada una se cierra con el cliente.
 
 **La distinción que sostiene el diseño** —y que conviene no perder al leer las subtareas—:
 editar una obra que ya existe de los dos lados tiene **base compartida** y se resuelve por
@@ -206,12 +206,15 @@ Confundirlas obligaría a inventar una base que no existe.
     reimplementación en Kotlin es parte de esta entrega, con pruebas contra vectores del
     servidor. La dificultad **no** se calcula en el teléfono: sale del índice IMDb de
     ~1,1 GB y viaja resuelta como un campo por obra.
-    **Servidor: falta una pieza**, verificado el 2026-09-11. Ni la dificultad ni la clave de
-    obra con la que el generador calcula la huella del mazo (`work_key` en
-    `domain/charades.py`) viajan por la API de dispositivo: `_device_item_payload` no las
-    incluye, ni tampoco los identificadores externos de los que esa clave sale. Sin eso el
-    teléfono no puede producir el mismo mazo que el servidor. Es de este frente y va antes
-    del cliente de [A2.4]; la forma tiene que respetar que los ids expuestos sean opacos.
+    **Servidor: hecho** (2026-09-12). `GET /api/v1/charades` sirve el insumo completo del
+    mazo: cada obra elegible con su clave, título, año, dificultad resuelta y origen, más
+    huella, conteos, mínimos y tiempos. Se aparta a propósito de lo que pedía esta misma
+    nota el 2026-09-11 —que la forma respetara ids opacos—: el mazo se ordena y se firma con
+    la clave, y un sustituto opaco repartiría otro mazo. La clave sale de identificadores
+    públicos o de título y año, nunca de rutas ni de ids internos, que es lo que ADR-0003
+    deja afuera. Los vectores para el port en Kotlin están en
+    `docs/briefs/charades-v1-vectors.json`, y el servidor los recalcula en cada corrida de
+    pruebas.
   - [ ] **[A2.5] Imágenes.** Miniatura local y portada completa en segundo plano.
   - [ ] **[A2.6] Ampliar lo que viaja**, en el orden de prioridad del owner: colecciones
     seguidas, después disponibilidad en streaming, después puntajes públicos. Cada escalón

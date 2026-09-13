@@ -72,6 +72,14 @@ una condición detectable, no una sorpresa a mitad de partida.
 El precedente de implementación ya existe: `back-cover.js` mapea un ID opaco a una de cinco
 plantillas estables con un FNV-1a puro. El mazo se arma igual.
 
+**Vectores para portarlo.** `docs/briefs/charades-v1-vectors.json` fija el generador para
+quien lo reimplemente —el teléfono de [A2.4]—: las constantes, el orden exacto de cada
+paso y casos calculados por el propio servidor para FNV-1a, huella, semilla y mazo.
+`tests/test_charades_vectors.py` los recalcula, así que un cambio del servidor que haría
+repartir otros mazos a los teléfonos instalados rompe la suite en vez de pasar en
+silencio. Uno de los casos es una trampa a propósito: claves donde el orden por punto de
+código y el orden por unidad UTF-16 —el que usa Kotlin por defecto— no coinciden.
+
 ## Dificultad
 
 ### El hallazgo que define el diseño
@@ -124,6 +132,13 @@ decisión humana; a lo sumo llena lo que nadie decidió.
 **En el servidor.** La señal de notoriedad sale del índice IMDb, que pesa ~1,1 GB y no va a
 un teléfono (ADR-0005). La dificultad viaja al cliente como **un campo chico por obra**, ya
 resuelto. El teléfono nunca es autónomo para *clasificar*; sí lo es para *jugar*.
+
+Lo que viaja es `GET /api/v1/charades` (2026-09-12): todas las obras elegibles de la
+cuenta —catálogo y colecciones seguidas, cada obra una vez— con su clave, el título que se
+actúa, el año, la dificultad resuelta y el origen, más la huella, los conteos, los mínimos
+y los tiempos del temporizador. No se pagina, porque la huella cubre todo el conjunto. Y
+las claves viajan tal como las calcula el servidor: el mazo se ordena y se firma con
+ellas, y un id opaco en su lugar repartiría otro orden.
 
 ## El temporizador
 

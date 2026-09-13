@@ -29,6 +29,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/availability",
                 "/api/v1/catalog/drafts",
                 "/api/v1/ratings",
+                "/api/v1/charades",
                 "/api/v1/collections",
                 "/api/v1/collections/{collectionId}/items",
                 "/api/v1/catalog/items",
@@ -68,6 +69,19 @@ class DeviceApiContractTests(unittest.TestCase):
         rating = document["components"]["schemas"]["PublicRating"]["properties"]
         self.assertIn("source", rating)
         self.assertNotIn("personal", rating)
+        # [A2.4]: a phone deals the same deck offline only if it holds the deck's
+        # whole input, keys included -- and nothing personal travels with it.
+        charades = document["paths"]["/api/v1/charades"]["get"]
+        self.assertEqual(charades["operationId"], "getCharadesSnapshot")
+        charade = document["components"]["schemas"]["CharadeWork"]
+        self.assertEqual(
+            sorted(charade["required"]), ["difficulty", "key", "source", "title", "year"]
+        )
+        for field in ("personal", "status", "rating", "review", "notes", "path", "local_files"):
+            self.assertNotIn(field, charade["properties"])
+        snapshot = document["components"]["schemas"]["CharadesSnapshot"]
+        for field in ("works", "fingerprint", "counts", "timer_options"):
+            self.assertIn(field, snapshot["required"])
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
 

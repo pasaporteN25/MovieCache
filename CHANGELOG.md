@@ -48,9 +48,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   Todavía no hay pantalla que muestre el QR ni aplicación que lo escanee.
 - La API de dispositivo también recibe el alta sin conexión —lo que un teléfono agrega
   sin red entra en un borrador que no vence y pasa por la revisión de siempre— y sirve
-  las colecciones seguidas, la disponibilidad en streaming y los puntajes públicos. La
-  disponibilidad y los puntajes de TMDb llegan con la fecha en que el teléfono tiene que
-  dejar de mostrarlos.
+  las colecciones seguidas, la disponibilidad en streaming, los puntajes públicos y lo
+  que un teléfono necesita para repartir sin conexión el mismo mazo de charadas que el
+  servidor. La disponibilidad y los puntajes de TMDb llegan con la fecha en que el
+  teléfono tiene que dejar de mostrarlos.
 - `movie-inbox images coverage` cuenta, por causa, por qué las obras no llenan las dos
   ventanas de imágenes de la consola: campo vacío, dirección que el proxy rechazaría o
   imagen todavía sin caché, y cuántas imágenes distintas tiene cada obra —dos tamaños de

@@ -33,6 +33,27 @@ from movie_inbox.domain.identity import AuthenticatedIdentity
 VoteLookup = Callable[[Mapping[str, Any]], int | None]
 
 
+def _summary(works: Sequence[CharadeWork]) -> dict[str, Any]:
+    counts = {name: 0 for name in DIFFICULTIES}
+    unclassified = 0
+    for work in works:
+        if work.difficulty:
+            counts[work.difficulty] += 1
+        else:
+            unclassified += 1
+    playable = playable_difficulties(counts)
+    return {
+        "eligible": len(works),
+        "unclassified": unclassified,
+        "counts": counts,
+        "playable_difficulties": playable,
+        "fingerprint": deck_fingerprint(work.key for work in works),
+        "minimums": {"eligible": MIN_ELIGIBLE_WORKS, "per_difficulty": MIN_PER_DIFFICULTY},
+        "timer_options": {name: list(TIMER_OPTIONS[name]) for name in DIFFICULTIES},
+        "ready": len(works) >= MIN_ELIGIBLE_WORKS and bool(playable),
+    }
+
+
 class CharadesNotReady(RuntimeError):
     """Raised when there are not enough works to play with."""
 
@@ -86,25 +107,20 @@ class CharadesService:
     def status(self, identity: AuthenticatedIdentity) -> dict[str, Any]:
         """What the surface needs to know before offering a game."""
 
+        return _summary(self.eligible_works(identity))
+
+    def snapshot(self, identity: AuthenticatedIdentity) -> dict[str, Any]:
+        """Everything a device needs to deal the same decks offline ([A2.4]).
+
+        The status plus every eligible work, from one pass over both stores. The
+        works are the deck's whole input: a device holding them and running the
+        documented generator deals exactly the deck `deck()` would, and can check
+        the fingerprint before a game instead of finding out halfway through.
+        Unclassified works travel too, because the fingerprint covers them.
+        """
+
         works = self.eligible_works(identity)
-        counts = {name: 0 for name in DIFFICULTIES}
-        unclassified = 0
-        for work in works:
-            if work.difficulty:
-                counts[work.difficulty] += 1
-            else:
-                unclassified += 1
-        playable = playable_difficulties(counts)
-        return {
-            "eligible": len(works),
-            "unclassified": unclassified,
-            "counts": counts,
-            "playable_difficulties": playable,
-            "fingerprint": deck_fingerprint(work.key for work in works),
-            "minimums": {"eligible": MIN_ELIGIBLE_WORKS, "per_difficulty": MIN_PER_DIFFICULTY},
-            "timer_options": {name: list(TIMER_OPTIONS[name]) for name in DIFFICULTIES},
-            "ready": len(works) >= MIN_ELIGIBLE_WORKS and bool(playable),
-        }
+        return {**_summary(works), "works": [work.to_dict() for work in works]}
 
     def deck(
         self,
