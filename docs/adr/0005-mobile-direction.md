@@ -280,13 +280,19 @@ borrador que no expira, y hay una cuenta por instalación.
    pantalla de bloqueo del teléfono. Las reviews y notas son datos personales y hoy en la
    web los protege una sesión.
 2. ~~**Primer arranque.**~~ **Cerrado por la enmienda de arriba:** la única entrada es
-   aparear contra una cuenta que ya existe. Queda como detalle menor qué pasa si alguien
-   desaparea el teléfono — conservar los datos de sólo lectura y permitir volver a aparear
-   es la respuesta razonable, pero conviene fijarla antes de A2.1.
+   aparear contra una cuenta que ya existe. Qué pasa si alguien desaparea el teléfono
+   **quedó decidido el 2026-09-13: los datos persisten**. Si siguen editables mientras
+   tanto se define con la matriz de casos de sincronización del cliente ([A5.1] de
+   `movieIndexAndroid`).
 3. **Varios teléfonos contra la misma instancia.** Funciona por construcción, porque la
    base de la fusión es **por par**, pero conviene fijarlo explícitamente antes de
-   implementar.
-4. **Llegar a la instancia desde la red local.** Si el certificado es de una CA pública para
+   implementar. **Nota del 2026-09-13:** hay un caso que no funciona por construcción. El
+   `PATCH` personal no tiene precondición, así que una edición de otro teléfono o de la web
+   hecha entre que un teléfono baja y sube se pierde sin aviso. Se prueba en [A5] del
+   cliente y, si se confirma, lo resuelve [X2] de este repositorio.
+4. ~~**Llegar a la instancia desde la red local.**~~ **Resuelto el 2026-09-09:** HTTPS en el
+   propio servidor con certificado autofirmado y su huella en el QR (`docs/deployment.md`).
+   Lo que sigue es el razonamiento original. Si el certificado es de una CA pública para
    un dominio público, el teléfono en casa resuelve la IP pública y el router puede no hacer
    hairpinning. DNS de horizonte partido, o certificado autofirmado con su huella en el QR.
    Cambia lo que el QR lleva, así que se decide antes de A2.1.

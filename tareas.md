@@ -148,6 +148,23 @@ suite. El análisis completo está en
   que son títulos. **Modelo sugerido**: Medio.
 - La pantalla que genera el QR sigue entre los traspasos al frente visual, más abajo.
 
+#### [X2] Precondición en el `PATCH` personal — a confirmar
+
+`PATCH /api/v1/catalog/items/{id}/personal` aplica lo que llega sin comparar con nada. Si la
+web u otro teléfono cambió el mismo campo entre que un teléfono bajó el estado y lo subió,
+gana el último y el otro cambio se pierde sin aviso: la fusión a tres bandas del cliente
+decide con lo que bajó, no con lo que hay al subir. Encontrado el 2026-09-13, al plantear la
+casuística de sincronización que pidió el owner.
+
+- **Alcance**: que el `PATCH` pueda recibir, por campo, el valor que el cliente tenía como
+  base, y rechazar el cambio si el servidor ya no vale eso, para que el cliente vuelva a
+  bajar y fusionar. Opcional para quien no lo mande, así cabe en la v1 del contrato según la
+  regla de versionado de ADR-0003.
+- **Criterio de cierre**: la matriz de casos del cliente ([A5.1] de `movieIndexAndroid`)
+  confirma el problema, y en el arnés contra el servidor real ([A5.3]) dos ediciones
+  cruzadas no pierden ninguna.
+- **Depende de**: [A5.1] del cliente. **Modelo sugerido**: Grande: toca el contrato.
+
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
   valores a `kind` ni reciclar campos audiovisuales antes de la decision.
