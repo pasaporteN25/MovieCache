@@ -25,7 +25,7 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
 | — | [B1] | **Cerrada 2026-09-11.** Alcance cubierto, medido y con gates en CI | criterio de cierre acordado con el owner |
-| 2 | [A2] | Cliente Android autónomo | A2.0 (entorno) + ADR-0005 |
+| 2 | [A2] | **Se mudó a `../movieIndexAndroid`** (2026-09-13) | tablero propio de ese repositorio |
 | 3 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
 | — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
 
@@ -114,142 +114,39 @@ bloquean U3 ni reabren la recuperación aceptada.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
-#### [A2] Cliente Android autónomo
+#### [A2] Cliente Android autónomo — **se mudó a su propio repositorio el 2026-09-13**
 
-> **Replanificada el 2026-09-07, segunda vez en el día.** El brief v1 arrancaba por el
-> login; ADR-0005 lo invirtió y el brief v2 escribió ese orden; y después el owner decidió
-> que **la aplicación requiere una cuenta creada en la web**, lo que vuelve a mover el
-> apareamiento al principio. El plan vigente es `docs/briefs/android-client-v3.md`, y
-> ADR-0005 quedó **enmendada** por la decisión de la cuenta (su sección de enmienda). Los
-> briefs v1 y v2 están marcados como reemplazados; no se borran porque su razonamiento
-> sostiene el actual.
+El cliente vive en `../movieIndexAndroid`, con su propio tablero (`tareas.md`), hoja de
+ruta y README. Así lo había decidido el owner el 2026-08-17 (`prompt-movie-inbox.md`,
+"Pregunta de mobile vs. Fase 5"): toolchain, CI y ciclo de versiones distintos para dos
+cosas que sólo se hablan por HTTP. El 2026-09-13 el proyecto se creó primero, por error,
+dentro de este repo, en `android/`; se sacó antes de publicarlo. Se mudaron con él la
+épica [A2] con sus subtareas, los briefs v1 a v3, la guía de entorno y el plan inicial.
 
-- **Alcance**: aplicación Android nativa (Kotlin + Compose) con almacén local propio. Se
-  aparea una vez contra una cuenta que ya existe en la instancia, y **desde ahí funciona sin
-  conexión**: explorar, buscar, editar estado personal y **dar de alta obras nuevas**. La
-  sincronización es bidireccional, la inicia una persona y **nunca borra**.
-- **Caso de uso que manda**, dicho por el owner: *guardar películas en la colección sin
-  estar frente a la computadora ni en casa*. Todo el orden de entrega sale de ahí.
-- **Criterio de cierre**: `assembleDebug` verde; el teléfono muestra y edita el catálogo
-  real sin conexión; y una obra dada de alta sin red llega al servidor por el camino de
-  importación y revisión que ya existe, sin decidir identidad por su cuenta.
-- **Depende de**: [A2.0] para el entorno; el apareamiento se apoya en [A1.2] y [A1.4], ya
-  cerradas.
-- **Modelo sugerido**: Grande. Es un proyecto cliente completo, no una pantalla más.
-- **Quién**: Claude, decidido el 2026-09-07. [B1] esperó mientras tanto y se cerró el
-  2026-09-11.
+Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese repositorio ([A3],
+[A4]). Acá queda lo que el cliente consume, ya construido —la API `/api/v1/`, el
+apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
+el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-**Estado al 2026-09-12: la mitad servidor está entera salvo la pantalla del QR, que es del
-frente visual, y el cliente no empezó.** Entre el 08 y el 09/09 se construyó lo que el
-servidor tenía que poner para [A2.1], [A2.3] y [A2.6], y el 2026-09-12 lo de [A2.4]; cada
-subtarea dice qué y con qué commit. El entorno de [A2.0] ya está instalado, así que lo que
-queda para cerrarla es trabajo de este frente y no una instalación del owner. Las
-subtareas siguen sin tildar porque cada una se cierra con el cliente.
+#### [X1] Vectores de prueba para el cliente Android
 
-**La distinción que sostiene el diseño** —y que conviene no perder al leer las subtareas—:
-editar una obra que ya existe de los dos lados tiene **base compartida** y se resuelve por
-fusión a tres bandas; dar de alta una obra que no existe en ningún lado **no tiene base**, así
-que no es una fusión sino una **importación**, y va por el camino de revisión que ya existe.
-Confundirlas obligaría a inventar una base que no existe.
+Lo que el cliente tiene que reimplementar con resultados idénticos a los del servidor se
+prueba contra vectores que genera el propio servidor, como ya se hizo con
+`docs/briefs/charades-v1-vectors.json`: un JSON versionado y una prueba acá que lo
+recalcula, para que un cambio que alteraría los resultados del teléfono falle en esta
+suite. El análisis completo está en
+`docs/analisis/lo-que-viene-del-servidor-2026-09-13.md` del repositorio del cliente.
 
-  - [ ] **[A2.0] Entorno.** JDK 17 o superior, Android SDK, Gradle Wrapper y un
-    `assembleDebug` que compile. **Es la primera tarea y bloquea todo lo demás**: medido en
-    la máquina de trabajo el 2026-09-07, hay JDK 1.8.0_471, no hay Gradle, no hay
-    `ANDROID_SDK_ROOT` ni `ANDROID_HOME`, y el repositorio no contiene proyecto Android.
-    Hasta que esto exista, el resto de [A2] es papel. Guía paso a paso en
-    `docs/briefs/android-setup.md`.
-    **Re-medido el 2026-09-11: el entorno ya está instalado.** Android Studio 2025.3.3 con
-    su propio JDK (JBR 21.0.10); el SDK con las plataformas 35, 36 y 36.1, build-tools hasta
-    37.0.0, `adb`, emulador e imágenes de sistema. El `java` del `PATH` sigue siendo 1.8 y
-    no hay variables definidas: no bloquea, pero para correr `gradlew` desde una terminal
-    hay que apuntar `JAVA_HOME` al JDK de Android Studio. **Falta la parte que no es
-    instalación**: el proyecto en el repositorio, con Gradle Wrapper, y un `assembleDebug`
-    verde. La primera corrida descarga Gradle y las dependencias.
-  - [ ] **[A2.1] Esqueleto, apareamiento y lectura offline.** El primer hito pedido por el
-    owner: **aparear y ver el catálogo real en el teléfono**. Kotlin/Compose, Hilt con KSP,
-    coroutines y `StateFlow`; el repositorio es el límite de errores. Room como almacén
-    local con la forma del contrato portable v9 —capa de obra y capa personal, **nunca** la
-    operativa—. Escaneo del QR con ZXing embebido, para no arrastrar Play Services.
-    **Requiere trabajo servidor**: token de un solo uso, endpoint de canje y la pantalla que
-    dibuja el QR en `Administrar`.
-    **Servidor: hecho, salvo la pantalla**, que además **no va en `Administrar`**: cada
-    cuenta aparea su propio teléfono, así que no puede ser sólo del owner. `334f4fe`
-    (2026-09-08): ticket de un solo uso que una sesión web emite para su propia cuenta,
-    canjeado en `POST /api/v1/pair` por una sesión de dispositivo sin que viaje una
-    contraseña; el uso único se cumple dentro de un solo `UPDATE`. `e9bcaab` (2026-09-08):
-    el QR se dibuja en el servidor con segno y vuelve como `data:` URI en el mismo `POST
-    /api/device-pairing` que emite el ticket. `11dbe0b` (2026-09-09): `serve` termina TLS
-    por su cuenta y deriva el pin de su certificado; `movie-inbox pairing-pin` queda para
-    cuando TLS lo termina un proxy. La pantalla está entre los traspasos al frente visual.
-  - [ ] **[A2.2] Edición personal sin conexión y fusión a tres bandas.** Room guarda por
-    obra la **base** —el estado del servidor en la última sincronización exitosa— y la local
-    actual. La base **sólo avanza cuando una sincronización termina entera**: una cortada a
-    la mitad no puede dejar el teléfono creyendo que convergió. Incluye interfaz de
-    conflictos, que muestra los dos valores y deja elegir por campo.
-  - [ ] **[A2.3] Alta sin conexión.** El caso de uso central. Borrador local con id de
-    cliente, marcado como no enriquecido, que **no expira** —a diferencia de los de
-    importación, que mueren a las 48 h—. Al escribirlo, el teléfono avisa si se parece a algo
-    que ya tenés, usando la normalización del servidor portada a Kotlin con vectores de
-    prueba, igual que se hizo con el generador de charadas. Es un aviso, no una decisión.
-    **Requiere trabajo servidor**: endpoint que reciba el borrador, lo enriquezca y lo meta
-    por el camino de importación y revisión existente.
-    **Servidor: hecho** (`f6e36e1`, 2026-09-09), con una corrección a la línea de arriba:
-    `POST /api/v1/catalog/drafts` **no enriquece** al recibir, a propósito. Sería una
-    llamada de red que haría esperar —o fallar— a un teléfono que acaba de recuperar señal;
-    el borrador lleva lo que la persona escribió y el enriquecimiento de siempre lo completa
-    al revisar. Todo lo del teléfono cae en un borrador por cuenta que no vence, el alta es
-    idempotente por el id del cliente, y una obra que el catálogo ya tiene vuelve como
-    `review` y no como "ya la tenés": un parecido de título no es identidad.
-  - [ ] **[A2.4] Charadas.** Backend entregado en [G2], contrato en
-    `docs/briefs/charades-v1.md`. El generador es portable a propósito —FNV-1a más un LCG
-    documentado— para que el cliente produzca **el mismo mazo** que el servidor; esa
-    reimplementación en Kotlin es parte de esta entrega, con pruebas contra vectores del
-    servidor. La dificultad **no** se calcula en el teléfono: sale del índice IMDb de
-    ~1,1 GB y viaja resuelta como un campo por obra.
-    **Servidor: hecho** (2026-09-12). `GET /api/v1/charades` sirve el insumo completo del
-    mazo: cada obra elegible con su clave, título, año, dificultad resuelta y origen, más
-    huella, conteos, mínimos y tiempos. Se aparta a propósito de lo que pedía esta misma
-    nota el 2026-09-11 —que la forma respetara ids opacos—: el mazo se ordena y se firma con
-    la clave, y un sustituto opaco repartiría otro mazo. La clave sale de identificadores
-    públicos o de título y año, nunca de rutas ni de ids internos, que es lo que ADR-0003
-    deja afuera. Los vectores para el port en Kotlin están en
-    `docs/briefs/charades-v1-vectors.json`, y el servidor los recalcula en cada corrida de
-    pruebas.
-  - [ ] **[A2.5] Imágenes.** Miniatura local y portada completa en segundo plano.
-  - [ ] **[A2.6] Ampliar lo que viaja**, en el orden de prioridad del owner: colecciones
-    seguidas, después disponibilidad en streaming, después puntajes públicos. Cada escalón
-    es servidor más cliente. **Ojo con disponibilidad**: es dato de TMDb con tope
-    contractual de retención de 180 días, y ese tope viaja con el dato — el teléfono también
-    tiene que dejar de mostrarlo cuando vence.
-    **Servidor: hecho** (2026-09-09): `9ff3ccd` colecciones —sólo las que la cuenta sigue,
-    con sus obras en un endpoint paginado aparte—, `7f24895` disponibilidad y `417f6d3`
-    puntajes públicos. El vencimiento viaja con el dato: cada fila de disponibilidad y cada
-    puntaje de TMDb llevan `expires_at`; los de IMDb no, porque salen del índice local y
-    ningún término externo limita cuánto se guardan. Construirlo destapó una deuda que ya
-    estaba en la web: la atribución a JustWatch que exige ADR-0004 no aparecía en ningún
-    lado del código; ahora viaja en la respuesta de los dos endpoints.
-
-  **Lo que sobrevive del brief v1** y sigue vigente: tokens en Android Keystore y nunca en
-  preferencias sin cifrar, logs, analytics, URI, portapapeles ni backups; HTTPS con
-  certificado válido, con la excepción de `http://10.0.2.2` sólo en `debug`; ignorar campos
-  opcionales desconocidos; respetar `X-Movie-Inbox-Api-Version`; y no usar el `/api/`
-  histórico, cookies ni `X-Movie-Inbox-Token`.
-
-  **Certificado, medido el 2026-09-07:** `CertificatePinner` de OkHttp **no** sirve para
-  aceptar un certificado autofirmado — el pin se comprueba después de un handshake que ya
-  pasó por el trust manager, así que un certificado que la plataforma rechaza falla antes.
-  Para una instancia con certificado propio hace falta un **trust anchor construido en
-  tiempo de ejecución** desde la huella SPKI que trae el QR. Nunca un trust manager
-  permisivo ni deshabilitar la verificación de hostname.
-
-  **Abierto y del owner:** si la aplicación quiere PIN o biometría propios además de la
-  pantalla de bloqueo, y qué pasa con los datos locales si se desaparea el teléfono —la
-  recomendación escrita es conservarlos y permitir volver a aparear—. La tercera pregunta,
-  cómo llega el teléfono a la instancia desde la red de casa, **se resolvió el
-  2026-09-09**: TLS en el propio proceso con un certificado autofirmado, y la huella viaja
-  en el QR. Lo que queda de eso es del owner y hace falta recién para probar [A2.1] de
-  punta a punta: emitir el certificado con la receta de `docs/deployment.md`, "HTTPS en la
-  red local, sin dominio".
+- [ ] **[X1.1] Vectores del pin SPKI.** `tests/test_pairing_certificate.py` ya tiene dos
+  certificados reales —P-256 y RSA-2048— con el pin que imprimió OpenSSL. Llevarlos a un
+  JSON, junto con payloads del QR válidos y rechazados. El cliente los usa en [A3.1] para
+  confiar en el certificado igual que el servidor. **Modelo sugerido**: Chico.
+- [ ] **[X1.2] Vectores de normalización de títulos.** `normalize_search_text`,
+  `title_match_key` y `title_similarity`, que el cliente porta en [A3.2] para avisar si un
+  alta se parece a algo que ya está. Los casos que importan son los que Python resuelve
+  solo: `html.unescape`, NFKC, el plegado de diacríticos sólo en letras latinas y los años
+  que son títulos. **Modelo sugerido**: Medio.
+- La pantalla que genera el QR sigue entre los traspasos al frente visual, más abajo.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar

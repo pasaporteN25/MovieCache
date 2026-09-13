@@ -73,6 +73,10 @@ El trabajo corre en paralelo, dividido por especialidad:
   (`docs/analisis/streaming-charadas-movil-2026-09-07.md`).
 - **Codex** — dirección visual y frontend de presentación: [U2-P] y sus derivados.
 
+El cliente Android es otro repositorio, `../movieIndexAndroid`, con su propio tablero
+(decisión del owner del 2026-08-17). Acá sólo vive lo que ese cliente consume: la API
+`/api/v1/`, su contrato OpenAPI y los vectores de prueba que el cliente porta.
+
 `tareas.md` es compartido: cada frente agrega su sección y no reescribe las ajenas. Antes
 de commitear, comprobar que el árbol no arrastra trabajo sin commitear del otro frente en
 los mismos archivos.

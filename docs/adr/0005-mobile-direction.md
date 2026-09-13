@@ -263,7 +263,8 @@ problema abierto a problema acotado.
 
 El apareamiento era la entrega A2.4, después del almacén local y del juego. Ahora es **lo
 primero**: sin aparear no hay cuenta, no hay datos y no hay aplicación. El plan de
-construcción con el orden nuevo está en `docs/briefs/android-client-v3.md`.
+construcción con el orden nuevo está en `docs/briefs/android-client-v3.md` del
+repositorio del cliente, `movieIndexAndroid`, adonde se mudó el 2026-09-13.
 
 ### Qué no cambia
 

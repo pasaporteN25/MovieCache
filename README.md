@@ -79,8 +79,8 @@ postergadas**: ver [ADR-0006](docs/adr/0006-radarr-como-fuente-de-inventario.md)
 [ADR-0007](docs/adr/0007-sonarr-como-fuente-de-inventario.md) y
 [ADR-0008](docs/adr/0008-letterboxd-historial-personal.md). El cliente Android se
 reespecificó como aplicación autónoma en
-[ADR-0005](docs/adr/0005-mobile-direction.md); cómo empezar a probarlo está en
-[`docs/briefs/android-setup.md`](docs/briefs/android-setup.md).
+[ADR-0005](docs/adr/0005-mobile-direction.md) y es un proyecto aparte, con su propio
+repositorio (`movieIndexAndroid`); este repositorio le da la API de dispositivo.
 
 ## Cómo está organizado
 
@@ -851,8 +851,7 @@ borraron— a `codigoLegacy/` en el checkout local, ignorado por Git
 parte de lo que se clona, se publica en un release ni se ejecuta en CI o Docker.
 
 Temporadas y episodios, y la sincronizacion directa de la extension, siguen siendo
-lineas futuras. La app Kotlin ya no lo es del todo: tiene direccion decidida en
-[ADR-0005](docs/adr/0005-mobile-direction.md), contrato en
-[`docs/briefs/android-client-v2.md`](docs/briefs/android-client-v2.md) y arranque
-documentado en [`docs/briefs/android-setup.md`](docs/briefs/android-setup.md), pero
-todavia no existe codigo.
+lineas futuras. La app Kotlin ya no lo es: tiene direccion decidida en
+[ADR-0005](docs/adr/0005-mobile-direction.md) y vive en su propio repositorio,
+`movieIndexAndroid`, que consume la API de dispositivo de este
+([`docs/openapi/device-api-v1.openapi.json`](docs/openapi/device-api-v1.openapi.json)).

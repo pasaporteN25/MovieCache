@@ -287,7 +287,8 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 
 1. **Cerrado 2026-09-07.** [A1] API versionada y sesiones revocables para dispositivos.
 2. [A2] Cliente Android autonomo, con almacen propio y sincronizacion que inicia una
-   persona (ADR-0005), en lugar del cliente basico que se preveia aca.
+   persona (ADR-0005). **Desde el 2026-09-13 es un repositorio aparte,
+   `movieIndexAndroid`**, con su propia hoja de ruta; aca queda la API que consume.
 3. **Cerrado 2026-09-07.** [I1] Evaluar Radarr, Sonarr y Letterboxd: evaluacion hecha y
    construccion postergada por decision del owner (ADR-0006, ADR-0007 y ADR-0008).
 4. [M1] Investigar juegos y musica como verticales propias, nunca como simples valores

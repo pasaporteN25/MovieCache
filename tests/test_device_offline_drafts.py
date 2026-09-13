@@ -3,7 +3,7 @@
 The use case, in the owner's words: saving a film to the collection without
 being at the computer or at home.
 
-The design rests on a distinction `docs/briefs/android-client-v3.md` makes
+The design rests on a distinction the Android client's brief v3 makes
 explicit, and most of these tests are about holding it: editing a work that
 exists on both sides has a shared base and merges, while **adding** one has no
 base at all. That is not a merge, it is an import -- so it lands in review, and

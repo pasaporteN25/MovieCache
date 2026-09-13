@@ -138,7 +138,7 @@ class ImportService:
         """Add works a phone recorded with no connection to that account's pending pile.
 
         This is the server half of [A2.3], and the distinction it rests on is
-        the one `docs/briefs/android-client-v3.md` makes explicit: editing a work
+        the one the Android client's brief v3 makes explicit: editing a work
         that exists on both sides has a shared base and merges, while **adding**
         one has no base at all. That is not a merge, it is an import -- so it
         goes down the path imports already take, and lands in review rather than
