@@ -7,6 +7,10 @@ voluntarily, with your own token, to validate [F5.3] against the live API
 over the corpus already recorded offline in tests/test_external_tmdb.py:
 Addio Zio Tom, Fanny & Alexander, Verano 1993 (2017) and the Heat movie/TV
 homonym (tt0180396).
+
+It also reads the two halves 0.9.0 added: public scores ([F6.2]) and streaming
+availability ([S1], [S3]). No offline test calls the adapter's streaming
+methods, so the last three tests are their only check against TMDb's answers.
 """
 
 from __future__ import annotations
@@ -72,6 +76,34 @@ class TmdbLiveSmokeTests(unittest.TestCase):
     def test_an_unusable_reference_asks_nothing_and_yields_nothing(self) -> None:
         self.assertEqual(self.adapter.public_rating("libro", "949"), {})
         self.assertEqual(self.adapter.public_rating("movie", "no-es-un-id"), {})
+
+    def test_argentina_is_among_the_markets_availability_can_be_asked_for(self) -> None:
+        # [S1]: the markets Administrar offers. ADR-0004 measured 139 regions,
+        # Argentina among them; the exact count drifts, so only a floor.
+        regions = self.adapter.watch_regions()
+        self.assertIn("AR", {row["code"] for row in regions})
+        self.assertGreater(len(regions), 50)
+
+    def test_the_argentine_platform_list_keeps_the_upstream_names(self) -> None:
+        # [S1]: what refreshing a market's platforms stores, movies and TV
+        # merged. ADR-0004 found 59 for Argentina, Netflix under that literal name.
+        providers = self.adapter.watch_providers("AR")
+        self.assertGreater(len(providers), 10)
+        self.assertIn("Netflix", {row["name"] for row in providers})
+        for row in providers:
+            self.assertEqual(row["region_code"], "AR")
+            self.assertTrue(row["provider_id"].isdigit(), row)
+
+    def test_one_work_in_one_market_yields_offers_or_nothing(self) -> None:
+        # [S3]: nothing means the market has no data for the work, never that it
+        # is not offered, so both answers are valid; what must hold is the shape.
+        found = self.adapter.watch_availability("movie", "949", "AR")
+        if found:
+            self.assertTrue(found["offers"] or found["link"], found)
+            for offer in found["offers"]:
+                self.assertIn(offer["kind"], {"flatrate", "free", "ads", "rent", "buy"})
+                self.assertTrue(offer["provider_id"].isdigit(), offer)
+        self.assertEqual(self.adapter.watch_availability("libro", "949", "AR"), {})
 
 
 if __name__ == "__main__":
