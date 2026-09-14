@@ -39,7 +39,6 @@ from movie_inbox.external.tmdb import TMDB_ATTRIBUTION_NOTICE
 from movie_inbox.web.catalog_api import load_items, patch_item_personal
 from movie_inbox.web.dependencies import (
     SessionCatalog,
-    _resolved_path,
     device_json,
     require_device_identity,
     session_catalog_rows,
@@ -430,16 +429,18 @@ def _device_catalog_entries(
     # and must not re-key every work in a paired client's local replica.
     secret = _sync_secret(request)
     for row in rows:
+        # Item ids are only unique within one source file, so the source still
+        # takes part in the key -- by position, which carries no path. The rows
+        # already hold that position as a public reference (`source-1`,
+        # `source-2`): resolving it as a path again never matched, and every
+        # work fell back to a single slot.
         source_reference = str(row.get("_source_file") or "")
         catalog_item_id = str(row.get("id") or "")
-        if not source_reference or not catalog_item_id:
+        if source_reference not in catalog.references or not catalog_item_id:
             continue
-        # Item ids are only unique within one source file, so the source still
-        # takes part in the key -- by position, which carries no path.
-        source_slot = catalog.references_by_path.get(_resolved_path(source_reference), "source-0")
         entries.append(
             DeviceCatalogItem(
-                _opaque_item_id(secret, identity.catalog.id, source_slot, catalog_item_id),
+                _opaque_item_id(secret, identity.catalog.id, source_reference, catalog_item_id),
                 source_reference,
                 catalog_item_id,
                 dict(row),
