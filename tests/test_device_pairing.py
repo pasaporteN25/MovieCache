@@ -335,6 +335,42 @@ class PairingServiceTests(unittest.TestCase):
         with self.assertRaises(PairingRejected):
             self.service.redeem(token, "Pixel")
 
+    def test_a_ticket_does_not_survive_a_password_change(self) -> None:
+        # Changing the password is how an account revokes every credential, and
+        # for the owner it is the only way: the owner cannot be deactivated. A
+        # ticket minted before the change is a credential too, so it goes with
+        # the sessions instead of opening a new one after them.
+        token = self._ticket()
+        self.auth.change_password(
+            self.identity, "a-long-enough-password", "another-long-enough-password"
+        )
+        with self.assertRaises(PairingRejected):
+            self.service.redeem(token, "Pixel")
+
+    def test_a_ticket_does_not_come_back_once_a_reset_member_sets_a_password(self) -> None:
+        # An admin reset blocks redemption on its own, through the pending
+        # change. The ticket must not come back to life when the member
+        # completes that change inside its five minutes. The reset is done the
+        # way MemberService.reset_password does it.
+        ana = self._member("ana", "otra-clave-bastante-larga")
+        token = str(self.service.create_ticket(ana)["payload"]["ticket"])
+        temporary = "clave-temporal-bastante-larga"
+        self.repository.replace_password(
+            ana.user.id, self.auth.hasher.hash(temporary), must_change_password=True
+        )
+        _, pending = self.auth.login("ana", temporary)
+        self.auth.change_password(pending, temporary, "clave-definitiva-bastante-larga")
+        with self.assertRaises(PairingRejected):
+            self.service.redeem(token, "Pixel")
+
+    def test_a_ticket_does_not_survive_deactivation_even_if_the_account_returns(self) -> None:
+        ana = self._member("ana", "otra-clave-bastante-larga")
+        token = str(self.service.create_ticket(ana)["payload"]["ticket"])
+        self.repository.set_user_active(ana.user.id, False)
+        self.repository.set_user_active(ana.user.id, True)
+        with self.assertRaises(PairingRejected):
+            self.service.redeem(token, "Pixel")
+
     def test_a_device_name_is_required_and_bounded(self) -> None:
         for name in ("", "   ", "x" * 200, "salto\nde linea"):
             with self.subTest(name=name):

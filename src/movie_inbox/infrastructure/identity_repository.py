@@ -678,9 +678,15 @@ class SqliteIdentityRepository:
                         (int(active), _utc_now(), user_id),
                     )
                     if not active:
+                        # Every credential goes, pairing tickets included: kept, one
+                        # would open a device session if the account came back
+                        # within its five minutes.
                         connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
                         connection.execute(
                             "DELETE FROM device_sessions WHERE user_id = ?", (user_id,)
+                        )
+                        connection.execute(
+                            "DELETE FROM device_pairing_tickets WHERE user_id = ?", (user_id,)
                         )
                     updated = connection.execute(
                         "SELECT * FROM users WHERE id = ?", (user_id,)
@@ -929,8 +935,14 @@ class SqliteIdentityRepository:
                     if cursor.rowcount != 1:
                         connection.rollback()
                         raise IdentityNotFound("Account was not found")
+                    # Changing a password revokes every credential: web and device
+                    # sessions, and pairing tickets not yet redeemed, which would
+                    # otherwise still open a device session after the change.
                     connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
                     connection.execute("DELETE FROM device_sessions WHERE user_id = ?", (user_id,))
+                    connection.execute(
+                        "DELETE FROM device_pairing_tickets WHERE user_id = ?", (user_id,)
+                    )
                     updated = connection.execute(
                         "SELECT * FROM users WHERE id = ?", (user_id,)
                     ).fetchone()
@@ -1188,6 +1200,9 @@ class SqliteIdentityRepository:
                     )
                     device_cursor = connection.execute(
                         "DELETE FROM device_sessions WHERE user_id = ?", (user_id,)
+                    )
+                    connection.execute(
+                        "DELETE FROM device_pairing_tickets WHERE user_id = ?", (user_id,)
                     )
                     connection.commit()
                     return max(0, web_cursor.rowcount) + max(0, device_cursor.rowcount)

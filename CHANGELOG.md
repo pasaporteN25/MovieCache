@@ -60,10 +60,12 @@ el trabajo visual de Inicio sigue en curso.
   afuera. Todavía no hay aplicación que la use.
 - Un dispositivo se puede aparear con una cuenta mediante un ticket de un solo uso, sin
   que viaje una contraseña: una sesión web lo emite para su propia cuenta y el servidor
-  lo dibuja como QR. `serve` puede servir HTTPS por su cuenta con un certificado propio
-  (`--ssl-certfile`, `--ssl-keyfile`) y calcula la huella que el QR le lleva al
-  teléfono; `movie-inbox pairing-pin` la imprime para cuando HTTPS lo termina un proxy.
-  Todavía no hay pantalla que muestre el QR ni aplicación que lo escanee.
+  lo dibuja como QR. El ticket vence a los cinco minutos, y cambiar la contraseña o
+  desactivar la cuenta lo anula junto con las sesiones. `serve` puede servir HTTPS por su
+  cuenta con un certificado propio (`--ssl-certfile`, `--ssl-keyfile`) y calcula la
+  huella que el QR le lleva al teléfono; `movie-inbox pairing-pin` la imprime para cuando
+  HTTPS lo termina un proxy. Todavía no hay pantalla que muestre el QR ni aplicación que
+  lo escanee.
 - La API de dispositivo también recibe el alta sin conexión —lo que un teléfono agrega
   sin red entra en un borrador que no vence y pasa por la revisión de siempre— y sirve
   las colecciones seguidas, la disponibilidad en streaming, los puntajes públicos y lo
