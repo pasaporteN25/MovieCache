@@ -66,8 +66,7 @@ def main() -> None:
     output = ROOT / "docs/design/u2-p6-evidence"
     output.mkdir(exist_ok=True)
     image_assets = {
-        "p6-backdrop.png": ROOT
-        / "src/movie_inbox/web/static/img/night-videotheque-wall-v1.png",
+        "p6-backdrop.png": ROOT / "src/movie_inbox/web/static/img/night-videotheque-wall-v1.png",
         "p6-page.png": ROOT / "src/movie_inbox/web/static/img/night-cinema-ambient-v1.png",
     }
     report = []

@@ -56,7 +56,9 @@ def main() -> None:
 
                 page.locator("#query").fill("Heat")
                 page.locator("#searchButton").click()
-                page.wait_for_function("document.querySelector('#catalogSummary').textContent.includes('Heat')")
+                page.wait_for_function(
+                    "document.querySelector('#catalogSummary').textContent.includes('Heat')"
+                )
                 page.wait_for_function(
                     "document.querySelector('#searchButton').textContent === 'Buscar'"
                 )
@@ -65,7 +67,9 @@ def main() -> None:
 
                 page.locator("#query").fill("zzzzzz")
                 page.locator("#searchButton").click()
-                page.wait_for_function("document.querySelector('#empty').textContent.includes('zzzzzz')")
+                page.wait_for_function(
+                    "document.querySelector('#empty').textContent.includes('zzzzzz')"
+                )
                 page.wait_for_function(
                     "document.querySelector('#searchButton').textContent === 'Buscar'"
                 )

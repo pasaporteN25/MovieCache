@@ -15,8 +15,7 @@ def main() -> None:
     output = ROOT / "docs/design/u2-p7-evidence"
     output.mkdir(exist_ok=True)
     image_assets = {
-        "p6-backdrop.png": ROOT
-        / "src/movie_inbox/web/static/img/night-videotheque-wall-v1.png",
+        "p6-backdrop.png": ROOT / "src/movie_inbox/web/static/img/night-videotheque-wall-v1.png",
         "p6-page.png": ROOT / "src/movie_inbox/web/static/img/night-cinema-ambient-v1.png",
     }
     report = []
@@ -78,9 +77,7 @@ def main() -> None:
                         path=str(output / f"console-{width}.png")
                     )
                     if width == 1440:
-                        page.locator("#homeView").screenshot(
-                            path=str(output / "home-1440.png")
-                        )
+                        page.locator("#homeView").screenshot(path=str(output / "home-1440.png"))
                 else:
                     assert metrics["parentSection"] == "p6-bay-0"
                     assert metrics["factsFontSize"] >= 12
