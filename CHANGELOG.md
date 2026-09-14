@@ -140,6 +140,12 @@ el trabajo visual de Inicio sigue en curso.
 - Los resultados de TMDb dejan de mostrarse como "Sin fuente". La etiqueta faltaba en el
   frontend desde que la fuente existe, y además de verse mal le quitaba un dato real a
   la desambiguación de duplicados, que compara etiquetas.
+- Traer los datos de una obra desde una dirección de FilmAffinity deja de fallar cuando
+  el sitio responde vacío. Python 3.11.16 y 3.14.7 cambiaron por dentro el lector de HTML
+  de la biblioteca estándar, que empezó a guardar su estado con un nombre que el lector de
+  fichas de FilmAffinity ya usaba para el suyo: con una respuesta vacía, el pedido
+  terminaba en un error en vez de volver sin datos. Pasa desde esas versiones de Python, y
+  la imagen de Docker toma la última 3.11 cada vez que se reconstruye.
 
 ## [0.8.0] - 2026-09-02
 
