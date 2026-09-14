@@ -165,6 +165,56 @@ casuística de sincronización que pidió el owner.
   cruzadas no pierden ninguna.
 - **Depende de**: [A5.1] del cliente. **Modelo sugerido**: Grande: toca el contrato.
 
+#### [X3] Registrar cuándo cambia cada campo personal
+
+Pedido del owner el 2026-09-14, al responder la matriz de sincronización del cliente
+([A5.1] de `movieIndexAndroid`). Hoy el servidor no guarda cuándo cambió un campo personal:
+`patch_personal` y la ficha web escriben el valor y nada más, y ADR-0005 (§6.1) decidió no
+exponer una marca que no existía.
+
+- **Alcance**: guardar, por obra, cuándo cambió por última vez cada campo personal —`status`
+  con `watched_at`, `rating` y `review`— y exponerlo en la API de dispositivo. Sirve para
+  mostrarle a la persona de cuándo es cada valor en un conflicto, para un historial de
+  cambios y, más adelante, para una sincronización que baje sólo lo que cambió.
+- **Lo que no hace**: decidir un conflicto. La marca informa, y la fusión sigue siendo a tres
+  bandas contra la base (ADR-0005, §4): el reloj de un teléfono puede estar mal, y "gana el
+  último" pierde datos sin aviso.
+- **Por qué es grande**: los campos personales viven en el contrato portable
+  `catalog.schema.json` y en la base del catálogo, así que la marca es un cambio de esquema
+  versionado, con migración, y no un campo más de la API.
+- **Criterio de cierre**: una edición desde la web o desde un teléfono deja su marca, la marca
+  viaja en la API de dispositivo, y sobrevive a exportar e importar el catálogo.
+- **Depende de**: nada; no frena [A2.2]. **Modelo sugerido**: Grande: toca el contrato
+  portable.
+
+#### [X4] Sesiones de dispositivo que no vencen y no se pierden por un corte
+
+Decisión del owner del 2026-09-14: un teléfono tiene que poder usar la instancia sin límite de
+tiempo, y volver a aparear no puede dar problemas. Hoy hay tres obstáculos, que encontró la
+matriz de sincronización del cliente ([A5.1], casos 8, 12 y 18):
+
+1. La sesión vence si pasan 30 días sin renovarla (`DEFAULT_DEVICE_REFRESH_TTL_SECONDS`), y
+   después hace falta un QR nuevo.
+2. La renovación rota el refresh token sin período de gracia (`rotate_device_session`): si la
+   respuesta se pierde en un corte, el teléfono se queda sin sesión.
+3. Una sesión sólo se corta cambiando la contraseña, desactivando la cuenta o desde el propio
+   teléfono. No hay forma de ver ni de revocar teléfonos desde la web.
+
+- **Alcance**:
+  - La sesión de un dispositivo no vence por falta de uso. El token de acceso sigue durando
+    15 minutos, y el teléfono lo renueva solo.
+  - La renovación se puede reintentar: acepta el refresh token anterior durante unos
+    segundos, o devuelve el mismo par si se repite.
+  - Cada cuenta ve sus teléfonos apareados, con el nombre y la última vez que se conectaron, y
+    puede revocar cualquiera. Es lo que reemplaza al vencimiento: sin eso, un teléfono perdido
+    conserva el acceso hasta que alguien lo corta. El backend es de este frente; la pantalla,
+    un traspaso al frente visual.
+- **Sigue igual**: cambiar la contraseña o desactivar la cuenta corta todas las sesiones.
+- **Criterio de cierre**: un teléfono que pasó meses sin conectarse sincroniza sin volver a
+  aparear; una renovación cuya respuesta se perdió se reintenta con éxito; y un teléfono
+  revocado desde la web queda afuera en su próxima llamada.
+- **Depende de**: nada. **Modelo sugerido**: Grande: es seguridad.
+
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
   valores a `kind` ni reciclar campos audiovisuales antes de la decision.
