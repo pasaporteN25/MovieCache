@@ -107,7 +107,12 @@ def set_policy(request: Request, body: dict[str, Any] = Depends(authorized_json)
 
 
 @router.post("/api/streaming/regions/{code}/providers/refresh")
-def refresh_providers(code: str, request: Request) -> JSONResponse:
+def refresh_providers(
+    code: str,
+    request: Request,
+    _: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    # The body is empty; the dependency is here for the token and origin checks.
     require_owner(request)
     service = request.app.state.streaming_service
     try:
