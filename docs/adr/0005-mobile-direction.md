@@ -273,6 +273,42 @@ sincronización la inicia una persona y nunca borra, la convergencia es fusión 
 sin depender de relojes, el QR aparea y no transporta, dar de alta sin conexión produce un
 borrador que no expira, y hay una cuenta por instalación.
 
+## Enmienda del 2026-09-14: los borrados viajan y el puntaje se resuelve solo
+
+Dos decisiones del owner al responder la matriz de casos de sincronización del cliente
+(`docs/analisis/matriz-de-sincronizacion-2026-09-14.md` de `movieIndexAndroid`).
+
+### Los borrados viajan
+
+**Revierte la regla de la sección 3**, "la sincronización nunca borra", y lo que repetía la
+enmienda anterior en "Qué no cambia". Borrar una obra en un lado la borra en el otro al
+sincronizar, con tres condiciones:
+
+- Un borrado viaja sólo como **registro explícito** de que una persona borró. Que una obra
+  falte de un lado nunca borra nada. La razón original de la sección 3 sigue en pie: un
+  catálogo no puede vaciarse porque una descarga salteó obras.
+- Si un lado borró y el otro editó la misma obra, **decide la persona**.
+- Unir duplicados en Curaduría cuenta como borrar el duplicado, y lo pendiente sobre él pasa a
+  la obra que queda.
+
+Hoy el servidor borra sin rastro, así que esto necesita registros de baja y una forma de
+consultarlos: es [X5] en `tareas.md`. La sección 3 pedía para las bajas "su propio ADR". Esta
+enmienda fija la decisión, y el diseño detallado va en [X5], que además evalúa una idea del
+owner: seguir cada obra con un identificador propio y durable.
+
+### El puntaje en conflicto se resuelve solo
+
+**Acota la sección 4** para un campo. Si los dos lados cambiaron el puntaje a valores
+distintos, gana **el más alto**, sin preguntar. Es una regla elegida por definición, no una
+consecuencia técnica, y se puede cambiar. Hasta que se decida otra cosa, un conflicto de
+`review`, `status` o `watched_at` sigue yendo a la persona.
+
+### Qué no cambia
+
+La fusión sigue siendo a tres bandas y por campo, sin relojes, y la sincronización la sigue
+iniciando una persona. [X3], la fecha de edición que el owner pidió ese mismo día, informa un
+conflicto pero no lo decide.
+
 ## Qué queda abierto
 
 1. **Autenticación local.** Con la cuenta viniendo de la instancia la identidad está
@@ -281,15 +317,16 @@ borrador que no expira, y hay una cuenta por instalación.
    web los protege una sesión.
 2. ~~**Primer arranque.**~~ **Cerrado por la enmienda de arriba:** la única entrada es
    aparear contra una cuenta que ya existe. Qué pasa si alguien desaparea el teléfono
-   **quedó decidido el 2026-09-13: los datos persisten**. Si siguen editables mientras
-   tanto se define con la matriz de casos de sincronización del cliente ([A5.1] de
-   `movieIndexAndroid`).
+   **quedó decidido el 2026-09-13: los datos persisten**. Y el 2026-09-14, con la matriz de
+   casos de sincronización del cliente ([A5.1] de `movieIndexAndroid`), que siguen
+   editables: los cambios viajan al volver a aparear la misma cuenta.
 3. **Varios teléfonos contra la misma instancia.** Funciona por construcción, porque la
    base de la fusión es **por par**, pero conviene fijarlo explícitamente antes de
    implementar. **Nota del 2026-09-13:** hay un caso que no funciona por construcción. El
    `PATCH` personal no tiene precondición, así que una edición de otro teléfono o de la web
    hecha entre que un teléfono baja y sube se pierde sin aviso. Se prueba en [A5] del
-   cliente y, si se confirma, lo resuelve [X2] de este repositorio.
+   cliente y, si se confirma, lo resuelve [X2] de este repositorio. La matriz de casos lo
+   confirmó el 2026-09-14.
 4. ~~**Llegar a la instancia desde la red local.**~~ **Resuelto el 2026-09-09:** HTTPS en el
    propio servidor con certificado autofirmado y su huella en el QR (`docs/deployment.md`).
    Lo que sigue es el razonamiento original. Si el certificado es de una CA pública para

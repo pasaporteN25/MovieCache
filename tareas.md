@@ -187,33 +187,62 @@ exponer una marca que no existía.
 - **Depende de**: nada; no frena [A2.2]. **Modelo sugerido**: Grande: toca el contrato
   portable.
 
-#### [X4] Sesiones de dispositivo que no vencen y no se pierden por un corte
+#### [X4] Sesiones de dispositivo que no se pierden por un corte
 
-Decisión del owner del 2026-09-14: un teléfono tiene que poder usar la instancia sin límite de
-tiempo, y volver a aparear no puede dar problemas. Hoy hay tres obstáculos, que encontró la
-matriz de sincronización del cliente ([A5.1], casos 8, 12 y 18):
+Lo encontró la matriz de sincronización del cliente ([A5.1], casos 8, 12 y 18), y lo acotan
+dos decisiones del owner del 2026-09-14. Primero pidió que un teléfono pudiera usar la
+instancia sin límite de tiempo; ese mismo día lo revisó por seguridad: **la llave vence, y
+pasado un mes hay que volver a escanear el QR**, y podría pedirse más seguido. Quedan dos
+obstáculos:
 
-1. La sesión vence si pasan 30 días sin renovarla (`DEFAULT_DEVICE_REFRESH_TTL_SECONDS`), y
-   después hace falta un QR nuevo.
-2. La renovación rota el refresh token sin período de gracia (`rotate_device_session`): si la
-   respuesta se pierde en un corte, el teléfono se queda sin sesión.
-3. Una sesión sólo se corta cambiando la contraseña, desactivando la cuenta o desde el propio
-   teléfono. No hay forma de ver ni de revocar teléfonos desde la web.
+1. La renovación rota el refresh token sin período de gracia (`rotate_device_session`): si la
+   respuesta se pierde en un corte, el teléfono se queda sin sesión y hay que volver a aparear
+   antes de tiempo.
+2. Una sesión sólo se corta cambiando la contraseña, desactivando la cuenta o desde el propio
+   teléfono. No hay forma de ver ni de revocar teléfonos desde la web, así que un teléfono
+   perdido conserva el acceso hasta que vence.
 
 - **Alcance**:
-  - La sesión de un dispositivo no vence por falta de uso. El token de acceso sigue durando
-    15 minutos, y el teléfono lo renueva solo.
   - La renovación se puede reintentar: acepta el refresh token anterior durante unos
     segundos, o devuelve el mismo par si se repite.
   - Cada cuenta ve sus teléfonos apareados, con el nombre y la última vez que se conectaron, y
-    puede revocar cualquiera. Es lo que reemplaza al vencimiento: sin eso, un teléfono perdido
-    conserva el acceso hasta que alguien lo corta. El backend es de este frente; la pantalla,
-    un traspaso al frente visual.
+    puede revocar cualquiera. El backend es de este frente; la pantalla, un traspaso al frente
+    visual.
+  - El vencimiento sigue en 30 días (`DEFAULT_DEVICE_REFRESH_TTL_SECONDS`). Falta que el owner
+    diga si el mes se cuenta desde la última renovación, como hoy, o desde el apareamiento
+    aunque el teléfono se use; lo segundo sería un vencimiento absoluto nuevo.
 - **Sigue igual**: cambiar la contraseña o desactivar la cuenta corta todas las sesiones.
-- **Criterio de cierre**: un teléfono que pasó meses sin conectarse sincroniza sin volver a
-  aparear; una renovación cuya respuesta se perdió se reintenta con éxito; y un teléfono
-  revocado desde la web queda afuera en su próxima llamada.
+- **Criterio de cierre**: una renovación cuya respuesta se perdió se reintenta con éxito, un
+  teléfono revocado desde la web queda afuera en su próxima llamada, y el vencimiento es el
+  que decidió el owner.
 - **Depende de**: nada. **Modelo sugerido**: Grande: es seguridad.
+
+#### [X5] Bajas que viajan en la sincronización
+
+Decisión del owner del 2026-09-14, que revierte "la sincronización nunca borra" de ADR-0005
+(ver su enmienda de esa fecha): borrar una obra en un lado la borra en el otro al
+sincronizar. Hoy el servidor borra sin rastro (`delete_item`), y una fusión de duplicados hace
+desaparecer una de las dos obras sin decir con cuál se unió. Un teléfono sólo ve un 404, sin
+saber qué pasó (caso 9 de la matriz de [A5.1]).
+
+- **Alcance**:
+  - Un registro de baja por obra borrada, con el id que conocía el dispositivo y la fecha, y
+    una forma de consultarlo desde la API de dispositivo. Una obra ausente sin registro nunca
+    se trata como baja.
+  - Una fusión deja un registro que dice con qué obra se unió, para que un cambio pendiente del
+    teléfono pase a la obra que queda.
+  - Recibir bajas desde un teléfono y aplicarlas al catálogo. Una baja sobre una obra que se
+    editó en el servidor después de la última sincronización de ese teléfono no se aplica
+    sola: decide la persona.
+  - Cuánto tiempo se conservan los registros, y qué pasa con un teléfono que sincroniza
+    después de ese plazo.
+  - Evaluar la idea del owner: seguir cada obra con un identificador propio y durable, que no
+    dependa de la posición de la fuente (caso 17) y que los registros de baja puedan citar.
+- **Criterio de cierre**: una baja en la web llega al teléfono y una baja en el teléfono llega
+  al servidor, sin que una obra ausente borre nada; y un cambio pendiente sobre una obra
+  fusionada termina en la obra que queda.
+- **Depende de**: nada para diseñarla; en el cliente, [A5.2] incorpora las reglas. **Modelo
+  sugerido**: Grande: toca el contrato y la identidad de las obras.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
