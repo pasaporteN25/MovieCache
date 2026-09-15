@@ -1628,7 +1628,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b"@media (hover: none) and (pointer: coarse)", css)
         self.assertIn(b":has(.dvd-open-surface:focus-visible)", css)
         self.assertIn(b".drawer-accordion", css)
-        self.assertIn(b".spotlight-stage", css)
+        # U4.6b: css/home.css, which held .spotlight-stage, is no longer imported.
+        self.assertIn(b"#homeView .spotlight-layout", css)
         self.assertIn(b".detail-drawer[open]", css)
         self.assertIn(b".personal-record-read", css)
         self.assertIn(b".drawer-navigation", css)

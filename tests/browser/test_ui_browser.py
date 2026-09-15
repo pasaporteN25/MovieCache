@@ -286,16 +286,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.route("**/api/items?*", add_mobile_recovery_fixture)
         page.set_viewport_size({"width": 390, "height": 844})
         self._open_and_wait_for_catalog(page)
-        preview = page.locator('[data-home-shelf-preview="available"]')
+        # U4.6b: choosing the shelf's spine fills the single console above the shelves,
+        # which replaced each shelf's own preview.
+        page.locator('[data-home-section="available"] .home-shelf-tape').first.click()
+        preview = page.locator('.spotlight-preview[data-selection-source="shelf:available"]')
         preview.wait_for()
-        self.assertEqual(
-            page.locator("#homeShelfPreview").evaluate(
-                "element => element.parentElement?.dataset.homeSection"
-            ),
-            "available",
-        )
+        self.assertEqual(preview.get_attribute("data-selected-entry-key"), "available-long-title")
         page.wait_for_function(
-            "[...document.querySelectorAll('.home-furniture-frame img')]"
+            "[...document.querySelectorAll('.spotlight-preview .home-furniture-frame img')]"
             ".every(image => image.hidden === true)"
         )
         poster = preview.locator(".home-furniture-frame img").nth(1)
@@ -313,32 +311,29 @@ class BrowserInterfaceTests(unittest.TestCase):
                 const header = box('.app-header');
                 const brand = box('.brand-lockup');
                 const title = box('h1');
-                const display = box('.home-furniture-display');
-                const body = box('.home-furniture-display-body');
-                const frame = box('.home-furniture-frame');
-                const credits = box('.home-furniture-credit-status');
-                const panel = box('.home-furniture-action-panel');
-                const summaryStyle = getComputedStyle(
-                    document.querySelector('.home-shelf-preview-summary')
-                );
+                const consoleBox = box('.spotlight-preview');
+                const frames = [
+                    ...document.querySelectorAll('.spotlight-preview .home-furniture-frame'),
+                ].map(frame => frame.getBoundingClientRect());
+                const credits = box('.spotlight-preview .home-furniture-credits');
+                const summary = document.querySelector('.spotlight-preview .spotlight-copy p');
+                const summaryStyle = getComputedStyle(summary);
                 return {
                     overflow: document.documentElement.scrollWidth - innerWidth,
                     headerHeight: header.height,
                     brandWidth: brand.width,
                     titleWidth: title.width,
                     titleHeight: title.height,
-                    displayWidth: display.width,
-                    bodyColumns: getComputedStyle(
-                        document.querySelector('.home-furniture-display-body')
-                    ).gridTemplateColumns,
-                    frameWidth: frame.width,
-                    frameRatio: frame.height / frame.width,
+                    consoleWidth: consoleBox.width,
+                    consoleInside: consoleBox.left >= 0 && consoleBox.right <= innerWidth,
+                    frameWidth: Math.min(...frames.map(frame => frame.width)),
+                    framesInsideConsole: frames.every(frame =>
+                        frame.left >= consoleBox.left - 1 && frame.right <= consoleBox.right + 1
+                    ),
                     creditsWidth: credits.width,
-                    panelAfterDisplay: panel.top - display.bottom,
-                    panelWidth: panel.width,
                     summaryFontSize: Number.parseFloat(summaryStyle.fontSize),
                     summaryLineHeight: Number.parseFloat(summaryStyle.lineHeight),
-                    summaryDisplay: summaryStyle.display,
+                    summaryFits: summary.scrollWidth <= summary.clientWidth + 1,
                 };
             }"""
         )
@@ -347,33 +342,41 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertGreater(geometry["brandWidth"], 320)
         self.assertGreater(geometry["titleWidth"], 300)
         self.assertLess(geometry["titleHeight"], 90)
-        self.assertGreater(geometry["displayWidth"], 330)
-        self.assertNotIn(" ", geometry["bodyColumns"])
+        self.assertGreater(geometry["consoleWidth"], 300)
+        self.assertTrue(geometry["consoleInside"])
         self.assertGreaterEqual(geometry["frameWidth"], 150)
-        self.assertAlmostEqual(geometry["frameRatio"], 9 / 16, delta=0.08)
+        self.assertTrue(geometry["framesInsideConsole"])
         self.assertGreater(geometry["creditsWidth"], 300)
-        self.assertGreaterEqual(geometry["panelAfterDisplay"], 11)
-        self.assertGreater(geometry["panelWidth"], 330)
-        self.assertGreaterEqual(geometry["summaryFontSize"], 15)
-        self.assertGreaterEqual(geometry["summaryLineHeight"], 21)
-        self.assertIn(geometry["summaryDisplay"], ("flow-root", "-webkit-box"))
+        # The compact console sets the floor: 12px text on an 18px line, never clipped.
+        self.assertGreaterEqual(geometry["summaryFontSize"], 12)
+        self.assertGreaterEqual(geometry["summaryLineHeight"], 18)
+        self.assertTrue(geometry["summaryFits"])
         self.assertTrue(fallback.is_visible())
         self.assertEqual(preview.locator(".home-furniture-frame").count(), 2)
-        self.assertEqual(preview.locator(".home-furniture-credit-status").count(), 1)
-        self.assertEqual(preview.locator(".home-shelf-preview-art").count(), 0)
+        self.assertEqual(preview.locator(".home-console-details").count(), 1)
+        self.assertEqual(page.locator(".home-shelf-preview, #homeShelfPreview").count(), 0)
         self.assertEqual(preview.locator(".home-furniture-format-panel").count(), 0)
-        self.assertEqual(preview.locator(".home-shelf-preview-action").count(), 2)
-        for action in preview.locator(".home-shelf-preview-action").all():
+        self.assertEqual(preview.locator(".spotlight-preview-action").count(), 2)
+        for action in preview.locator(".spotlight-preview-action").all():
             action_box = action.bounding_box()
             self.assertIsNotNone(action_box)
             self.assertGreaterEqual(action_box["height"], 44)
 
-        page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
-        page.wait_for_timeout(100)
-        navigation_top = page.locator(".primary-nav").bounding_box()["y"]
-        for action in preview.locator(".home-shelf-preview-action").all():
-            action_box = action.bounding_box()
-            self.assertLessEqual(action_box["y"] + action_box["height"], navigation_top - 8)
+        # The fixed bottom navigation may overlap an action until the page scrolls, but it
+        # must never cover one once it is brought to the middle of the screen.
+        for action in preview.locator(".spotlight-preview-action").all():
+            action.evaluate("element => element.scrollIntoView({block: 'center'})")
+            self.assertTrue(
+                action.evaluate(
+                    """element => {
+                        const box = element.getBoundingClientRect();
+                        const hit = document.elementFromPoint(
+                            box.left + box.width / 2, box.top + box.height / 2
+                        );
+                        return element === hit || element.contains(hit);
+                    }"""
+                )
+            )
 
         page.set_viewport_size({"width": 320, "height": 720})
         self.assertFalse(
@@ -466,25 +469,18 @@ class BrowserInterfaceTests(unittest.TestCase):
             self.assertIn("Opción 3", accessible_name)
 
             memory_spine.tap()
-            self.assertEqual(
-                touch_page.locator(".home-shelf-preview").get_attribute("data-home-shelf-preview"),
-                "memory",
-            )
+            # U4.6b: each shelf's own preview became the single console above the shelves,
+            # which names the shelf and the entry it shows.
+            console = touch_page.locator(".spotlight-preview")
+            self.assertEqual(console.get_attribute("data-selection-source"), "shelf:memory")
             self.assertEqual(memory_spine.get_attribute("aria-pressed"), "true")
+            self.assertEqual(console.get_attribute("data-selected-entry-key"), "memory-touch-2")
             self.assertEqual(
-                touch_page.locator("#homeShelfPreview").evaluate(
-                    "element => element.parentElement?.dataset.homeSection"
-                ),
-                "memory",
-            )
-            self.assertEqual(
-                touch_page.locator(".home-shelf-preview h3 > span").text_content(),
+                touch_page.locator("#spotlight-selected-title").text_content(),
                 "Memory obra 3",
             )
 
-            view_more = touch_page.locator(".home-shelf-preview").get_by_role(
-                "button", name="Ver más"
-            )
+            view_more = console.get_by_role("button", name="Ver más")
             view_more.tap()
             touch_page.wait_for_selector("#detailDrawer[open]")
             self.assertEqual(touch_page.evaluate("document.activeElement.id"), "closeDetail")
@@ -500,9 +496,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                     width,
                 )
                 self.assertTrue(
-                    touch_page.get_by_role(
-                        "region", name="Videoteca"
-                    ).is_visible(),
+                    touch_page.get_by_role("region", name="Videoteca").is_visible(),
                     width,
                 )
                 target_size = touch_page.locator(
@@ -605,19 +599,26 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.locator(".home-shelf-tape").get_attribute("aria-label"),
         )
 
+        # U4.6b: the console and the consulted poster exist once a spine is chosen.
+        page.locator(".home-shelf-tape").first.click()
+        console = page.locator('.spotlight-preview[data-selection-source="shelf:r7b-single"]')
+        console.wait_for()
+
         # Let the browser's real network failures settle before replaying load/error
         # events. Otherwise a late error from example.invalid can race the synthetic
         # load below when this case runs as part of the complete browser suite.
         page.wait_for_function(
-            """() => [
-                document.querySelector('[data-spotlight-image]'),
-                document.querySelector('.spotlight-preview-art [data-poster-image]'),
-                document.querySelector('.home-shelf-preview [data-poster-image]'),
-            ].every(image => image?.hidden === true)"""
+            """() => {
+                const images = [...document.querySelectorAll('img')].filter(
+                    image => (image.getAttribute('src') || '').includes('r7b-broken-poster')
+                );
+                return images.length >= 2 && images.every(image => image.hidden === true);
+            }"""
         )
 
-        marquee_image = page.locator("[data-spotlight-image]")
-        marquee_fallback = page.locator(".spotlight-poster-trigger > .spotlight-poster-fallback")
+        marquee = page.locator(".spotlight-selector:not(.home-consulted-poster)")
+        marquee_image = marquee.locator("[data-spotlight-image]")
+        marquee_fallback = marquee.locator(".spotlight-poster-trigger > .spotlight-poster-fallback")
         marquee_image.dispatch_event("load")
         self.assertTrue(marquee_fallback.is_hidden())
         marquee_image.dispatch_event("error")
@@ -625,22 +626,21 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(marquee_fallback.is_visible())
         self.assertIn("sin portada", marquee_fallback.inner_text().casefold())
 
-        upper_preview = page.locator(".spotlight-preview-art")
-        upper_image = upper_preview.locator("[data-poster-image]")
-        upper_fallback = upper_preview.locator(".spotlight-preview-art-fallback")
-        upper_image.dispatch_event("load")
-        self.assertTrue(upper_fallback.is_hidden())
-        upper_image.dispatch_event("error")
-        self.assertTrue(upper_image.is_hidden())
-        self.assertTrue(upper_fallback.is_visible())
+        consulted = page.locator(".home-consulted-poster")
+        consulted_image = consulted.locator("[data-spotlight-image]")
+        consulted_fallback = consulted.locator(".spotlight-poster-fallback")
+        consulted_image.dispatch_event("load")
+        self.assertTrue(consulted_fallback.is_hidden())
+        consulted_image.dispatch_event("error")
+        self.assertTrue(consulted_image.is_hidden())
+        self.assertTrue(consulted_fallback.is_visible())
 
-        shelf_preview = page.locator('[data-home-shelf-preview="r7b-single"]')
-        shelf_images = shelf_preview.locator(".home-furniture-frame [data-poster-image]")
-        shelf_fallbacks = shelf_preview.locator(".home-furniture-frame-fallback")
-        for index in range(shelf_images.count()):
-            shelf_images.nth(index).dispatch_event("error")
-            self.assertTrue(shelf_images.nth(index).is_hidden())
-        self.assertTrue(all(fallback.is_visible() for fallback in shelf_fallbacks.all()))
+        console_images = console.locator(".home-furniture-frame [data-poster-image]")
+        console_fallbacks = console.locator(".home-furniture-frame-fallback")
+        for index in range(console_images.count()):
+            console_images.nth(index).dispatch_event("error")
+            self.assertTrue(console_images.nth(index).is_hidden())
+        self.assertTrue(all(fallback.is_visible() for fallback in console_fallbacks.all()))
 
         for width, height in ((1440, 900), (1920, 1080)):
             page.set_viewport_size({"width": width, "height": height})
@@ -768,232 +768,48 @@ class BrowserInterfaceTests(unittest.TestCase):
             ),
         )
         self._open_and_wait_for_catalog(page)
+        probe = Path(__file__).with_name("home_visual_metrics.js").read_text(encoding="utf-8")
         for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
             page.set_viewport_size({"width": width, "height": height})
-            layout_metrics = page.evaluate(
-                """() => {
-                    const stats = document.querySelector('#stats').getBoundingClientRect();
-                    const statsStyle = getComputedStyle(document.querySelector('#stats'));
-                    const rows = [...document.querySelectorAll('[data-playlist-entry]')];
-                    const firstHeader = document.querySelector('.spotlight-playlist th');
-                    const firstCell = document.querySelector('.spotlight-playlist td');
-                    const firstSpineMeta = document.querySelector('.vhs-spine-meta');
-                    const previewFacts = document.querySelector('.spotlight-preview-facts');
-                    const tableWrap = document.querySelector(
-                        '.spotlight-table-wrap'
-                    ).getBoundingClientRect();
-                    return {
-                        viewportHeight: window.innerHeight,
-                        pageHeight: document.documentElement.scrollHeight,
-                        pageWidth: document.documentElement.scrollWidth,
-                        viewportWidth: window.innerWidth,
-                        headerHeight: document.querySelector(
-                            '.app-header'
-                        ).getBoundingClientRect().height,
-                        statsFontSize: parseFloat(statsStyle.fontSize),
-                        playlistHeaderFontSize: parseFloat(
-                            getComputedStyle(firstHeader).fontSize
-                        ),
-                        playlistCellFontSize: parseFloat(
-                            getComputedStyle(firstCell).fontSize
-                        ),
-                        spineMetaFontSize: parseFloat(
-                            getComputedStyle(firstSpineMeta).fontSize
-                        ),
-                        previewFactsFit:
-                            previewFacts.scrollWidth <= previewFacts.clientWidth + 1,
-                        statsHeight: stats.height,
-                        statsLineHeight: parseFloat(statsStyle.lineHeight),
-                        firstRowHeight: rows[0]?.getBoundingClientRect().height || 0,
-                        lastRowBottom: rows.at(-1)?.getBoundingClientRect().bottom || 0,
-                        tableBottom: tableWrap.bottom
-                    };
-                }"""
-            )
-            # U2-R.C3 deliberately lets the complete lower cabinet continue
-            # vertically instead of compressing or hiding its console at 720p.
-            self.assertGreaterEqual(layout_metrics["pageHeight"], height, layout_metrics)
-            self.assertLessEqual(layout_metrics["pageHeight"], height + 320, layout_metrics)
-            if (width, height) == (1440, 900):
-                self.assertLessEqual(layout_metrics["pageHeight"], height + 160, layout_metrics)
-            if (width, height) == (1920, 1080):
-                self.assertLessEqual(layout_metrics["pageHeight"], height + 1, layout_metrics)
-            self.assertLessEqual(
-                layout_metrics["pageWidth"], layout_metrics["viewportWidth"] + 1, layout_metrics
-            )
-            self.assertLessEqual(layout_metrics["headerHeight"], 70, layout_metrics)
-            self.assertGreaterEqual(layout_metrics["statsFontSize"], 12, layout_metrics)
-            self.assertGreaterEqual(layout_metrics["playlistHeaderFontSize"], 11, layout_metrics)
-            self.assertGreaterEqual(layout_metrics["playlistCellFontSize"], 12, layout_metrics)
-            self.assertGreaterEqual(layout_metrics["spineMetaFontSize"], 10, layout_metrics)
-            self.assertTrue(layout_metrics["previewFactsFit"], layout_metrics)
-            self.assertLessEqual(
-                layout_metrics["statsHeight"],
-                layout_metrics["statsLineHeight"] * 1.35,
-                layout_metrics,
-            )
-            self.assertGreaterEqual(layout_metrics["firstRowHeight"], 20, layout_metrics)
-            self.assertLessEqual(
-                abs(layout_metrics["lastRowBottom"] - layout_metrics["tableBottom"]),
-                2,
-                layout_metrics,
-            )
-
+            metrics = page.evaluate(probe)
+            self.assertEqual(metrics["rowCount"], 6)
+            self.assertLessEqual(metrics["localTableScroll"], 1)
+            self.assertFalse(metrics["rowsOverlapConsole"])
+            self.assertLessEqual(metrics["overflow"], 1)
+            self.assertEqual(metrics["posterCount"], 2)
+            self.assertAlmostEqual(metrics["posterWidthDifference"], 0, delta=1)
+            self.assertAlmostEqual(metrics["consoleWidthDifference"], 0, delta=1)
         self.assertEqual(
-            page.locator("#spotlightTitle").inner_text().strip().casefold(),
-            "cartelera disponible",
+            page.locator("#spotlightTitle").inner_text().strip().casefold(), "cartelera disponible"
         )
-
-        ambience = page.locator(".spotlight-ambience")
-        self.assertEqual(ambience.count(), 1)
-        self.assertEqual(ambience.get_attribute("aria-hidden"), "true")
-        self.assertEqual(
-            ambience.evaluate("element => getComputedStyle(element).pointerEvents"), "none"
-        )
-        # Decorative-only: it must not sit above the real controls it shares a
-        # stacking context with, or it would silently swallow clicks/taps.
-        stage_z_index = page.locator(".spotlight-stage").evaluate(
-            "element => getComputedStyle(element).zIndex"
-        )
-        ambience_z_index = ambience.evaluate("element => getComputedStyle(element).zIndex")
-        self.assertGreater(int(stage_z_index or "0"), int(ambience_z_index or "0"))
-
-        self.assertEqual(page.locator(".spotlight-poster-caption").count(), 0)
-        self.assertEqual(page.locator(".spotlight-carousel-controls").count(), 0)
-        self.assertEqual(page.locator(".spotlight-selector-heading strong").count(), 0)
-        self.assertEqual(page.locator(".spotlight-reason").count(), 0)
-        self.assertEqual(page.locator(".spotlight-preview-signal[aria-hidden='true']").count(), 1)
-        signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
-        marquee_geometry = page.evaluate(
-            """() => {
-                const selector = document.querySelector(
-                    '.spotlight-selector'
-                ).getBoundingClientRect();
-                const heading = document.querySelector(
-                    '.spotlight-selector-heading'
-                ).getBoundingClientRect();
-                const preview = document.querySelector(
-                    '.spotlight-preview'
-                ).getBoundingClientRect();
-                const signal = document.querySelector(
-                    '.spotlight-preview-signal'
-                ).getBoundingClientRect();
-                return {
-                    headingCenterError: Math.abs(
-                        heading.top + heading.height / 2 - selector.top
-                        - (8 + (selector.height - 16) * 139 / 1536)
-                    ),
-                    headingHorizontalError: Math.abs(
-                        heading.left + heading.width / 2 - selector.left - selector.width / 2
-                    ),
-                    signalWidthRatio: signal.width / preview.width
-                };
-            }"""
-        )
-        self.assertLessEqual(marquee_geometry["headingCenterError"], 0.5)
-        self.assertLessEqual(marquee_geometry["headingHorizontalError"], 0.5)
+        self.assertTrue(page.locator(".spotlight-ambience").is_hidden())
+        self.assertEqual(page.locator(".spotlight-preview-signal").count(), 0)
         self.assertEqual(page.locator(".spotlight-selector-options").count(), 0)
-        self.assertGreaterEqual(marquee_geometry["signalWidthRatio"], 0.38)
-        self.assertEqual(
-            page.locator("#spotlight").evaluate(
-                "element => getComputedStyle(element).borderTopWidth"
-            ),
-            "0px",
-        )
-        self.assertEqual(
-            page.locator(".spotlight-selector").evaluate(
-                "element => getComputedStyle(element).borderRightWidth"
-            ),
-            "0px",
-        )
-        poster_fill = page.locator(".spotlight-poster-trigger").evaluate(
-            """element => {
-                const trigger = element.getBoundingClientRect();
-                const art = element.firstElementChild.getBoundingClientRect();
-                return {
-                    width: Math.abs(trigger.width - art.width),
-                    height: Math.abs(trigger.height - art.height)
-                };
-            }"""
-        )
-        self.assertLessEqual(poster_fill["width"], 1)
-        self.assertLessEqual(poster_fill["height"], 1)
-        poster_geometry = page.locator(".spotlight-poster-card").evaluate(
-            """element => {
-                const selector = element.closest('.spotlight-selector').getBoundingClientRect();
-                const card = element.getBoundingClientRect();
-                const poster = element.querySelector(
-                    '.spotlight-poster, .spotlight-poster-fallback'
-                );
-                return {
-                    topRatio: (card.top - selector.top) / selector.height,
-                    bottomRatio: (card.bottom - selector.top) / selector.height,
-                    objectFit: poster ? getComputedStyle(poster).objectFit : ''
-                };
-            }"""
-        )
-        self.assertGreaterEqual(poster_geometry["topRatio"], 0.18)
-        self.assertLessEqual(poster_geometry["bottomRatio"], 0.87)
-        self.assertEqual(poster_geometry["objectFit"], "contain")
-        self.assertEqual(
-            page.locator(".spotlight-selector-heading span").inner_text().strip().casefold(),
-            "hoy",
-        )
-
-        catalog_box = page.locator("#catalogButton").bounding_box()
-        menu_box = page.locator("#systemMenu > summary").bounding_box()
-        self.assertIsNotNone(catalog_box)
-        self.assertIsNotNone(menu_box)
-        self.assertLessEqual(abs(menu_box["x"] - (catalog_box["x"] + catalog_box["width"])), 1)
-
-        desktop_date_control = page.locator(
-            ".spotlight-playlist-head > .spotlight-date-control-desktop"
-        )
-        self.assertEqual(desktop_date_control.count(), 1)
-        self.assertEqual(
-            desktop_date_control.evaluate("element => getComputedStyle(element).position"),
-            "static",
-        )
-        desktop_date_control.locator('[data-click="home-date-yesterday"]').click()
+        for selector in page.locator(".spotlight-selector").all():
+            heading = selector.locator(".spotlight-selector-heading")
+            bounds = selector.bounding_box()
+            label = heading.bounding_box()
+            self.assertAlmostEqual(
+                label["x"] + label["width"] / 2, bounds["x"] + bounds["width"] / 2, delta=1
+            )
+            self.assertEqual(
+                selector.locator(".spotlight-poster").evaluate(
+                    "node => getComputedStyle(node).objectFit"
+                ),
+                "contain",
+            )
+        date_control = page.locator(".spotlight-playlist-head")
+        date_control.locator('[data-click="home-date-yesterday"]').click()
         page.wait_for_function(
-            "document.querySelector('.spotlight-selector-heading span')?."
-            "textContent.trim() === 'Ayer'"
+            "document.querySelector('.spotlight-selector-heading span')?.textContent.trim() "
+            "=== 'Ayer'"
         )
+        # CSS uppercases the label, so read the page text like the date above.
+        consulted_poster = page.locator(".home-consulted-poster")
         self.assertEqual(
-            desktop_date_control.locator('[data-click="home-date-yesterday"]').get_attribute(
-                "aria-pressed"
-            ),
-            "true",
+            consulted_poster.locator(".spotlight-selector-heading").text_content(),
+            "En consulta",
         )
-        self.assertEqual(
-            page.locator(".spotlight-signal-wave").get_attribute("points"),
-            signal_points,
-        )
-
-        # Align to the cream aperture in the raster asset, not the whole selector.
-        for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
-            page.set_viewport_size({"width": width, "height": height})
-            for action, label in (("today", "Hoy"), ("yesterday", "Ayer")):
-                desktop_date_control.locator(f'[data-click="home-date-{action}"]').click()
-                page.wait_for_function(
-                    "label => document.querySelector('.spotlight-selector-heading span')"
-                    "?.textContent.trim() === label",
-                    arg=label,
-                )
-                offset = page.locator(".spotlight-selector-heading").evaluate(
-                    """element => {
-                        const heading = element.getBoundingClientRect();
-                        const selector = element.parentElement.getBoundingClientRect();
-                        return {
-                            x: Math.abs(heading.x + heading.width / 2
-                                - selector.x - selector.width / 2),
-                            y: Math.abs(heading.y + heading.height / 2
-                                - selector.y - 8 - (selector.height - 16) * 139 / 1536)
-                        };
-                    }"""
-                )
-                self.assertLessEqual(offset["x"], 0.5, (width, label, offset))
-                self.assertLessEqual(offset["y"], 0.5, (width, label, offset))
 
     def test_home_typography_is_local_scoped_and_works_with_csp(self) -> None:
         # Fresh context: exercise the real CSP, not the shared bypass used by other tests.
@@ -1012,6 +828,9 @@ class BrowserInterfaceTests(unittest.TestCase):
                 response = page.request.get(f"{self.base_url}/static/fonts/{name}.woff2")
                 self.assertEqual(response.status, 200)
                 self.assertEqual(response.headers["content-type"], "font/woff2")
+            # U4.6b: the console that replaced the shelf preview appears once a spine is chosen.
+            page.locator(".home-shelf-tape").first.click()
+            page.locator("#spotlight-selected-title").wait_for()
             session = context.new_cdp_session(page)
             session.send("DOM.enable")
             session.send("CSS.enable")
@@ -1020,7 +839,8 @@ class BrowserInterfaceTests(unittest.TestCase):
                 (".vhs-spine-title", "Barlow Condensed", "600"),
                 (".home-shelf-bay-plaque > span", "Oswald", "400"),
                 (".home-shelf-bay-plaque > small", "IBM Plex Mono", "400"),
-                (".home-shelf-preview-copy h3", "IBM Plex Mono", "400"),
+                ("#spotlight-selected-title", "Oswald", "400"),
+                (".spotlight-preview .spotlight-preview-facts dd", "IBM Plex Mono", "400"),
             ):
                 element = page.locator(selector).first
                 element.evaluate("el => el.textContent = 'ÁÉÍÓÚÜÑ áéíóúüñ ¿Año? 2026 Łódź'")
@@ -1069,7 +889,12 @@ class BrowserInterfaceTests(unittest.TestCase):
             self.assertFalse(page.evaluate("document.documentElement.scrollWidth > innerWidth + 1"))
         page.locator(".home-shelf-tape").first.focus()
         page.keyboard.press("Enter")
-        self.assertTrue(page.locator(".home-shelf-preview-copy h3").is_visible())
+        self.assertTrue(
+            page.locator(".spotlight-preview")
+            .get_attribute("data-selection-source")
+            .startswith("shelf:")
+        )
+        self.assertTrue(page.locator("#spotlight-selected-title").is_visible())
 
     def test_home_material_plaques_and_inset_spines_keep_geometry_on_desktop_and_mobile(
         self,
@@ -1103,8 +928,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(plaque.get_attribute("title"), label)
         self.assertEqual(plaque.locator("span").text_content(), label)
         self.assertIn(
-            "home-category-plaque-v1.png",
-            plaque.evaluate("node => getComputedStyle(node).borderImageSource"),
+            "home-category-plaque-inset-v1.png",
+            plaque.evaluate("node => getComputedStyle(node, '::before').backgroundImage"),
         )
         self.assertIn(
             "Oswald", plaque.locator("span").evaluate("node => getComputedStyle(node).fontFamily")
@@ -1112,55 +937,23 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(
             plaque.locator("span").evaluate("node => getComputedStyle(node).fontWeight"), "400"
         )
-        desktop = page.locator(".home-shelf-tape").first.evaluate(
-            """node => {
-                const spine = node.getBoundingClientRect();
-                const furniture = node.closest('#homeFurniture').getBoundingClientRect();
-                const plaque = document.querySelector('.home-shelf-bay-plaque');
-                const plate = plaque.getBoundingClientRect();
-                return {
-                    width: spine.width, height: spine.height,
-                    base: spine.bottom - furniture.top,
-                    plateHeight: plate.height,
-                    plateAbove: plate.bottom <= spine.top,
-                    insetWidth: getComputedStyle(node, '::after').width,
-                    insetPointer: getComputedStyle(node, '::after').pointerEvents,
-                    longTitleMode: getComputedStyle(plaque.querySelector('span')).textOverflow,
-                };
-            }"""
-        )
-        self.assertAlmostEqual(desktop["width"], 74.875, delta=1)
-        self.assertAlmostEqual(desktop["height"], 281.656, delta=1)
-        self.assertAlmostEqual(desktop["base"], 400.969, delta=1)
-        self.assertAlmostEqual(desktop["plateHeight"], 48, delta=1)
-        self.assertTrue(desktop["plateAbove"])
-        self.assertEqual(desktop["insetWidth"], "5px")
-        self.assertEqual(desktop["insetPointer"], "none")
-        self.assertEqual(desktop["longTitleMode"], "ellipsis")
-        for width in (390, 320):
-            page.set_viewport_size({"width": width, "height": 844})
-            mobile = plaque.evaluate(
-                """node => {
-                    const box = node.getBoundingClientRect();
-                    const title = node.querySelector('span');
-                    const spine = document.querySelector('.home-shelf-tape')
-                        .getBoundingClientRect();
-                    return {
-                        contained: box.left >= 0 && box.right <= innerWidth,
-                        above: box.bottom <= spine.top,
-                        titleFits: title.scrollWidth <= title.clientWidth + 1,
-                        wrapping: getComputedStyle(title).whiteSpace,
-                        spineHeight: spine.height,
-                    };
-                }"""
-            )
-            self.assertTrue(plaque.is_visible())
-            self.assertTrue(mobile["contained"], (width, mobile))
-            self.assertTrue(mobile["above"], (width, mobile))
-            self.assertTrue(mobile["titleFits"], (width, mobile))
-            self.assertEqual(mobile["wrapping"], "normal")
-            self.assertAlmostEqual(mobile["spineHeight"], 280, delta=1)
-            self.assertFalse(page.evaluate("document.documentElement.scrollWidth > innerWidth + 1"))
+        probe = Path(__file__).with_name("home_visual_metrics.js").read_text(encoding="utf-8")
+        for width in (1280, 1440, 1920, 390, 320):
+            page.set_viewport_size({"width": width, "height": 900})
+            metrics = page.evaluate(probe)
+            self.assertLessEqual(metrics["overflow"], 1, metrics)
+            self.assertAlmostEqual(metrics["spineHeight"], 308, delta=1)
+            self.assertAlmostEqual(metrics["plateHeight"], 54, delta=1)
+            self.assertGreaterEqual(metrics["plateGap"], 0, metrics)
+            self.assertEqual(metrics["spineTransform"], "none", metrics)
+            if width > 860:
+                self.assertAlmostEqual(metrics["contactGap"], 2, delta=1)
+            self.assertEqual(plaque.locator("span").text_content(), label)
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.locator(".home-shelf-tape").first.click()
+        metrics = page.evaluate(probe)
+        self.assertEqual(metrics["spineTransform"], "none")
+        self.assertAlmostEqual(metrics["contactGap"], 2, delta=1)
 
     def test_home_poster_replaces_dots_and_keeps_keyboard_navigation(self) -> None:
         page = self.page
@@ -1196,11 +989,11 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/items?*", add_second_featured)
         self._open_and_wait_for_catalog(page)
-        selector = page.locator(".spotlight-poster-trigger")
+        selector = page.locator('[data-click="spotlight-select"]')
         self.assertEqual(page.locator(".spotlight-selector-option").count(), 0)
-        self.assertEqual(page.locator(".spotlight-selector button").count(), 1)
+        self.assertEqual(page.locator(".spotlight-selector button").count(), 2)
         self.assertEqual(selector.get_attribute("aria-describedby"), "spotlight-navigation-help")
-        first_signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
+        self.assertEqual(page.locator(".spotlight-signal-wave").count(), 0)
 
         selector.focus()
         selected_before = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
@@ -1244,16 +1037,18 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         self.assertTrue(page.evaluate("window.tickHomeAutoplay()"))
         page.locator("[data-playlist-entry]").nth(1).click()
-        second_signal_points = page.locator(".spotlight-signal-wave").get_attribute("points")
-        self.assertNotEqual(second_signal_points, first_signal_points)
+        self.assertEqual(
+            page.locator(".home-consulted-poster").get_attribute("data-consulted-key"),
+            "browser-selector-alternate",
+        )
         page.locator("[data-playlist-entry]").nth(0).click()
         self.assertEqual(
-            page.locator(".spotlight-signal-wave").get_attribute("points"),
-            first_signal_points,
+            page.locator(".home-consulted-poster").get_attribute("data-consulted-key"),
+            "browser-selector-heat",
         )
         page.set_viewport_size({"width": 390, "height": 844})
-        self.assertTrue(page.locator(".spotlight-date-control-mobile").is_visible())
-        self.assertFalse(page.locator(".spotlight-date-control-desktop").is_visible())
+        self.assertFalse(page.locator(".spotlight-date-control-mobile").is_visible())
+        self.assertTrue(page.locator(".spotlight-date-control-desktop").is_visible())
         self.assertFalse(
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
@@ -1306,7 +1101,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             rows.nth(0)
             .locator(".playlist-index")
             .evaluate("element => getComputedStyle(element, '::before').content"),
-            '"▶"',
+            '"▸"',
         )
         rows.nth(1).click()
         selected_key = rows.nth(1).get_attribute("data-entry-key")
@@ -1332,7 +1127,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(
             page.locator('[data-click="spotlight-prev"], [data-click="spotlight-next"]').count(), 0
         )
-        page.locator(".spotlight-poster-trigger").focus()
+        page.locator('[data-click="spotlight-select"]').focus()
         page.keyboard.press("End")
         self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 5)
         self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-select")
@@ -1482,12 +1277,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(shelf.count(), 8)
         self.assertEqual(shelf.nth(0).get_attribute("tabindex"), "0")
         self.assertEqual(shelf.nth(1).get_attribute("tabindex"), "-1")
-        self.assertEqual(shelf.nth(0).get_attribute("data-vhs-state"), "selected")
+        self.assertEqual(shelf.nth(0).get_attribute("data-vhs-state"), "closed")
         self.assertEqual(shelf.nth(1).get_attribute("data-vhs-state"), "closed")
-        # The row shows each work as a spine. P.6 gives the opened preview two
-        # data-backed image wells and removes the former decorative cassette frame.
-        preview_frames = page.locator('[data-home-shelf-preview="available"] .home-furniture-frame')
-        self.assertEqual(preview_frames.count(), 2)
+        # U5 selects only on deliberate input, never by initial roving tabindex.
+        self.assertEqual(page.locator("[data-home-shelf-preview]").count(), 0)
         self.assertEqual(page.locator(".home-shelf-preview-frame").count(), 0)
 
         shelf.nth(0).focus()
@@ -1499,22 +1292,20 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(shelf.nth(1).get_attribute("aria-pressed"), "true")
         self.assertEqual(shelf.nth(1).get_attribute("data-vhs-state"), "selected")
         self.assertEqual(
-            page.locator('[data-home-shelf-preview="available"] h3 > span').text_content(),
+            page.locator("#spotlight-selected-title").text_content(),
             "Akira",
         )
         self.assertEqual(
-            page.locator('[data-home-shelf-preview="available"]').get_attribute("data-vhs-state"),
-            "open",
+            page.locator(".spotlight-preview").get_attribute("data-selection-source"),
+            "shelf:available",
         )
+        state_before_tab = page.evaluate("window.getHomePlaybackState()")
         page.keyboard.press("Tab")
-        self.assertEqual(
-            page.evaluate("document.activeElement.dataset.click"),
-            "open-detail-with-case-transition",
-        )
+        self.assertEqual(page.evaluate("window.getHomePlaybackState()"), state_before_tab)
 
         shelf.nth(0).click()
         self.assertEqual(
-            page.locator('[data-home-shelf-preview="available"] h3 > span').text_content(),
+            page.locator("#spotlight-selected-title").text_content(),
             "Heat",
         )
         page.set_viewport_size({"width": 390, "height": 844})
@@ -1594,7 +1385,8 @@ class BrowserInterfaceTests(unittest.TestCase):
                 self.assertEqual(spine.locator("img").count(), 0)
                 self.assertIsNone(spine.get_attribute("onerror"))
         spines.first.click()
-        page.locator('[data-home-shelf-preview="spine-variants"]').get_by_text("Ver más").click()
+        console = page.locator('.spotlight-preview[data-selection-source="shelf:spine-variants"]')
+        console.get_by_role("button", name="Ver más").click()
         page.wait_for_selector("#detailDrawer[open]")
         self.assertIn("pelicula", page.locator("#detailDrawer").inner_text().lower())
 
@@ -1657,76 +1449,38 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(all(bays.nth(index).is_visible() for index in range(4)))
         cabinet = page.locator("#homeFurniture")
         furniture = page.locator("#homeSections")
-        self.assertIn(
-            "vhs-continuous-furniture-v2.png",
-            cabinet.evaluate("element => getComputedStyle(element).backgroundImage"),
+        self.assertTrue(page.locator(".home-service-spine").is_hidden())
+        self.assertEqual(
+            page.locator(".home-machine-shell").evaluate(
+                "element => getComputedStyle(element).display"
+            ),
+            "contents",
         )
-        self.assertTrue(
-            cabinet.evaluate(
-                """element => {
-                    const preview = element.querySelector('#homeShelfPreview');
-                    return preview && preview.parentElement === element;
-                }"""
-            )
-        )
-        self.assertTrue(
-            all(
-                "vhs-shelf-bay-v1.png"
-                not in bays.nth(index).evaluate(
-                    "element => getComputedStyle(element).backgroundImage"
-                )
-                for index in range(4)
-            )
-        )
+        self.assertEqual(page.locator("#homeShelfPreview").count(), 0)
         self.assertTrue(furniture.evaluate("element => element.scrollWidth > element.clientWidth"))
         navigation = page.locator("#homeShelfCategories")
         controls = navigation.locator(".home-shelf-scroll-control")
         self.assertTrue(navigation.is_visible())
-        self.assertEqual(
-            navigation.locator(".home-shelf-navigation-label").text_content(),
-            "4 categorías · recorrido lateral",
-        )
         self.assertTrue(controls.nth(0).is_disabled())
         self.assertFalse(controls.nth(1).is_disabled())
-        self.assertEqual(page.locator(".home-program-heading").count(), 0)
-        self.assertEqual(page.locator(".home-shelf-bay > h2.sr-only").count(), 4)
+        # Each bay keeps a real heading; its hidden plaque is now a native button inside it.
+        self.assertEqual(page.locator(".home-shelf-bay > h2.home-shelf-heading").count(), 4)
         self.assertEqual(
-            furniture.evaluate("element => getComputedStyle(element).scrollbarWidth"), "none"
+            page.locator(".home-shelf-bay > h2 > .home-shelf-bay-plaque.sr-only").count(), 4
         )
-        geometry = cabinet.evaluate(
-            """element => {
-                const cabinet = element.getBoundingClientRect();
-                const home = element.closest('#homeView').getBoundingClientRect();
-                const shelf = element.querySelector('#homeSections').getBoundingClientRect();
-                const panels = [
-                    element.querySelector('.home-furniture-action-panel'),
-                    element.querySelector('.home-furniture-display'),
-                ].map(node => node.getBoundingClientRect());
-                return {
-                    shelfTop: (shelf.top - cabinet.top) / cabinet.height,
-                    shelfBottom: (shelf.bottom - cabinet.top) / cabinet.height,
-                    cabinetOverrun: cabinet.right - home.right,
-                    visibleFraction: (home.right - cabinet.left) / cabinet.width,
-                    shelfRightInset: home.right - shelf.right,
-                    pageOverflow: document.documentElement.scrollWidth - innerWidth,
-                    homeOverflowX: getComputedStyle(element.closest('#homeView')).overflowX,
-                    panelsContained: panels.every(panel =>
-                        panel.left >= cabinet.left && panel.right <= cabinet.right
-                        && panel.top >= cabinet.top && panel.bottom <= cabinet.bottom
-                    ),
-                    panelsSeparated: panels[0].right <= panels[1].left,
-                };
-            }"""
+        self.assertEqual(
+            furniture.evaluate("element => getComputedStyle(element).scrollbarWidth"), "thin"
         )
-        self.assertAlmostEqual(geometry["shelfTop"], 0.088, delta=0.012)
-        self.assertAlmostEqual(geometry["shelfBottom"], 0.639, delta=0.012)
-        self.assertGreaterEqual(geometry["cabinetOverrun"], 71)
-        self.assertLessEqual(geometry["visibleFraction"], 0.95)
-        self.assertGreaterEqual(geometry["shelfRightInset"], 40)
-        self.assertLessEqual(geometry["pageOverflow"], 1)
-        self.assertEqual(geometry["homeOverflowX"], "clip")
-        self.assertTrue(geometry["panelsContained"])
-        self.assertTrue(geometry["panelsSeparated"])
+        probe = Path(__file__).with_name("home_visual_metrics.js").read_text(encoding="utf-8")
+        geometry = page.evaluate(probe)
+        self.assertLessEqual(geometry["overflow"], 1)
+        self.assertAlmostEqual(geometry["contactGap"], 2, delta=1)
+        bounds = cabinet.evaluate("""element => {
+            const cabinet = element.getBoundingClientRect();
+            const home = element.closest('#homeView').getBoundingClientRect();
+            return {left: cabinet.left - home.left, right: home.right - cabinet.right};
+        }""")
+        self.assertAlmostEqual(bounds["left"], bounds["right"], delta=1)
         first_spine = page.locator('[data-home-section="bay-0"] .home-shelf-tape').nth(0)
         spine_readability = first_spine.evaluate(
             """element => {
@@ -1808,156 +1562,30 @@ class BrowserInterfaceTests(unittest.TestCase):
             furniture.evaluate("element => getComputedStyle(element).scrollBehavior"), "auto"
         )
 
-    def test_home_furniture_console_keeps_primary_copy_legible_at_desktop_sizes(
-        self,
-    ) -> None:
+    def test_home_furniture_console_keeps_primary_copy_legible_at_desktop_sizes(self) -> None:
+        """U4 B: one shared console; no lower percentage-positioned cabinet."""
         page = self.page
-        synopsis = (
-            "Un detective y un ladrón profesional se enfrentan en Los Ángeles "
-            "mientras sus vidas privadas empiezan a reflejarse."
-        )
-
-        def add_console_copy(route) -> None:
-            response = route.fetch()
-            payload = response.json()
-            items = payload.get("items") or []
-            home = payload.get("home") or {}
-            if items:
-                item = {
-                    **items[0],
-                    "title": "Heat: fuego contra fuego",
-                    "description": synopsis,
-                    "wikipedia_extract": "Este extracto no debe desplazar la descripción.",
-                    "directors": ["Michael Mann"],
-                    "writers": ["Michael Mann"],
-                    "cast": ["Al Pacino", "Robert De Niro", "Val Kilmer"],
-                    "genres": ["Policial"],
-                    "year": "1995",
-                    "duration_minutes": 170,
-                    "backdrop_image": "https://example.invalid/u2-p6-backdrop.jpg",
-                    "page_image": "https://example.invalid/u2-p6-page.jpg",
-                }
-                home["sections"] = [
-                    {
-                        "id": "console",
-                        "title": "Disponible esta noche",
-                        "items": [
-                            {
-                                "key": "console-heat",
-                                "origin": {"kind": "catalog"},
-                                "item": item,
-                                "reason": {
-                                    "label": "Lista para ver",
-                                    "detail": "El motivo editorial queda detrás de la sinopsis.",
-                                },
-                            }
-                        ],
-                    }
-                ]
-            payload["home"] = home
-            route.fulfill(response=response, json=payload)
-
-        page.route("**/api/items?*", add_console_copy)
         self._open_and_wait_for_catalog(page)
-        preview = page.locator('[data-home-shelf-preview="console"]')
-        self.assertEqual(preview.locator(".home-shelf-preview-summary").text_content(), synopsis)
-        self.assertEqual(preview.locator(".home-furniture-frame").count(), 2)
-        self.assertEqual(preview.locator(".home-shelf-preview-art").count(), 0)
-        self.assertEqual(preview.locator(".home-furniture-format-panel").count(), 0)
-        self.assertIn("Michael Mann", preview.locator(".home-furniture-credits").text_content())
-        self.assertIn("Al Pacino", preview.locator(".home-furniture-credits").text_content())
-        self.assertIn("Disponible", preview.locator(".home-shelf-preview-facts").text_content())
-        self.assertEqual(preview.locator(".home-furniture-format-signature").text_content(), "VHS")
-
+        page.locator(".home-shelf-tape").first.click()
+        probe = Path(__file__).with_name("home_visual_metrics.js").read_text(encoding="utf-8")
         for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
             with self.subTest(viewport=(width, height)):
                 page.set_viewport_size({"width": width, "height": height})
-                metrics = preview.evaluate(
-                    """element => {
-                        const cabinet = element.closest('.home-furniture');
-                        const display = element.querySelector('.home-furniture-display');
-                        const copy = element.querySelector('.home-shelf-preview-copy');
-                        const title = copy.querySelector('h3');
-                        const meta = copy.querySelector('.home-shelf-preview-meta');
-                        const summary = copy.querySelector('.home-shelf-preview-summary');
-                        const panel = element.querySelector('.home-furniture-action-panel');
-                        const panelRect = panel.getBoundingClientRect();
-                        const actions = [...panel.querySelectorAll('button')];
-                        const body = element.querySelector('.home-furniture-display-body');
-                        const bodyRect = body.getBoundingClientRect();
-                        const frames = [...element.querySelectorAll('.home-furniture-frame')];
-                        const credits = element.querySelector('.home-furniture-credit-status');
-                        const bodyChildren = [
-                            copy,
-                            element.querySelector('.home-furniture-frame-strip'),
-                            credits,
-                        ];
-                        return {
-                            cabinetHeight: cabinet.getBoundingClientRect().height,
-                            displayHeight: display.getBoundingClientRect().height,
-                            titleHeight: title.getBoundingClientRect().height,
-                            metaFontSize: parseFloat(getComputedStyle(meta).fontSize),
-                            summaryFontSize: parseFloat(getComputedStyle(summary).fontSize),
-                            summaryHeight: summary.getBoundingClientRect().height,
-                            copyFits: copy.scrollHeight <= copy.clientHeight + 1,
-                            bodyColumns: getComputedStyle(body).gridTemplateColumns
-                                .split(' ').length,
-                            bodyChildrenContained: bodyChildren.every(child => {
-                                const rect = child.getBoundingClientRect();
-                                return rect.left >= bodyRect.left - 1
-                                    && rect.right <= bodyRect.right + 1
-                                    && rect.top >= bodyRect.top - 1
-                                    && rect.bottom <= bodyRect.bottom + 1;
-                            }),
-                            frameSizes: frames.map(frame => {
-                                const rect = frame.getBoundingClientRect();
-                                return [rect.width, rect.height];
-                            }),
-                            creditsFit: credits.scrollHeight <= credits.clientHeight + 1,
-                            actionHeights: actions.map(
-                                action => action.getBoundingClientRect().height
-                            ),
-                            actionsCentered: actions.every(
-                                action => getComputedStyle(action).textAlign === 'center'
-                            ),
-                            actionsContained: actions.every(action => {
-                                const rect = action.getBoundingClientRect();
-                                return rect.top >= panelRect.top - 1
-                                    && rect.bottom <= panelRect.bottom + 1
-                                    && rect.left >= panelRect.left - 1
-                                    && rect.right <= panelRect.right + 1;
-                            }),
-                        };
-                    }"""
-                )
-                self.assertGreaterEqual(metrics["cabinetHeight"], 639)
-                self.assertGreaterEqual(metrics["displayHeight"], 130)
-                self.assertGreaterEqual(metrics["titleHeight"], 16)
-                self.assertGreaterEqual(metrics["metaFontSize"], 12)
-                self.assertGreaterEqual(metrics["summaryFontSize"], 12)
-                self.assertGreaterEqual(metrics["summaryHeight"], 16)
-                self.assertTrue(metrics["copyFits"])
-                self.assertEqual(metrics["bodyColumns"], 3)
-                self.assertTrue(metrics["bodyChildrenContained"])
-                self.assertTrue(metrics["creditsFit"])
-                self.assertTrue(
-                    all(width >= 60 and height >= 60 for width, height in metrics["frameSizes"])
-                )
-                self.assertTrue(metrics["actionsContained"])
-                self.assertTrue(metrics["actionsCentered"])
-                self.assertTrue(
-                    all(action_height >= 36 for action_height in metrics["actionHeights"])
-                )
-
-        page.set_viewport_size({"width": 1280, "height": 720})
-        self.assertEqual(
-            page.locator("#homeShelfPreview").evaluate("element => element.parentElement?.id"),
-            "homeFurniture",
-        )
-        self.assertGreater(
-            page.evaluate("document.documentElement.scrollHeight"),
-            page.evaluate("window.innerHeight"),
-        )
+                metrics = page.evaluate(probe)
+                self.assertLessEqual(metrics["overflow"], 1, metrics)
+                self.assertEqual(metrics["consoleCount"], 1, metrics)
+                self.assertEqual(metrics["retiredConsoleCount"], 0, metrics)
+                self.assertEqual(metrics["posterCount"], 2, metrics)
+                self.assertLessEqual(metrics["posterWidthDifference"], 1, metrics)
+                self.assertLessEqual(metrics["consoleWidthDifference"], 1, metrics)
+                self.assertFalse(metrics["rowsOverlapConsole"], metrics)
+                self.assertLessEqual(metrics["localTableScroll"], 1, metrics)
+                self.assertTrue(metrics["imageFit"], metrics)
+                self.assertEqual(metrics["reviewAction"], "Revisar imágenes en ficha")
+        preview = page.locator(".spotlight-preview")
+        self.assertEqual(preview.locator(".spotlight-preview-actions button").count(), 2)
+        self.assertEqual(preview.locator(".home-console-details").count(), 1)
+        self.assertTrue(preview.locator(".spotlight-copy h3").is_visible())
 
     def test_home_shelf_furniture_handles_zero_categories_without_empty_controls(self) -> None:
         page = self.page
@@ -1978,7 +1606,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "0")
         self.assertEqual(page.locator("#homeSections").get_attribute("tabindex"), "-1")
 
-    def test_direct_spine_choice_activates_its_bay_but_keeps_playlist_independent(
+    def test_direct_spine_choice_synchronizes_playlist_and_shared_console(
         self,
     ) -> None:
         page = self.page
@@ -2030,22 +1658,22 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/items?*", add_sync_sections)
         self._open_and_wait_for_catalog(page)
-        self.assertEqual(page.locator(".home-shelf-preview").count(), 1)
+        self.assertEqual(page.locator("#homeShelfPreview, .home-shelf-preview").count(), 0)
 
         initial_state = page.evaluate("window.getHomePlaybackState()")
-        initial_playlist_selection = page.locator("[data-playlist-entry].is-selected").evaluate_all(
-            "elements => elements.map(element => element.dataset.entryKey)"
-        )
-
         # Clicking a spine in another visible bay activates that bay and its
-        # preview directly. The upper playlist remains independent.
+        # playlist/consultation. Only the daily poster stays independent (U5).
         memory_spines = page.locator('[data-home-section="memory"] .home-shelf-tape')
         memory_spines.nth(1).click()
+        self.assertEqual(page.locator(".spotlight-preview").count(), 1)
         state = page.evaluate("window.getHomePlaybackState()")
         self.assertEqual(state["activeShelfId"], "memory")
-        self.assertEqual(state["playlistSource"], initial_state["playlistSource"])
-        self.assertEqual(state["selectedEntryKey"], initial_state["selectedEntryKey"])
-        self.assertEqual(state["selectedItemId"], initial_state["selectedItemId"])
+        self.assertEqual(state["playlistSource"], "shelf:memory")
+        self.assertEqual(state["selectedEntryKey"], "memory-heat")
+        self.assertEqual(state["selectedItemId"], "memory-heat-item")
+        self.assertEqual(state["selectionSource"], "shelf:memory")
+        self.assertEqual(state["carouselItemId"], initial_state["carouselItemId"])
+        self.assertEqual(page.locator("#spotlight-selected-title").text_content(), "Heat recordada")
         self.assertEqual(
             page.locator('[data-home-section="memory"]').get_attribute("data-active"),
             "true",
@@ -2055,14 +1683,15 @@ class BrowserInterfaceTests(unittest.TestCase):
             "false",
         )
         self.assertEqual(
-            page.locator(".home-shelf-preview").get_attribute("data-home-shelf-preview"), "memory"
+            page.locator(".spotlight-preview").get_attribute("data-selection-source"),
+            "shelf:memory",
         )
         self.assertEqual(
-            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            page.locator(".spotlight-preview").get_attribute("data-selected-entry-key"),
             "memory-heat",
         )
         self.assertEqual(
-            page.locator(".home-furniture-display-heading strong").text_content(),
+            page.locator(".home-console-heading strong").text_content(),
             "Tu archivo pide memoria",
         )
         self.assertEqual(
@@ -2072,11 +1701,13 @@ class BrowserInterfaceTests(unittest.TestCase):
             "memory-heat",
         )
         self.assertEqual(
-            page.locator("[data-playlist-entry].is-selected").evaluate_all(
+            page.locator("[data-playlist-entry]").evaluate_all(
                 "elements => elements.map(element => element.dataset.entryKey)"
             ),
-            initial_playlist_selection,
+            ["memory-akira", "memory-heat", *[f"memory-extra-{i}" for i in range(12)]],
         )
+        self.assertEqual(page.locator('[data-playlist-entry][aria-selected="true"]').count(), 1)
+        self.assertEqual(page.locator('[data-playlist-entry][tabindex="0"]').count(), 1)
         self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-heat")
 
         # Enter on a spine in a different bay follows the same state transition.
@@ -2085,10 +1716,11 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.keyboard.press("Enter")
         state = page.evaluate("window.getHomePlaybackState()")
         self.assertEqual(state["activeShelfId"], "available")
-        self.assertEqual(state["playlistSource"], initial_state["playlistSource"])
-        self.assertEqual(state["selectedEntryKey"], initial_state["selectedEntryKey"])
+        self.assertEqual(state["playlistSource"], "shelf:available")
+        self.assertEqual(state["selectedEntryKey"], "available-akira")
+        self.assertEqual(state["selectionSource"], "shelf:available")
         self.assertEqual(
-            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            page.locator(".spotlight-preview").get_attribute("data-selected-entry-key"),
             "available-akira",
         )
         self.assertEqual(
@@ -2109,10 +1741,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertNotEqual(focus_ring["style"], "none")
         self.assertGreaterEqual(focus_ring["width"], 2)
 
-        # Bay activation still owns the explicit playlist synchronization and
-        # restores that bay's remembered spine.
-        memory_bay = page.locator('[data-home-section="memory"].home-shelf-bay')
-        memory_bay.dispatch_event("click")
+        # The native plaque button restores that shelf's remembered spine.
+        memory_bay = page.locator('[data-click="home-shelf-activate"][data-section-id="memory"]')
+        memory_bay.click()
         self.assertEqual(
             page.evaluate("window.getHomePlaybackState().playlistSource"), "shelf:memory"
         )
@@ -2120,13 +1751,13 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "memory-heat"
         )
         self.assertEqual(
-            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            page.locator(".spotlight-preview").get_attribute("data-selected-entry-key"),
             "memory-heat",
         )
 
-        page_scroll_before = page.evaluate("window.scrollY")
         selected_row = page.locator("[data-playlist-entry].is-selected")
         selected_row.focus()
+        page_scroll_before = page.evaluate("window.scrollY")
         page.keyboard.press("Home")
         self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-akira")
         self.assertEqual(
@@ -2152,7 +1783,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             selected_spine.evaluate(
                 """element => {
                     const spine = element.getBoundingClientRect();
-                    const rail = element.closest('.home-shelf-rail').getBoundingClientRect();
+                    const rail = document.querySelector('#homeSections').getBoundingClientRect();
                     return spine.left >= rail.left - 1 && spine.right <= rail.right + 1;
                 }"""
             )
@@ -2163,12 +1794,258 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         self.assertEqual(page.evaluate("window.scrollY"), page_scroll_before)
         self.assertEqual(
-            page.locator(".home-shelf-preview").get_attribute("data-selected-entry-key"),
+            page.locator(".spotlight-preview").get_attribute("data-selected-entry-key"),
             "memory-extra-11",
         )
 
-        self.assertEqual(page.locator(".home-shelf-preview").count(), 1)
-        self.assertEqual(page.locator(".home-shelf-preview-actions button").count(), 2)
+        self.assertEqual(page.locator(".spotlight-preview").count(), 1)
+        self.assertEqual(page.locator(".spotlight-preview-actions button").count(), 2)
+
+    def _install_u5_source_fixture(self, count: int = 6) -> None:
+        """Extended lists are test-only; no production section limit is changed."""
+
+        def fixture(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            items = payload["items"]
+            daily = [
+                {"key": f"shared-{index}", "origin": {"kind": "catalog"}, "item": item}
+                for index, item in enumerate(items)
+            ]
+            payload["home"].update(
+                {
+                    "featured": daily,
+                    "sections": [
+                        {
+                            "id": "sample",
+                            "title": "Memoria del archivo",
+                            "items": [
+                                {
+                                    "key": f"sample-{index}",
+                                    "origin": {"kind": "catalog"},
+                                    "item": {
+                                        **items[index % len(items)],
+                                        "title": f"Obra {index + 1:03d} del archivo",
+                                    },
+                                }
+                                for index in range(count)
+                            ],
+                        },
+                        {
+                            "id": "club",
+                            "title": "Colección seguida",
+                            "items": [
+                                {
+                                    "key": "shared-0",
+                                    "origin": {
+                                        "kind": "collection",
+                                        "collection_id": "club-test",
+                                        "collection_title": "Archivo del Club",
+                                        "collection_item_id": items[0]["id"],
+                                    },
+                                    "item": {
+                                        **items[0],
+                                        "title": "Obra ajena con el mismo identificador",
+                                    },
+                                }
+                            ],
+                        },
+                    ],
+                }
+            )
+            route.fulfill(response=response, json=payload)
+
+        self.page.route("**/api/items?*", fixture)
+
+    def test_u5_source_counts_keyboard_alignment_and_removal(self) -> None:
+        page = self.page
+        for count in (0, 1, 6, 20, 100):
+            with self.subTest(count=count):
+                page.unroute("**/api/items?*")
+                self._install_u5_source_fixture(count)
+                self._open_and_wait_for_catalog(page)
+                if not count:
+                    self.assertEqual(page.locator('[data-home-section="sample"]').count(), 0)
+                    self.assertEqual(page.locator("[data-playlist-entry]").count(), 2)
+                    continue
+                plaque = page.locator(
+                    '[data-click="home-shelf-activate"][data-section-id="sample"]'
+                )
+                before = page.evaluate("window.getHomePlaybackState()")
+                plaque.focus()
+                page.keyboard.press("Tab")
+                self.assertEqual(page.evaluate("window.getHomePlaybackState()"), before)
+                self.assertEqual(
+                    page.evaluate("document.activeElement.dataset.click"), "home-shelf-select"
+                )
+                page.keyboard.press("Space")
+                self.assertEqual(page.locator("[data-playlist-entry]").count(), count)
+                self.assertEqual(
+                    page.evaluate("document.activeElement.dataset.entryKey"), "sample-0"
+                )
+                page.locator('[data-playlist-entry][aria-selected="true"]').focus()
+                scroll_before = page.evaluate("window.scrollY")
+                page.keyboard.press("End")
+                self.assertEqual(
+                    page.evaluate("document.activeElement.dataset.entryKey"), f"sample-{count - 1}"
+                )
+                self.assertEqual(page.evaluate("window.scrollY"), scroll_before)
+                metrics = page.evaluate(
+                    Path(__file__).with_name("home_list_metrics.js").read_text(encoding="utf-8")
+                )
+                self.assertTrue(metrics["selectedVisible"], metrics)
+                self.assertEqual(metrics["extended"], str(count > 6).lower())
+                self.assertFalse(metrics["windowOverlapsConsole"], metrics)
+                self.assertLessEqual(metrics["overflow"], 1, metrics)
+                announcement = page.locator("#homeSelectionAnnouncement").inner_text()
+                selected = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
+                page.evaluate("window.tickHomeAutoplay()")
+                self.assertEqual(
+                    page.locator("#homeSelectionAnnouncement").inner_text(), announcement
+                )
+                self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), selected)
+                self.assertEqual(
+                    page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected
+                )
+                # Live data changes use the real renderer; no stale console actions.
+                page.evaluate("""async () => {
+                    const home = await import('/static/js/surfaces/home.js');
+                    home.editorialHome.sections[0].items = [];
+                    home.renderEditorialHome();
+                }""")
+                self.assertEqual(page.locator("[data-playlist-count]").inner_text(), "0 obras")
+                self.assertEqual(page.locator(".spotlight-preview").count(), 0)
+                self.assertEqual(
+                    page.evaluate("document.activeElement.dataset.click"), "home-programming-return"
+                )
+                page.evaluate("""async () => {
+                    const home = await import('/static/js/surfaces/home.js');
+                    home.editorialHome.sections.shift();
+                    home.renderEditorialHome();
+                }""")
+                self.assertEqual(
+                    page.evaluate("window.getHomePlaybackState().playlistSource"), "daily"
+                )
+                self.assertEqual(page.locator("[data-playlist-entry]").count(), 2)
+                self.assertIn(
+                    "Volvimos a programación",
+                    page.locator("#homeSelectionAnnouncement").inner_text(),
+                )
+                self.assertEqual(
+                    page.evaluate("document.activeElement.dataset.click"), "home-date-today"
+                )
+
+    def test_u5_club_collision_dialog_focus_and_single_announcement(self) -> None:
+        page = self.page
+        self._install_u5_source_fixture()
+        self._open_and_wait_for_catalog(page)
+        writes = []
+        page.on(
+            "request",
+            lambda request: (
+                writes.append(request.url)
+                if request.method in ("POST", "PATCH", "PUT", "DELETE") and "/api/" in request.url
+                else None
+            ),
+        )
+        page.evaluate("""() => {
+            window.u5Announcements = [];
+            new MutationObserver(records => window.u5Announcements.push(...records.map(() =>
+                document.querySelector('#homeSelectionAnnouncement').textContent)))
+                .observe(document.querySelector('#homeSelectionAnnouncement'), {childList: true});
+        }""")
+        page.locator('[data-home-section="club"] .home-shelf-tape').click()
+        self.assertEqual(len(page.evaluate("window.u5Announcements")), 1)
+        page.locator('[data-home-section="club"] .home-shelf-tape').click()
+        self.assertEqual(len(page.evaluate("window.u5Announcements")), 1)
+        self.assertEqual(
+            page.locator('.spotlight-preview [data-click="edit-home-shelf-entry"]').count(), 0
+        )
+        self.assertEqual(
+            page.locator(".home-consulted-poster").get_attribute("data-consulted-source"),
+            "shelf:club",
+        )
+        for surface in ("consultation-view", "consultation-poster", "consultation-images"):
+            opener = page.locator(f'[data-home-focus="{surface}"]')
+            opener.click()
+            page.locator("#sharedDetailDialog").wait_for(state="visible")
+            self.assertIn(
+                "obra ajena con el mismo identificador",
+                page.locator("#sharedDetailBody").inner_text().casefold(),
+            )
+            self.assertEqual(
+                page.locator("#sharedDetailDialog").get_by_text("Editar mi ficha").count(), 0
+            )
+            self.assertFalse(page.evaluate("window.tickHomeAutoplay()"))
+            page.keyboard.press("Escape")
+            page.locator("#sharedDetailDialog").wait_for(state="hidden")
+            self.assertEqual(page.evaluate("document.activeElement.dataset.homeFocus"), surface)
+        page.locator('[data-click="home-programming-return"]').click()
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "home-date-today")
+        self.assertEqual(
+            page.locator('.spotlight-preview [data-click="edit-home-shelf-entry"]').count(), 1
+        )
+        self.assertEqual(writes, [])
+
+    def test_u5_removed_focused_spine_recovers_without_focusing_a_different_origin(self) -> None:
+        page = self.page
+        self._install_u5_source_fixture()
+        self._open_and_wait_for_catalog(page)
+        page.locator('[data-home-section="sample"] .home-shelf-tape').nth(1).click()
+        page.evaluate("""async () => {
+            const home = await import('/static/js/surfaces/home.js');
+            home.editorialHome.sections[0].items.splice(1, 1);
+            home.renderEditorialHome();
+        }""")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.click"), "home-shelf-activate"
+        )
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "sample-0"
+        )
+        page.locator('[data-home-section="club"] .home-shelf-tape').click()
+        page.locator('[data-playlist-entry][aria-selected="true"]').focus()
+        page.evaluate("""async () => {
+            const home = await import('/static/js/surfaces/home.js');
+            home.editorialHome.sections.pop();
+            home.renderEditorialHome();
+        }""")
+        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "home-date-today")
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectionSource"), "daily")
+
+    def test_u5_day_failure_retry_focus_and_cached_return(self) -> None:
+        page = self.page
+        self._install_u5_source_fixture()
+        self._open_and_wait_for_catalog(page)
+        page.locator('[data-home-section="sample"] .home-shelf-tape').nth(1).click()
+        page.route(
+            "**/api/home?*", lambda route: route.fulfill(status=503, json={"reason": "offline"})
+        )
+        yesterday = page.locator(
+            '#spotlightStage .spotlight-date-tabs [data-click="home-date-yesterday"]'
+        )
+        yesterday.click()
+        page.locator("#homeFeedback button").wait_for(state="visible")
+        self.assertEqual(
+            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "sample-1"
+        )
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.click"), "home-date-yesterday"
+        )
+        page.unroute("**/api/home?*")
+        page.locator("#homeFeedback button").click()
+        page.wait_for_function(
+            "document.querySelector('#spotlight').getAttribute('aria-busy') === 'false' "
+            "&& document.querySelector('#homeFeedback').hidden"
+        )
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().playlistSource"), "daily")
+        self.assertEqual(yesterday.get_attribute("aria-pressed"), "true")
+        page.locator('[data-home-section="sample"] .home-shelf-tape').nth(1).click()
+        yesterday.click()
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().playlistSource"), "daily")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.click"), "home-date-yesterday"
+        )
 
     def test_home_shelf_furniture_compacts_and_labels_short_categories(
         self,
@@ -2230,7 +2107,8 @@ class BrowserInterfaceTests(unittest.TestCase):
             plaques.all_text_contents(),
             ["Disponible esta noche1 título", "Volvé a esto1 título"],
         )
-        self.assertNotEqual(
+        # One material family; active state belongs to the selected VHS, not a new plaque color.
+        self.assertEqual(
             plaques.nth(0).evaluate("element => getComputedStyle(element).color"),
             plaques.nth(1).evaluate("element => getComputedStyle(element).color"),
         )
@@ -2257,8 +2135,8 @@ class BrowserInterfaceTests(unittest.TestCase):
                 };
             }"""
         )
-        self.assertTrue(all(width <= 221 for width in geometry["widths"]))
-        self.assertLessEqual(geometry["gap"], 37)
+        self.assertTrue(all(width >= 360 for width in geometry["widths"]))
+        self.assertGreaterEqual(geometry["gap"], 24)
         self.assertFalse(geometry["overflows"])
 
         page.locator("#homeSections").focus()
@@ -2315,9 +2193,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.route("**/api/items?*", add_mixed_origin_section)
         self._open_and_wait_for_catalog(page)
 
-        preview = page.locator('[data-home-shelf-preview="available"]')
+        page.locator('[data-home-section="available"] .home-shelf-tape').first.click()
+        preview = page.locator(".spotlight-preview")
         self.assertEqual(preview.get_by_text("Ver más").count(), 1)
-        self.assertEqual(preview.locator(".home-furniture-frame-strip > span").count(), 2)
+        self.assertEqual(preview.locator(".home-media-empty").count(), 1)
         edit_button = preview.get_by_text("Editar mi ficha")
         self.assertEqual(edit_button.count(), 1)
 
@@ -2373,14 +2252,15 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.set_viewport_size({"width": 390, "height": 844})
         self._open_and_wait_for_catalog(page)
 
-        preview = page.locator('[data-home-shelf-preview="followed"]')
+        page.locator('[data-home-section="followed"] .home-shelf-tape').first.click()
+        preview = page.locator(".spotlight-preview")
         self.assertEqual(preview.get_by_text("Ver ficha del Club").count(), 1)
         # The whole point: a not-yet-personal recommendation never offers to
         # "edit my record" for a record that doesn't exist yet.
         self.assertEqual(preview.get_by_text("Editar mi ficha").count(), 0)
         collection_action_box = preview.get_by_text("Ver ficha del Club").bounding_box()
         self.assertIsNotNone(collection_action_box)
-        self.assertGreater(collection_action_box["width"], 300)
+        self.assertGreater(collection_action_box["width"], 100)
         self.assertGreaterEqual(collection_action_box["height"], 44)
 
         preview.get_by_text("Ver ficha del Club").click()
@@ -2442,7 +2322,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.keyboard.press("Home")
             page.keyboard.press("End")
             shelf.nth(0).click()
-            page.locator('[data-home-shelf-preview="available"]').get_by_text("Ver más").click()
+            page.locator(".spotlight-preview").get_by_text("Ver más", exact=True).click()
             page.wait_for_selector("#detailDrawer[open]")
             page.keyboard.press("Escape")
             page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
@@ -2536,7 +2416,8 @@ class BrowserInterfaceTests(unittest.TestCase):
         # Playwright build ships a Chromium new enough to have it); we assert on
         # end-to-end behavior rather than instrumenting the API itself, since
         # wrapping it changes timing enough to throw off focus restoration.
-        view_more = page.locator('[data-home-shelf-preview="available"]').get_by_text("Ver más")
+        page.locator('[data-home-section="available"] .home-shelf-tape').first.click()
+        view_more = page.locator(".spotlight-preview").get_by_text("Ver más", exact=True)
         view_more.click()
         page.wait_for_selector("#detailDrawer[open]")
 
