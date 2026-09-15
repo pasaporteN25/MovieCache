@@ -15,11 +15,12 @@
 }
 
 #homeView .home-shelf-tape.vhs-spine {
-  background: url("../img/vhs-spine-shell-v1.png") center / 174% 102% no-repeat;
+  background: linear-gradient(180deg, rgb(3 15 18 / 18%), transparent 22%, rgb(0 0 0 / 20%)),
+    url("../img/vhs-spine-shell-v1.png") center / 174% 102% no-repeat;
   border: 1px solid transparent;
   border-radius: 5px;
   box-shadow: inset -5px 0 3px rgb(0 0 0 / 90%),
-    inset 2px 0 1px rgb(234 218 171 / 36%), 4px 5px 4px rgb(0 0 0 / 90%);
+    inset 2px 0 1px rgb(234 218 171 / 24%), 2px 3px 2px rgb(0 0 0 / 90%);
   color: var(--home-spine-ink);
   filter: none;
   flex: 0 0 var(--home-spine-width);
@@ -27,7 +28,12 @@
   grid-template-rows: minmax(0, 1fr) auto;
   min-width: 0;
   padding: 14px 10px 12px;
+  transform: none;
+  transition: border-color 160ms var(--ease-out), color 160ms var(--ease-out);
 }
+
+/* Cases remain seated: hover changes the edge, never the contact with the floor. */
+#homeView .home-shelf-tape.vhs-spine:hover { transform: none; border-color: #b89a68; }
 
 #homeView .vhs-spine-sticker { display: none; }
 
@@ -99,10 +105,27 @@
 }
 
 #homeView .home-shelf-tape.vhs-spine[data-vhs-state="selected"] {
-  border-color: #c6a572;
-  box-shadow: inset 0 0 0 1px #79623d, inset -5px 0 3px rgb(0 0 0 / 90%),
-    inset 2px 0 1px rgb(234 218 171 / 36%), 4px 5px 4px rgb(0 0 0 / 90%);
+  border-color: #e980b3;
+  box-shadow: inset -5px 0 3px rgb(0 0 0 / 90%),
+    inset 2px 0 1px rgb(233 128 179 / 65%), 2px 3px 2px rgb(0 0 0 / 90%);
   color: #ffe0a2;
+  transform: none;
+}
+
+#homeView .home-shelf-tape.vhs-spine[data-vhs-state="selected"] .vhs-spine-format {
+  color: #ffe1ef;
+  border-color: #e980b3;
+  background: #431a32;
+}
+
+#homeView .home-shelf-tape.vhs-spine[data-vhs-state="selected"]::before {
+  content: "▾";
+  position: absolute;
+  top: 0;
+  left: calc(50% - 6px);
+  color: #ffc9e5;
+  font: 12px/1 sans-serif;
+  pointer-events: none;
 }
 
 #homeView .home-shelf-tape.vhs-spine:focus-visible {

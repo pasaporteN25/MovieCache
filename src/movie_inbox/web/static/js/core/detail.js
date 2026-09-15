@@ -276,7 +276,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           return;
         }
         const activeElement = document.activeElement;
-        detailReturnFocus = activeElement?.dataset?.click?.startsWith("open-detail")
+        detailReturnFocus = (activeElement?.dataset?.click?.startsWith("open-detail") || activeElement?.dataset?.click === "edit-home-shelf-entry")
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
@@ -318,9 +318,15 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           if (updateHistory) syncRoute({ movie: "" }, "replace");
           const currentCard = [...document.querySelectorAll(".dvd-card")]
             .find((card) => card.dataset.id === detailReturnCardId);
+          // Home autoplay replaces the console while a detail dialog is open.
+          const currentHomeAction = detailReturnFocus?.closest?.(".spotlight-preview, .home-consulted-poster")
+            ? [...document.querySelectorAll(".spotlight-preview [data-click], .home-consulted-poster [data-click]")].find((action) =>
+              action.dataset.id === detailReturnCardId && action.dataset.click === detailReturnFocus.dataset.click
+              && action.dataset.homeFocus === detailReturnFocus.dataset.homeFocus)
+            : null;
           const returnTarget = detailReturnFocus?.isConnected
             ? detailReturnFocus
-            : currentCard?.querySelector(".dvd-open-surface");
+            : currentHomeAction || currentCard?.querySelector(".dvd-open-surface");
           if (restoreFocus) returnTarget?.focus();
           detailReturnFocus = null;
           detailReturnCardId = "";

@@ -87,8 +87,22 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIsNotNone(static_asset("css/home-furniture-continuity.css"))
         self.assertIsNotNone(static_asset("css/home-console.css"))
         self.assertIsNotNone(static_asset("css/home-acceptance.css"))
+        self.assertIsNotNone(static_asset("css/home-material.css"))
+        self.assertIsNotNone(static_asset("css/home-inset.css"))
+        for filename in (
+            "home-surface-petroleum-v2.png",
+            "home-aperture-bezel-v1.png",
+            "home-category-plaque-inset-v1.png",
+        ):
+            with self.subTest(material=filename):
+                asset = static_asset(f"img/{filename}")
+                self.assertIsNotNone(asset)
+                assert asset is not None
+                self.assertEqual(asset[0][:8], b"\x89PNG\r\n\x1a\n")
+                self.assertEqual(asset[1], "image/png")
         plaque = static_asset("img/home-category-plaque-v1.png")
         self.assertIsNotNone(plaque)
+        assert plaque is not None
         self.assertEqual(plaque[0][:8], b"\x89PNG\r\n\x1a\n")
         self.assertEqual(plaque[1], "image/png")
         self.assertIsNotNone(static_asset("js/core/http.js"))
@@ -108,6 +122,7 @@ class PackageLayoutTests(unittest.TestCase):
             for subset in ("latin", "latin-ext"):
                 asset = static_asset(f"fonts/{family}-{subset}.woff2")
                 self.assertIsNotNone(asset)
+                assert asset is not None
                 content, mime = asset
                 self.assertEqual(content[:4], b"wOF2")
                 self.assertEqual(mime, "font/woff2")

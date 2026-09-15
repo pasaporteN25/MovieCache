@@ -13,7 +13,7 @@ import { addStreamingRegion, handleStreamingAction, loadStreamingConfiguration, 
 import { applyCollectionYearRange, changeCollectionMode, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
-import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay } from "../surfaces/home.js";
+import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay } from "../surfaces/home.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
@@ -28,7 +28,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         const actions = {
           "open-detail": () => openDetailFromTrigger(target, id),
           "open-shared-detail": () => openSharedDetail(id),
-          "open-home-collection-detail": () => openHomeCollectionDetail(target.dataset.key || ""),
+          "open-home-collection-detail": () => openHomeCollectionDetail(target.dataset.key || "", target.dataset.source || ""),
           "open-collection": () => openCollection(id),
           "toggle-collection-follow": () => toggleCollectionFollow(id),
           "add-collection-item": () => addCollectionItems([id]),
@@ -41,6 +41,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "home-category-select": () => selectHomeCategory(target.dataset.sectionId || "", true),
           "home-shelf-scroll": () => scrollHomeFurniture(target.dataset.direction || "next"),
           "home-shelf-activate": () => activateHomeShelf(target.dataset.sectionId || "", true),
+          "home-programming-return": () => returnHomeProgramming(true),
           "edit-home-shelf-entry": () => openDetailForPersonalEdit(target, id),
           "open-detail-with-case-transition": () => openDetailWithCaseTransition(target, id),
           "home-date-today": () => loadEditorialFeaturedDate(todayLocalDate()),
@@ -111,7 +112,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.homeSections.addEventListener("keydown", moveHomeShelfBay);
       fields.homeSections.addEventListener("wheel", handleHomeFurnitureWheel, { passive: false });
       fields.homeSections.addEventListener("scroll", syncHomeFurnitureControls, { passive: true });
-      window.addEventListener("resize", syncHomeFurnitureControls);
+      window.addEventListener("resize", handleHomeResize);
       fields.homeButton.addEventListener("click", goHome);
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
       fields.inboxButton.addEventListener("click", () => goToInbox());

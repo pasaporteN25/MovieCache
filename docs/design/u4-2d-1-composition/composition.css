@@ -1,0 +1,24 @@
+/* Isolated layout proposal. All material, typography and component styles are
+   imported from the current Home. No production selectors/files are changed. */
+.composition-toolbar { position: relative; z-index: 2; background: #041219; color: #c5e6e6; padding: 10px 24px; font: 12px/1.5 'IBM Plex Mono',monospace; }
+.composition-toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+.composition-toolbar strong { color: #efd09b; font-weight: 400; }
+.composition-toolbar fieldset { display: flex; gap: 16px; padding: 0; margin: 0; border: 0; }
+.composition-toolbar label { display: flex; align-items: center; gap: 7px; }
+.composition-toolbar input { width: 16px; min-height: 16px; margin: 0; accent-color: #d6b174; }
+.composition-toolbar select { width: auto; font: inherit; min-height: 30px; padding: 3px 8px; }
+.composition-toolbar p { margin: 4px 0 0; max-width: none; }
+.composition-toolbar #labFeedback { color: #9dcbd1; font-size: 11px; }
+.composition-footer { width: min(calc(100% - 48px),2240px); margin: 12px auto 24px; color: #c5e6e6; font: 12px/1.5 'IBM Plex Mono',monospace; }
+.composition-footer p { max-width: 90ch; }
+.composition-footer a { color: #a4e3e9; }
+/* The laboratory has its own toolbar/footer outside main. Avoid counting a
+   second full viewport of blank space as part of either composition. */
+body:has(#homeView:not([hidden])) main { min-height: 0; }
+
+/* Production now owns the framing; this laboratory only styles its controls. */
+@media(max-width:860px) {
+  .composition-toolbar { padding-inline: 12px; }
+  .composition-toolbar .fixture-control { flex-wrap: wrap; }
+  .composition-toolbar select { max-width: 100%; }
+}

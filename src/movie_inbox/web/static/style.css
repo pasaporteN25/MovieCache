@@ -5,13 +5,10 @@
 @import "css/core-detail.css";
 @import "css/core-merge.css";
 @import "css/catalog.css";
-@import "css/home.css";
 @import "css/home-type.css";
 @import "css/home-spines.css";
-@import "css/home-plaques.css";
-@import "css/home-furniture-continuity.css";
-@import "css/home-console.css";
-@import "css/home-acceptance.css";
+@import "css/home-inset.css";
+@import "css/home-material.css";
 @import "css/club.css";
 @import "css/curation.css";
 @import "css/imports.css";

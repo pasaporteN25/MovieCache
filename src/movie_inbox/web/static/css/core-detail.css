@@ -1,3 +1,11 @@
+/* Shared collection hand-off formerly imported indirectly through home.css. */
+.home-collection-origin { border-block: 1px solid var(--line); display: grid; gap: 5px; padding: 13px 0; }
+.home-collection-origin span { color: var(--violet); font-weight: 800; }
+.home-collection-origin p { color: var(--muted); margin: 0; }
+.home-collection-detail-actions { align-items: center; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 9px; padding-top: 16px; }
+.home-collection-detail-actions button { width: auto; }
+.home-collection-detail-actions span { color: var(--muted); flex: 1 1 100%; font-size: var(--text-meta); min-height: 18px; }
+
       .personal-record-read,
       .personal-record-editor { display: grid; gap: 12px; }
       .record-heading {

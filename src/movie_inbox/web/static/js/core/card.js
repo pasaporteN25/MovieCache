@@ -120,6 +120,11 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         if (!image) return;
         image.hidden = false;
         image.classList.add("is-loaded");
+        if (image.matches("[data-home-preview-image]")) {
+          const frame = image.closest("[data-home-image-state]");
+          frame.dataset.homeImageState = "loaded";
+          frame.setAttribute("aria-busy", "false");
+        }
         const fallback = image.nextElementSibling;
         if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .home-furniture-frame-fallback, .spotlight-preview-art-fallback")) {
           fallback.hidden = true;
@@ -139,6 +144,13 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         if (!image) return;
         image.classList.remove("is-loaded");
         image.hidden = true;
+        if (image.matches("[data-home-preview-image]")) {
+          const frame = image.closest("[data-home-image-state]");
+          frame.dataset.homeImageState = "error";
+          frame.setAttribute("aria-busy", "false");
+          const label = frame.querySelector(".home-furniture-frame-fallback b");
+          if (label) label.textContent = "No se pudo cargar la imagen";
+        }
         const fallback = image.nextElementSibling;
         if (fallback?.matches(".dvd-placeholder, .drawer-poster-placeholder, .curation-thumb-placeholder, .home-shelf-preview-placeholder, .home-furniture-frame-fallback, .spotlight-preview-art-fallback")) {
           fallback.hidden = false;

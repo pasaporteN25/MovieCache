@@ -297,6 +297,116 @@ La separación conceptual queda visible con los nombres `Cartelera disponible` y
 `Videoteca · Tu archivo por categoría`. La región inferior toma su nombre accesible de
 Videoteca y el rótulo desaparece junto con el mueble cuando no hay categorías.
 
+### Integración material Home U4 (dirección elegida el 2026-09-09)
+
+La dirección visual U4 reemplaza la pared de ladrillo por una consola semiilustrada de
+metal oscuro, latón contenido, serigrafía, biseles y sombras internas. Cyan y magenta son
+reflejos o señales funcionales, no focos del fondo. La opción B original es una referencia
+valorada, pero sus dos implementaciones fueron rechazadas el 2026-09-09; ninguna es una
+base visual aprobada.
+
+Las ventilaciones y leyendas `Archivo / Películas / Memoria` y
+`Rebobinar / Explorar / Conservar` son detalles decorativos aprobados; no obligan a una
+columna lateral independiente. Su soporte puede cambiar para mejorar la composición.
+Los rieles deben continuar fuera del borde derecho en cada ancho desktop. Fondo, marco,
+placas y lomos comparten escala de grano, luz, desgaste y profundidad de contacto.
+
+La elección entre assets y CSS sigue abierta: se permite material raster elaborado y
+segmentado cuando aporta el volumen de la referencia. Retirar el ruido no implica
+eliminar textura, espesor ni identidad VHS. Texto y controles siguen siendo HTML.
+La nueva comparación vive en `docs/design/u4-2-options-v2/`; U4.3–U4.5 implementarán
+las uniones de cartelera, estante y ficha dentro de la composición que se elija.
+
+**Dirección de trabajo, 2026-09-09:** el owner autorizó desarrollar la videoteca
+empotrada: fondo y frente como un material continuo, con aberturas hacia adentro.
+El plan y la referencia aportada están en `docs/design/u4-2-inset-library-plan.md`.
+La B inicial deja de ser la topología de trabajo. El owner aprobó el acabado U4.2a el
+2026-09-10. `docs/design/u4-2a-material-kit-v1/` entrega un kit compuesto de CSS y
+fuentes RGB, no PNG transparentes. El owner aprobó el encuentro U4.2b en
+`docs/design/u4-2b-integrated-junction-v1/` y pidió ampliar la playlist. U4.2c integra
+esa base en Home mediante `home-inset.css` + `home-material.css`, reemplazando los
+imports de la antigua carcasa. U4.2 espera la revisión visual de esta integración.
+La textura pertenece al frente común; los bordes sólo añaden el espesor
+de las aberturas, sin fondos exteriores opacos de cada módulo. La geometría de esquina
+y la luz se mantienen al variar el tamaño; los textos y controles siguen vivos.
+
+La playlist desktop tiene altura natural: seis filas completas de al menos 38 px,
+texto de 13 px, sin scroll interno en 1280, 1440 y 1920. La abertura superior tiene
+mínimo 484 px; no se comprime la Home entera para hacerla caber en 720 px de alto.
+El frente llega a 1680 px útiles (main de 1744 px con padding lateral de 32 px).
+El estante se prolonga hasta el borde derecho del viewport; su piso y retorno se
+calculan desde la altura del VHS, no desde la scrollbar. Hasta 860 px se conserva
+el reflow existente, con scroll local de tablas/lomos y sin overflow de la página.
+
+**Reencuadre propuesto U4.2d.1, 2026-09-10 — todavía aislado:** el owner cuestionó
+la salida unilateral y las dos consolas. `docs/design/u4-2d-1-composition/` compara
+la base productiva anterior con un frente centrado de hasta 2240 px, margen fluido,
+dos retornos finos y estante desplazable dentro de la abertura. Conserva las seis
+filas y los VHS de 308 px; oculta el panel inferior sólo en la muestra. No cambia
+material ni fuentes. U4.2d.2 conectará filas/lomos a la consola superior sin alterar
+la programación; d.3 consolidará contenido y retirará el componente inferior real.
+U4.3 pulirá la consola resultante; el antiguo alcance de U4.5 queda absorbido allí.
+La propuesta no sustituye las reglas productivas hasta su aceptación e integración.
+
+**U4.2d.2 implementada, 2026-09-11:** la consulta superior se identifica por origen
+y clave, independiente de la programación de filas y de la rotación del póster.
+Seleccionar un VHS cambia la consulta, no esas dos fuentes. La selección explícita
+de fila toma prioridad; Hoy/Ayer y activación explícita conservan su semántica.
+Club mantiene su detalle sin edición personal. El componente inferior permanece
+transitoriamente hasta d.3; no se considera la consola única consolidada todavía.
+Evidencia: `docs/design/u4-2d-2-selection.md`.
+
+**U4.2d.3 integrada, 2026-09-11:** el frente productivo ahora comparte ancho centrado
+de hasta 2240 px; la estantería desplaza su contenido dentro de dos retornos finos.
+Se retiraron el host y el renderizador inferiores. La única consola superior reúne
+contexto/origen, acciones de ficha y categoría, título, sinopsis, dos imágenes,
+créditos, acceso, estado y duración. Sustituye la onda decorativa y miniportada;
+no cambia las seis filas ni los VHS de 308 px. El marco del póster mantiene 436 px
+de altura para no deformarse por la densidad de los créditos. En móvil la consola
+se apila; la playlist y cada rail tienen desplazamiento local. Impeccable guió
+la agrupación por significado y la comprobación de densidad/extremos.
+El laboratorio d.1 ya no ofrece una comparación «Anterior» basada en CSS actual:
+sus capturas conservan la historia. Evidencia actual: `docs/design/u4-2d-3-evidence/`.
+Aceptación visual del owner el 2026-09-12; sigue U4.3 para pulido material de esta consola.
+
+**Evolución planificada, 2026-09-12 — todavía sin implementación:** U5 revisa el
+gesto anterior de selección: elegir un VHS deberá cambiar la lista a su conjunto,
+manteniendo la cartelera Hoy/Ayer independiente. U6 agrega una cartelera derecha
+para la consulta; se estudia simetría/ancho antes de congelar la retícula U4.3.
+U7 investiga los dos espacios de imágenes de la consola y U8 un lomo terminal «Al azar»,
+apagado y con «?» decorativo sólo si el resultado no está disponible. U9 prevé
+sonido opcional de foco; MW1 deja la revisión mobile web al final, con Kotlin prioritario.
+Estas decisiones de comportamiento son futuras: el renderer actual todavía sigue d.2/d.3.
+Plan y elecciones pendientes: `docs/design/home-evolution-backlog-2026-09-12.md`.
+
+### Estudio conjunto U4.3 / U6.1 / U7.5 — 2026-09-12
+
+**Afinación U4.4, 2026-09-13:** placas unidas al travesaño continuo, VHS a 2 px
+de la base sin levantarse en hover ni selección. Sombras cortas y desgaste contenido
+preservan el material existente. Selección magenta con indicador de forma; foco
+cyan en lomo o placa, sin enmarcar el módulo completo. Las imágenes mantienen
+reserva y estados 0/1/2; «Revisar imágenes en ficha» abre dossier personal o ficha
+compartida según origen. El owner separó U7.5a visual de U7.5b datos/galería.
+Evidencia y límites del gate U4.6: `docs/design/u4-4-visual-gate/README.md`.
+
+Comparador aislado en `docs/design/u4-3-u6-1-u7-5/`: A aloja consola en el centro;
+B usa una franja común dentro de la abertura superior. Ambas conservan dos marcos
+simétricos, seis filas y una única consola; ninguna repone el panel bajo la biblioteca.
+B fue elegida e integrada en la Home real (cierre técnico 2026-09-13). El material
+y las tipografías aprobadas se conservan; datos y acciones comparten una sola base.
+Derecha deriva de la consulta, izquierda conserva su programación. Los diálogos
+pausan la rotación para preservar el foco de retorno. La lista aún sigue el contrato
+d.2/d.3; el cambio automático de fuente espera U5.
+
+Imágenes desde campos actuales: cero muestra ausencia, una ocupa el espacio conjunto,
+dos URLs distintas ocupan dos ventanas. Carga/error reservan geometría y no bloquean
+la ficha. Corrección y procedencia persistidas esperan el contrato U7. Evidencia:
+`docs/design/u4-3-b-integration/`.
+
+Contenido confirmado: preferir dos imágenes distintas de la misma obra, permitiendo
+panorámica + portada aunque esa portada esté a la derecha. Si falta material se puede
+repetir una imagen como fallback de presentación; nunca contarlo como dos assets.
+
 **Display Font:** Arial Narrow (con Trebuchet MS como fallback)
 **Body Font:** Space Grotesk (con Trebuchet MS, Verdana y system-ui como fallbacks)
 **Label/Mono Font:** Courier New

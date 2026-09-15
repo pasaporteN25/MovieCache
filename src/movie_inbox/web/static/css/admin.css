@@ -1,4 +1,6 @@
       .admin-view { display: grid; gap: 0; }
+      /* Preserve the admin heading independently of the Home stylesheet. */
+      .admin-heading h2 { font-family: var(--font-display); font-size: var(--text-section); font-style: italic; font-weight: 900; line-height: 0.95; margin: 0; text-transform: uppercase; }
       .admin-heading {
         align-items: end;
         display: flex;

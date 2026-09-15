@@ -24,6 +24,14 @@ el trabajo visual de Inicio sigue en curso.
 
 ### Agregado
 
+- Inicio ahora se presenta como una videoteca empotrada: una cartelera diaria a la
+  izquierda, otra de consulta a la derecha y una consola única. La obra consultada se
+  conserva separada de la rotación Hoy/Ayer y sus acciones respetan si pertenece al
+  catálogo personal o a una colección seguida del Club.
+- La estantería usa lomos VHS más legibles, placas de categoría activables y material
+  compartido de petróleo/latón. Las imágenes de la consola reservan su espacio, admiten
+  cero, una o dos imágenes y dejan abrir la ficha aunque una carga falle.
+
 - La instancia puede decir dónde se ve en streaming cada obra del catálogo propio. El
   owner elige en Administrar qué mercados se consultan, cuál es el predeterminado y si
   los miembros pueden elegir el suyo; las plataformas se traen de TMDb, con la
@@ -80,6 +88,11 @@ el trabajo visual de Inicio sigue en curso.
   nombra títulos, direcciones ni rutas.
 
 ### Cambiado
+
+- Elegir un VHS programa la lista con el conjunto editorial de ese estante, actualiza
+  consola y cartelera de consulta, y ofrece «Volver a programación» sin alterar el
+  carrusel diario. Teclado, foco, anuncios de selección y listas largas conservan el
+  contexto al cambiar fuente, día, tamaño o disponibilidad.
 
 - La búsqueda del catálogo dejó de leer una coincidencia de letras como si fuera una
   palabra compartida. Un artículo en común ya no acerca dos títulos, una palabra corta

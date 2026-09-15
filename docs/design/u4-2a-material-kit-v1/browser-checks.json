@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-09",
+  "scope": "isolated material sample, not production Home",
+  "provider": "Codex in-app browser",
+  "viewports": [
+    {"width":1280,"height":720,"clientWidth":1265,"scrollWidth":1265,"fonts":"loaded"},
+    {"width":1440,"height":900,"clientWidth":1425,"scrollWidth":1425,"fonts":"loaded"},
+    {"width":1920,"height":1080,"clientWidth":1905,"scrollWidth":1905,"fonts":"loaded"},
+    {"width":390,"height":844,"clientWidth":375,"scrollWidth":375,"fonts":"loaded"}
+  ],
+  "controls": {
+    "scale512": "background-size became 512px 512px",
+    "scale1024": "background-size became 1024px 1024px",
+    "restoredScale": "768px 768px",
+    "guides": "checked and unchecked successfully",
+    "keyboard": "Tab from scale reaches seams checkbox; outline solid"
+  },
+  "productionGate": false,
+  "alphaExportReady": false,
+  "notes": "Viewport screenshots captured after reload. No full-page stitched capture used. User approval and clean bezel/plaque export remain pending."
+}

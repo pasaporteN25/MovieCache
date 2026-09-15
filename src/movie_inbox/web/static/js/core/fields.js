@@ -84,7 +84,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         homeVideothequeHeading: document.querySelector(".home-videotheque-heading"),
         homeFurniture: document.querySelector("#homeFurniture"),
         homeSections: document.querySelector("#homeSections"),
-        homeShelfPreview: document.querySelector("#homeShelfPreview"),
+        homeSelectionAnnouncement: document.querySelector("#homeSelectionAnnouncement"),
         homeFeedback: document.querySelector("#homeFeedback"),
         homeEmpty: document.querySelector("#homeEmpty"),
         refreshClub: document.querySelector("#refreshClub"),

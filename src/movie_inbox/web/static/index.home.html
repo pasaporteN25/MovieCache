@@ -1,49 +1,58 @@
       <section id="homeView" class="app-view home-view" aria-busy="true">
-        <section id="spotlight" class="spotlight" aria-labelledby="spotlightTitle">
-          <div class="spotlight-ambience" aria-hidden="true"></div>
-          <div class="spotlight-bar">
-            <div>
-              <span class="eyebrow">Programación personal</span>
-              <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Cartelera disponible</h2>
-            </div>
-            <div class="spotlight-date-control spotlight-date-control-mobile" data-home-date-control>
-              <div class="spotlight-date-tabs" role="group" aria-label="Día de las recomendaciones">
-                <button id="homeDateToday" type="button" data-click="home-date-today" aria-pressed="true">Hoy</button>
-                <button id="homeDateYesterday" type="button" data-click="home-date-yesterday" aria-pressed="false">Ayer</button>
+        <div class="home-machine-shell">
+          <aside class="home-service-spine" aria-hidden="true">
+            <span class="home-service-spine-mark">Archivo<br>Películas<br>Memoria</span>
+            <span class="home-service-spine-command">Rebobinar<br>Explorar<br>Conservar</span>
+            <span class="home-service-spine-cue">▼</span>
+          </aside>
+          <div class="home-machine-content">
+            <section id="spotlight" class="spotlight" aria-labelledby="spotlightTitle">
+              <div class="spotlight-ambience" aria-hidden="true"></div>
+              <div class="spotlight-bar">
+                <div>
+                  <span class="eyebrow">Programación personal</span>
+                  <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Cartelera disponible</h2>
+                </div>
+                <div class="spotlight-date-control spotlight-date-control-mobile" data-home-date-control>
+                  <div class="spotlight-date-tabs" role="group" aria-label="Día de las recomendaciones">
+                    <button id="homeDateToday" type="button" data-click="home-date-today" aria-pressed="true">Hoy</button>
+                    <button id="homeDateYesterday" type="button" data-click="home-date-yesterday" aria-pressed="false">Ayer</button>
+                  </div>
+                  <time id="homeDate" class="spotlight-date"></time>
+                </div>
               </div>
-              <time id="homeDate" class="spotlight-date"></time>
-            </div>
-          </div>
-          <div id="spotlightStage" class="spotlight-stage" aria-live="off">
-            <div class="home-loading-hero" aria-hidden="true"></div>
-          </div>
-        </section>
+              <div id="spotlightStage" class="spotlight-stage" aria-live="off">
+                <div class="home-loading-hero" aria-hidden="true"></div>
+              </div>
+            </section>
 
-        <p id="homeFeedback" class="home-feedback" role="status" aria-live="polite" hidden></p>
-        <header class="home-videotheque-heading">
-          <h2 id="homeVideothequeTitle">Videoteca</h2>
-          <p>Tu archivo por categoría</p>
-        </header>
-        <nav id="homeShelfCategories" class="home-shelf-categories" aria-label="Navegación del mueble" hidden></nav>
-        <div id="homeFurniture" class="home-furniture">
-          <div id="homeSections" class="home-editorial-sections">
-            <section class="home-loading-section" aria-hidden="true">
-              <span></span>
-              <div></div>
+            <p id="homeFeedback" class="home-feedback" role="status" aria-live="polite" hidden></p>
+            <p id="homeSelectionAnnouncement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+            <header class="home-videotheque-heading">
+              <h2 id="homeVideothequeTitle">Videoteca</h2>
+              <p>Tu archivo por categoría</p>
+            </header>
+            <nav id="homeShelfCategories" class="home-shelf-categories" aria-label="Navegación del mueble" hidden></nav>
+            <div id="homeFurniture" class="home-furniture">
+              <div id="homeSections" class="home-editorial-sections">
+                <section class="home-loading-section" aria-hidden="true">
+                  <span></span>
+                  <div></div>
+                </section>
+              </div>
+            </div>
+            <section class="home-empty-state" id="homeEmpty" hidden>
+              <div>
+                <span class="section-kicker">Tu archivo empieza acá</span>
+                <h2>Prepará tu primera cartelera</h2>
+                <p>Agregá obras, importá una lista o seguí una colección para construir una programación personal.</p>
+              </div>
+              <div class="home-empty-actions">
+                <button type="button" data-click="home-empty-catalog">Abrir colección</button>
+                <button class="quiet-action" type="button" data-click="home-empty-import">Importar lista</button>
+                <button class="quiet-action" type="button" data-click="home-empty-club">Explorar Club</button>
+              </div>
             </section>
           </div>
-          <div id="homeShelfPreview" class="home-shelf-preview-host" aria-live="polite"></div>
         </div>
-        <section class="home-empty-state" id="homeEmpty" hidden>
-          <div>
-            <span class="section-kicker">Tu archivo empieza acá</span>
-            <h2>Prepará tu primera cartelera</h2>
-            <p>Agregá obras, importá una lista o seguí una colección para construir una programación personal.</p>
-          </div>
-          <div class="home-empty-actions">
-            <button type="button" data-click="home-empty-catalog">Abrir colección</button>
-            <button class="quiet-action" type="button" data-click="home-empty-import">Importar lista</button>
-            <button class="quiet-action" type="button" data-click="home-empty-club">Explorar Club</button>
-          </div>
-        </section>
       </section>

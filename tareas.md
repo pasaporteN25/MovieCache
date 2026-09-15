@@ -24,9 +24,13 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
+| 1 | [U4] | Integrar materialmente la Home como una única consola | U4.1 visual antes de código |
+| 2 | [U5] → [U6] → [U7] → [U8] | Lista del conjunto, cartelera consultada, imágenes y VHS al azar | B integrada con U4.3/U6.1; quedan U5, compatibilidad U6 e imágenes U7 |
 | — | [B1] | **Cerrada 2026-09-11.** Alcance cubierto, medido y con gates en CI | criterio de cierre acordado con el owner |
-| 2 | [A2] | **Se mudó a `../movieIndexAndroid`** (2026-09-13) | tablero propio de ese repositorio |
-| 3 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| 3 | [A2] | **Se mudó a `../movieIndexAndroid`** (2026-09-13) | tablero propio de ese repositorio |
+| 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| Posterior | [U9] | Sonido opcional de biblioteca | interacción VHS estable; no bloquea las otras épicas |
+| Último | [MW1] | Revisión y ajustes de web en navegador de celular | baja prioridad; cliente Kotlin por delante |
 | — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
 
 **Aviso entre frentes, 2026-09-11 — del lado lógica.** Este archivo lo escriben los dos
@@ -51,19 +55,296 @@ desincronizó.
   versión que no ve.
 
 
-**Reordenamiento del 2026-09-07, por decisión del owner.** Las integraciones externas
-([I1]) quedaron evaluadas y **explícitamente postergadas**: hay problemas mejores adelante.
-La prioridad pasa a ser el algoritmo y la presentación de búsqueda y colecciones ([B1] del
-lado de infraestructura, [U3] del lado visual).
+**Reordenamiento del 2026-09-09, por decisión del owner.** Las integraciones externas
+([I1]) siguen postergadas; en ese corte [B1] quedaba en espera por ser lógica
+(cerró posteriormente, el 2026-09-11). La prioridad
+es el nuevo pulido visual de Home [U4], abierto después de la aceptación de [U2-P].
 
-- **Próxima accionable:** delimitar [B1] con el owner; no tiene subtareas todavía porque
-  ranking, composición de fuentes y armado de colecciones son alcances distintos.
+- **Último corte visual:** [U4.4] implementada; [U4.6a] y [U7.5a] verificadas el
+  2026-09-13. Restan la regresión histórica [U4.6b] y datos/galería [U7.5b]. [U6.1]
+  cerró con B elegida y [U4.3] está integrada (2026-09-13). La Home ya
+  integra el encuadre de [U4.2d.1], selección de [U4.2d.2] y consola única de d.3.
+  [U4.2a/b] aprobadas; [U4.2c] integrada.
+  Sin framework nuevo; bases previas rechazadas.
 - **Cerrado recientemente:** [U2-R] cerró su gate técnico el 2026-09-06 y [U2-P]
   recibió aceptación visual el 2026-09-08;
   [U3], [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2] conservan su historia en
   `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
+
+### Frente: Inicio videoclub (integración material U4)
+
+#### [U4] Integrar Home como una única consola de archivo audiovisual
+
+**Abierta y aprobada 2026-09-09.** El mueble, la cartelera y sus controles conservan su
+función y contenido, pero deben dejar de verse como capas HTML apoyadas sobre imágenes.
+El fondo de ladrillos actual se descarta por completo. La dirección aprobada es una
+consola gráfica semiilustrada: formas controladas, metal pintado, serigrafía, sombras
+internas y luz contenida, con un campo nocturno abstracto que prolonga el objeto.
+
+- **Alcance:** composición y materialidad de Home en escritorio. Unificar profundidad,
+  iluminación, alineaciones y uniones entre controles, imágenes, lomos y carcasa. No se
+  presupone que la franja superior sea un único panel; sí que sus partes formen una
+  composición armónica.
+- **Criterio de cierre:** 1280×720, 1440×900 y 1920×1080 muestran una escena continua,
+  sin tarjetas flotantes, costuras laterales, poste ornamental ni vacío negro; controles y
+  texto siguen siendo HTML accesible. Móvil recibe sólo smoke de reflow/overflow porque
+  la experiencia vertical prioritaria se diseñará más adelante en Kotlin.
+- **Fuera de alcance:** lógica de catálogo/datos, nuevas funciones, tipografía global
+  y rediseño móvil profundo. Excepción solicitada para [U4.2d.2/d.3]: conectar la
+  selección visual común y preservar acciones, navegación y permisos existentes.
+- **Brief:** `docs/briefs/home-u4-material-integration-v1.md`.
+
+  - [x] **[U4.1] Explorar tres composiciones visuales.** Crear north stars de escritorio
+    sobre contenido realista, variando topología, profundidad y unión de los módulos sin
+    cambiar la dirección material. Presentarlas juntas y elegir qué elementos continúan;
+    no tocar todavía la Home de producción. **Opción B — Espina de control— elegida el
+    2026-09-09. El owner pidió conservar sus ventilaciones y las leyendas laterales.**
+  - [x] **[U4.2] Reemplazar escenario y recomponer carcasa.** Base actual aceptada
+    visualmente por el owner el 2026-09-12; cierre de esta etapa, no de todo U4.
+    Sustituir por completo la
+    pared fotográfica; recomponer el encuadre sin costuras ni vacío negro. La continuidad
+    unilateral se reemplaza por el frente centrado propuesto en [U4.2d].
+    **Reabierta el 2026-09-09:** se rechazó la
+    carcasa rasterizada v3 y también la reconstrucción CSS. Tras comparar tres opciones,
+    el owner pidió planificar una **videoteca empotrada con fondo/frente continuos**.
+    Plan: `docs/design/u4-2-inset-library-plan.md`; arranque autorizado conservando la
+    base tecnológica. Nueva base integrada en [U4.2c] y reencuadrada en d.3, aceptada.
+    Material [U4.2a] aprobado el 2026-09-10; entrega compuesta CSS + fuentes RGB en
+    `docs/design/u4-2a-material-kit-v1/`. Cierre registrado en `Hecho`; no son PNG alpha.
+    Encuentro [U4.2b] aprobado; cierre y ajuste de escala registrados en `Hecho`.
+    - [x] **[U4.2c] Base Home continua.** Aplicar el kit aprobado a fondo y aberturas;
+      verificar márgenes, scroll y continuidad derecha en los tres anchos desktop.
+      **Implementada:** `home-inset.css` + `home-material.css`, sin cambios a JS/APIs.
+      Seis filas sin scroll interno; ampliación pedida por el owner. Evidencia en
+      `docs/design/u4-2c-evidence/`; aceptada en el conjunto actual el 2026-09-12.
+    - [x] **[U4.2d] Reencuadre y consola única.** Conjunto aceptado el 2026-09-12.
+      Pedido posterior a c; se resuelve
+      antes de U4.3 para no pulir dos componentes que luego se consolidarán.
+      - [x] **[U4.2d.1] Composición visual.** Comparador entregado el 2026-09-10 en
+        `docs/design/u4-2d-1-composition/`: ancho común centrado, dos retornos finos,
+        sin consola inferior en Propuesta. QA 1280/1440/1920/2482 y smoke móvil 390;
+        revisión independiente sin fixes materiales. Encuadre integrado por d.3;
+        aceptación visual conjunta el 2026-09-12. Se conservan VHS y seis filas.
+      - **[U4.2d.2] Selección compartida — implementada.** Cierre técnico en `Hecho`;
+        no implica consolidación visual ni retiro del panel inferior.
+      - **[U4.2d.3] Consolidación — implementada.** Encuadre y consola única reales;
+        contenido/acciones trasladados y componente inferior retirado. Cierre técnico
+        en `Hecho`; aceptación visual el 2026-09-12. Absorbe la consolidación de U4.5.
+  - **[U4.3] Integración implementada.** B aprobada y trasladada a Home;
+    cierre técnico y evidencia en `Hecho` (2026-09-13).
+  - **[U4.4] Implementada.** Placas ancladas, VHS asentados y luz/desgaste unificados;
+    evidencia en `docs/design/u4-4-visual-gate/`, cierre técnico en `Hecho`.
+  - **[U4.5] Cerrada por absorción en d.3/U4.3.** Sin panel inferior separado;
+    registro en `Hecho` junto con la integración de B.
+  - [ ] **[U4.6] Gate visual y responsive acotado.** Comparar los tres anchos desktop,
+    verificar foco y contraste, y hacer sólo un smoke móvil de reflow y overflow.
+    Actualizar/correr las aserciones geométricas de navegador que aún describen U2
+    y la carcasa rechazada; U4.2c tiene QA conectado y 20 tests de servicio/packaging.
+    - [x] **[U4.6a] Gate visual conectado.** 2026-09-13: 1280/1440/1920, smoke
+      390/320, foco separado de selección, contraste de pantalla, 0/1/2 imágenes,
+      error, vacío, título largo y origen Club. Evidencia `u4-4-visual-gate/`.
+    - [ ] **[U4.6b] Regresión histórica de navegador.** Se migraron geometrías de
+      cartelera, placas, mueble y consola a B y a `home_visual_metrics.js`; la sonda
+      se ejecutó en navegador conectado. Falta migrar los tests de interacción que
+      aún usan `.home-shelf-preview`/señal eliminada y ejecutar el runner completo.
+      Preservar escenarios móvil, fuentes, fechas y foco; no saltarlos ni adaptar
+      expectativas para aprobar silenciosamente. Es trabajo de tests, no rediseño.
+
+### Frente: Home — lista del conjunto seleccionado
+
+#### [U5] Revisar la sincronización VHS / lista Winamp
+
+**Abierta 2026-09-12.** El owner confirma cambio automático al seleccionar un VHS.
+Revisa el contrato U2-R/U4.2d.2 que reservaba el cambio de lista a activar la categoría;
+preserva la independencia de la cartelera Hoy/Ayer. Plan detallado, matrices y gates:
+`docs/design/home-evolution-backlog-2026-09-12.md`.
+
+**Corte v0.9.0 actualizado 2026-09-14:** completar el cierre de U4/U5/U6 y el
+tramo visual U7.5a ya integrado. U8 pasa a otra release, sin número asignado;
+retoques no bloqueantes posteriores al fix. Subdivisión y contrato
+propuesto: `docs/design/home-v0-9-0-u5-u8-plan.md`. No se declara implementación.
+
+- [x] **[U5.1] Contrato, foco y alcance del conjunto.** `home.js`/`home_service.py`
+  y brief: fuente, consulta, selección vs Tab pasivo, placa y retorno diario; auditar
+  muestra editorial vs conjunto completo. Salida: matriz con autoplay/Hoy/Ayer/Club y
+  rótulos honestos. Dep.: d.3 aceptada. Modelo grande, diseño y semántica.
+  - [x] **[U5.1.1] Auditar alcance y estado existente.** Secciones editoriales de hasta
+    seis obras, no conjunto completo; tabla y fuentes ya reutilizables. Evidencia en el plan.
+  - [x] **[U5.1.2] Validar matriz y copy.** Contrato documentado: Tab pasivo,
+    selección explícita, fuente editorial honesta, retorno diario y recuperación.
+    Owner confirma el 2026-09-14 el alcance: mismas obras del estante, actualmente
+    hasta seis, no colección completa. Recorridos básicos verificados en la entrega
+    conectada; gate extendido U5.4–5 verificado el 2026-09-14. Evidencia: `docs/design/u5-integration-gate.md`.
+  - [x] **[U5.1.3] Fixtures del contrato.** Diaria/dos estantes, Club con ID coincidente,
+    vacío y 1/6/20/100 filas; base de U5.5, sin ampliar el límite de producción.
+- [x] **[U5.2] Coordinar fuente y selección.** `selectHomeShelfEntry()` y resolución
+  de estado en `home.js`: VHS cambia lista/consulta; carrusel conserva su estado,
+  selección recordada y fallback válido. Dep.: U5.1. Modelo grande.
+  Implementada 2026-09-14; memoria por clave/origen y scroll local. Gate U5.5 verificado.
+- [x] **[U5.3] Cabecera y retorno explícitos.** Renderer/Home CSS/HTML: nombre y
+  alcance del conjunto, retorno a Hoy/Ayer, placa activable visible y listas largas
+  sin hacer crecer todo el documento. Dep.: U5.1–2 + encaje U6.1. Modelo medio.
+  - [x] **[U5.3.1] Fuente y alcance visibles.** Nombre, cantidad y selección editorial
+    dentro de la cabecera existente; títulos largos sin achicar toda la Home.
+  - [x] **[U5.3.2] Retorno y placa activable.** Volver a programación y botón de placa
+    integrado, semántico, con foco estable; conservar Hoy/Ayer independiente.
+  - [x] **[U5.3.3] Densidad y lista larga.** Seis filas completas y scroll local para
+    más entradas, sin desplazar la página ni ocultar la selección.
+    Implementada 2026-09-14: ventana acotada, encabezado fijo, scroll por fuente y
+    recuperación al redimensionar. Evidencia: `docs/design/u5-long-list-gate/`.
+  - [x] **[U5.3.4] Evidencia visual conectada.** Tres desktops, reflow/zoom y estados
+    largos/vacíos; cerrar con U5.4–5, no sólo con capturas de maqueta.
+    - [x] 0/1/6/20/100 obras en 1280/1440/1920; capturas y métricas de geometría.
+    - [x] Reflow 390/320 y equivalente 720; Inicio/Fin nativos, encabezado fijo,
+      fila enfocada visible y sin scroll de documento causado por selección.
+    - [x] Aceptación manual del owner tras procedimiento de zoom real 200%,
+      2026-09-14. Tres capturas aprobadas; porcentaje/navegador no visibles en PNG.
+      Cierre por aceptación, no medición automatizada: `docs/design/u5-u6-owner-acceptance/`.
+- [x] **[U5.4] Teclado y origen.** Home/bootstrap: foco estable fila/lomo/diálogo,
+  anuncio único y acciones de Club sin edición personal. Dep.: U5.2–3. Modelo grande.
+  Verificada 2026-09-14: foco recuperable tras eliminación, tres accesos de Club
+  con retorno nativo, IDs coincidentes sin cruce de origen, Tab pasivo, anuncio
+  idempotente y reduced-motion. Sin modificar el mundo visual aprobado.
+- [x] **[U5.5] Gate de fuentes.** `tests/js/home-selection.test.mjs` y tests de
+  navegador: 0/1/6/20/100 entradas, autoplay, cambios de día, origen y eliminación;
+  migrar las aserciones del gesto anterior. Dep.: U5.4. Modelo grande para revisión.
+  Verificado 2026-09-14: 15 pruebas Chromium, 26 JS y 17 Python; respuestas de día
+  obsoletas ignoradas, error/reintento y cambios de fuente conservan contexto/foco.
+  Evidencia reproducible: `docs/design/u5-integration-gate.md`. No sustituye zoom
+  real 200% de U5.3.4, suite histórica completa U4.6b ni CI/gate de release.
+
+### Frente: Home — segunda cartelera de consulta
+
+#### [U6] Cartelera derecha simétrica
+
+**Abierta 2026-09-12.** Derecha muestra la obra consultada desde fila/VHS/azar;
+izquierda conserva Hoy/Ayer. Una consola única. La simetría y reducción de ancho de
+la lista quedan fijadas por la opción B elegida. Plan: `home-evolution-backlog-2026-09-12.md`.
+
+- **[U6.1] Cerrada: opción B elegida.** Comparador y capturas preservados;
+  decisión registrada en `Hecho` el 2026-09-13.
+- [x] **[U6.2] Portada ligada a consulta.** `home.js`/brief: obra y origen compartidos,
+  sin segundo autoplay, estados vacío/ausente/rota y placa de consulta. Salida: contrato
+  que nunca conserva portada ajena. Dep.: U6.1. Modelo grande.
+- [x] **[U6.3] Encaje y assets integrados.** `home-inset.css`, `home-material.css`,
+  HTML/renderer y marco existente: misma profundidad, portadas completas, centro
+  legible y consola única. Rehacer asset sólo si se deforma. Dep.: opción U6.1 elegida,
+  U6.2/U5.3; coordinar U4.3. Modelo grande, visual.
+- [x] **[U6.4] Acción y carga de derecha.** Home/bootstrap/card: ficha de misma obra,
+  origen Club, prioridad visible y rechazo de respuestas de consulta anterior.
+  Dep.: U6.2–3. Modelo medio.
+  **Base U6.2–4 implementada con U4.3 (2026-09-13):** portada derivada de consulta,
+  acción personal/Club, carga y fallback propios, retícula B. No rehacer esa base;
+  compatibilidad U5 verificada en U5.4–5; cierre consolidado con aceptación U6.5.
+- [x] **[U6.5] Gate espacial.** Capturas reales, roles iguales/distintos, errores,
+  vacío, largo, zoom 200% y seis filas completas en desktop; documentar adaptación
+  al faltar ancho. Dep.: U6.4. Modelo grande para revisión visual.
+  Cerrado 2026-09-14 por aceptación manual del owner y evidencia previa U4/U5.
+  Capturas y límites de verificación: `docs/design/u5-u6-owner-acceptance/`.
+
+### Frente: Home — imágenes de cada obra
+
+#### [U7] Completar las dos ventanas de imágenes de consola
+
+**Abierta 2026-09-12.** Investigar adquisición/cobertura además de presentación.
+Los escalares y el cache existentes no descubren URLs vacías ni almacenan una galería
+de dos panorámicas. Plan y fuentes primarias: `home-evolution-backlog-2026-09-12.md`.
+
+- [ ] **[U7.1] Diagnóstico de cobertura por causa.** `image_warmer.py`, payload
+  editorial y diagnóstico de conteos: vacío/roto/cache frío/identidad, tipo y origen.
+  Sin descarga masiva. Dep.: ninguna de implementación; muestra descartable.
+  Modelo grande, investigación; traspaso de datos.
+- [ ] **[U7.2] Fuentes y selección de imagen.** `external/tmdb.py`, metadata y
+  autoridad: IDs confirmados, imágenes distintas, procedencia/atribución y cobertura
+  por cine/series/anime. Sin matching por título parecido. Dep.: U7.1 + elección de
+  contenido de las dos ventanas. Modelo grande, lógica/investigación.
+- [ ] **[U7.3] Contrato de assets portable.** `catalog.schema.json`, schema,
+  repositorios JSON/SQLite, serializers/API: lista acotada con rol/origen y selección
+  manual, compatibilidad con escalares y export/import. Dep.: U7.2. Modelo grande,
+  principalmente lógica; visual entrega consumo/estados.
+  **Decisión de imágenes 2026-09-12:** dos distintas como preferencia; panorámica
+  + portada permitidas, incluso con portada a la derecha. Repetición de la única
+  disponible permitida como fallback visual, sin duplicar el asset almacenado.
+- [ ] **[U7.4] Adquisición y cache acotados.** Resolver/proxy/warmer: identidad,
+  dedupe de misma imagen en tamaños distintos, prioridad de consulta, backoff,
+  cache y corrección manual preservada. Dep.: U7.3. Modelo grande, lógica.
+- [ ] **[U7.5] Ventanas y corrección visual.** Separación aprobada por el owner
+  el 2026-09-13: cierre visual ahora, integración de datos explícitamente pendiente.
+  `homeSelectionPreview()`/Home CSS y
+  ficha: 0/1/2 imágenes, carga/error, medida reservada, procedencia y corrección sin
+  inutilizar Ver más. Comparar una ventana amplia vs segundo fallback cuando sólo
+  hay una. Dep.: U7.2–4 + encaje U6.3. Modelo grande, visual.
+  **Corte visual integrado 2026-09-13:** 0/1/2 imágenes desde campos actuales,
+  una ventana amplia si sólo hay una, carga/error reales y reserva estable.
+  Ver más funciona aunque fallen las imágenes. Pendientes procedencia/corrección
+  persistida y consumo del contrato de assets U7.2–4. Evidencia: `u4-3-b-integration/`.
+  - [x] **[U7.5a] Presentación y recuperación actuales.** 0/1/2 imágenes,
+    carga/error independientes, «Revisar imágenes en ficha», dossier personal y
+    ficha Club correcta, retorno de foco. Guardado de panorámica comprobado con
+    catálogo descartable. No promete editar portada ni atribución no registrada.
+    Evidencia: `u4-4-visual-gate/`.
+  - [ ] **[U7.5b] Integrar galería y corrección completa.** Tras U7.2–4: consumir
+    roles/procedencia/licencia reales, editar portada y segunda imagen, respetar
+    bloqueo manual, deduplicar tamaños y verificar persistencia/export/import.
+    Reutilizar ventanas y acceso existentes; no reconstruir la consola. Incluir
+    permisos de Club, rechazo de respuestas viejas y error recuperable.
+- [ ] **[U7.6] Gate de cobertura e identidad.** Tests del resolver/intercambio y QA
+  visual: remake/homónimo/idioma/origen, offline y manual bloqueado; conteos antes/
+  después por causa, sin promesa de 100%. Dep.: U7.5. Modelo grande.
+
+### Frente: Home — VHS al azar
+
+#### [U8] Sorteo visible al final de la biblioteca
+
+**Abierta 2026-09-12.** Categoría especial con un lomo que reemplaza su título mediante
+animación y consulta el resultado. Botón existente y lomo comparten sorteo. Apagado y
+«?» tenue sólo para resultado no disponible; título/foco siempre legibles.
+Plan: `home-evolution-backlog-2026-09-12.md`.
+
+**Fuera de v0.9.0 por decisión del owner (2026-09-14):** posponer U8 completa
+a otra release, sin número asignado. Conservar el botón Al azar existente;
+no implementar aún lomo nuevo, sorteo conectado ni animación. Se conserva el plan
+`home-v0-9-0-u5-u8-plan.md` como referencia histórica y diseño futuro.
+Owner confirma 2026-09-13: revelar resultado y actualizar consola/derecha; no abrir
+ficha automáticamente. «Ver más» la abre. La animación A/B aún debe compararse.
+
+- [ ] **[U8.1] Alcance y recorrido del comando.** `randomCandidates()`/detail/Home:
+  auditar todo catálogo vs página cargada, filtros, disponibilidad y cero candidatos;
+  definir resultado en consulta vs apertura final de ficha. Home no debe sortear sólo
+  el estante accidentalmente. Dep.: U5.1 y respuesta del owner. Modelo grande.
+- [ ] **[U8.2] Lomo terminal y estados.** Fixture/asset VHS/Home CSS: inicial,
+  ocupado, disponible, no disponible y vacío; comparación de «?» como decoración,
+  rótulo semántico y contraste. Dep.: U8.1 + U4.4/encaje U6.1. Modelo grande, visual.
+  - [ ] **[U8.2.1] Encaje terminal.** Placa AL AZAR y un lomo, fuera del conteo de
+    secciones editoriales, mismo material/tamaño que los VHS existentes.
+  - [ ] **[U8.2.2] Estados y copy.** Inicial/ocupado/disponible/no disponible/vacío,
+    error y resultado fuera de alcance; «?» decorativo, título y foco legibles.
+  - [ ] **[U8.2.3] Objeto integrado.** Foco/navegación reales, no colección ficticia;
+    enlazar resultado de U8.3 sin duplicar lógica ni consola.
+- [ ] **[U8.3] Resultado único y alcance común.** Servicio JS de sorteo y, si hace
+  falta, Python/API: un ID para todas las superficies, no repetición inmediata con
+  varios candidatos, cambio de preferencia y resultado fuera de alcance. Dep.: U8.1;
+  no nueva API si catálogo completo ya está disponible. Modelo grande, lógica.
+- [ ] **[U8.4] Comparar y construir revelación.** Animación de etiqueta rebobinada
+  o tira breve; elegir con muestras, reduced motion directo, coalescing y anuncio sólo
+  del resultado. Dep.: U8.2–3. Modelo grande, visual/interacción.
+  - [ ] **[U8.4.1] Comparación A/B.** Rebobinado recomendado frente a tira breve;
+    muestras para elegir antes de cerrar la dirección del efecto.
+  - [ ] **[U8.4.2] Efecto elegido.** Sólo etiqueta, resultado elegido de antemano,
+    sin relayout del rail ni títulos anunciados durante la transición.
+  - [ ] **[U8.4.3] Movimiento/foco/concurrencia.** Reduced motion directo, clics
+    coalescidos, control estable y un anuncio final; sin sonido U9.
+  - [ ] **[U8.4.4] Gate conectado.** Duración/performance y estados finales con
+    U8.5–6; ninguna obra distinta entre lomo, consola, derecha y ficha.
+- [ ] **[U8.5] Integración del botón, lomo y consulta.** Home/bootstrap/detail:
+  llegar al módulo sin perder foco, derecha/consola con mismo resultado, lista según
+  contrato y comando usable fuera de Home. Dep.: U5/U6 + U8.3–4. Modelo grande.
+- [ ] **[U8.6] Gate del sorteo.** 0/1/muchos, switch/todo/no disponible, rápido,
+  teclado, obra removida, offline/autoplay/reduced motion; sin cambios personales.
+  Dep.: U8.5. Modelo grande.
+
 
 ### Frente: Busqueda, comparacion y composicion de fuentes
 
@@ -285,10 +566,9 @@ consumir y qué reglas no se pueden romper.
   estas obras en cuatro categorías", rápida y reanudable, no un formulario por obra
   (`docs/briefs/charades-v1.md`). Las pantallas de juego y el temporizador van en el
   teléfono, dentro de [A2.4].
-- [ ] **Bandeja en el teléfono** (de [MB2]). Medido el 2026-09-07: desborda 317 px a 390
-  de ancho y 387 px a 320, con 53 nodos de contenido por debajo de 12 px; es la única
-  superficie con problemas reales (`docs/design/mb2-mobile-audit-2026-09-07.md`). Conviene
-  volver a medir antes de tomarlo, porque la web cambió desde entonces.
+- **Bandeja en el teléfono** (de [MB2]): traspaso consolidado en **[MW1.4]**, al
+  final de la cola a pedido del owner. La auditoría del 2026-09-07 es antecedente,
+  no diagnóstico vigente; volver a medir antes de corregir.
 - [ ] **`duplicateSignalsCollide()` compara etiquetas y no fuentes** (hallazgo de [F5.4]).
   En `js/surfaces/inbox-curation.js` compara `sourceLabel()` de cada lado, así que dos
   fuentes distintas sin etiqueta colapsan en una sola señal. La prueba estructural de
@@ -297,12 +577,72 @@ consumir y qué reglas no se pueden romper.
 - **[B2.1]**, el corte de dos caracteres en la caja de búsqueda, es otro traspaso y ya
   está anotado en [B2].
 
+### Frente: Biblioteca — sonido opcional
+
+#### [U9] Respuesta sonora al enfocar VHS
+
+**Abierta 2026-09-12, posterior.** Un efecto breve y silenciable desde el menú;
+no bloquea U5–U8. El primer foco no garantiza audio permitido por el navegador.
+
+- [ ] **[U9.1] Samples y gesto.** `docs/design/` + audio original/libre con licencia:
+  comparar 2–3 sonidos; decidir teclado/tap vs hover, duración y volumen. Dep.:
+  interacción VHS estable. Modelo grande, visual/sonoro.
+- [ ] **[U9.2] Preferencia y mute fácil.** Menú HTML/fields/settings: switch visible,
+  prueba opcional, elegir persistencia dispositivo/cuenta y default; propuesto apagado
+  y por dispositivo. Dep.: U9.1. Modelo medio; grande si requiere nuevo contrato.
+- [ ] **[U9.3] Audio por intención.** Módulo JS pequeño y eventos VHS: desbloquear
+  por gesto, debounce, silencio si bloqueado, no sonido al restaurar foco/autoplay y
+  mute inmediato. Dep.: U9.2. Modelo grande, interacción.
+- [ ] **[U9.4] Gate de silencio y carga.** Navegación rápida, recarga, pestaña oculta,
+  políticas Safari/Chromium, lector de pantalla, storage bloqueado y licencia.
+  Dep.: U9.3. Modelo medio.
+
+### Frente: Mobile web — última prioridad
+
+#### [MW1] Revisión desde navegador de celular
+
+**Abierta 2026-09-12.** Último frente de la cola. Android/Kotlin conserva prioridad
+para la experiencia vertical principal. Absorbe la corrección visual del traspaso MB2;
+no repite su auditoría como si fuera vigente. Plan: `home-evolution-backlog-2026-09-12.md`.
+
+- [ ] **[MW1.1] Auditoría actual de todas las superficies.** Home/Colección/ficha/
+  Club/Bandeja/menú: 320/360/390/430, horizontal, zoom, teclado virtual, barras del
+  navegador y safe areas. Registrar emulación vs dispositivo real. Dep.: Home final
+  y prioridad Kotlin atendida; no bloquea su desarrollo. Modelo grande.
+- [ ] **[MW1.2] Home y VHS táctiles.** CSS/renderer: priorizar consulta al apilar dos
+  carteleras, tabla adaptada y rails locales, azar descubrible y texto legible.
+  Dep.: MW1.1 + U5–U8. Modelo grande, visual.
+- [ ] **[MW1.3] Ficha y utilidades en celular.** Detail/menú/CSS: targets efectivos,
+  teclado virtual, barras que ocultan controles, salida y retorno. Dep.: MW1.1.
+  Modelo grande, visual.
+- [ ] **[MW1.4] Bandeja — corrección del traspaso MB2.** `inbox-curation`/scanner
+  y CSS: remedir cabecera/pestañas/scope-strip, corregir overflow y lectura. Dep.:
+  MW1.1; antecedente `docs/design/mb2-mobile-audit-2026-09-07.md`. Modelo grande.
+- [ ] **[MW1.5] Gate móvil acotado.** QA conectado y teléfono real cuando disponible:
+  reflow, acciones, teclado, preferencias, sin overflow del documento; separar mejoras
+  costosas para decidir contra Kotlin. Dep.: MW1.2–4. Modelo grande para revisión.
+
 ---
 
 ## En curso
 
-Sin implementación activa. [B1] es la próxima prioridad y requiere que el owner elija
-qué problema de calidad atacar primero.
+[U4.2c] integrada en Home tras aprobación de [U4.2b]. Playlist ampliada sin scroll
+interno desktop, material continuo y aberturas con apoyo compartido. Comprobación
+con app real/datos desechables; revisión independiente aplicada. Aceptación
+visual del owner recibida el 2026-09-12 sobre la base actual [U4.2d.3]; [U4.2]
+queda cerrada en este alcance. Ambas bases anteriores siguen rechazadas.
+[U4.2d.1] entregada como comparador aislado el 2026-09-10; encuadre centrado y una
+consola visible. [U4.2d.2] implementada el 2026-09-11; selección común en JS productivo,
+8 pruebas JS y 20 Python aprobadas tras d.3, que integra el encuadre y retira
+el panel inferior real. Aceptada visualmente el 2026-09-12. Se planificaron U5–U9
+y MW1. U6.1 cerró con B elegida; U4.3 integra esa retícula en la Home real el
+2026-09-13 y cierra la absorción de U4.5. U4.4 está implementada, U4.6a verificada
+y U4.6b pendiente. El 2026-09-14 se implementó la primera entrega U5.1.3/U5.2/U5.3.1–2;
+evidencia en `docs/design/u5-first-delivery/`. U5.3.3 y U5.4–5 completadas el 2026-09-14;
+U5.3.4/U6.5 aceptadas manualmente por el owner el 2026-09-14; resta U4.6b.
+Próximo frente: cerrar esos gates y V9; U8 diferida por el owner a otra release.
+U7.5 integra estados visuales con campos actuales y espera el contrato
+de adquisición/procedencia para su cierre completo.
 
 ### Frente: Versión 0.9.0
 
@@ -316,8 +656,8 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 | Falta | Quién | Estado |
 | --- | --- | --- |
 | Lint en verde en lo propio: orden de imports en `home_service.py`, formato de seis archivos, un tipo en `tests/test_catalog_comparison_index.py` y las líneas largas del HTML capturado en `tests/test_external_filmaffinity.py` | Frente lógico | **Hecho** (2026-09-13) |
-| Lint en verde en lo propio: formato de `tests/browser/test_ui_browser.py` y tres errores de mypy en `tests/test_package_layout.py`. Los tres scripts `capture_*` ya los formateó el frente lógico, a pedido del owner (2026-09-13) | Frente visual | Pendiente |
-| Si el trabajo de Inicio que todavía no está commiteado ([U4] y derivados) entra en la 0.9.0 | Owner | Abierta |
+| Lint/formato del frente visual, incluido el servidor de revisión; mypy global | Frente visual | Pendiente. Diagnóstico 2026-09-14: 61 hallazgos Ruff y 3 archivos sin formato en el subconjunto inspeccionado; mypy de `test_package_layout.py` y `test_ui_browser.py` ya pasa. No repetir como pendientes sus tres errores históricos |
+| Incluir Inicio nuevo [U4], U5, cartelera U6 y U7.5a ya integradas; sin nuevas épicas | Owner / frente visual | **Alcance actualizado** 2026-09-14: U8 completa fuera de 0.9.0. Cierre según `docs/design/v0-9-0-visual-closeout.md` |
 | Changelog: las entradas del trabajo visual desde la 0.8.0 | Frente visual | Pendiente |
 | Changelog: "Antes de actualizar" | Frente lógico | **Hecho** (2026-09-13) |
 | Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup | Owner, o el frente lógico con su autorización | Pendiente |
@@ -327,7 +667,84 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 
 - **Modelo sugerido**: Grande para coordinar el cierre; cada fila, por separado, es chica.
 
+#### Cierre visual de V9 — orden acordado 2026-09-14
+
+- [ ] **[V9.V1] U4.6b completo.** Ejecutar la suite de navegador, inventariar fallos,
+  migrar contratos retirados sin borrar escenarios y corregir regresiones reales.
+- [x] **[V9.V2] U5.3.4/U6.5.** Zoom real 200% en navegador de escritorio; cierre
+  conjunto espacial, seis filas, foco y dos carteleras. Consolidar U6.2–4 ya
+  implementadas contra la evidencia U4/U5, sin reconstruirlas ni incorporar azar.
+  Aceptación manual registrada 2026-09-14 en `docs/design/u5-u6-owner-acceptance/`.
+- [ ] **[V9.V3] Higiene y documentación.** Ruff/formato/tipos del frente propio,
+  changelog visual, revisión de archivos productivos/evidencia y gate automático local.
+  Avance 2026-09-14: Ruff, formato, mypy y compilación globales en verde; changelog
+  de Home agregado. La suite local completa corrió 881 pruebas: 880 verdes y una
+  expectativa histórica de `test_frontend_assets_are_served_without_inline_code`
+  sigue buscando `.spotlight-stage` en el CSS monolítico retirado. Se transfiere a
+  U4.6b, que migra tests históricos; no cerrar V9.V3 hasta repetir suite verde.
+- [ ] **[V9.V4] Candidata y entrega.** Preparar commit revisado y actualizar PR con
+  autorización; CI del commit exacto y upgrade Docker 0.8.0 → 0.9.0 con copia,
+  backup y restauración. Luego cierre de versión/merge/tag por responsables V9.
+
+Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
+
 ## Hecho
+
+- [x] **[U4.4] Materialidad de estante.** 2026-09-13. Placas sobre travesaño,
+  contacto corto, VHS a 2 px del suelo sin levantarse en hover/selección, luz y
+  desgaste más contenidos. Selección magenta con indicador; foco cyan en placa/lomo.
+  Refinamiento guiado por Impeccable, sin assets/frameworks nuevos ni cambio U5.
+  Evidencia: `docs/design/u4-4-visual-gate/`. Sin commit solicitado.
+- [x] **[U7.5a] Cierre visual acotado aprobado.** 2026-09-13. Recuperación de
+  imágenes desde ficha correcta y retorno de foco, con guardado de panorámica
+  verificado sólo en datos descartables. U7.5b sigue abierta, no se cierra U7 completa.
+
+### Frente: Integración material de Home
+
+- [x] **[U6.1] Estudio de espacio y elección.** 2026-09-13, sin commit solicitado.
+  El owner eligió B: dos marcos simétricos, consola común dentro de la abertura
+  superior. Comparador A/B y ocho capturas en `docs/design/u4-3-u6-1-u7-5/`.
+  No cierra U5 ni el gate U6.5.
+- [x] **[U4.3] Consola integrada — opción B.** 2026-09-13, sin commit solicitado.
+  Acciones, imágenes, datos y estado sobre retícula común. Segunda cartelera ligada
+  a consulta personal/Club; portadas completas y foco de origen conservado.
+  QA real 1280/1440/1920/2482 y smoke 390; 13 pruebas JS y 17 Python.
+  Evidencia: `docs/design/u4-3-b-integration/`. No sustituye U4.6 ni el gate U6.5.
+- [x] **[U4.5] Cierre por absorción.** 2026-09-13, sin commit solicitado.
+  d.3 retiró el panel inferior; U4.3 completa el pulido de la consola única.
+  No hay una tarea pendiente para reconstruir una consola bajo la biblioteca.
+
+- [x] **[U4.2] Base continua y encuadre aceptados.** 2026-09-12, aceptación del owner
+  «Creo que está bien» sobre d.3. Cierra c/d y la base actual, conservando rechazos
+  anteriores. U4.3/U4.4/U4.6 siguen pendientes; nuevas funciones planificadas en U5–U9,
+  mobile web al final en MW1. Sin commit solicitado en este intercambio.
+
+- [x] **[U4.2d.3] Consolidación técnica.** 2026-09-11, sin commit solicitado.
+  Una consola superior con contexto, acciones, sinopsis, imágenes, créditos y estado;
+  encuadre centrado con ambos retornos, sin panel inferior ni onda decorativa.
+  Foco de ficha/edición recuperado aun tras rotación; anuncios breves de selección.
+  8/8 pruebas JS y 20/20 Python; QA conectado con datos desechables.
+  Evidencia y límites: `docs/design/u4-2d-3-evidence/`. No cierra el gate visual U4.2
+  ni el pulido U4.3/U4.4/U4.6.
+
+- [x] **[U4.2d.2] Selección compartida.** Cierre técnico 2026-09-11, sin commit
+  solicitado todavía. Filas/VHS consultan la consola superior sin cambiar programación
+  ni permitir que autoplay pise la consulta. Origen Club/catálogo preservado, foco y
+  estados vacíos cubiertos. 6/6 pruebas JS + 20/20 Python; smoke conectado desktop/móvil.
+  Evidencia y límites: `docs/design/u4-2d-2-selection.md`. Sigue d.3: composición
+  productiva, consolidación de contenido y retiro del panel inferior.
+
+- [x] **[U4.2b] Encuentro representativo.** Cerrada el 2026-09-10 por aprobación del
+  owner. HTML/renderer reales, fixture aislada, esquina compartida de póster/playlist
+  y arranque de estante. Evidencia: `docs/design/u4-2b-integrated-junction-v1/`.
+  Ajuste solicitado —más escala y seis filas sin scroll interno— aplicado en U4.2c.
+  **Commit pendiente de solicitud del owner.**
+
+- [x] **[U4.2a] Material y kit de muestra.** Cerrada el 2026-09-10 con aprobación
+  explícita del acabado. `docs/design/u4-2a-material-kit-v1/` entrega textura petróleo v2,
+  canto y placa mediante `material-components.css` + fuentes RGB con recortes declarados.
+  No se presentan como PNG con alpha. Probado también en el encuentro U4.2b; sin
+  cambios nuevos a Home. **Commit pendiente de solicitud del owner.**
 
 ### Frente: Colección, búsqueda y alta
 
