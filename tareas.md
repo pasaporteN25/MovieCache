@@ -429,22 +429,24 @@ suite. El análisis completo está en
   que son títulos. **Modelo sugerido**: Medio.
 - La pantalla que genera el QR sigue entre los traspasos al frente visual, más abajo.
 
-#### [X2] Precondición en el `PATCH` personal — a confirmar
+#### [X2] Precondición en el `PATCH` personal
 
 `PATCH /api/v1/catalog/items/{id}/personal` aplica lo que llega sin comparar con nada. Si la
 web u otro teléfono cambió el mismo campo entre que un teléfono bajó el estado y lo subió,
 gana el último y el otro cambio se pierde sin aviso: la fusión a tres bandas del cliente
 decide con lo que bajó, no con lo que hay al subir. Encontrado el 2026-09-13, al plantear la
-casuística de sincronización que pidió el owner.
+casuística de sincronización que pidió el owner, y **confirmado el 2026-09-15** contra una
+instancia real: el arnés del cliente ([A5.3] de `movieIndexAndroid`) reproduce el caso
+exacto —un teléfono sube con lo que vio al bajar, sin volver a mirar el servidor— y hoy pisa
+en silencio un cambio que otro dispositivo hizo en el medio, sin que nadie se entere.
 
 - **Alcance**: que el `PATCH` pueda recibir, por campo, el valor que el cliente tenía como
   base, y rechazar el cambio si el servidor ya no vale eso, para que el cliente vuelva a
   bajar y fusionar. Opcional para quien no lo mande, así cabe en la v1 del contrato según la
   regla de versionado de ADR-0003.
-- **Criterio de cierre**: la matriz de casos del cliente ([A5.1] de `movieIndexAndroid`)
-  confirma el problema, y en el arnés contra el servidor real ([A5.3]) dos ediciones
-  cruzadas no pierden ninguna.
-- **Depende de**: [A5.1] del cliente. **Modelo sugerido**: Grande: toca el contrato.
+- **Criterio de cierre**: el mismo caso que hoy reproduce el arnés del cliente ([A5.3])
+  converge sin perder ningún cambio, con la precondición puesta.
+- **Depende de**: nada, ya está confirmado. **Modelo sugerido**: Grande: toca el contrato.
 
 #### [X3] Registrar cuándo cambia cada campo personal
 
@@ -523,6 +525,88 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
   fusionada termina en la obra que queda.
 - **Depende de**: nada para diseñarla; en el cliente, [A5.2] incorpora las reglas. **Modelo
   sugerido**: Grande: toca el contrato y la identidad de las obras.
+
+#### [X6] Recibos de altas sin conexión
+
+Encontrado en la matriz de sincronización del cliente ([A5.1] de `movieIndexAndroid`, caso
+10). `append_device_items` clasifica bien cada alta contra el catálogo y contra lo que ya
+tiene el borrador, pero el resultado no le llega al teléfono: ningún endpoint dice si una
+entrada terminó aplicada, unida a otra obra o descartada. Cuando la persona aplica el alta
+en la web, el teléfono baja la obra nueva y conserva su alta local: la ve dos veces. Además,
+la idempotencia del reintento sólo mira el borrador mientras sigue `status == "ready"`
+(`_device_draft`): si entre el envío y el reintento alguien aplicó o borró ese borrador en la
+web, el reintento crea uno nuevo con las mismas obras.
+
+- **Alcance**: recordar por cuenta los ids de cliente recibidos, más allá de la vida del
+  borrador, y exponer el estado de cada uno —pendiente, aplicada con el id de la obra
+  resultante, o descartada— por la API de dispositivo. Cierra los dos huecos a la vez: el
+  teléfono deja de ver dos veces lo aplicado, y un reintento tardío no duplica.
+- **Criterio de cierre**: una alta aplicada en la web deja de aparecer como pendiente en el
+  teléfono la próxima vez que consulta su estado, y un reintento después de aplicar o borrar
+  el borrador original no crea entradas nuevas.
+- **Depende de**: nada. **Modelo sugerido**: Grande: ruta nueva en el contrato.
+
+#### [X7] Declarar en el contrato los rechazos que el servidor ya da
+
+Encontrado en la matriz de sincronización del cliente ([A5.1], casos 10 y 15). El contrato
+declara sólo 200, 400 y 401 para `POST /api/v1/catalog/drafts`, pero el servidor ya responde
+409 `draft_busy` mientras el borrador se aplica en la web, 409 `device_draft_full` al pasar
+las 2000 obras y 409 `draft_limit_reached`; y una página de `GET /api/v1/catalog/items` con
+un cursor de antes de un reinicio da 400 `invalid_request` sin que el contrato lo avise. Un
+cliente fiel al contrato no los espera.
+
+- **Alcance**: agregar estas respuestas a `docs/openapi/device-api-v1.openapi.json`, sin
+  cambiar ningún comportamiento — el servidor ya las da, esto es sólo documentarlas.
+- **Criterio de cierre**: el contrato declara cada código que el servidor puede responder en
+  estas dos rutas, y `tests/test_device_api_contract.py` lo verifica.
+- **Depende de**: nada. **Modelo sugerido**: Chico.
+
+#### [X8] La ficha web no debe deshacer lo que subió un teléfono
+
+Encontrado en la matriz de sincronización del cliente ([A5.1], caso 14). `/api/personal`
+(`update_personal`) manda juntos `watched_at`, `rating` y `review` con los valores que tenía
+el formulario al abrirse. Si un teléfono sube un puntaje mientras esa ficha sigue abierta,
+guardar la review la vuelve al valor viejo, sin aviso — y pasa igual entre dos pestañas del
+navegador. [X2] no alcanza para esto: protege el `PATCH` del teléfono, no la escritura de la
+web.
+
+- **Alcance**: que la ficha mande sólo los campos que la persona tocó, o que lleve la misma
+  precondición que [X2]. Es trabajo compartido con el frente visual, que tiene que dejar de
+  mandar el formulario entero de una.
+- **Criterio de cierre**: guardar un campo desde la ficha no pisa un cambio que llegó por otro
+  lado después de que la ficha se abrió.
+- **Depende de**: [X2], si se elige compartir el mecanismo de precondición. **Modelo
+  sugerido**: Medio; con el frente visual.
+
+#### [X9] Cursor de catálogo firmado con el secreto durable
+
+Encontrado en la matriz de sincronización del cliente ([A5.1], caso 15). El cursor de
+`GET /api/v1/catalog/items` va firmado con `api_token`, que `serve` genera al azar en cada
+arranque: un reinicio a mitad de una descarga larga corta al teléfono con un 400
+`invalid_request` en la página siguiente. El cliente ya tiene que manejar ese corte
+empezando la descarga de nuevo ([A5.2] de `movieIndexAndroid`, regla 2), así que esto es una
+mejora, no un arreglo obligatorio.
+
+- **Alcance**: firmar el cursor con el secreto durable de la instancia (el mismo que deriva
+  los ids opacos), en vez de con `api_token`.
+- **Criterio de cierre**: un reinicio del servidor a mitad de una descarga no invalida el
+  cursor de la página siguiente.
+- **Depende de**: nada. **Modelo sugerido**: Chico, opcional.
+
+#### [X10] Paginar el catálogo de dispositivo por clave, no por posición
+
+Encontrado en la matriz de sincronización del cliente ([A5.1], caso 16). `_device_catalog_entries`
+pagina por posición: si una obra entra, sale o cambia de título entre dos páginas de una
+descarga, las siguientes se corren un lugar y la descarga puede saltear una obra o repetirla.
+El cliente ya tiene que tolerarlo —una obra repetida cuenta una vez, y una ausente no es una
+baja ([A5.2] de `movieIndexAndroid`, regla 3)—, así que esto elimina la causa en vez de sólo
+tolerar el síntoma.
+
+- **Alcance**: paginar por una clave estable —título, año e id— en vez de por posición, para
+  que un alta o una baja durante la descarga no corra a las obras que ya se bajaron.
+- **Criterio de cierre**: una obra agregada o quitada entre dos páginas de una descarga en
+  curso no hace que otra obra se saltee ni se repita.
+- **Depende de**: nada. **Modelo sugerido**: Medio, opcional.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
