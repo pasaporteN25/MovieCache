@@ -38,6 +38,591 @@
         ],
         "createdAt": "2026-09-03T02:43:39.868Z",
         "reason": "User confirmed: intentional opacity reduction on the pre-existing spotlight-bar gradient color so the audited noche-de-cine-v1.png ambience becomes visible through it."
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#160d31",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:38.998Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#000",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.063Z",
+        "reason": "Agent: in core.css #000 appears only as mask-image gradient stops (body::before), where only alpha matters; it is not a visible color"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#92f7ff",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.128Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ff9dca",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.194Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 0, 0, 0.54)",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.261Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(15, 18, 21, .95)",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.328Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(4, 6, 13, 0.82)",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.394Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(4, 6, 13, 0.78)",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.459Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffd8ed",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.531Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#fff",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.600Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#91d5d9",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.667Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted header and shell visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 0, 0, 0.66)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.733Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#d8dcf3",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.799Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#000",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.866Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(255, 255, 255, 0.52)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:39.933Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 0, 0, 0.48)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.001Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(3, 7, 16, 0.97)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.069Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(4, 6, 14, 0.98)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.135Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(4, 6, 14, 0.92)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.203Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(4, 5, 12, 0.76)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.271Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#77aeb2",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.338Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#b9b3a7",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.407Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#db9f3f",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:00:40.474Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#6f4515",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.289Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(255, 240, 196, .28)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.356Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#090804",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.422Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#2b1a08",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.488Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(255, 242, 201, .36)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.554Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#030302",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.622Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#02080d",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.689Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#04070d",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.756Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#161719",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.824Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 0, 0, .78)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.891Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#10181c",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:16.956Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 10, 14, .48)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.023Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#75e7ef",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.088Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#62dbe5",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.153Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#83d7dd",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.221Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#a5edf2",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.286Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(4, 7, 13, .98)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.352Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#110e09",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.420Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(255, 235, 180, .14)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.490Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#dfc28b",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.558Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#493418",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:17.627Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#f0d8a1",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.259Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(3, 8, 13, .72)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.328Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#5b8d91",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.396Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#67dfe6",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.463Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#70aeb3",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.535Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#b6e6e8",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.603Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1c1710",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.671Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#0d0b09",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.738Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#79dce3",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.807Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#9ebfc2",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.873Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(34, 24, 11, .94)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:19.939Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 0, 0, .58)",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.006Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#d34a9b",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.072Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#9ad9dd",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.137Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#123342",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.207Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#02070c",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.273Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#07131a",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.341Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#02070b",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.408Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#10272f",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.477Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#75bfc4",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.545Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#92dce1",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:01:20.615Z",
+        "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
       }
     ]
   }
