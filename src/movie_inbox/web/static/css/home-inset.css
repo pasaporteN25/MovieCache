@@ -130,7 +130,7 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 #homeView .home-furniture::before { content: ''; position: absolute; left: 12px; top: 68px; height: calc(var(--home-shelf-floor) - 64px); width: 12px; z-index: 2; border-left: 4px ridge #a0875b; background: linear-gradient(90deg,#4f3a27,#03090b); pointer-events: none; }
 #homeView .home-furniture::after { content: ''; position: absolute; right: 12px; top: 68px; height: calc(var(--home-shelf-floor) - 64px); width: 12px; z-index: 2; border-right: 4px ridge #a0875b; background: linear-gradient(270deg,#4f3a27,#03090b); pointer-events: none; }
 #homeView .home-editorial-sections { display: flex; align-items: start; gap: 24px; width: calc(100% - 24px); margin-inline: 12px; justify-content: space-between; overflow: auto; overscroll-behavior-inline: contain; padding: 8px 12px 14px; scrollbar-width: thin; scrollbar-color: #a08760 #061019; position: relative;
-  
+
   background: linear-gradient(to bottom, transparent 8px, #07141bb8 8px, #0c1a20d9 64px, #9e8156 68px, #403225 70px, #050a0b 73px, #01090c 86px, #01090c calc(var(--home-shelf-floor) - 1px), #9e8156 var(--home-shelf-floor), #403225 calc(var(--home-shelf-floor) + 2px), transparent calc(var(--home-shelf-floor) + 4px)) 0 0 / 100% 100% no-repeat; }
 #homeView .home-shelf-bay { flex: 0 0 auto; position: relative; padding-top: 64px; min-width: 360px; }
 #homeView .home-shelf-heading { margin: 0; font: inherit; }
