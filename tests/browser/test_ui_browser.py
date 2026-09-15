@@ -1146,25 +1146,39 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.goto(BrowserInterfaceTests.base_url)
         page.wait_for_selector("#homeView:not([hidden])")
         page.set_viewport_size({"width": 1280, "height": 720})
-        viewport_metrics = page.evaluate(
-            """() => ({
-                viewport: window.innerHeight,
-                page: document.documentElement.scrollHeight,
-                header: document.querySelector('.app-header')?.getBoundingClientRect().height || 0,
-                spotlight: document.querySelector(
-                    '#spotlight'
-                )?.getBoundingClientRect().height || 0,
-                categories: document.querySelector(
-                    '#homeShelfCategories'
-                )?.getBoundingClientRect().height || 0,
-                sections: document.querySelector(
-                    '#homeSections'
-                )?.getBoundingClientRect().height || 0
-            })"""
-        )
+        # U4.6b: measure Home once it is drawn. Right after it shows, the playlist rows and
+        # the console are still missing and the page reads 218 px shorter than it is.
+        page.wait_for_selector("[data-playlist-entry]")
+        page.wait_for_selector(".spotlight-preview")
+        home_metrics = """() => ({
+            viewport: window.innerHeight,
+            page: document.documentElement.scrollHeight,
+            header: document.querySelector('.app-header')?.getBoundingClientRect().height || 0,
+            spotlight: document.querySelector('#spotlight')?.getBoundingClientRect().height || 0,
+            categories: document.querySelector(
+                '#homeShelfCategories'
+            )?.getBoundingClientRect().height || 0,
+            sections: document.querySelector('#homeSections')?.getBoundingClientRect().height || 0
+        })"""
+        viewport_metrics = page.evaluate(home_metrics)
+        # DESIGN.md (U4.2c) replaced U2-R.6's "viewport + 320" budget: the upper opening
+        # keeps at least 484 px and Home is not compressed to fit 720 px of height, so part
+        # of the console sits below the fold.
         self.assertGreater(viewport_metrics["page"], viewport_metrics["viewport"])
-        self.assertLessEqual(
-            viewport_metrics["page"], viewport_metrics["viewport"] + 320, viewport_metrics
+        self.assertGreaterEqual(viewport_metrics["spotlight"], 484, viewport_metrics)
+        blocks = sum(
+            viewport_metrics[name] for name in ("header", "spotlight", "categories", "sections")
+        )
+        # Beyond those four blocks the page only adds the videotheque heading and the
+        # spacing around them, 90 px when this was written.
+        self.assertLessEqual(viewport_metrics["page"], blocks + 120, viewport_metrics)
+        page.set_viewport_size({"width": 1280, "height": 1000})
+        page.wait_for_timeout(150)
+        taller_metrics = page.evaluate(home_metrics)
+        self.assertGreaterEqual(
+            viewport_metrics["spotlight"],
+            taller_metrics["spotlight"] - 1,
+            (viewport_metrics, taller_metrics),
         )
 
     def test_desktop_menu_duplicate_commands_close_details_and_navigate(self) -> None:
