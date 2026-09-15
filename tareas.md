@@ -208,13 +208,12 @@ obstáculos:
   - Cada cuenta ve sus teléfonos apareados, con el nombre y la última vez que se conectaron, y
     puede revocar cualquiera. El backend es de este frente; la pantalla, un traspaso al frente
     visual.
-  - El vencimiento sigue en 30 días (`DEFAULT_DEVICE_REFRESH_TTL_SECONDS`). Falta que el owner
-    diga si el mes se cuenta desde la última renovación, como hoy, o desde el apareamiento
-    aunque el teléfono se use; lo segundo sería un vencimiento absoluto nuevo.
+  - El vencimiento sigue como hoy: 30 días desde la última sincronización
+    (`DEFAULT_DEVICE_REFRESH_TTL_SECONDS`), como decidió el owner el 2026-09-14.
 - **Sigue igual**: cambiar la contraseña o desactivar la cuenta corta todas las sesiones.
 - **Criterio de cierre**: una renovación cuya respuesta se perdió se reintenta con éxito, un
-  teléfono revocado desde la web queda afuera en su próxima llamada, y el vencimiento es el
-  que decidió el owner.
+  teléfono revocado desde la web queda afuera en su próxima llamada, y el vencimiento se sigue
+  contando desde la última sincronización.
 - **Depende de**: nada. **Modelo sugerido**: Grande: es seguridad.
 
 #### [X5] Bajas que viajan en la sincronización

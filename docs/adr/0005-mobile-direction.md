@@ -273,7 +273,7 @@ sincronización la inicia una persona y nunca borra, la convergencia es fusión 
 sin depender de relojes, el QR aparea y no transporta, dar de alta sin conexión produce un
 borrador que no expira, y hay una cuenta por instalación.
 
-## Enmienda del 2026-09-14: los borrados viajan y el puntaje se resuelve solo
+## Enmienda del 2026-09-14: los borrados viajan y los conflictos personales se resuelven solos
 
 Dos decisiones del owner al responder la matriz de casos de sincronización del cliente
 (`docs/analisis/matriz-de-sincronizacion-2026-09-14.md` de `movieIndexAndroid`).
@@ -296,18 +296,27 @@ consultarlos: es [X5] en `tareas.md`. La sección 3 pedía para las bajas "su pr
 enmienda fija la decisión, y el diseño detallado va en [X5], que además evalúa una idea del
 owner: seguir cada obra con un identificador propio y durable.
 
-### El puntaje en conflicto se resuelve solo
+### Los conflictos de estado personal se resuelven solos
 
-**Acota la sección 4** para un campo. Si los dos lados cambiaron el puntaje a valores
-distintos, gana **el más alto**, sin preguntar. Es una regla elegida por definición, no una
-consecuencia técnica, y se puede cambiar. Hasta que se decida otra cosa, un conflicto de
-`review`, `status` o `watched_at` sigue yendo a la persona.
+**Reemplaza el "conflicto: decide la persona" de la sección 4** para los cuatro campos
+personales. Cuando los dos lados cambiaron un campo a valores distintos, se resuelve sin
+preguntar:
+
+- `rating`: gana **el más alto**.
+- `review`: se conservan **los dos textos**, uno debajo del otro.
+- `status` con `watched_at`: **vista** gana sobre pendiente, y entre dos fechas queda **la más
+  reciente**.
+
+Son reglas elegidas por definición, no consecuencias técnicas, y se pueden cambiar. La
+comparación sigue siendo por campo y contra la base: si sólo un lado cambió, se toma ese
+cambio, como antes. El único conflicto que sigue llegando a la persona es un borrado contra
+una edición.
 
 ### Qué no cambia
 
 La fusión sigue siendo a tres bandas y por campo, sin relojes, y la sincronización la sigue
-iniciando una persona. [X3], la fecha de edición que el owner pidió ese mismo día, informa un
-conflicto pero no lo decide.
+iniciando una persona. [X3], la fecha de edición que el owner pidió ese mismo día, sirve al
+historial y no decide nada: las reglas de arriba no usan relojes.
 
 ## Qué queda abierto
 
