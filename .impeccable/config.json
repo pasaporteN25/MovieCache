@@ -623,6 +623,96 @@
         ],
         "createdAt": "2026-09-15T00:01:20.615Z",
         "reason": "Owner asked on 2026-09-14 to resolve these recurring findings: literal color of the owner-accepted Home visual work (U2-P, U4), not yet a DESIGN.md token; documenting it is pending for the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "27px",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.369Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 header work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "34px",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.436Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 header work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "32px",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.504Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 header work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "38px",
+        "files": [
+          "src/movie_inbox/web/static/css/core.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.575Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 header work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "17px",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.644Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 Home work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "54px",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.714Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 Home work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "25px",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.782Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 Home work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "19px",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.851Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 Home work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "38px",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.918Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 Home work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "23px",
+        "files": [
+          "src/movie_inbox/web/static/css/home.css"
+        ],
+        "createdAt": "2026-09-15T00:09:51.986Z",
+        "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 Home work, off the DESIGN.md type ramp; documenting it stays with the visual front"
       }
     ]
   }
