@@ -25,9 +25,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from movie_inbox.domain.imdb_dataset import parse_title_akas_row, parse_title_basics_row
+from movie_inbox.domain.imdb_dataset import (
+    AKA_REGIONS,
+    kind_from_title_type,
+    parse_title_akas_row,
+    parse_title_basics_row,
+    parse_title_ratings_row,
+)
 
-IMDB_DATASET_INDEX_SCHEMA_VERSION = 1
+IMDB_DATASET_INDEX_SCHEMA_VERSION = 2
 
 _BATCH_SIZE = 5000
 
@@ -48,10 +54,9 @@ _AKAS_COLUMNS = (
     "title",
     "region",
     "language",
-    "types",
-    "attributes",
     "is_original_title",
 )
+_RATINGS_COLUMNS = ("tconst", "average_rating", "num_votes")
 
 _SCHEMA = """
 CREATE TABLE imdb_title_basics (
@@ -65,7 +70,6 @@ CREATE TABLE imdb_title_basics (
     runtime_minutes INTEGER,
     genres TEXT
 );
-CREATE INDEX idx_imdb_title_basics_primary_title ON imdb_title_basics(primary_title);
 
 CREATE TABLE imdb_title_akas (
     tconst TEXT NOT NULL,
@@ -73,12 +77,15 @@ CREATE TABLE imdb_title_akas (
     title TEXT NOT NULL,
     region TEXT,
     language TEXT,
-    types TEXT,
-    attributes TEXT,
     is_original_title INTEGER,
     PRIMARY KEY (tconst, ordering)
 );
-CREATE INDEX idx_imdb_title_akas_title ON imdb_title_akas(title);
+
+CREATE TABLE imdb_title_ratings (
+    tconst TEXT PRIMARY KEY,
+    average_rating REAL NOT NULL,
+    num_votes INTEGER NOT NULL
+);
 """
 
 
@@ -94,6 +101,9 @@ class IndexBuildReport:
     akas_skipped_lines: int
     elapsed_seconds: float
     index_size_bytes: int
+    basics_filtered_rows: int = 0
+    akas_filtered_rows: int = 0
+    ratings_rows: int = 0
 
 
 @dataclass(frozen=True)
@@ -101,6 +111,7 @@ class IndexStats:
     basics_rows: int
     akas_rows: int
     index_size_bytes: int
+    ratings_rows: int = 0
 
 
 @dataclass(frozen=True)
@@ -109,6 +120,13 @@ class AkaEntry:
     region: str | None
     language: str | None
     is_original_title: bool
+
+
+@dataclass(frozen=True)
+class RatingLookupResult:
+    tconst: str
+    average_rating: float
+    num_votes: int
 
 
 @dataclass(frozen=True)
@@ -128,18 +146,23 @@ class _RowCounter:
     def __init__(self) -> None:
         self.parsed = 0
         self.skipped = 0
+        self.filtered = 0
 
 
 def _iter_rows(
     path: Path,
     parse: Callable[[str], dict[str, Any] | None],
     counter: _RowCounter,
+    keep: Callable[[dict[str, Any]], bool] | None = None,
 ) -> Iterator[dict[str, Any]]:
     with gzip.open(path, "rt", encoding="utf-8", errors="replace") as handle:
         for line in handle:
             row = parse(line)
             if row is None:
                 counter.skipped += 1
+                continue
+            if keep is not None and not keep(row):
+                counter.filtered += 1
                 continue
             counter.parsed += 1
             yield row
@@ -164,7 +187,22 @@ def _insert_batches(
         connection.executemany(statement, batch)
 
 
-def build_index(basics_path: Path, akas_path: Path, destination: Path) -> IndexBuildReport:
+def build_index(
+    basics_path: Path,
+    akas_path: Path,
+    destination: Path,
+    ratings_path: Path | None = None,
+) -> IndexBuildReport:
+    """Build a lean index: only what [Q5] gives the local source, nothing else.
+
+    Measured on the real datasets 2026-09-07: 58% of `title.basics` rows are
+    `tvEpisode`, which contributes no `kind` at all, and only 37% of aka rows
+    are in a region this catalogue reads. Storing the rest, plus text indexes
+    for a lookup path that only ever keys on `tconst`, is what made the v1 index
+    8.1 GB. Everything dropped here is unreachable by design, not a trade-off
+    against future features.
+    """
+
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
@@ -176,6 +214,9 @@ def build_index(basics_path: Path, akas_path: Path, destination: Path) -> IndexB
     temporary_path: Path | None = temp_path
     basics_counter = _RowCounter()
     akas_counter = _RowCounter()
+    ratings_counter = _RowCounter()
+    stored_akas = 0
+    stored_ratings = 0
     try:
         connection = sqlite3.connect(temp_path, isolation_level=None)
         try:
@@ -187,16 +228,48 @@ def build_index(basics_path: Path, akas_path: Path, destination: Path) -> IndexB
                 connection,
                 "imdb_title_basics",
                 _BASICS_COLUMNS,
-                _iter_rows(basics_path, parse_title_basics_row, basics_counter),
+                _iter_rows(
+                    basics_path,
+                    parse_title_basics_row,
+                    basics_counter,
+                    lambda row: bool(kind_from_title_type(row.get("title_type"))),
+                ),
             )
             _insert_batches(
                 connection,
                 "imdb_title_akas",
                 _AKAS_COLUMNS,
-                _iter_rows(akas_path, parse_title_akas_row, akas_counter),
+                _iter_rows(
+                    akas_path,
+                    parse_title_akas_row,
+                    akas_counter,
+                    lambda row: str(row.get("region") or "").upper() in AKA_REGIONS,
+                ),
             )
+            if ratings_path is not None and Path(ratings_path).exists():
+                _insert_batches(
+                    connection,
+                    "imdb_title_ratings",
+                    _RATINGS_COLUMNS,
+                    _iter_rows(ratings_path, parse_title_ratings_row, ratings_counter),
+                )
+            # Rows whose work was filtered out of basics can never be reached by a
+            # lookup, so they are pure weight. Removing them set-based is far
+            # cheaper than holding several million ids in memory while streaming.
+            for table in ("imdb_title_akas", "imdb_title_ratings"):
+                connection.execute(
+                    f"DELETE FROM {table} WHERE tconst NOT IN "
+                    "(SELECT tconst FROM imdb_title_basics)"
+                )
+            # Counted after the delete, so the report states what is actually on
+            # disk rather than what was read from the dumps.
+            stored_akas = connection.execute("SELECT COUNT(*) FROM imdb_title_akas").fetchone()[0]
+            stored_ratings = connection.execute(
+                "SELECT COUNT(*) FROM imdb_title_ratings"
+            ).fetchone()[0]
             connection.execute(f"PRAGMA user_version = {IMDB_DATASET_INDEX_SCHEMA_VERSION}")
             connection.execute("COMMIT")
+            connection.execute("VACUUM")
         finally:
             connection.close()
         os.replace(temp_path, destination)
@@ -207,10 +280,13 @@ def build_index(basics_path: Path, akas_path: Path, destination: Path) -> IndexB
     return IndexBuildReport(
         basics_rows=basics_counter.parsed,
         basics_skipped_lines=basics_counter.skipped,
-        akas_rows=akas_counter.parsed,
+        akas_rows=stored_akas,
         akas_skipped_lines=akas_counter.skipped,
         elapsed_seconds=time.monotonic() - started,
         index_size_bytes=destination.stat().st_size,
+        basics_filtered_rows=basics_counter.filtered,
+        akas_filtered_rows=akas_counter.filtered + (akas_counter.parsed - stored_akas),
+        ratings_rows=stored_ratings,
     )
 
 
@@ -264,6 +340,31 @@ def _fetch_title(connection: sqlite3.Connection, tconst: str) -> TitleLookupResu
     )
 
 
+def lookup_ratings_by_tconst(path: Path, tconst: str) -> RatingLookupResult | None:
+    """Public score for one work, read on demand.
+
+    Kept out of `TitleLookupResult` on purpose: ratings move, so they are read
+    when they are shown rather than merged into a catalogue that would then hold
+    a number that quietly goes stale.
+    """
+
+    connection = _open_readonly(path)
+    try:
+        row = connection.execute(
+            "SELECT average_rating, num_votes FROM imdb_title_ratings WHERE tconst = ?",
+            (tconst,),
+        ).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        return None
+    return RatingLookupResult(
+        tconst=tconst,
+        average_rating=float(row["average_rating"]),
+        num_votes=int(row["num_votes"]),
+    )
+
+
 def lookup_by_tconst(path: Path, tconst: str) -> TitleLookupResult | None:
     connection = _open_readonly(path)
     try:
@@ -302,10 +403,12 @@ def index_stats(path: Path) -> IndexStats:
     try:
         basics_rows = connection.execute("SELECT COUNT(*) FROM imdb_title_basics").fetchone()[0]
         akas_rows = connection.execute("SELECT COUNT(*) FROM imdb_title_akas").fetchone()[0]
+        ratings_rows = connection.execute("SELECT COUNT(*) FROM imdb_title_ratings").fetchone()[0]
     finally:
         connection.close()
     return IndexStats(
         basics_rows=basics_rows,
         akas_rows=akas_rows,
         index_size_bytes=Path(path).stat().st_size,
+        ratings_rows=ratings_rows,
     )

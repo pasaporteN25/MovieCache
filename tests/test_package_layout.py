@@ -37,10 +37,12 @@ class PackageLayoutTests(unittest.TestCase):
                 "cache",
                 "db",
                 "enrich",
+                "images",
                 "imdb-dataset",
                 "import",
                 "match",
                 "migrate",
+                "pairing-pin",
                 "scan",
                 "search-lab",
                 "serve",
@@ -81,12 +83,54 @@ class PackageLayoutTests(unittest.TestCase):
         self.assertIsNotNone(static_asset("style.css"))
         self.assertIsNotNone(static_asset("app.js"))
         self.assertIsNotNone(static_asset("css/tokens.css"))
+        self.assertIsNotNone(static_asset("css/home-plaques.css"))
+        self.assertIsNotNone(static_asset("css/home-furniture-continuity.css"))
+        self.assertIsNotNone(static_asset("css/home-console.css"))
+        self.assertIsNotNone(static_asset("css/home-acceptance.css"))
+        self.assertIsNotNone(static_asset("css/home-material.css"))
+        self.assertIsNotNone(static_asset("css/home-inset.css"))
+        for filename in (
+            "home-surface-petroleum-v2.png",
+            "home-aperture-bezel-v1.png",
+            "home-category-plaque-inset-v1.png",
+        ):
+            with self.subTest(material=filename):
+                asset = static_asset(f"img/{filename}")
+                self.assertIsNotNone(asset)
+                assert asset is not None
+                self.assertEqual(asset[0][:8], b"\x89PNG\r\n\x1a\n")
+                self.assertEqual(asset[1], "image/png")
+        plaque = static_asset("img/home-category-plaque-v1.png")
+        self.assertIsNotNone(plaque)
+        assert plaque is not None
+        self.assertEqual(plaque[0][:8], b"\x89PNG\r\n\x1a\n")
+        self.assertEqual(plaque[1], "image/png")
         self.assertIsNotNone(static_asset("js/core/http.js"))
         self.assertIsNotNone(static_asset("login.js"))
         self.assertIsNotNone(static_asset("password-change.js"))
         self.assertIsNone(static_asset("../pyproject.toml"))
         self.assertIsNone(static_asset("../../pyproject.toml"))
         self.assertIsNone(static_asset("css/../../pyproject.toml"))
+
+    def test_home_fonts_are_packaged_with_licenses_and_correct_mime(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+        patterns = project["tool"]["setuptools"]["package-data"]["movie_inbox.web"]
+        self.assertIn("static/fonts/*.woff2", patterns)
+        self.assertIn("static/fonts/*-OFL.txt", patterns)
+        for family in ("barlow-condensed-600", "ibm-plex-mono-400", "oswald-400"):
+            for subset in ("latin", "latin-ext"):
+                asset = static_asset(f"fonts/{family}-{subset}.woff2")
+                self.assertIsNotNone(asset)
+                assert asset is not None
+                content, mime = asset
+                self.assertEqual(content[:4], b"wOF2")
+                self.assertEqual(mime, "font/woff2")
+        for family in ("barlowcondensed", "ibmplexmono", "oswald"):
+            license_path = root / f"src/movie_inbox/web/static/fonts/{family}-OFL.txt"
+            self.assertIn("SIL OPEN FONT LICENSE", license_path.read_text(encoding="utf-8"))
+        self.assertIsNone(static_asset("fonts/../secret.woff2"))
+        self.assertIsNone(static_asset("fonts/missing.woff2"))
 
     def test_fastapi_application_disables_public_api_documentation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

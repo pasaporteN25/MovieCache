@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="movie-inbox-token" content="isolated-specimen-no-api">
+  <title>Movie Inbox · Dos carteleras y una consola</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/lab-controls.css">
+  <link rel="stylesheet" href="/study.css">
+  <script type="module" src="/study.js"></script>
+</head>
+<body data-composition="bridge">
+  <aside class="composition-toolbar" aria-label="Comparador de diseño">
+    <div class="composition-toolbar-row">
+      <strong>U4.3 · U6.1 · U7.5 — Muestra, no aplicación</strong>
+      <label>Composición <select id="composition">
+        <option value="bridge">B · Consola común a todo el frente</option>
+        <option value="center">A · Consola entre carteleras</option>
+      </select></label>
+      <label>Imágenes <select id="images">
+        <option value="two">Dos muestras técnicas</option>
+        <option value="one">Una imagen horizontal</option>
+        <option value="portrait">Una imagen vertical</option>
+        <option value="none">Ninguna</option>
+        <option value="loading">Cargando</option>
+        <option value="error">Error de carga</option>
+      </select></label>
+      <label>Si hay una <select id="single">
+        <option value="wide">Una ventana amplia</option>
+        <option value="paired">Conservar segundo hueco</option>
+        <option value="repeat">Repetir la imagen disponible</option>
+      </select></label>
+    </div>
+    <div class="composition-toolbar-row">
+      <label>Muestra <select id="fixtureMode">
+        <option value="populated">Archivo poblado</option>
+        <option value="sparse">Títulos y créditos extensos</option>
+        <option value="missing">Sin portadas</option>
+        <option value="empty">Editorial vacía</option>
+      </select></label>
+      <button type="button" id="advanceRotation">Probar rotación del póster</button>
+      <output id="measurements" aria-label="Medidas del diseño"></output>
+    </div>
+    <p id="labFeedback" role="status">Elegí un VHS o una fila: cambia la consulta de la derecha, no la cartelera izquierda.</p>
+    <details><summary>Qué estamos comparando</summary><p>La base y el renderer son los actuales. B integra la consola en la misma abertura superior a todo su ancho; A reserva el centro para lista y consola. No hay panel bajo la biblioteca. Las ventanas usan assets de ambiente como muestras técnicas de encuadre: no son imágenes de las películas. Los controles de ficha simulan su recorrido sin acceder a tus datos.</p></details>
+  </aside>
+  <main id="mount"><p role="status">Cargando composición…</p></main>
+  <footer class="composition-footer"><p>Prototipo local sin catálogo ni escrituras. Portada de Metropolis: Boris Bilinsky, 1927, fuente conservada en el laboratorio U4.2d.1. Contenido confirmado: preferir dos imágenes distintas; panorámica + portada y repetición por falta de material permitidas. B elegida e integrada en Home el 2026-09-13; este comparador conserva el estudio original.</p></footer>
+  <dialog id="previewDetail" aria-labelledby="previewDetailTitle">
+    <h2 id="previewDetailTitle">Ficha · muestra de recorrido</h2>
+    <p id="detailWork"></p>
+    <p>La ficha real seguirá disponible aunque las imágenes fallen. La corrección de imágenes se integrará aquí cuando U7.3 exponga procedencia y selección manual.</p>
+    <p>No se pueden guardar cambios desde este comparador.</p>
+    <form method="dialog"><button>Cerrar muestra</button></form>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,81 @@
+/* Visual study only. Inject into the isolated fixture; not imported by the app. */
+@font-face {
+  font-family: "Proposal Bebas";
+  src: url("/proposal-fonts/BebasNeue-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Proposal Oswald";
+  src: url("/proposal-fonts/Oswald-Variable.ttf") format("truetype");
+  font-weight: 200 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@media (min-width: 861px) {
+  #homeView .home-furniture .home-editorial-sections.home-editorial-sections {
+    top: 8.8%;
+  }
+  #homeView .home-furniture .home-shelf-rail {
+    padding-top: 60px;
+  }
+  #homeView .home-furniture .home-shelf-bay-plaque.sr-only {
+    background: #101110;
+    border: 0;
+    border-image: url("/proposal-assets/plaque.png") 110 fill / 8px / 0 stretch;
+    box-shadow: 2px 4px 5px rgb(0 0 0 / 75%);
+    color: #c9a66b;
+    height: 48px;
+    max-width: none;
+    width: max-content;
+    min-width: 256px;
+    padding: 7px 24px 8px;
+    top: 0;
+    left: 0;
+    gap: 1px;
+    text-align: center;
+    align-content: center;
+    overflow: visible;
+  }
+  #homeView .home-furniture .home-shelf-bay-plaque > span {
+    color: inherit;
+    font-family: "Proposal Bebas", "Barlow Condensed", sans-serif;
+    font-size: 19px;
+    font-weight: 400;
+    font-synthesis: none;
+    letter-spacing: .14em;
+    line-height: 1.15;
+    text-shadow: 0 1px 1px #000;
+    overflow: visible;
+  }
+  #homeView .home-furniture .home-shelf-bay-plaque > small {
+    color: #bdab85;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: .06em;
+    line-height: 1.2;
+  }
+  #homeView .home-furniture .home-shelf-bay[data-active="true"] .home-shelf-bay-plaque {
+    color: #e4c186;
+  }
+  body[data-spine-proposal="b"] #homeView .home-shelf-tape.vhs-spine {
+    /* Canto inset: total width, baseline and text remain identical to A. */
+    box-shadow: inset -5px 0 3px rgb(0 0 0 / 90%),
+      inset 2px 0 1px rgb(234 218 171 / 36%),
+      4px 5px 4px rgb(0 0 0 / 90%);
+  }
+  body[data-spine-proposal="b"] #homeView .home-shelf-tape.vhs-spine::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    right: 3px;
+    width: 5px;
+    border-left: 1px solid rgb(207 183 139 / 42%);
+    background: linear-gradient(90deg, rgb(19 17 21 / 38%), rgb(0 0 0 / 88%));
+    pointer-events: none;
+  }
+}

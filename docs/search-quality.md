@@ -179,7 +179,7 @@ hispanohablante), es una decisión de producto aparte, no una que esta
 tarea deba resolver por adelantado.
 
 **Presupuesto**: como máximo 2 variantes extra por fuente débil, solo
-cuando esa fuente volvió vacía. Las llamadas de reintento usan un timeout
+cuando esa fuente no devolvió nada usable. Las llamadas de reintento usan un timeout
 de 4s (`VARIANT_RETRY_TIMEOUT_SECONDS`, la mitad del default de 8s) por
 ser una mejora de mejor esfuerzo sobre una búsqueda que ya falló. Peor caso
 por fuente: Wikipedia y FilmAffinity ~8s + hasta 2×4s = 16s; IMDb sin
@@ -188,18 +188,25 @@ fuentes corren en paralelo (`ThreadPoolExecutor` de `registry.py`, sin
 tocar), el techo real de `GET /api/search` es el máximo de los tres, no la
 suma.
 
-**Limitación conocida, documentada a propósito**: el corpus dorado de [Q2]
-(`external_diagnostics_v1.json`) no ganó casos nuevos para el mecanismo de
-Wikipedia/FilmAffinity — se intentó construir uno contra datos reales
-(mismo estándar que los 3 casos existentes), pero encontrar una búsqueda
-que la propia cobertura de Wikipedia deje genuinamente vacía (no solo
-irrelevante: `gsrsearch` casi siempre devuelve algo) resultó más difícil de
-lo esperado contra títulos reales, y se paró la exploración en vivo contra
-la API pública antes de gastar más cupo en algo no crítico. El mecanismo sí
-queda cubierto por pruebas unitarias directas contra el código real
-(`tests/test_external_metadata.py`, `tests/test_external_query_variants.py`),
-verificadas por ejecución, no solo revisadas — la brecha es puntual al
-corpus con datos en vivo, no a la cobertura de la lógica en sí.
+**Limitación conocida al cerrar [Q3], y lo que resultó ser**: el corpus
+dorado de [Q2] (`external_diagnostics_v1.json`) no ganó casos nuevos para
+el mecanismo de Wikipedia/FilmAffinity. Se intentó construir uno contra
+datos reales y encontrar una búsqueda que la propia cobertura de Wikipedia
+dejara genuinamente vacía —no sólo irrelevante: `gsrsearch` casi siempre
+devuelve algo— resultó más difícil de lo esperado, y se paró la
+exploración en vivo antes de gastar más cupo en algo no crítico.
+
+> **Resuelto el 2026-09-11.** Esa dificultad no era un problema del corpus:
+> era el defecto. Una búsqueda casi nunca vuelve vacía, pero vuelve inútil
+> todo el tiempo, y el disparador miraba lo primero en vez de lo segundo.
+> El reintento ahora se dispara cuando **nada supera el piso de relevancia**
+> —la condición con la que el puente de IMDb ya venía disparando desde
+> [Q3]— y el corpus tiene tres casos nuevos con HTTP real capturado y
+> recortado: Wikipedia bajo alias, FilmAffinity resolviendo a una ficha, y
+> FilmAffinity con un listado donde nada superaba el piso. Las tres fuentes
+> quedan medidas. El presupuesto de arriba no cambia por reintento, pero se
+> paga más seguido: ahora alcanza con que la respuesta sea mala, no hace
+> falta que sea vacía.
 
 ### Búsqueda por dirección como descubrimiento explícito ([Q4], 2026-08-29)
 

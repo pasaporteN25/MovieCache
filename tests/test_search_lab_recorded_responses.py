@@ -109,13 +109,15 @@ class ReplayRecordedResponsesTests(unittest.TestCase):
         en_url = (
             "https://en.wikipedia.org/w/api.php?action=query&generator=search"
             "&gsrsearch=Heat%20film&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1"
-            "&prop=extracts%7Cpageimages%7Cpageprops&exintro=1&explaintext=1"
+            "&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url"
+            "&exintro=1&explaintext=1"
             "&pithumbsize=480&format=json&formatversion=2"
         )
         es_url = (
             "https://es.wikipedia.org/w/api.php?action=query&generator=search"
             "&gsrsearch=Heat%20pelicula&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1"
-            "&prop=extracts%7Cpageimages%7Cpageprops&exintro=1&explaintext=1"
+            "&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url"
+            "&exintro=1&explaintext=1"
             "&pithumbsize=480&format=json&formatversion=2"
         )
         empty_query_result: dict[str, object] = {"query": {"pages": []}}
@@ -171,6 +173,27 @@ class RecordLiveResponsesTests(unittest.TestCase):
         self.assertEqual(results[0]["title"], "Heat")
         self.assertEqual(log.urls, [IMDB_SUGGESTION_URL])
         self.assertEqual(json.loads(captured[IMDB_SUGGESTION_URL]), IMDB_SUGGESTION_BODY)
+
+
+class MissingFixtureTests(unittest.TestCase):
+    """A hole in the fixture table has to reach the caller, not a source.
+
+    The adapters catch Exception around their own fetches -- that is how a
+    source failing becomes an empty shelf -- so an UnrecordedRequestError that
+    inherited from Exception was indistinguishable from a source that answered
+    nothing. It cost a corpus case: the Wikipedia diagnostics case kept passing
+    after its recorded search URL went stale, through a path it was not written
+    to exercise.
+    """
+
+    def test_a_missing_recording_is_not_swallowed_by_an_adapter(self) -> None:
+        with replay_recorded_responses({}):
+            with self.assertRaises(UnrecordedRequestError):
+                WikipediaAdapter().search("Addio zio Tom")
+
+    def test_it_is_not_an_exception_on_purpose(self) -> None:
+        self.assertFalse(issubclass(UnrecordedRequestError, Exception))
+        self.assertTrue(issubclass(UnrecordedRequestError, BaseException))
 
 
 if __name__ == "__main__":

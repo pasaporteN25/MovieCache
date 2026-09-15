@@ -183,6 +183,31 @@
       "original_title": "アキラ",
       "year": "1988",
       "kind": "anime"
+    },
+    {
+      "id": "ed-wood-1994",
+      "title": "Ed Wood",
+      "year": "1994",
+      "kind": "pelicula"
+    },
+    {
+      "id": "edge-of-tomorrow-2014",
+      "title": "Edge of Tomorrow",
+      "year": "2014",
+      "kind": "pelicula"
+    },
+    {
+      "id": "m-1931",
+      "title": "M",
+      "original_title": "M - Eine Stadt sucht einen Morder",
+      "year": "1931",
+      "kind": "pelicula"
+    },
+    {
+      "id": "m-butterfly-1993",
+      "title": "M. Butterfly",
+      "year": "1993",
+      "kind": "pelicula"
     }
   ],
   "cases": [
@@ -201,6 +226,30 @@
       "query": "It 2017",
       "relevant_ids": ["it-2017"],
       "forbidden_ids": ["it-1990", "different-film"]
+    },
+    {
+      "id": "catalog-short-term-in-longer-title",
+      "label": "Un termino corto encuentra el titulo largo al que pertenece",
+      "context": "catalog",
+      "query": "Ed",
+      "relevant_ids": ["ed-wood-1994"],
+      "forbidden_ids": ["edge-of-tomorrow-2014"]
+    },
+    {
+      "id": "catalog-single-letter-title",
+      "label": "Un titulo de una sola letra se encuentra por su propio titulo",
+      "context": "catalog",
+      "query": "M",
+      "relevant_ids": ["m-1931", "m-butterfly-1993"],
+      "forbidden_ids": ["moonlight-2016"]
+    },
+    {
+      "id": "catalog-word-inside-a-word",
+      "label": "Un fragmento adentro de una palabra no es la palabra",
+      "context": "catalog",
+      "query": "Fly",
+      "relevant_ids": ["the-fly-1958", "the-fly-1986"],
+      "forbidden_ids": ["m-butterfly-1993"]
     },
     {
       "id": "catalog-up-substring",
@@ -300,7 +349,7 @@
       "context": "identity",
       "candidate": {"title": "The Fly", "year": "", "kind": "pelicula"},
       "relevant_ids": ["the-fly-1958", "the-fly-1986"],
-      "forbidden_ids": [],
+      "forbidden_ids": ["m-butterfly-1993"],
       "expected_acceptance": {"the-fly-1958": false, "the-fly-1986": false},
       "required_reasons": {
         "the-fly-1958": ["exact_title_missing_year"],

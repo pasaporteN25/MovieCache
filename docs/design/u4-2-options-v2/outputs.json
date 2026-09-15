@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-09",
+  "kind": "generated-concepts-not-browser-evidence",
+  "outputs": [
+    {
+      "id": "a",
+      "output_hint": "Generated images are saved to C:\\Users\\Lucas\\.codex\\generated_images\\01a07366-41f5-72a1-9856-261dbbd44cdf as C:\\Users\\Lucas\\.codex\\generated_images\\01a07366-41f5-72a1-9856-261dbbd44cdf\\exec-cbc5242f-e000-4c85-8b97-03585c96a504.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "b",
+      "output_hint": "Generated images are saved to C:\\Users\\Lucas\\.codex\\generated_images\\01a07366-41f5-72a1-9856-261dbbd44cdf as C:\\Users\\Lucas\\.codex\\generated_images\\01a07366-41f5-72a1-9856-261dbbd44cdf\\exec-4f639279-8a0d-4b82-8add-3af92c0d06d8.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": "c",
+      "output_hint": "Generated images are saved to C:\\Users\\Lucas\\.codex\\generated_images\\01a07366-41f5-72a1-9856-261dbbd44cdf as C:\\Users\\Lucas\\.codex\\generated_images\\01a07366-41f5-72a1-9856-261dbbd44cdf\\exec-5f004f3f-3305-48a5-adc0-368fd2dc7768.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    }
+  ]
+}

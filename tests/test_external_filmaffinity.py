@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from movie_inbox.domain.search import EXTERNAL_RELEVANCE_THRESHOLD, external_result_score
 from movie_inbox.external.filmaffinity import (
+    FilmAffinityAdapter,
     FilmAffinityMetadataParser,
     fetch_filmaffinity_metadata,
 )
@@ -194,6 +196,105 @@ class FetchFilmAffinityMetadataTests(unittest.TestCase):
     def test_rejects_urls_from_other_sources_without_fetching(self) -> None:
         self.assertEqual(
             fetch_filmaffinity_metadata("https://en.wikipedia.org/wiki/Heat_(1995_film)"), {}
+        )
+
+
+# Captured from https://www.filmaffinity.com/es/search.php on 2026-09-10 through
+# the adapter's own fetch_text, then trimmed. Searching an original title the
+# site recognises does not return a listing at all: it serves the film's own
+# page. The trim keeps the tags both parsers read, verbatim -- the Open Graph
+# pair that says which kind of response this is, the title/year/synopsis
+# microdata, and the two navigation anchors ("Ficha", "Imagenes") the listing
+# parser used to return as if they were films. Verified rather than eyeballed:
+# this body and the full 117 KB one produce an identical result row.
+SPIRITED_AWAY_SEARCH_HTML = """<html><head><meta property="og:type" content="video." ><meta property="og:url" content="https://www.filmaffinity.com/es/film759533.html" ></head><body><h1 id="main-title">
+        <span itemprop="name">El viaje de Chihiro</span>
+        
+        <span class="movie-type"><span class="type">Animación</span></span>
+        
+    </h1><dt>Título original</dt>
+            <dd>
+                Sen to Chihiro no kamikakushi<span class="show-akas ui-corner-all" >aka <i class="fa-solid fa-caret-down"></i></span>             </dd><dd itemprop="datePublished">2001</dd><dd class="" itemprop="description">Chihiro es una niña de diez años que viaja en coche con sus padres. Después de atravesar un túnel, llegan a un mundo fantástico, en el que no hay lugar para los seres humanos, sólo para los dioses de primera y segunda clase. Cuando descubre que sus padres han sido convertidos en cerdos, Chihiro se siente muy sola y asustada. (FILMAFFINITY)</dd><a class="active" href="https://www.filmaffinity.com/es/film759533.html">
+
+                                <span class="icon d-md-none"><i class="fa-light fa-film"></i></span>
+
+                                <span class="d-none d-md-block">Ficha&nbsp;</span>
+
+                            </a><a  href="https://www.filmaffinity.com/es/filmimages.php?movie_id=759533">
+
+                                <span class="icon d-md-none"><i class="fa-light fa-images"></i></span>
+
+                                <span class="d-none d-md-block">Imágenes&nbsp;<em>[113]</em></span>
+
+                            </a></body></html>"""  # noqa: E501
+
+# The same search endpoint answering with an actual listing, for the same query
+# shape. Two result cards, verbatim, from the response to "Der Untergang".
+LISTING_SEARCH_HTML = """<html><head><meta property="og:type" content="website" ><meta property="og:url" content="https%3A%2F%2Fwww.filmaffinity.com%2Fes%2Fsearch.php%3Fstext%3DDer%2520Untergang"></head><body><div class="fs-6 mc-title">
+
+                    <a class="d-none d-md-inline-block" href="https://www.filmaffinity.com/es/film599984.html">El hundimiento</a>
+
+                    <a class="d-md-none stretched-link" href="https://www.filmaffinity.com/es/film599984.html">El hundimiento</a>
+
+                </div><div class="fs-6 mc-title">
+
+                    <a class="d-none d-md-inline-block" href="https://www.filmaffinity.com/es/film592705.html">Stalingrado: el ataque, el cerco y la caída</a>
+
+                    <a class="d-md-none stretched-link" href="https://www.filmaffinity.com/es/film592705.html">Stalingrado: el ataque, el cerco y la caída</a>
+
+                </div></body></html>"""  # noqa: E501
+
+
+class SearchResolvingToAFilmPageTests(unittest.TestCase):
+    """[B1]: a search that lands on a film page has to be read as one.
+
+    Measured against the live site before the fix. Searching "Sen to Chihiro no
+    kamikakushi" returned eight rows and not one of them was the film: the top
+    two were the page's own navigation, titled "Ficha" and "Imagenes", and the
+    rest were other Ghibli films from the related rail. "Ficha" scored 10.2 and
+    the relevance floor is 28.0, so FilmAffinity contributed nothing at all for
+    a query whose answer was at the top of the response it sent.
+    """
+
+    def _search(self, query: str, body: str) -> list[dict[str, object]]:
+        with patch("movie_inbox.external.filmaffinity.fetch_text", return_value=body):
+            return FilmAffinityAdapter()._fetch(query)
+
+    def test_the_film_page_is_read_as_the_film(self) -> None:
+        [row] = self._search("Sen to Chihiro no kamikakushi", SPIRITED_AWAY_SEARCH_HTML)
+
+        self.assertEqual(row["title"], "El viaje de Chihiro")
+        self.assertEqual(row["original_title"], "Sen to Chihiro no kamikakushi")
+        self.assertEqual(row["year"], "2001")
+        self.assertEqual(row["url"], "https://www.filmaffinity.com/es/film759533.html")
+
+    def test_the_page_navigation_is_no_longer_returned_as_films(self) -> None:
+        rows = self._search("Sen to Chihiro no kamikakushi", SPIRITED_AWAY_SEARCH_HTML)
+
+        titles = [str(row["title"]) for row in rows]
+        self.assertNotIn("Ficha", titles)
+        self.assertFalse([title for title in titles if title.startswith("Im")])
+
+    def test_the_original_title_is_what_makes_the_row_score(self) -> None:
+        # The whole point: the query is in the original language and the site
+        # answers in Spanish. Without the original title travelling with the
+        # row there is nothing for the query to match.
+        [row] = self._search("Sen to Chihiro no kamikakushi", SPIRITED_AWAY_SEARCH_HTML)
+
+        score = external_result_score("Sen to Chihiro no kamikakushi", row)
+
+        self.assertGreaterEqual(score, EXTERNAL_RELEVANCE_THRESHOLD)
+
+    def test_a_listing_is_still_read_as_a_listing(self) -> None:
+        # The same endpoint answers both ways; only the response says which.
+        rows = self._search("Der Untergang", LISTING_SEARCH_HTML)
+
+        self.assertEqual(
+            [row["url"] for row in rows],
+            [
+                "https://www.filmaffinity.com/es/film599984.html",
+                "https://www.filmaffinity.com/es/film592705.html",
+            ],
         )
 
 

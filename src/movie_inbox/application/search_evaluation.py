@@ -67,8 +67,10 @@ def inspect_catalog_search(
 ) -> dict[str, Any]:
     """Inspect a JSON export without mutating it or consulting the network."""
     clean_query = " ".join(str(query or "").split())
-    if len(clean_query) < 2:
-        raise SearchCorpusError("Search Lab queries must contain at least two characters")
+    # Matches what production answers: search_catalog_items accepts a single
+    # character, so the inspection tool has to be able to ask about one.
+    if not clean_query:
+        raise SearchCorpusError("Search Lab queries cannot be empty")
     if mode not in {"catalog", "identity", "scanner"}:
         raise SearchCorpusError(f"Unsupported inspection mode: {mode}")
     rows = [dict(item) for item in items]

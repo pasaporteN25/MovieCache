@@ -252,6 +252,88 @@ aparece en la URL y SQLite guarda solamente su hash. El token anti-CSRF, la vali
 de `Origin` y la sesión se exigen juntos. Uvicorn no registra access logs y Nginx omite
 el log del proxy de imágenes para no guardar URLs del catálogo.
 
+## HTTPS en la red local, sin dominio
+
+Esta receta es para el caso opuesto al de arriba: la instancia **no sale a internet** y no
+hay nombre público que Let's Encrypt pueda firmar. Es lo que hace falta para aparear un
+teléfono, porque el apareamiento se niega a viajar por HTTP plano — el QR lleva una
+credencial, y sobre HTTP se la queda cualquiera que esté en la misma red.
+
+Acá no hay proxy: **el proceso termina TLS él mismo**. Nginx sigue siendo el camino para
+publicar en internet; para una red de casa es una pieza más sin nada que aportar.
+
+### 1. Reservar la IP del servidor
+
+En el router, reservá por DHCP la IP del servidor. El certificado se emite **para esa
+dirección**, así que si cambia deja de servir y el teléfono empieza a rechazar la conexión.
+
+### 2. Emitir el certificado, en el servidor
+
+```bash
+openssl req -x509 -newkey rsa:2048 -sha256 -days 825 -nodes \
+  -keyout /var/lib/movie-inbox/tls/lan.key \
+  -out /var/lib/movie-inbox/tls/lan.crt \
+  -subj "/CN=192.168.1.50" \
+  -addext "subjectAltName=IP:192.168.1.50"
+chmod 600 /var/lib/movie-inbox/tls/lan.key
+```
+
+Cambiá `192.168.1.50` por la IP reservada, en los dos lugares. El `subjectAltName` **no es
+opcional**: sin él, un cliente moderno rechaza el certificado aunque el `CN` coincida.
+
+825 días es el máximo que aceptan los clientes actuales para un certificado emitido a mano.
+Anotá la fecha: cuando venza hay que reemitir y **el pin cambia**, así que también hay que
+volver a aparear los teléfonos.
+
+### 3. Servir
+
+```bash
+movie-inbox serve /var/lib/movie-inbox/movie-inbox.db \
+  --host 0.0.0.0 --port 8765 \
+  --public-origin https://192.168.1.50:8765 \
+  --ssl-certfile /var/lib/movie-inbox/tls/lan.crt \
+  --ssl-keyfile /var/lib/movie-inbox/tls/lan.key
+```
+
+`--public-origin` tiene que coincidir **exacto** con lo que el teléfono va a escribir,
+incluido el puerto: de ahí sale el origen que viaja en el QR.
+
+En Docker, montá los dos archivos, agregá los dos argumentos al `command` y publicá el
+puerto en toda la red en vez de sólo en loopback:
+
+```dotenv
+MOVIE_INBOX_BIND_ADDRESS=0.0.0.0
+MOVIE_INBOX_PUBLIC_ORIGIN=https://192.168.1.50:8765
+```
+
+### 4. El pin del certificado se calcula solo
+
+Cuando este proceso sirve TLS, **lee su propio certificado y deriva el pin**; no hay que
+copiar nada. El QR sale con la huella adentro y el teléfono la usa para confiar en un
+certificado que ninguna autoridad pública firmó.
+
+`--device-pairing-cert-pin` existe sólo para el caso contrario: si un proxy termina TLS,
+este proceso no ve el certificado y hay que pasárselo. Para eso está el subcomando:
+
+```bash
+movie-inbox pairing-pin /etc/ssl/certs/instancia.crt
+```
+
+### Tres cosas que van a pasar y conviene esperar
+
+**El navegador de escritorio va a advertir.** Es correcto: nadie firmó ese certificado. La
+aplicación del teléfono no advierte nada porque no depende de las autoridades públicas,
+sino de la huella que le llegó por el QR.
+
+**Un antivirus que inspecciona HTTPS rompe el pin.** Medido el 2026-09-09 en una máquina
+con Avast: el certificado que llega al cliente **no es el del servidor**, sino uno reemitido
+al vuelo por `Avast Web/Mail Shield`. En ese caso el pin del QR nunca va a coincidir con lo
+que el cliente ve. Afecta a los clientes de la máquina con el antivirus, no al teléfono en
+la red — pero si algo no cierra, es lo primero que hay que descartar.
+
+**Fuera de casa no funciona**, por diseño. Para eso está la VPN, que además da un nombre
+estable y hace innecesario todo esto.
+
 ## Checklist de publicacion
 
 - Los checks pasan sobre el commit desplegado.

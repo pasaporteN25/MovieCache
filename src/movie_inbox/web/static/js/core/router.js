@@ -1,24 +1,25 @@
 import { closeDetail, openDetail, selectedDetailId } from "./detail.js";
 import { fields } from "./fields.js";
 import { API_TOKEN, apiFetch } from "./http.js";
-import { currentIdentity, currentView, inboxMode, items, setCurrentView, setInboxModeValue, setSelectedExistingIdForSearch } from "./state.js";
+import { CATALOG_PAGE_SIZE, currentIdentity, currentView, inboxMode, items, setCurrentView, setInboxModeValue, setSelectedExistingIdForSearch } from "./state.js";
 import { loadLibraries } from "../surfaces/admin-libraries.js";
 import { loadImageCacheStatus, loadMembers, syncImageCacheStatusPolling } from "../surfaces/admin-members.js";
 import { loadPublicPresentations } from "../surfaces/admin-public-presentations.js";
-import { COLLECTION_MULTI_FILTER_KEYS, applyCollectionRoute, collectionRouteValues, collectionSearchMessage, render, renderHeaderStats, resetCollectionFilters, setCollectionSearchMode } from "../surfaces/catalog-grid.js";
-import { activeQuery, clearManualSearch, manualResults, renderManualResults, runSearch, setCatalogMergeResults, setManualResults, setSearchState, setSelectedManualIndex, showFixedLocalItemForLink } from "../surfaces/catalog-search.js";
+import { loadStreamingConfiguration } from "../surfaces/admin-streaming.js";
+import { COLLECTION_MULTI_FILTER_KEYS, applyCollectionRoute, collectionRouteValues, collectionSearchMessage, render, renderHeaderStats, resetCollectionFilters, setCatalogVisibleCount, setCollectionSearchMode } from "../surfaces/catalog-grid.js";
+import { activeQuery, clearManualSearch, manualResults, renderManualResults, runSearch, setCatalogMergeResults, setManualResults, setSearchState, setSelectedManualCandidate, setSelectedManualIndex, showCollectionAnchor, showFixedLocalItemForLink } from "../surfaces/catalog-search.js";
 import { loadClub } from "../surfaces/club.js";
 import { loadCurationQueue, setCurationFilter } from "../surfaces/inbox-curation.js";
 import { loadImportDrafts } from "../surfaces/inbox-imports.js";
 import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
 
       export const COLLECTION_ROUTE_KEYS = [
-        "q", ...COLLECTION_MULTI_FILTER_KEYS, "year_from", "year_to", "sort", "duplicates", "external", "mode", "link_id"
+        "q", ...COLLECTION_MULTI_FILTER_KEYS, "year_from", "year_to", "sort", "duplicates", "external", "mode", "link_id", "candidate_source", "candidate_ref"
       ];
 
       export function goHome() {
         closeDetail({ restoreFocus: false, updateHistory: false });
-        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
         render();
         showView("home", { updateHistory: false, focus: true });
         syncRoute(routeValuesForView("home"), "push");
@@ -30,9 +31,29 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
 
       export function goToCollectionRoot() {
         resetCollectionFilters();
-        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
+        setCollectionSearchMode("browse");
         showView("catalog", { updateHistory: false, focus: true });
         syncRoute(routeValuesForView("catalog"), "push");
+      }
+
+      export function goToCollectionSearch() {
+        resetCollectionFilters();
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
+        setCollectionSearchMode("search");
+        showView("catalog", { updateHistory: false, focus: false });
+        syncRoute(routeValuesForView("catalog"), "push");
+        requestAnimationFrame(() => fields.query.focus());
+      }
+
+      export function goToCollectionAdd() {
+        resetCollectionFilters();
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
+        fields.externalSource.checked = true;
+        setCollectionSearchMode("add");
+        showView("catalog", { updateHistory: false, focus: false });
+        syncRoute(routeValuesForView("catalog"), "push");
+        requestAnimationFrame(() => fields.query.focus());
       }
 
       export async function goToInbox(filter = "") {
@@ -54,14 +75,14 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
 
       export async function goToClub() {
         closeDetail({ restoreFocus: false, updateHistory: false });
-        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
         showView("club");
         await loadClub();
       }
 
       export function goToAdmin(options = {}) {
         showView("admin", options);
-        Promise.all([loadMembers(), loadLibraries(), loadImageCacheStatus(), loadPublicPresentations()]);
+        Promise.all([loadMembers(), loadLibraries(), loadImageCacheStatus(), loadPublicPresentations(), loadStreamingConfiguration()]);
       }
 
       export function showView(view, options = {}) {
@@ -167,7 +188,7 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         else await loadCurationQueue(options);
       }
 
-      export function syncRoute(values = {}, method = "replace") {
+      export function syncRoute(values = {}, method = "replace", state = {}) {
         const url = new URL(window.location.href);
         for (const [key, value] of Object.entries(values)) {
           url.searchParams.delete(key);
@@ -178,7 +199,8 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
           }
         }
         if (Object.prototype.hasOwnProperty.call(values, "view")) url.hash = "";
-        history[method === "push" ? "pushState" : "replaceState"]({}, "", url);
+        const nextState = { ...(history.state || {}), ...state };
+        history[method === "push" ? "pushState" : "replaceState"](nextState, "", url);
       }
 
       export function routeValuesForView(view) {
@@ -198,6 +220,7 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
           ? params.get("view")
           : hasCollectionRoute ? "catalog" : "home";
         const query = requestedView === "catalog" ? rawQuery : "";
+        const collectionState = history.state?.collection || {};
         if (requestedView === "catalog") {
           setSelectedManualIndex(null);
           fields.reviewPrevious.hidden = true;
@@ -205,16 +228,38 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
           applyCollectionRoute(params);
           const mode = params.get("mode") || "";
           const linkId = params.get("link_id") || "";
+          const candidateSource = params.get("candidate_source") || "";
+          const candidateRef = params.get("candidate_ref") || "";
+          const candidate = collectionState.candidate || null;
+          const restoredMode = ["search", "add", "compare", "link"].includes(mode)
+            ? mode
+            : "browse";
+          setCatalogVisibleCount(Number(collectionState.visibleCount) || CATALOG_PAGE_SIZE);
           const linkedItem = mode === "link" && linkId ? items.find((item) => item.id === linkId) : null;
           if (linkedItem) {
             setSelectedExistingIdForSearch(linkId);
             showFixedLocalItemForLink(linkId);
+          } else if (restoredMode === "compare") {
+            setSelectedExistingIdForSearch(null);
+            setSelectedManualCandidate(candidateSource, candidateRef);
+            if (candidate) {
+              setManualResults([candidate]);
+              setSelectedManualIndex(0);
+              renderManualResults();
+              showCollectionAnchor("compare", candidate);
+            } else {
+              setManualResults([]);
+              setSelectedManualIndex(null);
+              showCollectionAnchor("compare", {}, true);
+            }
+            setCollectionSearchMode("compare");
           } else {
             setSelectedExistingIdForSearch(null);
+            setSelectedManualCandidate();
             setCatalogMergeResults([]);
             fields.catalogMergeResults.innerHTML = "";
             fields.catalogMergeSection.classList.remove("active");
-            setCollectionSearchMode(mode === "compare" ? "compare" : "browse");
+            setCollectionSearchMode(restoredMode);
           }
           if (!fields.externalSource.checked) {
             setManualResults([]);
@@ -228,7 +273,12 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
           fields.query.value = query;
           runSearch({ updateHistory: false });
         } else if (!query && activeQuery) {
-          clearManualSearch({ focus: false, updateHistory: false, resetExternal: requestedView !== "catalog" });
+          clearManualSearch({
+            focus: false,
+            updateHistory: false,
+            resetExternal: requestedView !== "catalog",
+            forceModeChange: true
+          });
         } else {
           render();
           setSearchState(query.length >= 2 ? "results" : "idle", query.length >= 2 ? collectionSearchMessage() : "");
@@ -239,10 +289,22 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
           closeDetail({ restoreFocus: false, updateHistory: false });
         }
         showView(requestedView, { updateHistory: false, scroll: false });
+        if (requestedView === "catalog") {
+          requestAnimationFrame(() => {
+            const focusTarget = collectionState.focusId
+              ? document.getElementById(collectionState.focusId)
+              : null;
+            focusTarget?.focus({ preventScroll: true });
+            if (Number.isFinite(Number(collectionState.scrollY))) {
+              window.scrollTo({ top: Number(collectionState.scrollY), behavior: "auto" });
+            }
+          });
+        }
         if (requestedView === "inbox") loadCurrentInbox();
         if (requestedView === "club") loadClub();
         if (requestedView === "admin") {
           loadMembers();
           loadPublicPresentations();
+          loadStreamingConfiguration();
         }
       }

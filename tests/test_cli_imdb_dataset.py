@@ -41,7 +41,7 @@ class RunSyncTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.output_dir = Path(self.temporary.name)
 
-    def test_sync_downloads_both_initial_datasets_and_builds_the_index(self) -> None:
+    def test_sync_downloads_every_dataset_and_builds_the_index(self) -> None:
         download_calls: list[str] = []
 
         def fake_download(name: str, destination: Path, **kwargs: object) -> DownloadResult:
@@ -50,10 +50,15 @@ class RunSyncTests(unittest.TestCase):
                 name=name, url="https://x", bytes_downloaded=1234, elapsed_seconds=0.5
             )
 
-        build_calls: list[tuple[Path, Path, Path]] = []
+        build_calls: list[tuple[Path, Path, Path, Path | None]] = []
 
-        def fake_build(basics_path: Path, akas_path: Path, destination: Path) -> IndexBuildReport:
-            build_calls.append((basics_path, akas_path, destination))
+        def fake_build(
+            basics_path: Path,
+            akas_path: Path,
+            destination: Path,
+            ratings_path: Path | None = None,
+        ) -> IndexBuildReport:
+            build_calls.append((basics_path, akas_path, destination, ratings_path))
             return IndexBuildReport(
                 basics_rows=2,
                 basics_skipped_lines=1,
@@ -72,15 +77,17 @@ class RunSyncTests(unittest.TestCase):
                 exit_code = run_sync(self.output_dir, None)
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(sorted(download_calls), ["title.akas", "title.basics"])
+        self.assertEqual(sorted(download_calls), ["title.akas", "title.basics", "title.ratings"])
         self.assertEqual(len(build_calls), 1)
-        basics_path, akas_path, destination = build_calls[0]
+        basics_path, akas_path, destination, ratings_path = build_calls[0]
         self.assertEqual(basics_path, self.output_dir / "title.basics.tsv.gz")
         self.assertEqual(akas_path, self.output_dir / "title.akas.tsv.gz")
         self.assertEqual(destination, self.output_dir / "imdb-dataset.db")
+        self.assertEqual(ratings_path, self.output_dir / "title.ratings.tsv.gz")
         output = buffer.getvalue()
         self.assertIn("2 titles", output)
         self.assertIn("3 alternate titles", output)
+        self.assertIn("public ratings", output)
         self.assertIn(IMDB_ATTRIBUTION_NOTICE, output)
 
     def test_sync_writes_a_json_report_when_a_path_is_given(self) -> None:
@@ -91,7 +98,12 @@ class RunSyncTests(unittest.TestCase):
                 name=name, url="https://x", bytes_downloaded=10, elapsed_seconds=0.1
             )
 
-        def fake_build(basics_path: Path, akas_path: Path, destination: Path) -> IndexBuildReport:
+        def fake_build(
+            basics_path: Path,
+            akas_path: Path,
+            destination: Path,
+            ratings_path: Path | None = None,
+        ) -> IndexBuildReport:
             return IndexBuildReport(
                 basics_rows=1,
                 basics_skipped_lines=1,

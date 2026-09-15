@@ -1,0 +1,25 @@
+{
+  "method": "Viewport 720x450 equivalent to layout at 1440x900 / 200%; not real browser zoom",
+  "afterResize": {
+    "consoleCount": 1,
+    "contentHeight": 3839,
+    "count": 100,
+    "documentHeight": 2541,
+    "extended": "true",
+    "focusAction": "playlist-select",
+    "focusKey": "u5-stress-99",
+    "headerPinned": true,
+    "height": 450,
+    "overflow": -15,
+    "pixelRatio": 1,
+    "posterDifference": 0,
+    "scrollTop": 3572,
+    "scrollY": 0,
+    "selectedKey": "u5-stress-99",
+    "selectedVisible": true,
+    "source": "shelf:u5-stress",
+    "width": 720,
+    "windowHeight": 266,
+    "windowOverlapsConsole": false
+  }
+}

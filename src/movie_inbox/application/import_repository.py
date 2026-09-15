@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
-from movie_inbox.domain.imports import ImportDraft
+from movie_inbox.domain.imports import ImportDraft, ImportDraftItem
 
 
 class ImportRepositoryError(RuntimeError):
@@ -39,5 +40,20 @@ class ImportDraftRepository(Protocol):
     def fail(self, user_id: str, draft_id: str, now: int) -> None: ...
 
     def delete(self, user_id: str, draft_id: str) -> bool: ...
+
+    def append_items(
+        self,
+        user_id: str,
+        draft_id: str,
+        items: Sequence[ImportDraftItem],
+        now: int,
+    ) -> bool:
+        """Add items to a draft that is still `ready`; False if it is not.
+
+        Appending rather than rewriting: a phone syncs more than once, and
+        rewriting the whole draft each time would race with someone reviewing it
+        in the browser.
+        """
+        ...
 
     def purge_expired(self, now: int) -> int: ...

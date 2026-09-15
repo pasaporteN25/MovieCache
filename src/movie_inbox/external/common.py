@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import unquote
 from urllib.request import Request, urlopen
 
 
@@ -65,10 +66,20 @@ def string_list(value: Any) -> list[str]:
 
 
 def dedupe_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse rows that name the same thing, however they spell its address.
+
+    Percent-encoding is part of how a URL is written, not of what it points at,
+    and two paths through the same source can write it differently: Wikipedia's
+    own canonicalurl keeps the parentheses of "The Fly (1986 film)" literal,
+    while a URL built from the article title encodes them. Comparing the two as
+    text left one article in the shelf twice -- which is most film articles,
+    since almost all of them are disambiguated that way.
+    """
+
     seen: set[str] = set()
     deduped: list[dict[str, Any]] = []
     for result in results:
-        url = str(result.get("url") or "").strip().rstrip("/").casefold()
+        url = unquote(str(result.get("url") or "").strip()).rstrip("/").casefold()
         key = url or f"{result.get('source')}:{result.get('title')}"
         if key in seen:
             continue

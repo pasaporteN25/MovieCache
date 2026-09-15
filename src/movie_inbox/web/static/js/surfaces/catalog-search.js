@@ -6,12 +6,16 @@ import { mergeSearchResult } from "../core/merge.js";
 import { showView } from "../core/router.js";
 import { findLinkForItem } from "../core/search-bridge.js";
 import { CATALOG_PAGE_SIZE, SEARCH_PAGE_SIZE, items, selectedExistingIdForSearch, setSelectedExistingIdForSearch } from "../core/state.js";
-import { collectionSearchMessage, collectionSearchMode, comparisonSearchMessage, render, renderDatabaseMenu, setCatalogVisibleCount, setCollectionSearchMode, setRandomOrder, syncCollectionRoute } from "./catalog-grid.js";
+import { collectionModeCopy, collectionSearchMessage, collectionSearchMode, comparisonSearchMessage, render, renderDatabaseMenu, setCatalogVisibleCount, setCollectionSearchMode, setRandomOrder, syncCollectionRoute } from "./catalog-grid.js";
 import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, oneEditApart, searchResult, showDuplicateChoice } from "./catalog-search-cards.js";
 
       export let manualResults = [];
 
       export let selectedManualIndex = null;
+
+      export let selectedManualCandidateSource = "";
+
+      export let selectedManualCandidateRef = "";
 
       export let manualSearchSource = "all";
 
@@ -72,6 +76,11 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         selectedManualIndex = value;
       }
 
+      export function setSelectedManualCandidate(source = "", reference = "") {
+        selectedManualCandidateSource = String(source || "");
+        selectedManualCandidateRef = String(reference || "");
+      }
+
       export function setCatalogMergeResults(value) {
         catalogMergeResults = value;
       }
@@ -109,10 +118,11 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           return;
         }
         activeQuery = requestedQuery.length >= 2 ? requestedQuery : "";
-        if (collectionSearchMode !== "browse") {
+        if (["compare", "link"].includes(collectionSearchMode)) {
           await refineComparisonSearch(requestedQuery, { updateHistory });
           return;
         }
+        const requestedMode = collectionSearchMode === "add" ? "add" : "search";
         selectedManualIndex = null;
         setSelectedExistingIdForSearch(null);
         manualResults = [];
@@ -131,7 +141,8 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         fields.catalogMergeSection.classList.remove("active");
         fields.reviewPrevious.hidden = true;
         fields.reviewNext.hidden = true;
-        setCollectionSearchMode("browse");
+        setCollectionSearchMode(requestedMode);
+        if (requestedMode === "add") fields.externalSource.checked = true;
         render();
         renderDatabaseMenu();
         if (requestedQuery.length < 2) {
@@ -169,7 +180,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function setSearchState(state, message = "") {
-        const comparisonMode = collectionSearchMode !== "browse";
+        const comparisonMode = ["compare", "link"].includes(collectionSearchMode);
         fields.collectionView.classList.toggle("has-search-results", Boolean(activeQuery) && state !== "idle");
         fields.searchContext.hidden = state !== "searching" && state !== "error" && !comparisonMode;
         fields.searchContext.dataset.state = state;
@@ -194,6 +205,30 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         return result?.source === "anime_offline_database" ? "jikan" : result?.source || "";
       }
 
+      export function candidateReference(result = {}) {
+        const reference = result.tmdb_id
+          || result.imdb_id
+          || result.mal_id
+          || result.wikidata_id
+          || result.url;
+        return String(reference || [result.title, result.year].filter(Boolean).join("|") || "unknown");
+      }
+
+      export function showCollectionAnchor(kind, item = {}, unavailable = false) {
+        fields.collectionAnchor.hidden = false;
+        fields.collectionAnchorLabel.textContent = kind === "link"
+          ? "Obra local fija"
+          : "Referencia externa fija";
+        fields.collectionAnchorTitle.textContent = unavailable
+          ? "La referencia elegida ya no está disponible"
+          : displayTitle(item) || "Obra sin título";
+        const source = resultShelfSource(item) || item.source || "catálogo local";
+        const details = [item.year, source].filter(Boolean).join(" · ");
+        fields.collectionAnchorMeta.textContent = unavailable
+          ? "Podés volver al paso anterior sin perder la consulta."
+          : details;
+      }
+
       export function requestedExternalSources(source, includeExternal) {
         if (!includeExternal) return [];
         if (source === "all" || !EXTERNAL_SEARCH_SOURCES.includes(source)) return configuredExternalSources();
@@ -202,7 +237,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
 
       export function setSearchBusy(busy) {
         fields.searchButton.disabled = busy;
-        fields.searchButton.textContent = busy ? "Buscando..." : "Buscar";
+        fields.searchButton.textContent = busy ? "Buscando..." : collectionModeCopy().action;
         fields.searchConsole.setAttribute("aria-busy", String(busy));
         if (busy) fields.searchButton.setAttribute("aria-busy", "true");
         else fields.searchButton.removeAttribute("aria-busy");
@@ -279,9 +314,9 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           catalogMergeResults = payload.catalog?.results || [];
           catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
           fields.catalogMergeSection.classList.add("active");
-          fields.catalogMergeKicker.textContent = "Tu catálogo";
-          fields.catalogMergeTitle.textContent = "Coincidencias locales";
-          fields.catalogMergeStatus.textContent = `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "obra encontrada" : "obras encontradas"}, sin aplicar los filtros de la estantería.`;
+          fields.catalogMergeKicker.textContent = "Antes de agregar";
+          fields.catalogMergeTitle.textContent = "Coincidencias en tu catálogo";
+          fields.catalogMergeStatus.textContent = `${catalogMergeResults.length} ${catalogMergeResults.length === 1 ? "obra parecida" : "obras parecidas"}. Revisalas para evitar duplicados.`;
           renderCatalogMergeResults();
         } catch (error) {
           if (error.name === "AbortError" || !isCurrentSearch(controller)) return;
@@ -354,7 +389,8 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export async function searchManual(source = "all", statusPrefix = "") {
         const query = fields.query.value.trim();
         if (query.length < 2) return;
-        const includeExternal = fields.externalSource.checked;
+        const includeExternal = fields.externalSource.checked || ["add", "link"].includes(collectionSearchMode);
+        fields.externalSource.checked = includeExternal;
         if (externalSearchController) externalSearchController.abort();
         const controller = new AbortController();
         externalSearchController = controller;
@@ -376,15 +412,17 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         if (includeExternal) renderManualResults();
         setSearchState(
           "searching",
-          collectionSearchMode === "browse"
+          collectionSearchMode === "search"
             ? includeExternal
               ? `Buscando “${query}” en tu catálogo y fuentes externas…`
               : `Buscando “${query}” en tu catálogo…`
+            : collectionSearchMode === "add"
+              ? `Buscando “${query}” para agregar y comprobando duplicados…`
             : comparisonSearchMessage()
         );
         const effectiveQuery = effectiveSearchQuery(query);
         const tasks = [];
-        if (collectionSearchMode === "browse") tasks.push(loadLocalSearchResults(effectiveQuery, controller));
+        if (collectionSearchMode === "add") tasks.push(loadLocalSearchResults(effectiveQuery, controller));
         sources.forEach((name) => tasks.push(loadExternalSourceResults(effectiveQuery, name, controller)));
         try {
           await Promise.allSettled(tasks);
@@ -392,7 +430,11 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           updateExternalSearchSummary();
           setSearchState(
             "results",
-            collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
+            collectionSearchMode === "search"
+              ? collectionSearchMessage()
+              : collectionSearchMode === "add"
+                ? `Revisá las fuentes y las coincidencias locales antes de agregar “${query}”.`
+                : comparisonSearchMessage()
           );
           if (includeExternal) renderManualResults();
           renderDatabaseMenu();
@@ -424,7 +466,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           updateExternalSearchSummary();
           setSearchState(
             "results",
-            collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
+            collectionSearchMode === "search" ? collectionSearchMessage() : comparisonSearchMessage()
           );
         } finally {
           if (externalSearchController === controller) {
@@ -451,12 +493,26 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         renderManualResults();
         setSearchState(
           "results",
-          collectionSearchMode === "browse" ? collectionSearchMessage() : comparisonSearchMessage()
+          collectionSearchMode === "search" ? collectionSearchMessage() : comparisonSearchMessage()
         );
       }
 
-      export function clearManualSearch({ focus = true, updateHistory = true, resetExternal = false } = {}) {
+      export function clearManualSearch({
+        focus = true,
+        updateHistory = true,
+        resetExternal = false,
+        forceModeChange = false
+      } = {}) {
         const hadSearch = Boolean(activeQuery || fields.query.value.trim());
+        if (["compare", "link"].includes(collectionSearchMode) && !forceModeChange) {
+          fields.query.value = "";
+          activeQuery = "";
+          setSearchState("error", "Ingresá al menos 2 caracteres o usá Volver para salir sin perder el paso anterior.");
+          if (updateHistory) syncCollectionRoute("push");
+          if (focus) fields.query.focus();
+          return;
+        }
+        const returnMode = collectionSearchMode === "add" ? "add" : "browse";
         fields.collectionUtilityMenu.open = false;
         if (externalSearchController) externalSearchController.abort();
         externalSearchController = null;
@@ -465,10 +521,11 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         manualSourceVisibleCounts = {};
         catalogMergeResults = [];
         selectedManualIndex = null;
+        setSelectedManualCandidate();
         setSelectedExistingIdForSearch(null);
         manualSearchSource = "all";
         activeQuery = "";
-        setCollectionSearchMode("browse");
+        setCollectionSearchMode(returnMode);
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
         setCatalogVisibleCount(CATALOG_PAGE_SIZE);
         externalSourcesLastUsed = [];
@@ -490,12 +547,14 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         if (updateHistory && hadSearch) syncCollectionRoute("push");
         render();
         renderDatabaseMenu();
-        if (focus) fields.query.focus();
+        if (focus && returnMode === "add") fields.query.focus();
+        if (focus && returnMode === "browse") fields.catalogSection.querySelector("#catalogTitle")?.focus();
       }
 
       export function showFixedLocalItemForLink(itemId) {
         setCollectionSearchMode("link");
         const item = items.find((entry) => entry.id === itemId);
+        showCollectionAnchor("link", item || {}, !item);
         catalogMergeResults = item ? [item] : [];
         catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
         fields.catalogMergeSection.classList.add("active");
@@ -514,11 +573,14 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           return;
         }
         const result = manualResults[index] || {};
+        syncCollectionRoute("replace");
+        setSelectedManualCandidate(resultShelfSource(result), candidateReference(result));
         setCollectionSearchMode("compare");
+        showCollectionAnchor("compare", result);
         fields.query.value = [result.title, result.year].filter(Boolean).join(" ");
         activeQuery = fields.query.value.trim();
         render();
-        syncCollectionRoute("push");
+        syncCollectionRoute("push", { candidate: result });
         await searchCatalogForMerge("", result);
         setSearchState("results", comparisonSearchMessage());
         fields.searchContext.scrollIntoView({ behavior: "smooth", block: "start" });

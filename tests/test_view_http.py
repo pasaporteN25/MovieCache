@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.privacy import PrivacyPreferences
+from movie_inbox.external.registry import default_source_adapters
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -1583,7 +1584,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b".dvd-case", css)
         self.assertIn(b".dvd-front-statuses", css)
         self.assertIn(b".home-shelf-rail", css)
-        self.assertIn(b".vhs-cassette", css)
+        self.assertIn(b".vhs-spine", css)
+        self.assertIn(b".vhs-case", css)
+        self.assertIn(b".home-shelf-categories", css)
         self.assertIn(b".spotlight-selector", css)
         self.assertIn(b".collection-filter-toolbar", css)
         self.assertIn(b".filter-segments", css)
@@ -1625,7 +1628,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b"@media (hover: none) and (pointer: coarse)", css)
         self.assertIn(b":has(.dvd-open-surface:focus-visible)", css)
         self.assertIn(b".drawer-accordion", css)
-        self.assertIn(b".spotlight-stage", css)
+        # U4.6b: css/home.css, which held .spotlight-stage, is no longer imported.
+        self.assertIn(b"#homeView .spotlight-layout", css)
         self.assertIn(b".detail-drawer[open]", css)
         self.assertIn(b".personal-record-read", css)
         self.assertIn(b".drawer-navigation", css)
@@ -1663,6 +1667,25 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn(b"<svg", body)
 
+    def test_every_registrable_external_source_has_a_frontend_label(self) -> None:
+        # [F5.4]: TMDb reached production without an entry in SOURCE_LABELS, so every
+        # real result rendered as "Sin fuente". Cosmetic in the result card, but
+        # duplicateSignalsCollide() compares labels rather than raw sources, so two
+        # items from different unlabelled sources also collapsed into one signal and
+        # the [V5-4] disambiguation fallback lost a real distinguishing fact. Only a
+        # live run with a valid token could surface it, so pin it structurally here.
+        status, body = self.request("GET", "/static/js/core/format.js")
+        self.assertEqual(status, 200)
+        block = re.search(r"const SOURCE_LABELS = \{(.*?)\n\s*\};", body.decode("utf-8"), re.DOTALL)
+        self.assertIsNotNone(block)
+        assert block is not None
+        labelled = set(re.findall(r"(\w+)\s*:", block.group(1)))
+        registrable = {
+            adapter.name for adapter in default_source_adapters("token-that-registers-tmdb")
+        }
+        self.assertIn("tmdb", registrable)
+        self.assertEqual(sorted(registrable - labelled), [])
+
     def test_vhs_frame_is_a_packaged_local_png_asset(self) -> None:
         status, body = self.request("GET", "/static/img/vhs-cassette-frame-v1.png")
         self.assertEqual(status, 200)
@@ -1672,7 +1695,7 @@ class ViewerHttpTests(unittest.TestCase):
     def test_static_assets_are_cached_with_etag_revalidation(self) -> None:
         first = self.client.get("/static/js/core/bootstrap.js")
         self.assertEqual(first.status_code, 200)
-        self.assertEqual(first.headers["cache-control"], "public, max-age=3600, must-revalidate")
+        self.assertEqual(first.headers["cache-control"], "public, max-age=0, must-revalidate")
         etag = first.headers["etag"]
         self.assertTrue(etag)
 
@@ -1680,9 +1703,7 @@ class ViewerHttpTests(unittest.TestCase):
             "/static/js/core/bootstrap.js", headers={"If-None-Match": etag}
         )
         self.assertEqual(revalidated.status_code, 304)
-        self.assertEqual(
-            revalidated.headers["cache-control"], "public, max-age=3600, must-revalidate"
-        )
+        self.assertEqual(revalidated.headers["cache-control"], "public, max-age=0, must-revalidate")
         self.assertFalse(revalidated.content)
 
         # API responses stay uncached: they carry per-session catalog data.

@@ -7,7 +7,7 @@ import re
 import time
 import unicodedata
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
@@ -15,15 +15,33 @@ from typing import Any
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
 from movie_inbox.application.import_repository import ImportDraftRepository
-from movie_inbox.domain.catalog import catalog_membership, normalize_item
+from movie_inbox.domain.catalog import CatalogComparisonIndex, catalog_membership, normalize_item
 from movie_inbox.domain.collections import (
     CollectionItem,
     CuratedCollection,
     normalize_collection_item,
 )
-from movie_inbox.domain.imports import ImportDraft, ImportDraftItem, ParsedImport
+from movie_inbox.domain.imports import (
+    DEVICE_ORIGIN,
+    NEVER_EXPIRES,
+    ImportDraft,
+    ImportDraftItem,
+    ParsedImport,
+    ParsedImportItem,
+)
+from movie_inbox.domain.titles import clean_whitespace
 
 IMPORT_DRAFT_TTL_SECONDS = 48 * 60 * 60
+
+# Everything a phone adds while offline lands in one draft per account rather
+# than one draft per work. Two reasons: it matches how it reads -- "things I
+# added from my phone" is one pending pile, not twenty -- and one work per draft
+# would hit MAX_IMPORT_DRAFTS_PER_USER after twenty bus rides.
+DEVICE_DRAFT_NAME = "Agregado desde el telefono"
+MAX_DEVICE_ITEMS_PER_REQUEST = 100
+# One draft cannot grow without limit either, or a phone that loops on a failing
+# sync would fill the instance. Well above any realistic offline backlog.
+MAX_DEVICE_DRAFT_ITEMS = 2_000
 IMPORT_APPLY_STALE_SECONDS = 5 * 60
 MAX_IMPORT_SELECTION = 10_000
 MAX_IMPORT_DRAFTS_PER_USER = 20
@@ -53,6 +71,10 @@ class ImportPermissionError(ValueError):
 
 class ImportDraftLimit(ValueError):
     """Raised when a user must remove a draft before creating another."""
+
+
+class DeviceDraftFull(ValueError):
+    """Raised when the device draft cannot hold more pending works."""
 
 
 class ImportService:
@@ -106,6 +128,148 @@ class ImportService:
         )
         self.repository.create(draft)
         return self._payload(draft, include_items=True, now=now)
+
+    def append_device_items(
+        self,
+        user_id: str,
+        entries: Sequence[Mapping[str, Any]],
+        catalog_items: list[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Add works a phone recorded with no connection to that account's pending pile.
+
+        This is the server half of [A2.3], and the distinction it rests on is
+        the one the Android client's brief v3 makes explicit: editing a work
+        that exists on both sides has a shared base and merges, while **adding**
+        one has no base at all. That is not a merge, it is an import -- so it
+        goes down the path imports already take, and lands in review rather than
+        in the catalogue.
+
+        The phone never decides identity. Each entry is classified against the
+        catalogue by the same rules a file import uses: an obvious match reads
+        `present`, an uncertain one `review`, and only a clear miss reads `new`.
+        Nothing is written to the catalogue here.
+
+        Idempotent by the client's own id. A sync that succeeds on the server and
+        fails on the way back will be retried, and a retry must not duplicate
+        the film -- so an entry whose id is already in the draft is reported
+        back, not added again.
+
+        Enrichment is deliberately **not** done here. It is a network call, and
+        making a phone wait on it -- or fail because a third party is down --
+        would defeat the point of an offline addition. The draft carries what
+        the person typed; the existing enrichment path fills the rest in when
+        someone reviews it.
+        """
+
+        if len(entries) > MAX_DEVICE_ITEMS_PER_REQUEST:
+            raise ValueError(
+                f"At most {MAX_DEVICE_ITEMS_PER_REQUEST} works can be sent in one request"
+            )
+        now = self._now()
+        self.repository.purge_expired(now)
+        draft = self._device_draft(user_id)
+        known = {entry.id for entry in draft.items} if draft is not None else set()
+        position = max((entry.position for entry in draft.items), default=-1) if draft else -1
+
+        parsed_items: list[ParsedImportItem] = []
+        duplicates: list[str] = []
+        for raw in entries:
+            entry_id = str(raw.get("id") or "").strip()[:64]
+            if not entry_id:
+                raise ValueError("Every work needs a client id, so a retry cannot duplicate it")
+            if entry_id in known or entry_id in {row.id for row in parsed_items}:
+                duplicates.append(entry_id)
+                continue
+            position += 1
+            parsed_items.append(self._device_entry(entry_id, position, raw))
+
+        if draft is not None and len(draft.items) + len(parsed_items) > MAX_DEVICE_DRAFT_ITEMS:
+            raise DeviceDraftFull(
+                f"The device draft already holds {len(draft.items)} works; "
+                "review it before adding more"
+            )
+
+        added: tuple[ImportDraftItem, ...] = ()
+        if parsed_items:
+            parsed = ParsedImport(DEVICE_DRAFT_NAME, "json", tuple(parsed_items))
+            # Classified against the catalogue plus what the draft already holds,
+            # so a work added twice on two different days is caught as well.
+            seen = list(catalog_items) + [
+                entry.item for entry in (draft.items if draft else ()) if entry.item
+            ]
+            added = self._classify(parsed, seen)
+            draft = self._store_device_items(user_id, draft, added, now)
+
+        return {
+            "draft_id": draft.id if draft is not None else "",
+            "accepted": [
+                {"id": entry.id, "state": entry.state, "reason": entry.reason} for entry in added
+            ],
+            "duplicates": duplicates,
+            "counts": draft.counts() if draft is not None else {},
+        }
+
+    def _device_draft(self, user_id: str) -> ImportDraft | None:
+        for summary in self.repository.list_for_user(user_id):
+            if summary.origin == DEVICE_ORIGIN and summary.status == "ready":
+                return self.repository.get_for_user(user_id, summary.id)
+        return None
+
+    def _device_entry(
+        self,
+        entry_id: str,
+        position: int,
+        raw: Mapping[str, Any],
+    ) -> ParsedImportItem:
+        title = clean_whitespace(str(raw.get("title") or ""))[:400]
+        if not title:
+            return ParsedImportItem(entry_id, position, "(sin titulo)", None, "missing_title")
+        year = str(raw.get("year") or "").strip()[:8]
+        label = f"{title} ({year})" if year else title
+        item = normalize_item(
+            {
+                "title": title,
+                "year": year,
+                "kind": str(raw.get("kind") or "pelicula"),
+                "notes": clean_whitespace(str(raw.get("notes") or ""))[:2000],
+            }
+        ).to_dict()
+        return ParsedImportItem(entry_id, position, label, item)
+
+    def _store_device_items(
+        self,
+        user_id: str,
+        draft: ImportDraft | None,
+        added: tuple[ImportDraftItem, ...],
+        now: int,
+    ) -> ImportDraft:
+        if draft is None:
+            if self.repository.count_for_user(user_id) >= self.max_drafts:
+                raise ImportDraftLimit(
+                    f"Import draft limit reached ({self.max_drafts}); "
+                    "delete a draft before adding from a phone"
+                )
+            created = ImportDraft(
+                id=self.id_factory(),
+                user_id=user_id,
+                source_name=DEVICE_DRAFT_NAME,
+                source_format="json",
+                source_hash=hashlib.sha256(f"device:{user_id}".encode()).hexdigest(),
+                status="ready",
+                created_at=now,
+                updated_at=now,
+                expires_at=NEVER_EXPIRES,
+                origin=DEVICE_ORIGIN,
+                items=added,
+            )
+            self.repository.create(created)
+            return created
+        if not self.repository.append_items(user_id, draft.id, added, now):
+            # Someone is applying the draft in the browser right now, or it was
+            # just deleted. Saying so beats writing into a draft about to
+            # disappear: the phone keeps the works and offers them again.
+            raise ImportDraftBusy("The device draft is being applied; try again")
+        return replace(draft, updated_at=now, items=draft.items + added)
 
     def list_drafts(self, user_id: str) -> list[dict[str, Any]]:
         now = self._now()
@@ -324,7 +488,11 @@ class ImportService:
         parsed: ParsedImport,
         catalog_items: list[Mapping[str, Any]],
     ) -> tuple[ImportDraftItem, ...]:
-        source_items: list[Mapping[str, Any]] = []
+        # Both comparisons below run once per parsed row against the same two
+        # lists, so both lists are prepared once. The source one grows as rows
+        # are accepted, which is what add() is for.
+        source_items = CatalogComparisonIndex()
+        prepared_catalog = CatalogComparisonIndex(catalog_items)
         classified: list[ImportDraftItem] = []
         for parsed_entry in parsed.items:
             if parsed_entry.item is None:
@@ -356,8 +524,8 @@ class ImportService:
                     )
                 )
                 continue
-            source_items.append(parsed_entry.item)
-            membership = catalog_membership(parsed_entry.item, catalog_items)
+            source_items.add(parsed_entry.item)
+            membership = catalog_membership(parsed_entry.item, prepared_catalog)
             state = "new" if membership["state"] == "missing" else membership["state"]
             classified.append(
                 ImportDraftItem(
@@ -379,11 +547,12 @@ class ImportService:
         catalog_items: list[Mapping[str, Any]],
     ) -> ImportDraft:
         refreshed: list[ImportDraftItem] = []
+        prepared = CatalogComparisonIndex(catalog_items)
         for entry in draft.items:
             if entry.state == "invalid" or not entry.collection_eligible:
                 refreshed.append(entry)
                 continue
-            membership = catalog_membership(entry.item or {}, catalog_items)
+            membership = catalog_membership(entry.item or {}, prepared)
             state = "new" if membership["state"] == "missing" else membership["state"]
             refreshed.append(
                 replace(
@@ -476,10 +645,13 @@ class ImportService:
                 "fingerprint": draft.source_hash[:12],
             },
             "status": draft.status,
+            "origin": draft.origin,
             "created_at": _iso_time(draft.created_at),
             "updated_at": _iso_time(draft.updated_at),
-            "expires_at": _iso_time(draft.expires_at),
-            "remaining_seconds": max(0, draft.expires_at - now),
+            # A device draft has no expiry to report, and inventing one would
+            # put a countdown on a surface that must not show one.
+            "expires_at": "" if draft.never_expires else _iso_time(draft.expires_at),
+            "remaining_seconds": None if draft.never_expires else max(0, draft.expires_at - now),
             "counts": draft.counts(),
             "result": draft.result,
         }

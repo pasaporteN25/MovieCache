@@ -12,7 +12,9 @@
       <header class="app-header">
         <div class="brand-lockup">
           <span class="brand-kicker">Video club // night shift</span>
-          <h1>__MOVIE_INBOX_TITLE__</h1>
+          <a class="brand-home" href="/" aria-label="Ir a Inicio">
+            <h1>__MOVIE_INBOX_TITLE__</h1>
+          </a>
           <div class="stats" id="stats" aria-live="polite">Cargando...</div>
         </div>
         <nav class="primary-nav" aria-label="Navegación principal">
@@ -23,7 +25,15 @@
           </button>
           <button id="clubButton" class="nav-action" type="button">Club</button>
         </nav>
-        <div class="header-utilities" role="group" aria-label="Acciones de la cuenta">
+        <div class="header-utilities" role="group" aria-label="Utilidades del mostrador">
+          <button id="headerSearchButton" class="header-utility-action" type="button" title="Buscar en tu colección">
+            <span>Buscar</span>
+            <small>En tu colección</small>
+          </button>
+          <button id="headerAddButton" class="header-utility-action" type="button" title="Agregar a tu colección">
+            <span>Agregar</span>
+            <small>A tu colección</small>
+          </button>
           <button id="randomButton" class="header-command random-command" type="button">
             <span>Al azar</span>
             <small id="randomScopeLabel">Disponibles</small>
@@ -32,8 +42,27 @@
             <summary aria-label="Abrir menú de cuenta">
               <span id="currentUserInitial" class="account-mark" aria-hidden="true">MI</span>
               <span id="currentUserLabel">Perfil</span>
+              <span class="menu-summary-label">Menú</span>
             </summary>
             <div class="system-menu-panel">
+              <div class="menu-route-group" role="group" aria-label="Vistas y herramientas">
+                <button class="nav-action inbox-nav-action menu-route-action menu-desktop-action" type="button" data-click="menu-inbox">
+                  Bandeja <span class="nav-count" data-menu-inbox-badge hidden>0</span><span class="nav-count nav-count-scanner" data-menu-scanner-badge hidden>0</span>
+                </button>
+                <button class="nav-action menu-route-action menu-desktop-action" type="button" data-click="menu-club">Club</button>
+                <button class="header-command random-command menu-route-action menu-desktop-action" type="button" data-click="menu-random">
+                  <span>Al azar</span>
+                  <small data-menu-random-scope>Disponibles</small>
+                </button>
+                <button class="header-utility-action menu-route-action menu-desktop-action" type="button" data-click="menu-search" title="Buscar en tu colección">
+                  <span>Buscar</span>
+                  <small>En tu colección</small>
+                </button>
+                <button class="header-utility-action menu-route-action menu-desktop-action" type="button" data-click="menu-add" title="Agregar a tu colección">
+                  <span>Agregar</span>
+                  <small>A tu colección</small>
+                </button>
+              </div>
               <div class="account-overview">
                 <span class="system-menu-kicker">Cuenta activa</span>
                 <strong id="currentUserName">Cargando…</strong>
@@ -51,4 +80,3 @@
           </details>
         </div>
       </header>
-

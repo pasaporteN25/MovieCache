@@ -7,7 +7,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-        button, .dvd-flipper, .dvd-case, .detail-drawer, .vhs-cassette-shell, .home-shelf-tape-copy { transition: none; }
+        button, .dvd-flipper, .dvd-case, .detail-drawer, .vhs-spine, .home-shelf-preview-frame { transition: none; }
         .dvd-cover-image,
         .dvd-placeholder,
         .drawer-poster,
@@ -25,6 +25,12 @@
         .source-search-spinner { animation: none; }
         .dvd-card:hover .dvd-flipper,
         .dvd-card:has(.dvd-open-surface:focus-visible) .dvd-flipper { transform: none; }
+        /* Defensa en profundidad: openDetailWithCaseTransition ya evita llamar a
+           document.startViewTransition() bajo reduced-motion, esto es un respaldo
+           por si el navegador dispara una transición de todos modos. */
+        ::view-transition-group(*),
+        ::view-transition-old(*),
+        ::view-transition-new(*) { animation: none !important; }
 }
 
 @media (forced-colors: active) {

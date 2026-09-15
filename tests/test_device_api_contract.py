@@ -24,13 +24,64 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/auth/login",
                 "/api/v1/auth/refresh",
                 "/api/v1/auth/session",
+                "/api/v1/pair",
                 "/api/v1/me",
+                "/api/v1/availability",
+                "/api/v1/catalog/drafts",
+                "/api/v1/ratings",
+                "/api/v1/charades",
+                "/api/v1/collections",
+                "/api/v1/collections/{collectionId}/items",
                 "/api/v1/catalog/items",
                 "/api/v1/catalog/items/{itemId}",
                 "/api/v1/catalog/items/{itemId}/personal",
                 "/api/v1/search",
             },
         )
+        # [A2.1]: pairing is additive -- a new path, no existing meaning changed --
+        # so it belongs inside v1 by ADR-0003's own versioning rule.
+        pair = document["paths"]["/api/v1/pair"]["post"]
+        self.assertEqual(pair["operationId"], "redeemPairingTicket")
+        self.assertEqual(pair["security"], [], "a device pairing has no session yet")
+        self.assertIn("429", pair["responses"], "redemption is rate limited like login")
+        # [A2.3]: adding offline is an import, not a merge, so the contract
+        # says plainly that nothing here reaches the catalogue.
+        drafts = document["paths"]["/api/v1/catalog/drafts"]["post"]
+        self.assertEqual(drafts["operationId"], "addOfflineDrafts")
+        self.assertIn("200", drafts["responses"])
+        self.assertNotIn("201", drafts["responses"], "appending is not creating")
+        item = document["components"]["schemas"]["OfflineDraftItem"]
+        self.assertEqual(sorted(item["required"]), ["id", "title"])
+        # [A2.6]: a collection work carries identity and nothing personal --
+        # following a collection does not copy anything into your catalogue.
+        work = document["components"]["schemas"]["CollectionWork"]
+        for field in ("personal", "status", "rating", "review", "path", "local_files"):
+            self.assertNotIn(field, work["properties"])
+        # [A2.6]: the two conditions ADR-0004 attached to this source have to
+        # survive on the wire, not just in a document.
+        result = document["components"]["schemas"]["AvailabilityResult"]
+        self.assertIn("attribution", result["required"])
+        self.assertIn("justwatch", result["properties"]["attribution"]["required"])
+        row = document["components"]["schemas"]["WorkAvailability"]["properties"]
+        self.assertIn("expires_at", row, "a replica has to know when to stop showing it")
+        # [F3.2] on the wire: a public score is somebody else's opinion, so
+        # the shape has no room for the viewer's own rating to be written into.
+        rating = document["components"]["schemas"]["PublicRating"]["properties"]
+        self.assertIn("source", rating)
+        self.assertNotIn("personal", rating)
+        # [A2.4]: a phone deals the same deck offline only if it holds the deck's
+        # whole input, keys included -- and nothing personal travels with it.
+        charades = document["paths"]["/api/v1/charades"]["get"]
+        self.assertEqual(charades["operationId"], "getCharadesSnapshot")
+        charade = document["components"]["schemas"]["CharadeWork"]
+        self.assertEqual(
+            sorted(charade["required"]), ["difficulty", "key", "source", "title", "year"]
+        )
+        for field in ("personal", "status", "rating", "review", "notes", "path", "local_files"):
+            self.assertNotIn(field, charade["properties"])
+        snapshot = document["components"]["schemas"]["CharadesSnapshot"]
+        for field in ("works", "fingerprint", "counts", "timer_options"):
+            self.assertIn(field, snapshot["required"])
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
 

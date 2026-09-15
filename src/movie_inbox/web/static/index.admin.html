@@ -15,6 +15,7 @@
           <a href="#adminPublicPresentations">Carteleras públicas</a>
           <a href="#adminDatabase">Base de datos</a>
           <a href="#adminExternal">Fuentes externas</a>
+          <a href="#adminStreaming">Plataformas</a>
           <a href="#adminMatching">Matching y duplicados</a>
         </nav>
 
@@ -151,6 +152,32 @@
             </div>
           </div>
           <div id="databaseExternalPanel" class="db-panel admin-db-panel"></div>
+        </section>
+
+        <section id="adminStreaming" class="admin-section" aria-labelledby="adminStreamingTitle">
+          <div class="admin-section-heading">
+            <div>
+              <h3 id="adminStreamingTitle">Plataformas de streaming</h3>
+              <p>Qué mercados consulta esta instancia y con qué plataformas. Estar en una plataforma no es lo mismo que tener el archivo.</p>
+            </div>
+          </div>
+          <form id="streamingRegionForm" class="streaming-region-form">
+            <label>País
+              <input id="streamingRegionCode" type="text" maxlength="2" minlength="2" placeholder="AR" autocomplete="off" required>
+            </label>
+            <label>Nombre visible
+              <input id="streamingRegionName" type="text" maxlength="80" placeholder="Argentina" autocomplete="off">
+            </label>
+            <button id="addStreamingRegion" type="submit">Agregar región</button>
+          </form>
+          <div id="streamingPolicy" class="streaming-policy"></div>
+          <div class="streaming-policy-actions">
+            <button id="saveStreamingPolicy" class="quiet-action" type="button">Guardar política de regiones</button>
+          </div>
+          <p id="streamingFeedback" class="admin-inline-feedback" role="status" aria-live="polite" hidden></p>
+          <div id="streamingRegionList" class="streaming-region-list" aria-live="polite">
+            <p class="member-list-empty">Abrí Administrar para ver las regiones configuradas.</p>
+          </div>
         </section>
 
         <section id="adminMatching" class="admin-section" aria-labelledby="adminMatchingTitle">

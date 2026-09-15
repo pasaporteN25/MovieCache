@@ -76,6 +76,7 @@
         wikipedia: "Wikipedia",
         imdb: "IMDb",
         filmaffinity: "FilmAffinity",
+        tmdb: "TMDb",
         jikan: "Jikan / MyAnimeList",
         anime_offline_database: "Anime DB offline",
         wikidata: "Wikidata",

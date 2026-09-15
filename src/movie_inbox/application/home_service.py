@@ -9,14 +9,22 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import date
 from typing import Any
 
-from movie_inbox.domain.catalog import catalog_membership, external_urls, title_match_key
+from movie_inbox.domain.catalog import (
+    CatalogComparisonIndex,
+    catalog_membership,
+    external_urls,
+    title_match_key,
+)
 from movie_inbox.domain.collections import CuratedCollection
 from movie_inbox.domain.normalization import normalize_bool, normalize_rating
 from movie_inbox.domain.releases import normalize_release_dates
 
 HOME_SECTION_LIMIT = 6
 HOME_SECTION_COUNT = 5
-HOME_FEATURED_LIMIT = 4
+# The desktop home billboard has room for six daily recommendations. Keep the
+# limit in one server-side constant so API payloads, saved snapshots, and
+# clients can agree on the same bounded contract.
+HOME_FEATURED_LIMIT = 6
 _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -293,11 +301,16 @@ class EditorialHomeService:
     ) -> dict[str, Any] | None:
         candidates: list[tuple[CuratedCollection, Any]] = []
         work_keys: set[str] = set()
+        # Every entry of every followed collection is compared against the whole
+        # catalogue, and an entry that is missing -- which is the interesting
+        # case here -- cannot short-circuit, so it walks all of it. Prepared
+        # once instead of once per entry.
+        prepared = CatalogComparisonIndex(catalog)
         for collection in collections:
             if not collection.followed:
                 continue
             for entry in collection.items:
-                if catalog_membership(entry.item, catalog)["state"] != "missing":
+                if catalog_membership(entry.item, prepared)["state"] != "missing":
                     continue
                 work_key = _work_key(entry.item)
                 if work_key in work_keys:

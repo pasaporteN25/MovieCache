@@ -1,0 +1,54 @@
+[
+  {
+    "background": "rgba(0, 0, 0, 0)",
+    "font": "12px",
+    "ink": "rgb(164, 227, 233)",
+    "selector": ".spotlight-copy p",
+    "backing": "rgb(2,13,19)",
+    "ratio": 13.78
+  },
+  {
+    "background": "rgba(0, 0, 0, 0)",
+    "font": "12px",
+    "ink": "rgb(131, 191, 199)",
+    "selector": ".home-console-details dt",
+    "backing": "rgb(2,13,19)",
+    "ratio": 9.58
+  },
+  {
+    "background": "rgba(0, 0, 0, 0)",
+    "font": "12px",
+    "ink": "rgb(197, 230, 230)",
+    "selector": ".home-console-details dd",
+    "backing": "rgb(2,13,19)",
+    "ratio": 14.81
+  },
+  {
+    "background": "rgba(0, 0, 0, 0)",
+    "font": "10px",
+    "ink": "rgb(164, 205, 208)",
+    "selector": ".home-media-review",
+    "backing": "rgb(2,13,19)",
+    "ratio": 11.43
+  },
+  {
+    "background": "rgba(0, 0, 0, 0)",
+    "font": "11px",
+    "ink": "rgb(239, 208, 155)",
+    "selector": ".home-media-review button",
+    "backing": "rgb(2,13,19)",
+    "ratio": 13.24
+  },
+  {
+    "background": "rgba(0, 0, 0, 0)",
+    "font": "10px",
+    "ink": "rgb(133, 211, 220)",
+    "selector": ".spotlight-playlist th",
+    "backing": "rgb(2,13,19)",
+    "ratio": 11.55
+  },
+  {
+    "selector": "focus ring",
+    "ratio": 11.24
+  }
+]

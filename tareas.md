@@ -24,110 +24,505 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U1] | Inicio videoclub: selector A + estanterias C | cierre v0.7.0 |
-| 2 | [A1] | API versionada para dispositivos | D1 |
-| 3 | [A2] / [I1] | Cliente Android / evaluacion de integraciones | A1 |
+| 1 | [U4] | Integrar materialmente la Home como una única consola | U4.1 visual antes de código |
+| 2 | [U5] → [U6] → [U7] → [U8] | Lista del conjunto, cartelera consultada, imágenes y VHS al azar | B integrada con U4.3/U6.1; quedan U5, compatibilidad U6 e imágenes U7 |
+| — | [B1] | **Cerrada 2026-09-11.** Alcance cubierto, medido y con gates en CI | criterio de cierre acordado con el owner |
+| 3 | [A2] | **Se mudó a `../movieIndexAndroid`** (2026-09-13) | tablero propio de ese repositorio |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
+| Posterior | [U9] | Sonido opcional de biblioteca | interacción VHS estable; no bloquea las otras épicas |
+| Último | [MW1] | Revisión y ajustes de web en navegador de celular | baja prioridad; cliente Kotlin por delante |
+| — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
 
-- **En curso:** ninguna tarea; [D1], [W3] y [U1] ya tienen validacion y cierre verificables.
-- **Cerrado recientemente:** [C2], [D1], [W1], [W2], [W3] y [U1]. El detalle verificable
-  permanece en `Hecho`.
+**Aviso entre frentes, 2026-09-11 — del lado lógica.** Este archivo lo escriben los dos
+frentes y conviene decir en voz alta quién movió qué, porque durante esta semana se
+desincronizó.
+
+- **Lo que movió lógica**: [B1] quedó **cerrada** con el criterio acordado con el owner, y
+  se abrió [B2] con los dos pendientes que deja. **[B2.1] es del frente visual**: el corte
+  de dos caracteres en `catalog-search.js` es lo único que hoy impide que una consulta de
+  una sola letra —`M`, `Z`, `9` son películas— funcione desde la caja de búsqueda; por API
+  y por CLI ya funciona desde `57ad234`.
+- **Cómo se editó, para que nadie pierda trabajo**: cada commit de lógica se prepara contra
+  `HEAD` y toca **sólo sus propias secciones**, y después se vuelve a aplicar sobre el árbol
+  de trabajo. Por eso ninguno de esos commits arrastró las líneas sin commitear del otro
+  frente, y por eso la fila de [B1] en la tabla se escribió resistente a las dos formas que
+  la tabla tiene ahora mismo.
+- **Lo que conviene mirar**: al 2026-09-11 este archivo tiene ~118 líneas sin commitear del
+  frente visual, entre ellas un párrafo que sigue diciendo que *"[B1] queda en espera por
+  ser un frente de lógica"*. Eso ya no es cierto y va a contradecir la fila de la tabla
+  cuando se commitee. **La cura no es coordinar mejor: es commitear más seguido.** Mientras
+  un frente retiene cambios en un archivo compartido, el otro está escribiendo sobre una
+  versión que no ve.
+
+
+**Reordenamiento del 2026-09-09, por decisión del owner.** Las integraciones externas
+([I1]) siguen postergadas; en ese corte [B1] quedaba en espera por ser lógica
+(cerró posteriormente, el 2026-09-11). La prioridad
+es el nuevo pulido visual de Home [U4], abierto después de la aceptación de [U2-P].
+
+- **Último corte visual:** [U4.4] implementada; [U4.6a] y [U7.5a] verificadas el
+  2026-09-13. Restan la regresión histórica [U4.6b] y datos/galería [U7.5b]. [U6.1]
+  cerró con B elegida y [U4.3] está integrada (2026-09-13). La Home ya
+  integra el encuadre de [U4.2d.1], selección de [U4.2d.2] y consola única de d.3.
+  [U4.2a/b] aprobadas; [U4.2c] integrada.
+  Sin framework nuevo; bases previas rechazadas.
+- **Cerrado recientemente:** [U2-R] cerró su gate técnico el 2026-09-06 y [U2-P]
+  recibió aceptación visual el 2026-09-08;
+  [U3], [C2], [D1], [W1], [W2], [W3], [U1] y la base técnica [U2] conservan su historia en
+  `Hecho`.
 - **Lectura:** `Backlog` contiene solo trabajo pendiente; `Hecho` preserva decisiones,
   pruebas y commits sin mezclarlo con la cola.
 
+### Frente: Inicio videoclub (integración material U4)
+
+#### [U4] Integrar Home como una única consola de archivo audiovisual
+
+**Abierta y aprobada 2026-09-09.** El mueble, la cartelera y sus controles conservan su
+función y contenido, pero deben dejar de verse como capas HTML apoyadas sobre imágenes.
+El fondo de ladrillos actual se descarta por completo. La dirección aprobada es una
+consola gráfica semiilustrada: formas controladas, metal pintado, serigrafía, sombras
+internas y luz contenida, con un campo nocturno abstracto que prolonga el objeto.
+
+- **Alcance:** composición y materialidad de Home en escritorio. Unificar profundidad,
+  iluminación, alineaciones y uniones entre controles, imágenes, lomos y carcasa. No se
+  presupone que la franja superior sea un único panel; sí que sus partes formen una
+  composición armónica.
+- **Criterio de cierre:** 1280×720, 1440×900 y 1920×1080 muestran una escena continua,
+  sin tarjetas flotantes, costuras laterales, poste ornamental ni vacío negro; controles y
+  texto siguen siendo HTML accesible. Móvil recibe sólo smoke de reflow/overflow porque
+  la experiencia vertical prioritaria se diseñará más adelante en Kotlin.
+- **Fuera de alcance:** lógica de catálogo/datos, nuevas funciones, tipografía global
+  y rediseño móvil profundo. Excepción solicitada para [U4.2d.2/d.3]: conectar la
+  selección visual común y preservar acciones, navegación y permisos existentes.
+- **Brief:** `docs/briefs/home-u4-material-integration-v1.md`.
+
+  - [x] **[U4.1] Explorar tres composiciones visuales.** Crear north stars de escritorio
+    sobre contenido realista, variando topología, profundidad y unión de los módulos sin
+    cambiar la dirección material. Presentarlas juntas y elegir qué elementos continúan;
+    no tocar todavía la Home de producción. **Opción B — Espina de control— elegida el
+    2026-09-09. El owner pidió conservar sus ventilaciones y las leyendas laterales.**
+  - [x] **[U4.2] Reemplazar escenario y recomponer carcasa.** Base actual aceptada
+    visualmente por el owner el 2026-09-12; cierre de esta etapa, no de todo U4.
+    Sustituir por completo la
+    pared fotográfica; recomponer el encuadre sin costuras ni vacío negro. La continuidad
+    unilateral se reemplaza por el frente centrado propuesto en [U4.2d].
+    **Reabierta el 2026-09-09:** se rechazó la
+    carcasa rasterizada v3 y también la reconstrucción CSS. Tras comparar tres opciones,
+    el owner pidió planificar una **videoteca empotrada con fondo/frente continuos**.
+    Plan: `docs/design/u4-2-inset-library-plan.md`; arranque autorizado conservando la
+    base tecnológica. Nueva base integrada en [U4.2c] y reencuadrada en d.3, aceptada.
+    Material [U4.2a] aprobado el 2026-09-10; entrega compuesta CSS + fuentes RGB en
+    `docs/design/u4-2a-material-kit-v1/`. Cierre registrado en `Hecho`; no son PNG alpha.
+    Encuentro [U4.2b] aprobado; cierre y ajuste de escala registrados en `Hecho`.
+    - [x] **[U4.2c] Base Home continua.** Aplicar el kit aprobado a fondo y aberturas;
+      verificar márgenes, scroll y continuidad derecha en los tres anchos desktop.
+      **Implementada:** `home-inset.css` + `home-material.css`, sin cambios a JS/APIs.
+      Seis filas sin scroll interno; ampliación pedida por el owner. Evidencia en
+      `docs/design/u4-2c-evidence/`; aceptada en el conjunto actual el 2026-09-12.
+    - [x] **[U4.2d] Reencuadre y consola única.** Conjunto aceptado el 2026-09-12.
+      Pedido posterior a c; se resuelve
+      antes de U4.3 para no pulir dos componentes que luego se consolidarán.
+      - [x] **[U4.2d.1] Composición visual.** Comparador entregado el 2026-09-10 en
+        `docs/design/u4-2d-1-composition/`: ancho común centrado, dos retornos finos,
+        sin consola inferior en Propuesta. QA 1280/1440/1920/2482 y smoke móvil 390;
+        revisión independiente sin fixes materiales. Encuadre integrado por d.3;
+        aceptación visual conjunta el 2026-09-12. Se conservan VHS y seis filas.
+      - **[U4.2d.2] Selección compartida — implementada.** Cierre técnico en `Hecho`;
+        no implica consolidación visual ni retiro del panel inferior.
+      - **[U4.2d.3] Consolidación — implementada.** Encuadre y consola única reales;
+        contenido/acciones trasladados y componente inferior retirado. Cierre técnico
+        en `Hecho`; aceptación visual el 2026-09-12. Absorbe la consolidación de U4.5.
+  - **[U4.3] Integración implementada.** B aprobada y trasladada a Home;
+    cierre técnico y evidencia en `Hecho` (2026-09-13).
+  - **[U4.4] Implementada.** Placas ancladas, VHS asentados y luz/desgaste unificados;
+    evidencia en `docs/design/u4-4-visual-gate/`, cierre técnico en `Hecho`.
+  - **[U4.5] Cerrada por absorción en d.3/U4.3.** Sin panel inferior separado;
+    registro en `Hecho` junto con la integración de B.
+  - [ ] **[U4.6] Gate visual y responsive acotado.** Comparar los tres anchos desktop,
+    verificar foco y contraste, y hacer sólo un smoke móvil de reflow y overflow.
+    Actualizar/correr las aserciones geométricas de navegador que aún describen U2
+    y la carcasa rechazada; U4.2c tiene QA conectado y 20 tests de servicio/packaging.
+    - [x] **[U4.6a] Gate visual conectado.** 2026-09-13: 1280/1440/1920, smoke
+      390/320, foco separado de selección, contraste de pantalla, 0/1/2 imágenes,
+      error, vacío, título largo y origen Club. Evidencia `u4-4-visual-gate/`.
+    - [ ] **[U4.6b] Regresión histórica de navegador.** Se migraron geometrías de
+      cartelera, placas, mueble y consola a B y a `home_visual_metrics.js`; la sonda
+      se ejecutó en navegador conectado. Falta migrar los tests de interacción que
+      aún usan `.home-shelf-preview`/señal eliminada y ejecutar el runner completo.
+      Preservar escenarios móvil, fuentes, fechas y foco; no saltarlos ni adaptar
+      expectativas para aprobar silenciosamente. Es trabajo de tests, no rediseño.
+
+### Frente: Home — lista del conjunto seleccionado
+
+#### [U5] Revisar la sincronización VHS / lista Winamp
+
+**Abierta 2026-09-12.** El owner confirma cambio automático al seleccionar un VHS.
+Revisa el contrato U2-R/U4.2d.2 que reservaba el cambio de lista a activar la categoría;
+preserva la independencia de la cartelera Hoy/Ayer. Plan detallado, matrices y gates:
+`docs/design/home-evolution-backlog-2026-09-12.md`.
+
+**Corte v0.9.0 actualizado 2026-09-14:** completar el cierre de U4/U5/U6 y el
+tramo visual U7.5a ya integrado. U8 pasa a otra release, sin número asignado;
+retoques no bloqueantes posteriores al fix. Subdivisión y contrato
+propuesto: `docs/design/home-v0-9-0-u5-u8-plan.md`. No se declara implementación.
+
+- [x] **[U5.1] Contrato, foco y alcance del conjunto.** `home.js`/`home_service.py`
+  y brief: fuente, consulta, selección vs Tab pasivo, placa y retorno diario; auditar
+  muestra editorial vs conjunto completo. Salida: matriz con autoplay/Hoy/Ayer/Club y
+  rótulos honestos. Dep.: d.3 aceptada. Modelo grande, diseño y semántica.
+  - [x] **[U5.1.1] Auditar alcance y estado existente.** Secciones editoriales de hasta
+    seis obras, no conjunto completo; tabla y fuentes ya reutilizables. Evidencia en el plan.
+  - [x] **[U5.1.2] Validar matriz y copy.** Contrato documentado: Tab pasivo,
+    selección explícita, fuente editorial honesta, retorno diario y recuperación.
+    Owner confirma el 2026-09-14 el alcance: mismas obras del estante, actualmente
+    hasta seis, no colección completa. Recorridos básicos verificados en la entrega
+    conectada; gate extendido U5.4–5 verificado el 2026-09-14. Evidencia: `docs/design/u5-integration-gate.md`.
+  - [x] **[U5.1.3] Fixtures del contrato.** Diaria/dos estantes, Club con ID coincidente,
+    vacío y 1/6/20/100 filas; base de U5.5, sin ampliar el límite de producción.
+- [x] **[U5.2] Coordinar fuente y selección.** `selectHomeShelfEntry()` y resolución
+  de estado en `home.js`: VHS cambia lista/consulta; carrusel conserva su estado,
+  selección recordada y fallback válido. Dep.: U5.1. Modelo grande.
+  Implementada 2026-09-14; memoria por clave/origen y scroll local. Gate U5.5 verificado.
+- [x] **[U5.3] Cabecera y retorno explícitos.** Renderer/Home CSS/HTML: nombre y
+  alcance del conjunto, retorno a Hoy/Ayer, placa activable visible y listas largas
+  sin hacer crecer todo el documento. Dep.: U5.1–2 + encaje U6.1. Modelo medio.
+  - [x] **[U5.3.1] Fuente y alcance visibles.** Nombre, cantidad y selección editorial
+    dentro de la cabecera existente; títulos largos sin achicar toda la Home.
+  - [x] **[U5.3.2] Retorno y placa activable.** Volver a programación y botón de placa
+    integrado, semántico, con foco estable; conservar Hoy/Ayer independiente.
+  - [x] **[U5.3.3] Densidad y lista larga.** Seis filas completas y scroll local para
+    más entradas, sin desplazar la página ni ocultar la selección.
+    Implementada 2026-09-14: ventana acotada, encabezado fijo, scroll por fuente y
+    recuperación al redimensionar. Evidencia: `docs/design/u5-long-list-gate/`.
+  - [x] **[U5.3.4] Evidencia visual conectada.** Tres desktops, reflow/zoom y estados
+    largos/vacíos; cerrar con U5.4–5, no sólo con capturas de maqueta.
+    - [x] 0/1/6/20/100 obras en 1280/1440/1920; capturas y métricas de geometría.
+    - [x] Reflow 390/320 y equivalente 720; Inicio/Fin nativos, encabezado fijo,
+      fila enfocada visible y sin scroll de documento causado por selección.
+    - [x] Aceptación manual del owner tras procedimiento de zoom real 200%,
+      2026-09-14. Tres capturas aprobadas; porcentaje/navegador no visibles en PNG.
+      Cierre por aceptación, no medición automatizada: `docs/design/u5-u6-owner-acceptance/`.
+- [x] **[U5.4] Teclado y origen.** Home/bootstrap: foco estable fila/lomo/diálogo,
+  anuncio único y acciones de Club sin edición personal. Dep.: U5.2–3. Modelo grande.
+  Verificada 2026-09-14: foco recuperable tras eliminación, tres accesos de Club
+  con retorno nativo, IDs coincidentes sin cruce de origen, Tab pasivo, anuncio
+  idempotente y reduced-motion. Sin modificar el mundo visual aprobado.
+- [x] **[U5.5] Gate de fuentes.** `tests/js/home-selection.test.mjs` y tests de
+  navegador: 0/1/6/20/100 entradas, autoplay, cambios de día, origen y eliminación;
+  migrar las aserciones del gesto anterior. Dep.: U5.4. Modelo grande para revisión.
+  Verificado 2026-09-14: 15 pruebas Chromium, 26 JS y 17 Python; respuestas de día
+  obsoletas ignoradas, error/reintento y cambios de fuente conservan contexto/foco.
+  Evidencia reproducible: `docs/design/u5-integration-gate.md`. No sustituye zoom
+  real 200% de U5.3.4, suite histórica completa U4.6b ni CI/gate de release.
+
+### Frente: Home — segunda cartelera de consulta
+
+#### [U6] Cartelera derecha simétrica
+
+**Abierta 2026-09-12.** Derecha muestra la obra consultada desde fila/VHS/azar;
+izquierda conserva Hoy/Ayer. Una consola única. La simetría y reducción de ancho de
+la lista quedan fijadas por la opción B elegida. Plan: `home-evolution-backlog-2026-09-12.md`.
+
+- **[U6.1] Cerrada: opción B elegida.** Comparador y capturas preservados;
+  decisión registrada en `Hecho` el 2026-09-13.
+- [x] **[U6.2] Portada ligada a consulta.** `home.js`/brief: obra y origen compartidos,
+  sin segundo autoplay, estados vacío/ausente/rota y placa de consulta. Salida: contrato
+  que nunca conserva portada ajena. Dep.: U6.1. Modelo grande.
+- [x] **[U6.3] Encaje y assets integrados.** `home-inset.css`, `home-material.css`,
+  HTML/renderer y marco existente: misma profundidad, portadas completas, centro
+  legible y consola única. Rehacer asset sólo si se deforma. Dep.: opción U6.1 elegida,
+  U6.2/U5.3; coordinar U4.3. Modelo grande, visual.
+- [x] **[U6.4] Acción y carga de derecha.** Home/bootstrap/card: ficha de misma obra,
+  origen Club, prioridad visible y rechazo de respuestas de consulta anterior.
+  Dep.: U6.2–3. Modelo medio.
+  **Base U6.2–4 implementada con U4.3 (2026-09-13):** portada derivada de consulta,
+  acción personal/Club, carga y fallback propios, retícula B. No rehacer esa base;
+  compatibilidad U5 verificada en U5.4–5; cierre consolidado con aceptación U6.5.
+- [x] **[U6.5] Gate espacial.** Capturas reales, roles iguales/distintos, errores,
+  vacío, largo, zoom 200% y seis filas completas en desktop; documentar adaptación
+  al faltar ancho. Dep.: U6.4. Modelo grande para revisión visual.
+  Cerrado 2026-09-14 por aceptación manual del owner y evidencia previa U4/U5.
+  Capturas y límites de verificación: `docs/design/u5-u6-owner-acceptance/`.
+
+### Frente: Home — imágenes de cada obra
+
+#### [U7] Completar las dos ventanas de imágenes de consola
+
+**Abierta 2026-09-12.** Investigar adquisición/cobertura además de presentación.
+Los escalares y el cache existentes no descubren URLs vacías ni almacenan una galería
+de dos panorámicas. Plan y fuentes primarias: `home-evolution-backlog-2026-09-12.md`.
+
+- [ ] **[U7.1] Diagnóstico de cobertura por causa.** `image_warmer.py`, payload
+  editorial y diagnóstico de conteos: vacío/roto/cache frío/identidad, tipo y origen.
+  Sin descarga masiva. Dep.: ninguna de implementación; muestra descartable.
+  Modelo grande, investigación; traspaso de datos.
+- [ ] **[U7.2] Fuentes y selección de imagen.** `external/tmdb.py`, metadata y
+  autoridad: IDs confirmados, imágenes distintas, procedencia/atribución y cobertura
+  por cine/series/anime. Sin matching por título parecido. Dep.: U7.1 + elección de
+  contenido de las dos ventanas. Modelo grande, lógica/investigación.
+- [ ] **[U7.3] Contrato de assets portable.** `catalog.schema.json`, schema,
+  repositorios JSON/SQLite, serializers/API: lista acotada con rol/origen y selección
+  manual, compatibilidad con escalares y export/import. Dep.: U7.2. Modelo grande,
+  principalmente lógica; visual entrega consumo/estados.
+  **Decisión de imágenes 2026-09-12:** dos distintas como preferencia; panorámica
+  + portada permitidas, incluso con portada a la derecha. Repetición de la única
+  disponible permitida como fallback visual, sin duplicar el asset almacenado.
+- [ ] **[U7.4] Adquisición y cache acotados.** Resolver/proxy/warmer: identidad,
+  dedupe de misma imagen en tamaños distintos, prioridad de consulta, backoff,
+  cache y corrección manual preservada. Dep.: U7.3. Modelo grande, lógica.
+- [ ] **[U7.5] Ventanas y corrección visual.** Separación aprobada por el owner
+  el 2026-09-13: cierre visual ahora, integración de datos explícitamente pendiente.
+  `homeSelectionPreview()`/Home CSS y
+  ficha: 0/1/2 imágenes, carga/error, medida reservada, procedencia y corrección sin
+  inutilizar Ver más. Comparar una ventana amplia vs segundo fallback cuando sólo
+  hay una. Dep.: U7.2–4 + encaje U6.3. Modelo grande, visual.
+  **Corte visual integrado 2026-09-13:** 0/1/2 imágenes desde campos actuales,
+  una ventana amplia si sólo hay una, carga/error reales y reserva estable.
+  Ver más funciona aunque fallen las imágenes. Pendientes procedencia/corrección
+  persistida y consumo del contrato de assets U7.2–4. Evidencia: `u4-3-b-integration/`.
+  - [x] **[U7.5a] Presentación y recuperación actuales.** 0/1/2 imágenes,
+    carga/error independientes, «Revisar imágenes en ficha», dossier personal y
+    ficha Club correcta, retorno de foco. Guardado de panorámica comprobado con
+    catálogo descartable. No promete editar portada ni atribución no registrada.
+    Evidencia: `u4-4-visual-gate/`.
+  - [ ] **[U7.5b] Integrar galería y corrección completa.** Tras U7.2–4: consumir
+    roles/procedencia/licencia reales, editar portada y segunda imagen, respetar
+    bloqueo manual, deduplicar tamaños y verificar persistencia/export/import.
+    Reutilizar ventanas y acceso existentes; no reconstruir la consola. Incluir
+    permisos de Club, rechazo de respuestas viejas y error recuperable.
+- [ ] **[U7.6] Gate de cobertura e identidad.** Tests del resolver/intercambio y QA
+  visual: remake/homónimo/idioma/origen, offline y manual bloqueado; conteos antes/
+  después por causa, sin promesa de 100%. Dep.: U7.5. Modelo grande.
+
+### Frente: Home — VHS al azar
+
+#### [U8] Sorteo visible al final de la biblioteca
+
+**Abierta 2026-09-12.** Categoría especial con un lomo que reemplaza su título mediante
+animación y consulta el resultado. Botón existente y lomo comparten sorteo. Apagado y
+«?» tenue sólo para resultado no disponible; título/foco siempre legibles.
+Plan: `home-evolution-backlog-2026-09-12.md`.
+
+**Fuera de v0.9.0 por decisión del owner (2026-09-14):** posponer U8 completa
+a otra release, sin número asignado. Conservar el botón Al azar existente;
+no implementar aún lomo nuevo, sorteo conectado ni animación. Se conserva el plan
+`home-v0-9-0-u5-u8-plan.md` como referencia histórica y diseño futuro.
+Owner confirma 2026-09-13: revelar resultado y actualizar consola/derecha; no abrir
+ficha automáticamente. «Ver más» la abre. La animación A/B aún debe compararse.
+
+- [ ] **[U8.1] Alcance y recorrido del comando.** `randomCandidates()`/detail/Home:
+  auditar todo catálogo vs página cargada, filtros, disponibilidad y cero candidatos;
+  definir resultado en consulta vs apertura final de ficha. Home no debe sortear sólo
+  el estante accidentalmente. Dep.: U5.1 y respuesta del owner. Modelo grande.
+- [ ] **[U8.2] Lomo terminal y estados.** Fixture/asset VHS/Home CSS: inicial,
+  ocupado, disponible, no disponible y vacío; comparación de «?» como decoración,
+  rótulo semántico y contraste. Dep.: U8.1 + U4.4/encaje U6.1. Modelo grande, visual.
+  - [ ] **[U8.2.1] Encaje terminal.** Placa AL AZAR y un lomo, fuera del conteo de
+    secciones editoriales, mismo material/tamaño que los VHS existentes.
+  - [ ] **[U8.2.2] Estados y copy.** Inicial/ocupado/disponible/no disponible/vacío,
+    error y resultado fuera de alcance; «?» decorativo, título y foco legibles.
+  - [ ] **[U8.2.3] Objeto integrado.** Foco/navegación reales, no colección ficticia;
+    enlazar resultado de U8.3 sin duplicar lógica ni consola.
+- [ ] **[U8.3] Resultado único y alcance común.** Servicio JS de sorteo y, si hace
+  falta, Python/API: un ID para todas las superficies, no repetición inmediata con
+  varios candidatos, cambio de preferencia y resultado fuera de alcance. Dep.: U8.1;
+  no nueva API si catálogo completo ya está disponible. Modelo grande, lógica.
+- [ ] **[U8.4] Comparar y construir revelación.** Animación de etiqueta rebobinada
+  o tira breve; elegir con muestras, reduced motion directo, coalescing y anuncio sólo
+  del resultado. Dep.: U8.2–3. Modelo grande, visual/interacción.
+  - [ ] **[U8.4.1] Comparación A/B.** Rebobinado recomendado frente a tira breve;
+    muestras para elegir antes de cerrar la dirección del efecto.
+  - [ ] **[U8.4.2] Efecto elegido.** Sólo etiqueta, resultado elegido de antemano,
+    sin relayout del rail ni títulos anunciados durante la transición.
+  - [ ] **[U8.4.3] Movimiento/foco/concurrencia.** Reduced motion directo, clics
+    coalescidos, control estable y un anuncio final; sin sonido U9.
+  - [ ] **[U8.4.4] Gate conectado.** Duración/performance y estados finales con
+    U8.5–6; ninguna obra distinta entre lomo, consola, derecha y ficha.
+- [ ] **[U8.5] Integración del botón, lomo y consulta.** Home/bootstrap/detail:
+  llegar al módulo sin perder foco, derecha/consola con mismo resultado, lista según
+  contrato y comando usable fuera de Home. Dep.: U5/U6 + U8.3–4. Modelo grande.
+- [ ] **[U8.6] Gate del sorteo.** 0/1/muchos, switch/todo/no disponible, rápido,
+  teclado, obra removida, offline/autoplay/reduced motion; sin cambios personales.
+  Dep.: U8.5. Modelo grande.
+
+
 ### Frente: Busqueda, comparacion y composicion de fuentes
 
-Diagnostico del 2026-08-26: la busqueda local principal usa titulos, aliases, IDs y
-archivos; `directors` existe en el modelo pero se excluye deliberadamente de la
-evidencia de identidad. Las tres fuentes externas reciben hoy casi la misma consulta:
-IMDb hace una sola llamada al endpoint de sugerencias, Wikipedia busca en ingles y
-espanol agregando `film`/`pelicula`, y FilmAffinity envia el texto literal. El puente de
-aliases de Wikidata para IMDb se activa solo si IMDb devolvio filas pero todas quedaron
-debajo del umbral; no se activa cuando la sugerencia vino vacia. Esto explica por que
-agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb o
-Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
-consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
+#### [B2] Los dos pendientes que deja [B1]
+
+Abierta el 2026-09-11 al cerrar [B1], para que lo que quedó afuera tenga número y dueño en
+vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
+
+- [ ] **[B2.1] El corte de dos caracteres en la caja de búsqueda.** `catalog-search.js`
+  descarta las consultas de menos de dos caracteres **antes de salir del navegador**, así
+  que el arreglo de servidor de `57ad234` —una consulta de una sola letra es una consulta
+  real: `M`, `Z`, `9` son películas— funciona hoy por API y por CLI pero no desde la caja.
+  **Es del frente visual**, se anota acá sólo para que no se pierda la dependencia.
+- [ ] **[B2.2] La consulta por fuente de Wikipedia, sin medir.** La medición del
+  2026-09-11 cerró el punto para FilmAffinity con número —primera consulta 5/6, final
+  6/6— pero la mitad de Wikipedia salió **inválida**: devolvió `429 Too Many Requests` y
+  los supuestos fallos de búsqueda eran eso. Si se retoma, medir **con
+  `ExternalSourceService` en el medio** —que es quien maneja el 429 con cooldown leído de
+  `Retry-After`— y a ritmo bajo. La hipótesis a refutar es que ya esté resuelto: [Q3] le da
+  a Wikipedia el título original como primer alias, que es exactamente lo que su cobertura
+  en/es no cubre.
+- **Modelo sugerido**: Chico. Son dos puntas acotadas, no un frente.
 
 ### Frente: Fuentes externas y especializacion de anime
 
-La epica [F2] quedo cerrada en tres entregas: contrato de composicion [F2.1], fuente
-en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
-en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
-queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
-ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
-de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
-consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres cerradas).
-[F5] queda completo.
+- [ ] **Dos verificaciones en vivo que esperan un entorno**, colas de frentes cerrados.
+  Ninguna bloquea nada; se anotan para que no dependan de la memoria de nadie.
+  - **Overlay de Docker de TMDb** (cola de [F5.4]): el smoke de
+    `compose.tmdb.example.yaml` nunca corrió porque la máquina de trabajo no tiene Docker;
+    re-medido el 2026-09-11, sigue sin tenerlo. Espera un host con Compose.
+  - **Puntajes de TMDb contra la API real** (cola de [F6.2]): es lo único de [F6.2] que no
+    se verificó en vivo, porque el archivo del token no estaba en la máquina. Queda como
+    `tests/test_external_tmdb_live_smoke.py`, que se salta solo sin token.
 
-### Frente: Superficie publica y despliegue
+### Frente: Inicio videoclub (exploraciones posteriores)
 
-### Frente: Inicio videoclub (candidato v0.8.0)
+[U2-R] quedó cerrada y se preserva en `Hecho`. Las dos exploraciones siguientes no
+bloquean U3 ni reabren la recuperación aceptada.
 
-**Decisión 2026-09-01.** La lámina generada 1 es una referencia de dirección, no un
-asset ni contenido de la aplicación. El rediseño no comienza durante v0.7.0: primero
-se cierran [D1] y [W3] y se publica ese incremento. El objetivo posterior no es sumar
-un tema decorativo sino reorganizar Inicio: arriba la variante A como selector principal
-y abajo la variante C como estanterías de descubrimiento. La cartelera pública puede
-adoptar el mismo sistema visual más adelante, pero conserva el contrato aislado de
-[W1]/[W2] y nunca gana acciones privadas.
+  - [ ] **[U2-X.1] Prototipar transición vertical de cartelera.** Experimento posterior,
+    no bloqueante para U2-R: conservar poster saliente/entrante como una tira que avanza
+    verticalmente detrás del marco, medir fluidez con imágenes reales y definir fallback
+    directo para reduced motion antes de decidir si se incorpora.
+  - [ ] **[U2-X.2] Evaluar señal temporal basada en medios reales.** Después de U2-R,
+    investigar si archivos locales autorizados o una fuente con licencia permiten
+    derivar waveform/espectro y marcas temporales reales. No bloquear la preview ni
+    representar datos inventados como análisis de la película.
 
 ### Frente: Clientes, integraciones y nuevos medios
 
-#### [A1] Definir API versionada y sesiones para dispositivos
-- **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
-  busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
-- **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
-  servidor-cliente antes de iniciar una app.
-- **Depende de**: [T4], [D1].
-- **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
+#### [A2] Cliente Android autónomo — **se mudó a su propio repositorio el 2026-09-13**
 
-  - [x] **[A1.1] Congelar contrato de dispositivo v1.** ADR y OpenAPI estático para
-    HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
-    patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
-    prueba de que la superficie y la serialización no heredan rutas o paths internos.
-  - [x] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
-    access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
-    dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
-    desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
-  - [x] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
-    paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
-    estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
-    expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
+El cliente vive en `../movieIndexAndroid`, con su propio tablero (`tareas.md`), hoja de
+ruta y README. Así lo había decidido el owner el 2026-08-17 (`prompt-movie-inbox.md`,
+"Pregunta de mobile vs. Fase 5"): toolchain, CI y ciclo de versiones distintos para dos
+cosas que sólo se hablan por HTTP. El 2026-09-13 el proyecto se creó primero, por error,
+dentro de este repo, en `android/`; se sacó antes de publicarlo. Se mudaron con él la
+épica [A2] con sus subtareas, los briefs v1 a v3, la guía de entorno y el plan inicial.
 
-#### [A2] Cliente Android basico
-- **Alcance**: login seguro, lectura/busqueda/detalle y edicion de estado, fecha vista,
-  puntaje y review; disponibilidad fisica solo lectura, sin offline ni administracion.
-- **Criterio de cierre**: MVP contra la API de [A1], matriz de compatibilidad y pruebas
-  de red/autenticacion/ciclo de vida.
-- **Depende de**: [A1].
-- **Modelo sugerido**: Grande. Proyecto cliente multiplataforma potencial.
+Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese repositorio ([A3],
+[A4]). Acá queda lo que el cliente consume, ya construido —la API `/api/v1/`, el
+apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
+el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-  - [ ] **[A2.1] Fundacion Android y conexion segura.** Modulo Android nativo con
-    Kotlin/Compose, Hilt/KSP, Retrofit/OkHttp y serializacion; configuracion de URL HTTPS
-    por instancia, excepcion HTTP solo para loopback de debug, almacenamiento Keystore de
-    tokens y flujo de login/refresh/logout contra `/api/v1/auth/*`. Cierre: `assembleDebug`
-    y pruebas MockWebServer sin secretos en logs, memoria o backups.
-  - [ ] **[A2.2] Lectura del catalogo personal.** Estados Compose para catalogo paginado,
-    busqueda local y detalle, con loading/error/empty explicitos, Coil para imagenes y
-    disponibilidad solo lectura. Cierre: pruebas de repositorio y de UI para páginas,
-    cursor inválido, sesión vencida y campos desconocidos compatibles.
-  - [ ] **[A2.3] Edicion personal y gate de cliente.** Formulario de estado, fecha vista,
-    puntaje y review con `PATCH` parcial, manejo de conflicto/error y cierre de sesión;
-    matriz API/cliente, pruebas de rotación, recreación de Activity y configuración de
-    instancia. No agrega offline, Scanner, administración ni mutaciones compartidas.
+#### [X1] Vectores de prueba para el cliente Android
 
-**Nota de arranque A2, 2026-09-02.** El checkout todavía no contiene un proyecto Android.
-La terminal disponible detecta Java 8 y no detecta Gradle ni `ANDROID_SDK_ROOT`; A2.1 debe
-ejecutarse en un entorno con JDK 17+ y Android SDK configurado antes de poder prometer un
-APK o una prueba de emulador reproducible.
+Lo que el cliente tiene que reimplementar con resultados idénticos a los del servidor se
+prueba contra vectores que genera el propio servidor, como ya se hizo con
+`docs/briefs/charades-v1-vectors.json`: un JSON versionado y una prueba acá que lo
+recalcula, para que un cambio que alteraría los resultados del teléfono falle en esta
+suite. El análisis completo está en
+`docs/analisis/lo-que-viene-del-servidor-2026-09-13.md` del repositorio del cliente.
 
-#### [I1] Evaluar Radarr, Sonarr y Letterboxd
-- **Alcance**: separar importacion, enlaces e inventario; revisar autenticacion,
-  licencias, IDs, webhooks/rate limits y que datos personales saldrian de la instancia.
-- **Criterio de cierre**: matriz y ADR por integracion; cada aprobada genera su propia
-  tarea de adaptador.
-- **Depende de**: [A1] para contratos externos estables y [L1] para inventario.
-- **Modelo sugerido**: Grande. Tres productos con semanticas distintas.
+- [ ] **[X1.1] Vectores del pin SPKI.** `tests/test_pairing_certificate.py` ya tiene dos
+  certificados reales —P-256 y RSA-2048— con el pin que imprimió OpenSSL. Llevarlos a un
+  JSON, junto con payloads del QR válidos y rechazados. El cliente los usa en [A3.1] para
+  confiar en el certificado igual que el servidor. **Modelo sugerido**: Chico.
+- [ ] **[X1.2] Vectores de normalización de títulos.** `normalize_search_text`,
+  `title_match_key` y `title_similarity`, que el cliente porta en [A3.2] para avisar si un
+  alta se parece a algo que ya está. Los casos que importan son los que Python resuelve
+  solo: `html.unescape`, NFKC, el plegado de diacríticos sólo en letras latinas y los años
+  que son títulos. **Modelo sugerido**: Medio.
+- La pantalla que genera el QR sigue entre los traspasos al frente visual, más abajo.
+
+#### [X2] Precondición en el `PATCH` personal — a confirmar
+
+`PATCH /api/v1/catalog/items/{id}/personal` aplica lo que llega sin comparar con nada. Si la
+web u otro teléfono cambió el mismo campo entre que un teléfono bajó el estado y lo subió,
+gana el último y el otro cambio se pierde sin aviso: la fusión a tres bandas del cliente
+decide con lo que bajó, no con lo que hay al subir. Encontrado el 2026-09-13, al plantear la
+casuística de sincronización que pidió el owner.
+
+- **Alcance**: que el `PATCH` pueda recibir, por campo, el valor que el cliente tenía como
+  base, y rechazar el cambio si el servidor ya no vale eso, para que el cliente vuelva a
+  bajar y fusionar. Opcional para quien no lo mande, así cabe en la v1 del contrato según la
+  regla de versionado de ADR-0003.
+- **Criterio de cierre**: la matriz de casos del cliente ([A5.1] de `movieIndexAndroid`)
+  confirma el problema, y en el arnés contra el servidor real ([A5.3]) dos ediciones
+  cruzadas no pierden ninguna.
+- **Depende de**: [A5.1] del cliente. **Modelo sugerido**: Grande: toca el contrato.
+
+#### [X3] Registrar cuándo cambia cada campo personal
+
+Pedido del owner el 2026-09-14, al responder la matriz de sincronización del cliente
+([A5.1] de `movieIndexAndroid`). Hoy el servidor no guarda cuándo cambió un campo personal:
+`patch_personal` y la ficha web escriben el valor y nada más, y ADR-0005 (§6.1) decidió no
+exponer una marca que no existía.
+
+- **Alcance**: guardar, por obra, cuándo cambió por última vez cada campo personal —`status`
+  con `watched_at`, `rating` y `review`— y exponerlo en la API de dispositivo. Sirve para
+  mostrarle a la persona de cuándo es cada valor en un conflicto, para un historial de
+  cambios y, más adelante, para una sincronización que baje sólo lo que cambió.
+- **Lo que no hace**: decidir un conflicto. La marca informa, y la fusión sigue siendo a tres
+  bandas contra la base (ADR-0005, §4): el reloj de un teléfono puede estar mal, y "gana el
+  último" pierde datos sin aviso.
+- **Por qué es grande**: los campos personales viven en el contrato portable
+  `catalog.schema.json` y en la base del catálogo, así que la marca es un cambio de esquema
+  versionado, con migración, y no un campo más de la API.
+- **Criterio de cierre**: una edición desde la web o desde un teléfono deja su marca, la marca
+  viaja en la API de dispositivo, y sobrevive a exportar e importar el catálogo.
+- **Depende de**: nada; no frena [A2.2]. **Modelo sugerido**: Grande: toca el contrato
+  portable.
+
+#### [X4] Sesiones de dispositivo que no se pierden por un corte
+
+Lo encontró la matriz de sincronización del cliente ([A5.1], casos 8, 12 y 18), y lo acotan
+dos decisiones del owner del 2026-09-14. Primero pidió que un teléfono pudiera usar la
+instancia sin límite de tiempo; ese mismo día lo revisó por seguridad: **la llave vence, y
+pasado un mes hay que volver a escanear el QR**, y podría pedirse más seguido. Quedan dos
+obstáculos:
+
+1. La renovación rota el refresh token sin período de gracia (`rotate_device_session`): si la
+   respuesta se pierde en un corte, el teléfono se queda sin sesión y hay que volver a aparear
+   antes de tiempo.
+2. Una sesión sólo se corta cambiando la contraseña, desactivando la cuenta o desde el propio
+   teléfono. No hay forma de ver ni de revocar teléfonos desde la web, así que un teléfono
+   perdido conserva el acceso hasta que vence.
+
+- **Alcance**:
+  - La renovación se puede reintentar: acepta el refresh token anterior durante unos
+    segundos, o devuelve el mismo par si se repite.
+  - Cada cuenta ve sus teléfonos apareados, con el nombre y la última vez que se conectaron, y
+    puede revocar cualquiera. El backend es de este frente; la pantalla, un traspaso al frente
+    visual.
+  - El vencimiento sigue como hoy: 30 días desde la última sincronización
+    (`DEFAULT_DEVICE_REFRESH_TTL_SECONDS`), como decidió el owner el 2026-09-14.
+- **Sigue igual**: cambiar la contraseña o desactivar la cuenta corta todas las sesiones.
+- **Criterio de cierre**: una renovación cuya respuesta se perdió se reintenta con éxito, un
+  teléfono revocado desde la web queda afuera en su próxima llamada, y el vencimiento se sigue
+  contando desde la última sincronización.
+- **Depende de**: nada. **Modelo sugerido**: Grande: es seguridad.
+
+#### [X5] Bajas que viajan en la sincronización
+
+Decisión del owner del 2026-09-14, que revierte "la sincronización nunca borra" de ADR-0005
+(ver su enmienda de esa fecha): borrar una obra en un lado la borra en el otro al
+sincronizar. Hoy el servidor borra sin rastro (`delete_item`), y una fusión de duplicados hace
+desaparecer una de las dos obras sin decir con cuál se unió. Un teléfono sólo ve un 404, sin
+saber qué pasó (caso 9 de la matriz de [A5.1]).
+
+- **Alcance**:
+  - Un registro de baja por obra borrada, con el id que conocía el dispositivo y la fecha, y
+    una forma de consultarlo desde la API de dispositivo. Una obra ausente sin registro nunca
+    se trata como baja.
+  - Una fusión deja un registro que dice con qué obra se unió, para que un cambio pendiente del
+    teléfono pase a la obra que queda.
+  - Recibir bajas desde un teléfono y aplicarlas al catálogo. Una baja sobre una obra que se
+    editó en el servidor después de la última sincronización de ese teléfono no se aplica
+    sola: decide la persona.
+  - Cuánto tiempo se conservan los registros, y qué pasa con un teléfono que sincroniza
+    después de ese plazo.
+  - Evaluar la idea del owner: seguir cada obra con un identificador propio y durable, que no
+    dependa de la posición de la fuente (caso 17) y que los registros de baja puedan citar.
+- **Criterio de cierre**: una baja en la web llega al teléfono y una baja en el teléfono llega
+  al servidor, sin que una obra ausente borre nada; y un cambio pendiente sobre una obra
+  fusionada termina en la obra que queda.
+- **Depende de**: nada para diseñarla; en el cliente, [A5.2] incorpora las reglas. **Modelo
+  sugerido**: Grande: toca el contrato y la identidad de las obras.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
@@ -137,15 +532,679 @@ APK o una prueba de emulador reproducible.
 - **Depende de**: despues de estabilizar los frentes anteriores.
 - **Modelo sugerido**: Grande. Descubrimiento de producto, no un cambio de enum.
 
+### Frente: Traspasos del lado lógica al frente visual
+
+Anotado el 2026-09-11 por el frente lógico, al poner el tablero al día. Son superficies
+con el backend entregado y probado que **ninguna pantalla muestra todavía**. Se habían
+asignado en `docs/analisis/streaming-charadas-movil-2026-09-07.md` y nunca llegaron a este
+tablero, que es el que el frente visual lee: es la causa más probable de que no avanzaran.
+Cuándo y en qué orden se toman lo deciden el frente visual y el owner; lo que sigue es qué
+consumir y qué reglas no se pueden romper.
+
+- [ ] **Disponibilidad en streaming en la ficha** (el [S4] del análisis; no confundir con
+  [S1]/[S2] de la purga del historial, que comparten número). Consume `GET
+  /api/streaming/availability` y `GET`/`POST /api/streaming/preferences`. Tres reglas: una
+  obra ausente del mapa es "no lo consultamos", nunca "no está disponible"; sólo
+  `available_on` es "Disponible en X", y `acquire_on` —alquiler o compra— necesita otro
+  verbo; y la atribución a JustWatch, que viene en la respuesta, es obligatoria donde se
+  muestre, porque sus términos incluyen revocar el acceso a toda la API. La ficha no lleva
+  fecha; `checked_at` se informa en `Administrar`. Traspaso completo en el análisis, §7.
+- [ ] **Puntajes públicos en la ficha, junto al propio** (la mitad de presentación de
+  [F6.2]). Consume `GET /api/ratings`: IMDb y TMDb juntos, ordenados por cantidad de votos
+  y no por fuente. Lleva las atribuciones que vienen en la respuesta, y un puntaje marcado
+  `is_meaningful: false` —menos de 50 votos— tiene que verse distinto. Nunca se presenta
+  como valoración propia.
+- [ ] **La pantalla que genera el QR de apareamiento** (de [A2.1]). `POST
+  /api/device-pairing` devuelve el QR como `data:` URI junto con su contenido, que
+  conviene ofrecer también como texto para aparear a mano. **No va en `Administrar`**:
+  cada cuenta aparea su propio teléfono, así que tiene que estar al alcance de cualquier
+  cuenta. El ticket vive cinco minutos, y sin HTTPS configurado el endpoint responde
+  `pairing_not_configured`: la pantalla tiene que decirlo en vez de fallar muda.
+- [ ] **La pasada de revisión de dificultad de charadas** (de [G2]). Consume `GET
+  /api/charades/review` y `POST /api/charades/difficulty`. La banda intermedia es casi
+  todo el catálogo, así que esta revisión es el camino principal y no un plan B: "repartí
+  estas obras en cuatro categorías", rápida y reanudable, no un formulario por obra
+  (`docs/briefs/charades-v1.md`). Las pantallas de juego y el temporizador van en el
+  teléfono, dentro de [A2.4].
+- **Bandeja en el teléfono** (de [MB2]): traspaso consolidado en **[MW1.4]**, al
+  final de la cola a pedido del owner. La auditoría del 2026-09-07 es antecedente,
+  no diagnóstico vigente; volver a medir antes de corregir.
+- [ ] **`duplicateSignalsCollide()` compara etiquetas y no fuentes** (hallazgo de [F5.4]).
+  En `js/surfaces/inbox-curation.js` compara `sourceLabel()` de cada lado, así que dos
+  fuentes distintas sin etiqueta colapsan en una sola señal. La prueba estructural de
+  `40cd9b8` cubre a los adaptadores; cualquier otra fuente sin etiqueta lo reabre. Es una
+  línea de lógica, pero vive en código del frente visual.
+- **[B2.1]**, el corte de dos caracteres en la caja de búsqueda, es otro traspaso y ya
+  está anotado en [B2].
+
+### Frente: Biblioteca — sonido opcional
+
+#### [U9] Respuesta sonora al enfocar VHS
+
+**Abierta 2026-09-12, posterior.** Un efecto breve y silenciable desde el menú;
+no bloquea U5–U8. El primer foco no garantiza audio permitido por el navegador.
+
+- [ ] **[U9.1] Samples y gesto.** `docs/design/` + audio original/libre con licencia:
+  comparar 2–3 sonidos; decidir teclado/tap vs hover, duración y volumen. Dep.:
+  interacción VHS estable. Modelo grande, visual/sonoro.
+- [ ] **[U9.2] Preferencia y mute fácil.** Menú HTML/fields/settings: switch visible,
+  prueba opcional, elegir persistencia dispositivo/cuenta y default; propuesto apagado
+  y por dispositivo. Dep.: U9.1. Modelo medio; grande si requiere nuevo contrato.
+- [ ] **[U9.3] Audio por intención.** Módulo JS pequeño y eventos VHS: desbloquear
+  por gesto, debounce, silencio si bloqueado, no sonido al restaurar foco/autoplay y
+  mute inmediato. Dep.: U9.2. Modelo grande, interacción.
+- [ ] **[U9.4] Gate de silencio y carga.** Navegación rápida, recarga, pestaña oculta,
+  políticas Safari/Chromium, lector de pantalla, storage bloqueado y licencia.
+  Dep.: U9.3. Modelo medio.
+
+### Frente: Mobile web — última prioridad
+
+#### [MW1] Revisión desde navegador de celular
+
+**Abierta 2026-09-12.** Último frente de la cola. Android/Kotlin conserva prioridad
+para la experiencia vertical principal. Absorbe la corrección visual del traspaso MB2;
+no repite su auditoría como si fuera vigente. Plan: `home-evolution-backlog-2026-09-12.md`.
+
+- [ ] **[MW1.1] Auditoría actual de todas las superficies.** Home/Colección/ficha/
+  Club/Bandeja/menú: 320/360/390/430, horizontal, zoom, teclado virtual, barras del
+  navegador y safe areas. Registrar emulación vs dispositivo real. Dep.: Home final
+  y prioridad Kotlin atendida; no bloquea su desarrollo. Modelo grande.
+- [ ] **[MW1.2] Home y VHS táctiles.** CSS/renderer: priorizar consulta al apilar dos
+  carteleras, tabla adaptada y rails locales, azar descubrible y texto legible.
+  Dep.: MW1.1 + U5–U8. Modelo grande, visual.
+- [ ] **[MW1.3] Ficha y utilidades en celular.** Detail/menú/CSS: targets efectivos,
+  teclado virtual, barras que ocultan controles, salida y retorno. Dep.: MW1.1.
+  Modelo grande, visual.
+- [ ] **[MW1.4] Bandeja — corrección del traspaso MB2.** `inbox-curation`/scanner
+  y CSS: remedir cabecera/pestañas/scope-strip, corregir overflow y lectura. Dep.:
+  MW1.1; antecedente `docs/design/mb2-mobile-audit-2026-09-07.md`. Modelo grande.
+- [ ] **[MW1.5] Gate móvil acotado.** QA conectado y teléfono real cuando disponible:
+  reflow, acciones, teclado, preferencias, sin overflow del documento; separar mejoras
+  costosas para decidir contra Kotlin. Dep.: MW1.2–4. Modelo grande para revisión.
+
 ---
 
 ## En curso
 
-Sin tareas activas.
+[U4.2c] integrada en Home tras aprobación de [U4.2b]. Playlist ampliada sin scroll
+interno desktop, material continuo y aberturas con apoyo compartido. Comprobación
+con app real/datos desechables; revisión independiente aplicada. Aceptación
+visual del owner recibida el 2026-09-12 sobre la base actual [U4.2d.3]; [U4.2]
+queda cerrada en este alcance. Ambas bases anteriores siguen rechazadas.
+[U4.2d.1] entregada como comparador aislado el 2026-09-10; encuadre centrado y una
+consola visible. [U4.2d.2] implementada el 2026-09-11; selección común en JS productivo,
+8 pruebas JS y 20 Python aprobadas tras d.3, que integra el encuadre y retira
+el panel inferior real. Aceptada visualmente el 2026-09-12. Se planificaron U5–U9
+y MW1. U6.1 cerró con B elegida; U4.3 integra esa retícula en la Home real el
+2026-09-13 y cierra la absorción de U4.5. U4.4 está implementada, U4.6a verificada
+y U4.6b pendiente. El 2026-09-14 se implementó la primera entrega U5.1.3/U5.2/U5.3.1–2;
+evidencia en `docs/design/u5-first-delivery/`. U5.3.3 y U5.4–5 completadas el 2026-09-14;
+U5.3.4/U6.5 aceptadas manualmente por el owner el 2026-09-14; resta U4.6b.
+Próximo frente: cerrar esos gates y V9; U8 diferida por el owner a otra release.
+U7.5 integra estados visuales con campos actuales y espera el contrato
+de adquisición/procedencia para su cierre completo.
+
+### Frente: Versión 0.9.0
+
+#### [V9] Cerrar la 0.9.0 — **abierta desde el 2026-09-13**
+
+La 0.9.0 vive en la rama `release/0.9.0` y se cierra al fusionar su PR contra `master`, por
+decisión del owner: todavía no está pulida y se le siguen sumando cambios. Todo lo que se
+commitea en este checkout entra en la versión; lo que no tenga que entrar, va en otra rama.
+El gate es `docs/release-checklist.md`, y los pasos de cierre están en su sección 8.
+
+| Falta | Quién | Estado |
+| --- | --- | --- |
+| Lint en verde en lo propio: orden de imports en `home_service.py`, formato de seis archivos, un tipo en `tests/test_catalog_comparison_index.py` y las líneas largas del HTML capturado en `tests/test_external_filmaffinity.py` | Frente lógico | **Hecho** (2026-09-13) |
+| Lint/formato del frente visual, incluido el servidor de revisión; mypy global | Frente visual | Pendiente. Diagnóstico 2026-09-14: 61 hallazgos Ruff y 3 archivos sin formato en el subconjunto inspeccionado; mypy de `test_package_layout.py` y `test_ui_browser.py` ya pasa. No repetir como pendientes sus tres errores históricos |
+| Incluir Inicio nuevo [U4], U5, cartelera U6 y U7.5a ya integradas; sin nuevas épicas | Owner / frente visual | **Alcance actualizado** 2026-09-14: U8 completa fuera de 0.9.0. Cierre según `docs/design/v0-9-0-visual-closeout.md` |
+| Changelog: las entradas del trabajo visual desde la 0.8.0 | Frente visual | Pendiente |
+| Changelog: "Antes de actualizar" | Frente lógico | **Hecho** (2026-09-13) |
+| Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup | Owner, o el frente lógico con su autorización | Pendiente |
+| El gate de `docs/release-checklist.md`, con el CI del PR en verde | Todos | Pendiente |
+| Último commit: versión `0.9.0`, changelog, `README.md`, `CLAUDE.md` y roadmap | Frente lógico | Pendiente |
+| Fusionar con merge commit y etiquetar `v0.9.0` | Owner | Pendiente |
+
+- **Modelo sugerido**: Grande para coordinar el cierre; cada fila, por separado, es chica.
+
+#### Cierre visual de V9 — orden acordado 2026-09-14
+
+- [ ] **[V9.V1] U4.6b completo.** Ejecutar la suite de navegador, inventariar fallos,
+  migrar contratos retirados sin borrar escenarios y corregir regresiones reales.
+- [x] **[V9.V2] U5.3.4/U6.5.** Zoom real 200% en navegador de escritorio; cierre
+  conjunto espacial, seis filas, foco y dos carteleras. Consolidar U6.2–4 ya
+  implementadas contra la evidencia U4/U5, sin reconstruirlas ni incorporar azar.
+  Aceptación manual registrada 2026-09-14 en `docs/design/u5-u6-owner-acceptance/`.
+- [ ] **[V9.V3] Higiene y documentación.** Ruff/formato/tipos del frente propio,
+  changelog visual, revisión de archivos productivos/evidencia y gate automático local.
+  Avance 2026-09-14: Ruff, formato, mypy y compilación globales en verde; changelog
+  de Home agregado. La suite local completa corrió 881 pruebas: 880 verdes y una
+  expectativa histórica de `test_frontend_assets_are_served_without_inline_code`
+  sigue buscando `.spotlight-stage` en el CSS monolítico retirado. Se transfiere a
+  U4.6b, que migra tests históricos; no cerrar V9.V3 hasta repetir suite verde.
+- [ ] **[V9.V4] Candidata y entrega.** Preparar commit revisado y actualizar PR con
+  autorización; CI del commit exacto y upgrade Docker 0.8.0 → 0.9.0 con copia,
+  backup y restauración. Luego cierre de versión/merge/tag por responsables V9.
+
+Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
 
 ## Hecho
 
+- [x] **[U4.4] Materialidad de estante.** 2026-09-13. Placas sobre travesaño,
+  contacto corto, VHS a 2 px del suelo sin levantarse en hover/selección, luz y
+  desgaste más contenidos. Selección magenta con indicador; foco cyan en placa/lomo.
+  Refinamiento guiado por Impeccable, sin assets/frameworks nuevos ni cambio U5.
+  Evidencia: `docs/design/u4-4-visual-gate/`. Sin commit solicitado.
+- [x] **[U7.5a] Cierre visual acotado aprobado.** 2026-09-13. Recuperación de
+  imágenes desde ficha correcta y retorno de foco, con guardado de panorámica
+  verificado sólo en datos descartables. U7.5b sigue abierta, no se cierra U7 completa.
+
+### Frente: Integración material de Home
+
+- [x] **[U6.1] Estudio de espacio y elección.** 2026-09-13, sin commit solicitado.
+  El owner eligió B: dos marcos simétricos, consola común dentro de la abertura
+  superior. Comparador A/B y ocho capturas en `docs/design/u4-3-u6-1-u7-5/`.
+  No cierra U5 ni el gate U6.5.
+- [x] **[U4.3] Consola integrada — opción B.** 2026-09-13, sin commit solicitado.
+  Acciones, imágenes, datos y estado sobre retícula común. Segunda cartelera ligada
+  a consulta personal/Club; portadas completas y foco de origen conservado.
+  QA real 1280/1440/1920/2482 y smoke 390; 13 pruebas JS y 17 Python.
+  Evidencia: `docs/design/u4-3-b-integration/`. No sustituye U4.6 ni el gate U6.5.
+- [x] **[U4.5] Cierre por absorción.** 2026-09-13, sin commit solicitado.
+  d.3 retiró el panel inferior; U4.3 completa el pulido de la consola única.
+  No hay una tarea pendiente para reconstruir una consola bajo la biblioteca.
+
+- [x] **[U4.2] Base continua y encuadre aceptados.** 2026-09-12, aceptación del owner
+  «Creo que está bien» sobre d.3. Cierra c/d y la base actual, conservando rechazos
+  anteriores. U4.3/U4.4/U4.6 siguen pendientes; nuevas funciones planificadas en U5–U9,
+  mobile web al final en MW1. Sin commit solicitado en este intercambio.
+
+- [x] **[U4.2d.3] Consolidación técnica.** 2026-09-11, sin commit solicitado.
+  Una consola superior con contexto, acciones, sinopsis, imágenes, créditos y estado;
+  encuadre centrado con ambos retornos, sin panel inferior ni onda decorativa.
+  Foco de ficha/edición recuperado aun tras rotación; anuncios breves de selección.
+  8/8 pruebas JS y 20/20 Python; QA conectado con datos desechables.
+  Evidencia y límites: `docs/design/u4-2d-3-evidence/`. No cierra el gate visual U4.2
+  ni el pulido U4.3/U4.4/U4.6.
+
+- [x] **[U4.2d.2] Selección compartida.** Cierre técnico 2026-09-11, sin commit
+  solicitado todavía. Filas/VHS consultan la consola superior sin cambiar programación
+  ni permitir que autoplay pise la consulta. Origen Club/catálogo preservado, foco y
+  estados vacíos cubiertos. 6/6 pruebas JS + 20/20 Python; smoke conectado desktop/móvil.
+  Evidencia y límites: `docs/design/u4-2d-2-selection.md`. Sigue d.3: composición
+  productiva, consolidación de contenido y retiro del panel inferior.
+
+- [x] **[U4.2b] Encuentro representativo.** Cerrada el 2026-09-10 por aprobación del
+  owner. HTML/renderer reales, fixture aislada, esquina compartida de póster/playlist
+  y arranque de estante. Evidencia: `docs/design/u4-2b-integrated-junction-v1/`.
+  Ajuste solicitado —más escala y seis filas sin scroll interno— aplicado en U4.2c.
+  **Commit pendiente de solicitud del owner.**
+
+- [x] **[U4.2a] Material y kit de muestra.** Cerrada el 2026-09-10 con aprobación
+  explícita del acabado. `docs/design/u4-2a-material-kit-v1/` entrega textura petróleo v2,
+  canto y placa mediante `material-components.css` + fuentes RGB con recortes declarados.
+  No se presentan como PNG con alpha. Probado también en el encuentro U4.2b; sin
+  cambios nuevos a Home. **Commit pendiente de solicitud del owner.**
+
+### Frente: Colección, búsqueda y alta
+
+#### [U3] Replantear Colección como destino único de descubrimiento
+
+**Cerrada el 2026-09-08.** Colección funciona como destino único con modos visibles
+`Explorar`, `Buscar`, `Agregar`, `Comparar` y `Vincular`; conserva query, filtros, ancla,
+posición y foco en URL/historial. Evidencia responsive en `docs/design/u3-23-evidence/`.
+
+- [x] **[U3.1] Arquitectura.** Brief, wireflow y contrato aprobados; commit `adbe319`.
+- [x] **[U3.2] Entrada y filtros.** Cabecera de tarea unificada, alta diferenciada,
+  filtros cotidianos visibles, divulgación avanzada, chips y vacíos contextuales.
+- [x] **[U3.3] Modos e historial.** Rutas canónicas para search/add/compare/link,
+  anclas estables, restauración de foco/scroll/cantidad visible y pruebas de navegador.
+  Cierre técnico: 36 pruebas de navegador y 7 de layout en verde, sin overflow en
+  1440/390/320 y sin hallazgos de layout en Impeccable.
+
+### Frente: Inicio videoclub (afinación visual U2-P)
+
+#### [U2-P] Afinar Home según la comparación anotada del usuario
+
+**Cerrada y aprobada 2026-09-08 — commits `88eaa0d` y `44ab864`.** La Home quedó
+alineada con la revisión visual: cartelera centrada sin indicadores, tipografías libres
+integradas, lomos más altos con lectura ascendente, placas materiales Oswald 400,
+mueble continuo fuera de pantalla y consola ampliada con sinopsis, dos imágenes,
+créditos y estado resumido. En móvil, la ficha acompaña a la categoría activa.
+
+- [x] **[U2-P.0] Relevamiento y decisiones.** Brief consolidado en
+  `docs/briefs/home-u2-p-refinement-v1.md`.
+- [x] **[U2-P.1–P.5] Cartelera, tipografía, lomos, placas y mueble.** Entrega
+  `88eaa0d`, con evidencia visual por etapa.
+- [x] **[U2-P.6] Consola.** Dos imágenes con fallback honesto, créditos, estado,
+  firma VHS y adaptación móvil. Evidencia en `docs/design/u2-p6-evidence/`.
+- [x] **[U2-P.7] Aceptación.** El usuario aprobó 1A/2A/3A; evidencia en
+  `docs/design/u2-p7-evidence/`. Regresión final: **44/44 pruebas**, sin overflow
+  horizontal en 1280/1440/1920/390/320.
+
+### Frente: Inicio videoclub (recuperación visual prioritaria)
+
+**Decisión original 2026-09-03.** [U2] había quedado técnicamente cerrada, pero la
+revisión visual rechazó su composición: hero convencional, lomos aislados y exceso de
+vacío no expresaban el videoclub continuo aprobado. Sin borrar esa historia, [U2-R]
+conservó los contratos útiles de permisos, teclado y datos y reemplazó la arquitectura
+visual antes de [U3] y [A2]. La referencia vinculante es
+`docs/design/u2-recovery-north-star-v1.png`; el contrato autosuficiente está en
+`docs/briefs/home-videotheque-recovery-v1.md`. Para la franja superior, la corrección
+vinculante más reciente es `docs/design/u2-r4-annotated-review-v1.png`.
+
+#### [U2-R] Recuperar Inicio según el north star aceptado
+**Cerrado 2026-09-06 — commit `a322d1f`.** Gate integral 17/20, sin hallazgos P0/P1
+abiertos.
+- **Alcance**: reconstruir Inicio de escritorio como una escena física compacta: una
+  cartelera vertical autónoma, una lista tipo Winamp cuya fuente puede ser la
+  programación diaria o una estantería, y cuatro módulos dentro de un mueble horizontal
+  continuo. `Ver más` abre una contratapa VHS y `Editar mi ficha` reutiliza el editor.
+- **Criterio de cierre**: el mueble muestra continuidad lateral sin scrollbar visible;
+  1280×720 permite flujo vertical antes que ocultar o comprimir contenido; no hay
+  overflow horizontal; cartelera automática y selección manual no se pisan; fila/lomo
+  coinciden dentro de la fuente activa y el lomo directo gobierna la ficha inferior sin
+  reprogramar la playlist; teclado/touch/lector/reduced motion son equivalentes; móvil
+  no queda peor que antes de U2.
+- **Depende de**: base técnica de [U2]. **Precede a**: [U3] y [A2]. No cambia `/api/home`,
+  A1, permisos ni rutas públicas.
+- **Modelo sugerido**: Medio por subtask de implementación; Grande para la exploración
+  de diseño [U2-R.4e] y el gate [U2-R.7]. Las partes están ordenadas y acotadas para
+  poder delegarlas sin pedir a un modelo menor que redescubra la arquitectura.
+
+  - [x] **[U2-R.1] Construir el escenario desktop y el mostrador mínimo.** Aplicar pared,
+    marco y grilla física; dejar `Colección` + `Menú` juntos, marca → Inicio y el resto
+    de comandos dentro del menú; encuadrar cartelera/lista/mueble dentro de 1280×720 sin
+    tocar comportamiento. Acotar a `index.shell-open.html`, `index.home.html`,
+    `css/core.css`, `css/home.css` y tests estructurales. Los selectores nuevos se
+    prefijan `home-videotheque-*`. **Modelo: Medio. Depende de U2-R.0.**
+    - [x] **[U2-R.1a] Mostrador y arquitectura de navegación.** Marca enlazada a Inicio,
+      `Colección` y `Menú` como únicos destinos visibles del mostrador desktop; Bandeja,
+      Club, azar, buscar y agregar conservan sus handlers dentro del menú.
+    - [x] **[U2-R.1b] Escenario material y aislamiento responsive.** Aplicar los assets
+      originales de pared, marco, shelf bay y lomo sólo en desktop, preservando el DOM y
+      la navegación móvil previos.
+    - [x] **[U2-R.1c] Gate de encuadre.** Verificar 1280×720 sin scroll vertical tanto con
+      cartelera poblada como vacía y conservar el indicio de continuidad inferior.
+    - **Cierre**: escenario desktop material aplicado sobre los assets de U2-R.0;
+      `Colección` + `Menú` forman el mostrador, la marca vuelve a Inicio y los comandos
+      reubicados conservan navegación, foco y contadores. El modo compacto de altura
+      mantiene la composición poblada dentro de 1280×720 y móvil conserva su shell.
+  - [x] **[U2-R.2] Separar cartelera automática, fuente de playlist y selección.** En
+    `js/surfaces/home.js`, modelar `carouselItemId`, `playlistSource` y `selectedItemId`;
+    renderizar la lista tabular con fuente visible y autoplay que sólo cambia el item al
+    aire. Probar click/Enter en cartelera, flechas/Home/End, brillo no seleccionado y que
+    el timer no roba foco/preview. **Modelo: Medio. Depende de U2-R.1.**
+    - [x] **[U2-R.2a] Estado independiente.** Separar item al aire, fuente activa y obra
+      seleccionada sin cambiar `/api/home`.
+    - [x] **[U2-R.2b] Playlist Winamp accesible.** Tabla HTML real con fuente, columnas,
+      selección roving y preview sincronizado para cartelera o estantería.
+    - [x] **[U2-R.2c] Autoplay y navegación de borde.** Cerrar wrap de anterior/siguiente,
+      pausa efectiva fuera de Inicio, preservación de foco/preview y sus regresiones.
+    - [x] **[U2-R.2d] Ampliar la programación visible.** Elevar a seis el contrato acotado
+      de funciones destacadas en servidor, snapshots y cliente, manteniendo el límite
+      explícito en `home.limits.featured_items` y su fallback compatible.
+    - [x] **[U2-R.2e] Recuperar la cartelera física y el selector temporal.** Renderizar el
+      marco vertical sin deformar su relación 2:3, retirar la barra superior redundante y
+      reubicar Hoy/Ayer como interruptor físico compacto dentro del reproductor.
+    - [x] **[U2-R.2f] Cerrar el gate visual de playlist y preview.** Dar a la tabla el
+      lenguaje CRT/Winamp de la referencia, diferenciar al aire de selección y componer
+      una preview compacta con datos útiles y las acciones doradas a la izquierda.
+    - **Cierre**: `carouselItemId`, `playlistSource`, `selectedItemId` y la selección de
+      fila son estados independientes. La cartelera gira sin alterar preview/foco; la
+      playlist usa tabla HTML CRT de seis funciones y navegación roving;
+      anterior/siguiente envuelven, el timer se detiene fuera de Inicio o con movimiento
+      reducido y el marco/selector temporal/preview respetan el north star a 1280×720.
+  - [x] **[U2-R.3] Convertir las categorías en mueble horizontal continuo.** Sustituir el
+    selector de una sola fila por cuatro bays contiguos, con placa por categoría, un bay
+    dominante y el siguiente cortado; rueda/trackpad/Shift+rueda/flechas desplazan con
+    límites y equivalente enfocable sin barra visible. Usar `vhs-shelf-bay-v1.png` y
+    `vhs-spine-shell-v1.png`; mantener texto/estado en DOM. Archivos: `home.js`,
+    `home.css`, pruebas de 0/1/4 categorías y overflow. **Modelo: Medio. Depende de
+    U2-R.1.**
+    - [x] **[U2-R.3a] Mueble y bays.** Renderizar hasta cuatro secciones simultáneas como
+      módulos contiguos sobre el asset de estantería, con uno dominante y continuidad
+      parcial visible.
+    - [x] **[U2-R.3b] Recorrido multimodal.** Implementar rueda vertical/horizontal,
+      trackpad, Shift+rueda, flechas y controles enfocables sobre un scroll lateral
+      acotado, sin scrollbar y con reduced motion.
+    - [x] **[U2-R.3c] Casos de borde y aislamiento.** Probar 0/1/2/4 módulos, overflow y
+      límites; conservar la composición móvil anterior sin mostrar los controles nuevos.
+    - **Cierre**: las categorías dejan de reemplazarse mediante pestañas y conviven en un
+      único mueble con scroll real. En desktop se ve el siguiente bay cortado; teclado,
+      touch y rueda disponen de caminos equivalentes, y móvil conserva su presentación.
+  - [x] **[U2-R.4] Sincronizar playlist, lomo y preview y cerrar la composición
+    superior.** Click/Enter en un bay cambia la fuente; click/Enter en un lomo
+    selecciona/alinea su fila; flechas en la lista seleccionan y llevan a vista el lomo
+    correspondiente. Preview, fila y lomo deben compartir ID tras cada camino. Poner
+    **a la izquierda** `Ver más` y `Editar mi ficha`, ambos con el mismo estilo físico
+    dorado y diferente intensidad; conservar el gate real de permisos. Archivos:
+    `home.js`, `home.css`, `test_ui_browser.py`. **Modelo: Medio. Depende de U2-R.2 y
+    U2-R.3.**
+    - [x] **[U2-R.4a] Unificar selección y alineación.** Converger click/Enter de bay o
+      lomo y flechas/Home/End de playlist en el mismo entry/item; conservar selección
+      recordada, foco y scroll visible en ambos sentidos.
+    - [x] **[U2-R.4b] Preview compartida y permisos.** Sustituir previews repetidas por
+      una única franja activa bajo el mueble; mantener `Ver más` y `Editar mi ficha` a
+      la izquierda, y omitir edición para obras de Club.
+    - [x] **[U2-R.4c] Pulido de cartelera y encuadre.** Llenar el hueco con el poster sin
+      caption redundante ni flechas, integrar puntos al zócalo, liberar el fondo,
+      agrupar `Colección`/`Menú`, contener Hoy/Ayer y sostener 1280×720 poblado.
+    - [x] **[U2-R.4d] Corregir encastre y programa temporal.** Respetar la abertura real
+      del marco sin recortar el poster, usar la placa como rótulo dinámico `Hoy`/`Ayer`
+      e integrar el selector temporal al flujo del encabezado Winamp sin superposición.
+    - [x] **[U2-R.4e] Explorar el mostrador superior con dirección de diseño.** Encargar a
+      un subagente de diseño 2–3 composiciones acotadas para la barra, usando como entrada
+      el north star y la revisión anotada. Debe mantener marca → Inicio y
+      `Colección` + `Menú`, resolver marca/estadísticas en una única línea y evitar una
+      barra genérica o más alta. Entregar comparación visual y una recomendación antes
+      de tocar código. **Modelo: Grande. Sin dependencia técnica; primera prioridad.**
+    - [x] **[U2-R.4f] Implementar el mostrador elegido.** Llevar la variante confirmada a
+      `index.shell-open.html` y `css/core.css`; conservar handlers, permisos, foco,
+      contadores y ancho sin wrap en desktop, con fallback de altura/zoom y sin modificar
+      la navegación móvil. **Modelo: Medio. Depende de U2-R.4e.**
+    - [x] **[U2-R.4g] Liberar y jerarquizar la cartelera.** Eliminar el rectángulo exterior
+      que encajona la marquesina, agrandar y centrar el marco dentro de su columna,
+      centrar `Hoy`/`Ayer` en la placa y retirar el contador `01 / 06`. Preservar encastre
+      completo del poster, autoplay independiente, click/Enter y puntos en el zócalo.
+      **Modelo: Medio. Depende de U2-R.4f.**
+    - [x] **[U2-R.4h] Rebalancear la playlist de hasta seis funciones.** Distribuir las
+      filas para aprovechar la altura disponible sin scroll ni enormes huecos laterales;
+      mantener tabla real, columnas, selección/al aire y legibilidad en 1–6 resultados.
+      Probar títulos/géneros largos y que una lista corta no produzca filas absurdamente
+      altas. **Modelo: Medio. Depende de U2-R.4g.**
+    - [x] **[U2-R.4i] Destilar la preview del reproductor.** Retirar el motivo redundante
+      `Disponible y pendiente` sobre el título, conservar identidad, metadatos y hechos
+      útiles una sola vez, y redistribuir acciones, miniatura y ficha sin romper el gate
+      de edición para obras propias/Club. **Modelo: Medio. Depende de U2-R.4h.**
+    - [x] **[U2-R.4j] Incorporar una señal temporal decorativa y determinista.** Ocupar el
+      centro libre de la preview con una visualización SVG/CSS estable derivada del ID:
+      aspecto de forma de onda/espectro sobre una línea de tiempo, claramente decorativa,
+      `aria-hidden`, sin afirmar que proviene del audio real. Debe variar entre obras sin
+      cambiar al rerenderizar y degradar a un trazo estático con reduced motion.
+      **Modelo: Medio. Depende de U2-R.4i.**
+    - [x] **[U2-R.4k] Gate visual de la franja superior.** Comparar implementación con
+      `u2-r4-annotated-review-v1.png` en 1280×720, 1440×900 y 1920×1080; verificar 1/6
+      funciones, poster roto, textos extensos, teclado, autoplay, zoom y ausencia de
+      scroll vertical. Documentar capturas y no cerrar R.4 sólo por tests verdes.
+      **Modelo: Medio. Depende de U2-R.4f–U2-R.4j.**
+    - [x] **[U2-R.4l] Segunda pasada de legibilidad del reproductor.** Dar mayor presencia
+      al rótulo `Hoy`/`Ayer` y a los indicadores del zócalo, ampliar identidad y señal de
+      preview, incorporar `Director` con ausencia explícita y limpiar el indicador de la
+      fila activa. **Modelo: Medio. Depende de U2-R.4k.**
+    - [x] **[U2-R.4m] Fijar geometría y eliminar frontend obsoleto.** Anclar placa e
+      indicadores a bandas verificables del asset, reservar al menos 38 % de la preview
+      para la señal y forzar revalidación ETag de assets no versionados. **Modelo: Medio.
+      Depende de U2-R.4l.**
+    - [x] **[U2-R.4n] Recuperar el mueble continuo de la referencia.** Reemplazar la
+      repetición de fondos por `vhs-continuous-furniture-v2.png`: un único hueco sin
+      divisores donde conviven hasta cuatro categorías y la siguiente queda cortada.
+      Encastrar lomos sobre el estante, mantener un único scroll lateral y retirar las
+      placas del travesaño: la categoría activa vive discretamente abajo. Integrar las
+      acciones en el panel físico izquierdo, una pantalla retrofuturista tipo Winamp/CRT
+      con dos fotogramas placeholder en el panel central y el distintivo VHS en el panel
+      derecho. Suavizar la pared con tratamiento gráfico y cañerías laterales decorativas
+      sin alterar móvil. **Modelo: Medio. Depende de U2-R.4m.**
+    - **Cierre 2026-09-03**: se eligió una marquesina abierta y continua, con marca y
+      estadísticas en una línea y `Colección`/`Menú` como placas contiguas. La cartelera
+      queda libre de caja y contador; seis filas llenan el reproductor sin inflar listas
+      cortas; preview, fila y lomo comparten selección, y la preview elimina razones
+      redundantes y suma una señal decorativa estable por obra. La biblioteca inferior
+      usa un solo mueble continuo con consola integrada, no módulos raster repetidos. El
+      gate y las decisiones están documentados en `docs/design/u2-r4-upper-gate-v1.md`.
+  - [x] **[U2-R.5] Implementar la contratapa determinista.** Extraer un mapper puro de ID
+    opaco → una de 4–5 plantillas estables; componer sobre
+    `vhs-back-cover-shell-v1.png` sinopsis, créditos, año, duración, géneros,
+    disponibilidad/memoria y dos placeholders de imagen. `Ver más` abre con transición
+    breve, Escape/reduced motion y retorno de foco; `Editar` sigue abriendo la ficha
+    actual. Acotar a un módulo JS nuevo, integración mínima en `home.js`, CSS de
+    contratapa y tests del mapper/foco. **Modelo: Medio. Depende de U2-R.4k.**
+    - **Cierre 2026-09-04**: `back-cover.js` concentra el hash puro y cinco plantillas
+      estables sin exponer el ID; `Ver más` compone la contratapa sobre el shell
+      original con sinopsis, ficha, disponibilidad, memoria y exactamente dos
+      placeholders honestos. El diálogo existente conserva Escape, retorno de foco y
+      reduced motion con una transición breve; `Editar mi ficha` sigue entrando al
+      dossier editable. La cobertura de navegador valida las cinco asignaciones,
+      encastre, contenido, foco y separación de ambos flujos.
+  - [x] **[U2-R.C] Corregir la franja inferior antes del gate.** Aplicar los hallazgos
+    acotados de `docs/design/u2-lower-review-2026-09-05.md` sin reabrir la base técnica
+    ni rediseñar toda la home. **Depende de U2-R.4n y U2-R.5. Precede a U2-R.7.**
+    - [x] **[U2-R.C1] Recuperar lectura de lomos.** Reservar el track principal al título
+      y llevar año/formato a un pie compacto, conservando el nombre accesible completo.
+    - [x] **[U2-R.C2] Corregir selección directa entre categorías.** Click o Enter sobre
+      cualquier lomo activa su categoría y ficha inferior en el mismo gesto, sin cambiar
+      la playlist superior.
+    - [x] **[U2-R.C3] Recuperar altura útil de la consola.** Mostrar título, año,
+      dirección y sinopsis breve legibles en los tres tamaños desktop; metadata principal
+      de 12 px o más y flujo vertical cuando la altura o el zoom no alcancen.
+      - **Cierre 2026-09-05:** la pantalla central mide 114/114/124 px en los tres
+        viewports objetivo, conserva sinopsis de dos líneas y metadata de 12 px sin
+        overflow; los botones quedan contenidos y 720p usa scroll vertical de página.
+        La descripción propia y luego Wikipedia preceden al motivo editorial.
+    - [x] **[U2-R.C4] Resolver orientación y grupos cortos.** Comparar placas pequeñas por
+      categoría con el rótulo inferior activo y evitar huecos desproporcionados.
+      - **Cierre 2026-09-06:** cada grupo desktop expone una placa con nombre y cantidad;
+        la activa usa el estado dorado y la consola repite el contexto seleccionado. Los
+        grupos de 1–2 obras bajan a 192–220 px, los gaps a 20–36 px y la navegación sólo
+        se muestra cuando el mueble tiene overflow real. Móvil conserva el flujo previo.
+  - [x] **[U2-R.6] Aislar desktop y recuperar móvil.** Auditar los cambios responsive de
+    U2 contra la composición previa; fuera del breakpoint desktop conservar/restaurar
+    la navegación y flujo móvil anterior, sin intentar este rediseño material. Probar
+    390×844, zoom alto, poster roto, título largo y acciones por permiso. **Modelo:
+    Medio. Depende de U2-R.1–U2-R.5.**
+    - **Cierre 2026-09-06:** la cabecera móvil reserva una fila completa a la marca y otra
+      a sus cuatro utilidades; la preview apila display y acciones, recupera portada +
+      texto en 92 px + resto y conserva sinopsis de 15 px y controles de 44 px. Posters
+      rotos muestran fallback, títulos largos no fragmentan la marca, 390/320 px no
+      desbordan y las variantes personal/Club respetan sus permisos. Playwright 35/35 y
+      detector de layout en verde; lector, touch real y gate visual completo pasan a R.7.
+  - [x] **[U2-R.7] Ejecutar gate visual y de regresión.** Comparar con el north star en
+    1280×720, 1440×900 y 1920×1080; revisar coherencia de estado, flujo vertical legible
+    a 720p, ausencia de overflow horizontal, indicio lateral, teclado, touch, lector,
+    reduced motion y suites completas.
+    Corregir sólo defectos del gate, documentar capturas y no declarar cierre por tests
+    verdes si la composición vuelve a divergir. **Modelo: Grande. Depende de todo
+    U2-R.**
+    - [x] **[U2-R.7a] Gate de encuadre desktop.** Capturar una home sintética poblada en
+      1280×720, 1440×900 y 1920×1080; comparar cabecera, cartelera/playlist, continuidad
+      del mueble y consola con las dos láminas vinculantes. Medir overflow y flujo a
+      720p, registrar evidencia y corregir sólo bloqueos visuales de este gate.
+      - **Auditoría inicial 2026-09-06:** integridad visual aprobada y cero overflow
+        horizontal. Gate todavía rojo: texto operativo de 8–10 px y 202 px de flujo
+        vertical incluso en 1920×1080. Evidencia y score preliminar en
+        `docs/design/u2-r7a-visual-gate-2026-09-06.md`.
+      - **Cierre 2026-09-06:** decisión 1A + 2A aplicada. La escena completa entra en
+        1920×1080, 1440×900 reduce el recorrido a 154 px y 720p conserva flujo vertical
+        sin comprimir la consola. Estadísticas/celdas usan 12 px, encabezados 11 px y
+        metadata de lomo 10 px; seis funciones y hechos operativos quedan contenidos.
+        Evidencia final, score 17/20 y verificaciones en el mismo documento.
+    - [x] **[U2-R.7b] Matriz de contenido y estados límite.** Verificar 0/1/4 categorías,
+      filas vacías, poster roto, título/género extensos, permisos personal/Club y
+      contratapa determinista con sus dos placeholders.
+      - **Cierre 2026-09-06:** estado totalmente vacío, 1/2/4 categorías, título y
+        géneros extensos, nombre de instancia completo, posters ausentes/rotos,
+        permisos personal/Club y cinco contratapas con dos marcos quedaron cubiertos.
+        Se añadieron fallbacks consistentes a cartelera/preview y una escala compacta de
+        marca sin overflow. Matriz y evidencia en
+        `docs/design/u2-r7b-content-state-matrix-2026-09-06.md`; suite 32/32.
+    - [x] **[U2-R.7c] Gate de interacción y accesibilidad.** Recorrer click, Enter,
+      flechas, cambio de estantería, temporizador, foco/retorno, touch, nombres
+      accesibles y reduced motion; repetir reflow móvil en 390/320 px sin callejones.
+      - **Cierre 2026-09-06:** click/Enter/flechas, sincronización explícita de módulo,
+        temporizador, foco/retorno, nombres accesibles, reduced motion y tap real quedaron
+        cubiertos. El contexto móvil 390/320 conserva targets de 44×44 px y cero overflow
+        horizontal. Matriz y score 17/20 en
+        `docs/design/u2-r7c-interaction-accessibility-gate-2026-09-06.md`; gate focal 10/10.
+    - [x] **[U2-R.7d] Regresión y cierre contractual.** Ejecutar suites completas,
+      resolver o documentar cualquier gate rojo, validar formato/tipos/compilación,
+      actualizar brief/revisión/backlog y cerrar U2-R sólo con evidencia integral.
+      - **Cierre 2026-09-06 — commit `a322d1f`:** 560 pruebas generales y 31 de
+        navegador quedaron verdes; Ruff, formato, mypy estricto, `compileall`, sintaxis
+        de 26 módulos JavaScript y `git diff --check` pasaron. El brief y la revisión
+        reflejan el contrato final; evidencia integral en
+        `docs/design/u2-r7d-contract-closure-2026-09-06.md`.
+
+#### [U2-R.0] Congelar dirección y kit material
+**Cerrado 2026-09-03 — commit `9406887`.**
+
+Se versionó la composición aprobada en
+`docs/design/u2-recovery-north-star-v1.png` y se convirtió la conversación en un
+contrato durable de layout, estado, interacción, accesibilidad y aceptación dentro de
+`docs/briefs/home-videotheque-recovery-v1.md`. El brief fija, entre otras decisiones,
+`Colección` junto a `Menú`, autoplay independiente de selección, correlación
+lista-lomo-preview, cuatro bays continuos y `Ver más`/`Editar mi ficha` agrupados a la
+izquierda con el mismo lenguaje físico dorado.
+
+El kit original y auditado suma pared, marco de cartelera con hueco alfa, módulo vacío
+de estantería, shell de lomo y shell de contratapa. Ningún asset contiene texto, marca,
+obra o datos rasterizados; `docs/assets/home-videotheque-kit-v1.md` registra dimensiones,
+hashes, prompts, procedencia y reglas de integración. No se tocó código de interfaz.
+
 ### Frente: Inicio videoclub
+
+#### [U2.4] Conectar edición explícita desde la previsualización y la ficha
+**Cerrado 2026-09-03, cierra [U2] completo.**
+`docs/briefs/home-edit-permissions-v1.md` documenta la auditoría: antes de escribir
+código, se revisaron las tres superficies que Inicio puede abrir para confirmar si
+faltaba alguna gate real. `#detailDrawer` sólo puede mostrar un `id` del catálogo del
+usuario autenticado (estructuralmente imposible que muestre una obra ajena);
+`EditorialHomeService` sólo produce `origin.kind` `catalog` o `collection` (ya cubiertos
+por la gate de [U2.2]); y `#sharedDetailDialog` — reusado por la recomendación de Club
+en Inicio y por el catálogo compartido de otro miembro en Club — nunca arma un botón de
+edición en ninguno de sus dos usos. El modelo de permisos ya estaba bien conectado; lo
+que faltaba era verificarlo con pruebas, no agregar gates nuevas.
+
+Dos pruebas de navegador nuevas cierran ese verificación:
+`test_home_shelf_collection_entries_never_show_an_edit_action` (una recomendación de
+colección nunca ofrece `Editar mi ficha`, ni en la previsualización ni en el diálogo
+compartido) y
+`test_selecting_and_previewing_a_shelf_entry_never_mutates_the_catalog` (navegar,
+seleccionar, previsualizar y abrir/cerrar el dossier no dispara ningún
+`POST`/`PATCH`/`PUT`/`DELETE` contra `/api/*`, registrado en vivo durante la secuencia).
+560 pruebas unitarias, 27 de navegador, Ruff, formato, mypy estricto, `compileall` y
+`git diff --check` en verde.
+
+#### [U2.3] Abrir la caja para el detalle extendido
+**Cerrado 2026-09-03.** `docs/briefs/home-dossier-case-open-v1.md` documenta la
+entrega. `Ver más` en la previsualización de una estantería abre el mismo
+`#detailDrawer` compartido de siempre (sin cambios de ruta/API); esta entrega suma una
+transición decorativa reversible y un cassette VHS negro permanente en el dossier
+compartido (decisión del owner: aplica sin importar el punto de entrada — Inicio,
+Colección o Club — no sólo cuando se abre desde una estantería).
+
+`openDetailWithCaseTransition()` (`detail.js`) envuelve la apertura en
+`document.startViewTransition()` cuando el navegador lo soporta y no hay
+`prefers-reduced-motion`, y `closeDetail()` recuerda si el dossier actual se abrió así
+para envolver el cierre de la misma manera — reversible de verdad, no sólo una entrada
+animada. Sólo el botón `Ver más` de la previsualización usa este camino; el resto de
+los puntos de entrada al dossier (`Editar mi ficha`, Colección, Club, Al azar) siguen
+abriendo directo. Un fix necesario en el camino: el foco de retorno comparaba
+`data-click` contra el literal `"open-detail"`, que dejó de coincidir con el nuevo
+valor; ahora usa `dataset.click?.startsWith("open-detail")`.
+
+El cassette negro (`.drawer-vhs-case` + dos `.drawer-vhs-reel`, 100% CSS, sin librería
+ni asset nuevo) vive en `drawerPoster()`, la única función que arma la portada del
+dossier personal, la ficha compartida de Club y el detalle de una recomendación de
+colección en Inicio — un solo lugar, tres superficies. Es decorativo
+(`aria-hidden`/`pointer-events: none`) y nunca compite con los estados de carga/error
+de la portada real, que siguen intactos.
+
+Verificado con una prueba de navegador nueva
+(`test_home_shelf_view_more_opens_dossier_with_reversible_case_transition`: cassette
+inerte, Escape no bloquea foco, `prefers-reduced-motion` sigue funcionando) más toda la
+suite existente actualizada donde hacía falta (el foco esperado tras Tab desde la
+estantería cambió de `open-detail` a `open-detail-with-case-transition`). En el camino
+se corrigieron dos cosas de la prueba en sí, no de la app: `wait_for_selector` para un
+diálogo cerrado necesita `state="hidden"` (el default es `"visible"`, que nunca se
+cumple ahí) y el foco tras cerrar hay que sondearlo con `wait_for_function` en vez de
+leerlo una sola vez, porque Chromium lo asienta un tick después de cerrar el `<dialog>`
+mientras la transición todavía se captura — instrumentar
+`document.startViewTransition` para contar invocaciones introducía esa misma carrera,
+así que la prueba verifica comportamiento end-to-end en su lugar. 560 pruebas
+unitarias, 25 de navegador, Ruff, formato, mypy estricto, `compileall` y
+`git diff --check` en verde. Verificado también visualmente en un servidor
+descartable en 1345px y 375px.
+
+#### [U2.2] Convertir cada fila editorial en una estantería de lomos
+**Cerrado 2026-09-03.** `docs/briefs/home-shelves-v2.md` documenta la entrega, que
+reemplaza el tratamiento visual de U1.2 sin tocar `/api/home` ni `home_service.py`.
+`#homeShelfCategories` suma un selector de categorías con roving tabindex
+(flechas/Home/End/clic): en escritorio (`min-width: 861px`) sólo la estantería activa
+se muestra (`.home-program[data-active="false"] { display: none; }`), sin apilar todas
+las filas; en móvil (`≤860px`) el selector se oculta y todas vuelven a apilarse y hacer
+scroll vertical, como antes. Con una sola sección no hace falta elegir, así que el
+selector no se renderiza.
+
+Cada obra de la fila pasó de una caja frontal (`vhs-cassette-frame-v1.png`) a un lomo
+angosto (`.vhs-spine`, texto vertical real vía `writing-mode`, sin imagen): el marco
+auditado se movió a la previsualización (`.home-shelf-preview-frame`), que ahora sí es
+"una previsualización basada en `vhs-cassette-frame-v1.png`, caja frontal/portada" tal
+como pedía el brief maestro. El botón de detalle se renombró a `Ver más`; se sumó
+`Editar mi ficha` sólo para entradas de origen `catalog` (reutiliza
+`openDetail()`+`editPersonalRecord()` vía la nueva `openDetailForPersonalEdit()` en
+`detail.js`, sin editor nuevo), ausente para recomendaciones de Club sin agregar
+(`origin.kind === "collection"`) — el endurecimiento completo de permisos queda para
+[U2.4].
+
+Verificado con dos pruebas de navegador nuevas (categorías con teclado/mobile,
+`Editar mi ficha` sólo en entradas propias y foco en el campo de fecha al abrir) más la
+prueba de estanterías existente actualizada para el nuevo marco/spines; también en un
+servidor descartable con siete obras en 1345px y 375px. 560 pruebas unitarias, 24 de
+navegador, Ruff, formato, mypy estricto, `compileall` y `git diff --check` en verde.
+
+#### [U2.1] Fijar y prototipar la cartelera-lista
+**Cerrado 2026-09-02.** `docs/briefs/home-cartelera-winamp-v1.md` documenta la
+entrega. U1.1 ya había resuelto la mecánica de teclado (flechas, Home/End, Enter vía
+semántica nativa de `<button>`) y click/tap como alternativa; esta entrega es
+puramente visual y no toca `/api/home` ni `home_service.py`. El kicker de la sección
+pasa de "Programación personal" a `Cartelera disponible` (el término exacto del brief
+maestro); las filas del selector bajan de 64px a 52px con un indicador triangular
+decorativo en la fila activa, más denso y parecido a una lista de reproducción.
+
+`.spotlight-ambience` agrega una capa `aria-hidden`/`pointer-events: none` detrás de
+la barra y el escenario. El owner generó y auditó `night-cinema-ambient-v1.png`
+(prompt, procedencia C2PA, hash y licencia en `docs/assets/night-cinema-ambient-v1.md`)
+y quedó integrado como fondo real de esa capa, con un tinte de marca liviano encima
+(sin logos, actores ni texto agregado por CSS).
+
+La primera integración dejaba el fondo casi invisible: `.spotlight-selector` tenía un
+`background-color` opaco de respaldo y `.spotlight-bar` alfas de 0.92–0.98 (92-100% de
+tapado), y dentro de `.spotlight-ambience` los gradientes CSS estaban listados antes
+que la imagen en el `background-image` (la primera capa listada es la más cercana a
+quien mira), tapándola aún donde sí se veía. Se corrigió reordenando la imagen como
+capa de fondo real, aligerando los gradientes a un tinte y bajando `.spotlight-bar` a
+0.78–0.86 y `.spotlight-selector` a un degradé con alfa 0.88–0.9 en vez del color
+opaco. Verificado visualmente en un servidor descartable (1280px y 375px, con y sin
+`page_image` para aislar el efecto): la ambientación ahora se distingue como puntos de
+luz reales, y el contraste del texto de la lista se mantiene alto porque la foto es
+mayormente oscura.
+
+Estados de carga, vacío y advertencia/error ya existían de U1.1-U1.3 y no cambiaron.
+Verificado con una prueba de navegador nueva
+(`test_home_marquee_shows_the_available_billboard_label_and_decorative_ambience`) más
+toda la suite existente sin tocar un assert: 560 pruebas unitarias, 22 de navegador,
+Ruff, formato, mypy estricto, `compileall` y `git diff --check` en verde.
+
+#### [U2.0] Integrar navegación y utilidades en el escenario
+**Cerrado 2026-09-02.** `docs/briefs/home-control-desk-v1.md` fija la arquitectura de
+información de la cabecera compartida antes de que U2.1 la reemplace visualmente:
+`Inicio`/`Colección`/`Bandeja`/`Club` siguen siendo los destinos de `.primary-nav`, sin
+cambios de IDs, rutas ni estado activo; `.header-utilities` suma `Buscar` y `Agregar`
+junto a `Al azar` y `Usuario` ya existentes. `Buscar` navega a `Colección` y enfoca
+`#query` (`goToCollectionSearch()`); `Agregar`, por decisión del owner, navega a
+`Colección` igual que el botón de navegación (`goToCollectionRoot()`) como redirección
+interina, porque la intención real de "buscar para agregar" implica repensar
+`Colección`/su buscador — tarea futura, todavía sin numerar, que el brief deja
+documentada y fuera de alcance de U2.
+
+Ningún destino ni utilidad existente cambió de comportamiento; el orden de tabulación
+queda destinos → `Buscar` → `Agregar` → `Al azar` → `Usuario`, sin trampas de foco y con
+el tamaño táctil de 44px heredado en móvil. Verificado con Playwright real
+(`test_header_utilities_open_collection_search_and_add` nueva, más las aserciones de
+foco y de layout sin scroll horizontal en escritorio/390px ya existentes) y visualmente
+en un servidor descartable en 800px y 375px: sin overflow ni recorte de texto. 560
+pruebas unitarias y 21 de navegador, Ruff, formato, mypy estricto, `compileall` y
+`git diff --check` en verde.
 
 #### [U1.1] Definir el selector fijo de Inicio a partir de la variante A
 **Cerrado 2026-09-02, commit `f6a1c60`.** El carrusel inferior se reemplazó por un
@@ -179,6 +1238,110 @@ procedencia C2PA y prompt están auditados en `docs/assets/vhs-cassette-frame-v1
 `pyproject.toml`/el servidor declaran y sirven PNG estático. La prueba de navegador
 cubre los tres estados, teclado, móvil y movimiento reducido; el asset se sirve desde la
 misma instancia. La cartelera pública y su payload v1 no se tocaron.
+
+### Frente: Clientes, integraciones y nuevos medios
+
+#### [A1] Definir API versionada y sesiones para dispositivos — **cerrada 2026-09-07**
+- **Alcance**: contrato minimo para login contra URL HTTPS elegida, catalogo,
+  busqueda/detalle y cambios personales; expiracion/revocacion sin administrar Scanner.
+- **Criterio de cierre**: OpenAPI/versionado, threat model y pruebas de compatibilidad
+  servidor-cliente antes de iniciar una app.
+- **Depende de**: [T4], [D1].
+- **Modelo sugerido**: Grande. Prerrequisito de cualquier cliente externo.
+
+  - [x] **[A1.1] Congelar contrato de dispositivo v1.** ADR y OpenAPI estático para
+    HTTPS, login/refresh/revocación, identidad, catálogo, detalle, búsqueda local y
+    patch personal; deja fuera Scanner, administración, Club e importaciones. Incluye
+    prueba de que la superficie y la serialización no heredan rutas o paths internos.
+  - [x] **[A1.2] Implementar sesiones opacas por dispositivo.** Migración aislada,
+    access/refresh con hash, expiración, rotación, logout/revocación, rate limiting y
+    dependencias Bearer que no acepten cookie ni el token CSRF web. Cerrar contraseña,
+    desactivar o archivar una cuenta invalida también sus sesiones de dispositivo.
+  - [x] **[A1.3] Implementar recursos v1 y compatibilidad.** Serializador allowlist,
+    paginación/cursor firmado, lectura de disponibilidad resumida, patch idempotente de
+    estado personal y fixtures cliente-servidor contra el contrato congelado. Los IDs
+    expuestos son opacos por catálogo y no revelan paths, fuentes o IDs internos.
+  - [x] **[A1.4] Clave de sincronización durable.** Cerrada 2026-09-07, commit `609f56e`.
+    Nació de los tres huecos que midió ADR-0005 para un cliente con réplica local. Sólo
+    uno era un problema de corrección y se arregló: el id opaco se derivaba del
+    `api_token` rotable más la ruta del archivo, así que rotar el token o mover el
+    catálogo re-clavaba todas las obras. Ahora sale de un secreto de instancia persistente
+    (migración v16, tabla `instance_secrets`) más la *posición* de la fuente, que no lleva
+    ruta. Los otros dos huecos —marcas de tiempo y feed de cambios— se dejaron sin hacer a
+    propósito, con el motivo escrito en la sección 6.1 de `docs/adr/0005-mobile-direction.md`:
+    ningún timestamp registra hoy una edición personal, y la fusión a tres bandas no
+    necesita un feed para ser correcta.
+
+#### [I1] Evaluar Radarr, Sonarr y Letterboxd — **cerrada 2026-09-07**
+
+Criterio de cierre cumplido: matriz en
+`docs/analisis/i1-radarr-sonarr-letterboxd-2026-09-07.md` y un ADR por integración.
+**Ninguna se construyó, y por decisión del owner ninguna se construye por ahora**: la
+evaluación queda como trabajo hecho para cuando haga falta.
+
+- **Radarr — aceptada con condiciones (ADR-0006).** Entrega `tmdbId`, la identidad fuerte
+  que `decide_match` ya reconoce: empareja con `shared_tmdb_id` a 1.0. No acelera al
+  Scanner, **le evita adivinar**. Compuerta que no es técnica: si el owner no corre Radarr,
+  vale cero.
+- **Sonarr — rechazada por ahora (ADR-0007).** Misma API, veredicto distinto, y no por la
+  fuente. Informa `episodeFileCount`/`totalEpisodeCount`; medido, 3 de 86 episodios, y
+  `en_catalogo` es booleano: `true` y `false` son las dos falsas. Reabre cuando se decida
+  qué significa "tener" una serie parcial.
+- **Letterboxd — rechazada como integración, aceptada como importación (ADR-0008).** API
+  por invitación sin garantía, export con Pro, y el CSV **no trae ningún identificador**.
+  El parser existente ya lee el archivo y el emparejamiento por títulos alternativos
+  funciona; el homónimo es el techo, así que la persona se queda en el medio.
+
+**Si esto se retoma**, la tarea más chica y con mejor relación valor/costo es el preset de
+importación de Letterboxd: armar el `column_map` solo, decidir qué se hace con `Rewatch` y
+`Tags` —que no tienen destino— y convertir la escala de estrellas a 1–10.
+
+### Frente: Streaming, charadas, puntajes públicos y TMDb en vivo
+
+Los frentes que abrió el análisis del 2026-09-07
+(`docs/analisis/streaming-charadas-movil-2026-09-07.md`), anotados en este tablero recién
+el 2026-09-11: se cerraron mientras el archivo tenía trabajo sin commitear del frente
+visual, así que quedaron registrados sólo en el análisis, que sigue siendo donde está el
+razonamiento completo. Las [S1]–[S3] de streaming son las que citan sus commits y **no
+son** las [S1]/[S2] de la purga del historial, más abajo; no se renumeran para no romper
+esas referencias.
+
+- [x] **[F5.4] Activar y validar TMDb contra la API real.** 2026-09-07, `a08298c` y
+  `40cd9b8`. Smoke en vivo 4/4, verificación en navegador con token válido y un alta real
+  entrando por enriquecimiento. La corrida real encontró dos cosas: la relajación de TLS
+  de [F1] culpaba a la cadena de Amazon por lo que hacía un antivirus local —se revirtió—,
+  y TMDb no tenía etiqueta en el frontend. Quedó sin correr el overlay de Docker; está en
+  `Backlog`.
+- [x] **[F6.1] Conectar el índice local de IMDb.** 2026-09-07, `7fe6966`; índice liviano
+  en `f90d764`. La política de [Q5] nombraba como primera fuente a un índice que
+  producción no podía consultar; ahora puede. Busca sólo por id de IMDb, es opt-in, y una
+  instalación sin índice enriquece igual que antes. El índice bajó de ~8,1 GB a ~1,1 GB
+  estimados.
+- [x] **[F6.2] Puntajes públicos, lado de datos.** 2026-09-07, `1f17507` y `bad682f`. IMDb
+  sale del índice y se lee al mostrar; TMDb se guarda como snapshot fechado, con 30 días
+  de refresco y 180 de tope contractual. Que un puntaje público nunca llegue al `rating`
+  personal ahora es estructural. La presentación está entre los traspasos al frente
+  visual.
+- [x] **[S1] Back office de regiones y plataformas.** 2026-09-07, `63c3253` y `6ea04c7`.
+  El owner decide qué mercados consulta la instancia y si los miembros pueden elegir; un
+  miembro elige sólo entre los habilitados.
+- [x] **[S2] Elegir la fuente de disponibilidad.** 2026-09-07, `3de406e` y ADR-0004. TMDb,
+  con dos condiciones: atribución obligatoria a JustWatch y el tope de retención aplicado
+  al snapshot.
+- [x] **[S3] Consulta, persistencia y procedencia.** 2026-09-07, `1e0b2b7`. Snapshot
+  fechado en tabla propia; `en_catalogo` no se toca y `en_plataforma` se deriva al leer.
+  "No lo consultamos" nunca se presenta como "no está disponible".
+- [x] **[G1] Contrato de charadas.** 2026-09-07, `ff91867`, `5f40b8c` y `2d23b39`;
+  `docs/briefs/charades-v1.md`. El conteo de votos no sirve para clasificar la banda
+  media, así que se automatizan sólo los extremos y el resto lo decide una persona.
+- [x] **[G2] Generador y dificultad.** 2026-09-07, `72d1f31`. Generador portable —FNV-1a
+  más un LCG documentado— para que el teléfono arme el mismo mazo; una dificultad puesta
+  por una persona sobrevive a cualquier recálculo. La pasada de revisión está entre los
+  traspasos; el juego va en [A2.4].
+- [x] **[MB1] Dirección móvil.** 2026-09-07, `a8f5a32` y `50e86a7`; ADR-0005. Cliente
+  autónomo, sincronización que inicia una persona y nunca borra, fusión a tres bandas.
+- [x] **[MB2] Auditoría móvil, mitad medible.** 2026-09-07, `2bd43ca`. Bandeja es la única
+  superficie con problemas reales; el arreglo está entre los traspasos.
 
 ### Frente: Superficie publica y despliegue
 
@@ -298,6 +1461,317 @@ hoja de ruta reflejan que [W2]/[W3] dependen de estas tres partes. No se modific
 comportamiento de la instancia: hoy continua completamente privada por defecto.
 
 ### Frente: Busqueda, comparacion y composicion de fuentes
+
+Diagnostico del 2026-08-26: la busqueda local principal usa titulos, aliases, IDs y
+archivos; `directors` existe en el modelo pero se excluye deliberadamente de la
+evidencia de identidad. Las tres fuentes externas reciben hoy casi la misma consulta:
+IMDb hace una sola llamada al endpoint de sugerencias, Wikipedia busca en ingles y
+espanol agregando `film`/`pelicula`, y FilmAffinity envia el texto literal. El puente de
+aliases de Wikidata para IMDb se activa solo si IMDb devolvio filas pero todas quedaron
+debajo del umbral; no se activa cuando la sugerencia vino vacia. Esto explica por que
+agregar `Jacopetti` puede ayudar a FilmAffinity sin rescatar necesariamente IMDb o
+Wikipedia. Ademas, `runSearch()` restablece el modo `browse`, por lo que editar la
+consulta durante `Comparar` pierde el contexto y ejecuta una busqueda comun.
+
+> **Corrección del 2026-09-10.** Dos de esas afirmaciones ya no son ciertas y conviene no
+> volver a salir a arreglarlas: el puente de aliases de IMDb **sí** se activa con una
+> respuesta vacía desde [Q3] (`imdb.py`, rama `is_empty`), y Wikipedia y FilmAffinity
+> tienen desde entonces su propio reintento por alias confirmado. El contexto de
+> `Comparar` lo cerró [U3]. Lo que queda en pie del párrafo es que las tres fuentes
+> reciben una consulta muy parecida.
+
+#### [B1] Mejorar el algoritmo de búsqueda y de colecciones — **cerrada 2026-09-11**
+
+**Abierto el 2026-09-07 por decisión del owner**, que pidió priorizar esto por encima de
+las integraciones externas. Es el lado de infraestructura; la presentación de las mismas
+superficies es [U3], del frente visual, y las dos conviene que avancen conversando.
+
+- **Alcance**: la calidad del resultado, no su dibujo. Ranking, evidencia de identidad,
+  composición entre fuentes y cómo se arma y ordena una colección.
+- **Punto de partida ya escrito**: el diagnóstico del 2026-08-26 en este mismo archivo
+  (frente de búsqueda) y `docs/search-quality.md`. De las tres cosas concretas que ese
+  diagnóstico nombraba, **dos ya están cerradas** y quedaron marcadas allá con una
+  corrección fechada el 2026-09-10: el puente de aliases de IMDb sí dispara con respuesta
+  vacía desde [Q3], y el contexto de `Comparar` lo cerró [U3]. Se anota acá porque salir a
+  arreglarlas de nuevo fue el costo real de no haberlo actualizado a tiempo.
+- **Lo único que queda en pie de aquel diagnóstico**: las tres fuentes externas reciben una
+  consulta muy parecida. **Medido el 2026-09-11 y resultó ser mucho menos de lo que el
+  diagnóstico sugería** — ver la nota de medición al final de la ficha.
+  `docs/search-quality.md` está al día y no necesita corrección.
+- **Herramienta que ya existe**: `movie-inbox search-lab run --enforce` mide el ranking
+  productivo sin cambiarlo y es gate en CI desde v0.3.0. Cualquier cambio de algoritmo se
+  mide contra él **antes y después**, o no se sabe si mejoró.
+- **Criterio de cierre**: pendiente de acotar con el owner. No se abren subtareas todavía
+  para no inventar alcance.
+- **Invariante que no se negocia**: el gate de v0.3.0 sigue en pie — cero falsos positivos
+  conocidos en auto-match. Un ranking más generoso que gane recall rompiendo eso no es una
+  mejora.
+
+**Avances del 2026-09-09 (lado infraestructura).** Cuatro arreglos de ranking, cada uno
+medido con `search-lab run` antes y después, y cada uno con un caso propio en el corpus
+dorado que falla si se revierte el arreglo. Un caso que pasa igual con y sin el arreglo es
+decoración, así que se verificó uno por uno.
+
+- `ad3e1e7` — un artículo compartido dejó de ser evidencia de identidad. "The Fly" y "The
+  Gift" valían 0.5 de similitud por culpa de "the". Precision@5 0.933 → 1.000, casos
+  estrictos 26/29 → 29/29.
+- `1d38c6a` — un término de dos letras no coincidía ni con uno idéntico, porque las dos
+  pruebas de subcadena arrancaban en tres caracteres y no había prueba de igualdad. "Ed"
+  no encontraba nada en un catálogo con "Ed Wood". El corpus estaba ciego a esto: todos
+  sus casos de título corto consultaban con año, que cae en la ruta de título exacto.
+- `32461b0` — una palabra corta metida adentro de otra más larga dejó de contar como
+  palabra compartida, y la comparación de respaldo pasó a medir palabras con contenido en
+  vez de cadenas crudas. Buscar "The Fly" traía "M. Butterfly" (32.2) por encima de "The
+  Flies" (29.0).
+- `57ad234` — una consulta de una sola letra es una consulta real. "M" no se podía buscar
+  por su propio título, ni siquiera agregando el año.
+- `13e9aab` — la misma ancla, sobre la regla que compara la consulta entera contra el
+  título entero. Era peor de lo anotado: "Age" puntuaba 82 contra "Carnage" y buscar
+  "Fly" ponía "M. Butterfly" **arriba de las dos películas llamadas "The Fly"**, porque
+  empataba en puntaje y ganaba el desempate alfabético.
+
+Corpus al cierre: 30 items, 32 casos, 32/32 estrictos, todas las métricas en 1.000, cero
+hits prohibidos y precisión de auto-match 1.000. **Ninguno de los cinco abre un
+auto-match nuevo**: la aceptación se decide en `decide_match`, que `rank_catalog_candidates`
+corre sobre todo el catálogo sin leer el gate de búsqueda. Se midió, no se supuso.
+
+**Colecciones, 2026-09-10.** El commit `5bdf32e` arregla dos defectos independientes de la
+colección [P2] que una biblioteca publica en Club, encontrados sondeando esa superficie y
+reproducidos de punta a punta antes de tocarlos.
+
+- **Publicación que fallaba en silencio.** Un archivo emparejado conserva la identidad con
+  la que se emparejó hasta que cambia su huella, así que una biblioteca con dos copias de
+  la misma película —una escaneada antes de que su ficha se enriqueciera— reportaba la obra
+  **dos veces**. Dos items de colección con la misma clave primaria: el insert fallaba, la
+  colección no se creaba nunca y la única señal era `set_share_availability` devolviendo
+  `synced=False`, que está documentado como un tropiezo transitorio que el próximo escaneo
+  arregla. Este era permanente. De paso corregía mal la cuenta de disponibilidad en la
+  ficha: informaba una copia donde había dos.
+- **Orden publicado tomado de un id interno.** La colección se numeraba por `work_key`, así
+  que un estante se leía Casablanca, Alien, Blade Runner, Dune —ids de TMDb comparados como
+  texto, 78 cae entre 348 y 841— y una película sin id de TMDb quedaba después de todas las
+  que sí lo tenían. Peor que arbitrario: se movía, porque la clave pasa de `work:<hash>` a
+  `tmdb:movie:<id>` en cuanto el enriquecimiento la encuentra, y el título saltaba de lugar
+  en una colección que otros ya estaban mirando. Ahora se lee alfabéticamente por el título
+  que se muestra, igual que la grilla del catálogo. **Sólo para colecciones que nadie
+  ordenó**: el orden de una colección curada es la declaración de quien la armó y no se
+  toca.
+
+**Colecciones curadas, 2026-09-11.** El commit `a82927e`. La mitad que faltaba de
+colecciones: no la derivada de una biblioteca sino las que arma una persona.
+
+- **Lo que se revisó y está bien**, dicho para que nadie lo vuelva a mirar: el camino de
+  importación arma los items con el id normalizado —no con el crudo, que puede venir
+  vacío— y los deja en el orden del archivo de origen. Ese orden **es** la declaración de
+  quien importó la lista, así que se respeta, igual que la regla que quedó escrita con
+  [P2]. El corte por duplicados dentro de una misma importación ya existía
+  (`collection_eligible`), así que el choque de clave primaria que rompía la colección
+  derivada no puede pasar por acá. Verificado corriendo el servicio de verdad.
+- **Lo que estaba roto es el costo de armarla.** `possible_duplicate_candidates` compara
+  una ficha contra todo el catálogo y, mientras lo hace, vuelve a calcular las claves de
+  título de cada ficha del catálogo. Una vez no es nada; una vez por cada elemento de una
+  lista es **todo** el costo. Perfilado sobre un catálogo de 5000 y una colección de 200:
+  normalizar el catálogo una vez son 0.124 s, y la página lo hacía 200 veces — **24.9 s de
+  los 28 que tardaba**, contra 2.3 s de comparación real. El 92% del tiempo era recalcular
+  lo mismo.
+- **Tres pantallas hacían exactamente eso**: abrir una colección, refrescar un borrador de
+  importación y armar Inicio a partir de las colecciones seguidas. Inicio es la peor de las
+  tres, porque las fichas de una colección seguida están mayormente **ausentes** del
+  catálogo y una ficha ausente no puede cortar temprano: recorre el catálogo entero.
+  Preparado una vez: **39.7 s → 2.8 s**.
+- **El detalle que vale releer**: el índice es perezoso a propósito. La primera versión
+  preparaba todo por adelantado y hacía más lento el caso contrario —`catalog_membership`
+  devuelve apenas reconoce un id, así que quien pregunta una sola vez por una ficha que
+  está en la posición 3 de 5000 habría pagado por preparar las 5000—. Las filas se calculan
+  a medida que se llega a ellas y quedan cacheadas, así que el corte temprano sobrevive:
+  medido en 0.2 ms, sin cambio.
+- Las pruebas cuentan llamadas en vez de segundos, porque una aserción de tiempo en una
+  suite mide la máquina que la corre.
+
+**Fuentes externas, 2026-09-10.** El commit `07e12be`. Lo primero que apareció al ir a
+buscar los dos defectos que el diagnóstico del 2026-08-26 nombraba: **los dos ya estaban
+arreglados** por [Q2] y [Q3], y la nota nunca se actualizó. Lo que seguía siendo cierto es
+que nadie medía si [Q3] había servido — el corpus de diagnóstico tenía tres casos, los tres
+de IMDb, así que el reintento por alias que [Q3] le dio a Wikipedia y a FilmAffinity nunca
+se ejercitó.
+
+Servía a medias. El reintento encuentra la película y después el piso de relevancia la
+descarta, porque la fila vuelve titulada en el idioma del mercado y se puntúa contra una
+consulta que está en otro. Medido contra la consulta de la que salió cada reintento, con
+el piso en 28:
+
+| Consulta | Fila que encuentra | Puntaje |
+| --- | --- | --- |
+| Der Untergang | El hundimiento (2004) | 13.9 |
+| Kimi no na wa | Your Name. (2016) | 21.5 |
+| Sen to Chihiro no kamikakushi | El viaje de Chihiro (2001) | 25.5 |
+| Les quatre cents coups | Los cuatrocientos golpes (1959) | 35.1 |
+| Addio zio Tom | Adiós, tío Tom (1971) | 41.2 |
+
+Sólo pasaban los cognados: el reintento rendía justo donde menos falta hacía. IMDb nunca
+tuvo el problema porque su propio puente arma la fila desde la entidad de Wikidata, que se
+lleva el título original con ella. Ahora un `AliasVariant` viaja con la entidad que lo
+respalda y `with_alias_identity()` copia sus títulos confirmados **sólo sobre la fila cuyo
+título es el que se reintentó** — una búsqueda por el alias puede devolver una página
+entera, y estampar identidad sobre toda ella sería inventarla. Los tres primeros pasan a
+100.
+
+El instrumento también estaba mal: `_FALLBACK_SIGNATURES` decía que FilmAffinity no tenía
+fallback propio —cierto cuando se escribió, falso desde [Q3]— así que un reintento que
+disparaba se reportaba como ninguno, y de los dos fallbacks de Wikipedia reconocía uno.
+
+- El caso nuevo de Wikipedia discrimina: sin el arreglo el gate **falla** con
+  `it/wikipedia` Recall@5 en 0.000 y el motivo nombrado como el instrumento fue construido
+  para nombrarlo — `discarded_by_threshold: score=23.2`, que es "la fuente la devolvió y la
+  tiramos" y no "la fuente nunca la tuvo".
+
+**FilmAffinity, 2026-09-11.** El commit `5ad2f52`, a pedido del owner: grabar las
+respuestas reales para el caso de diagnóstico que faltaba. **La grabación contradijo de
+entrada el escenario que estaba por escribir de memoria.** FilmAffinity no falla con los
+títulos originales; lo que hace es contestar una búsqueda que resuelve a una sola película
+con **la ficha de esa película en vez de un listado** — dos de los cuatro títulos que sondeé,
+así que no es un caso de borde — y Movie Inbox leía esa ficha con el parser escrito para
+listados.
+
+Buscar `Sen to Chihiro no kamikakushi` devolvía ocho filas y **ninguna era la película**. Las
+dos primeras eran la navegación de la propia página, tituladas "Ficha" e "Imágenes"; el
+resto eran otras películas de Ghibli del carrusel de relacionadas. "Ficha" puntuaba 10.2
+contra un piso de 28.0, así que FilmAffinity no aportaba nada para una consulta cuya
+respuesta era lo primero que venía en lo que el sitio había mandado. `Addio zio Tom` se
+comportaba igual.
+
+La página dice de qué tipo es (`og:type` `video.` y un `og:url` que apunta a sí misma en vez
+de a la búsqueda), así que ahora la lee el parser de ficha que ya existía, que recupera el
+título original — el único campo que hace que una fila así puntúe contra una consulta en su
+propio idioma. Medido sobre los cuerpos capturados: 10.2 → **100.0**.
+
+El corpus gana el caso de FilmAffinity que le faltaba, así que **las tres fuentes están
+medidas**. Su cuerpo es la respuesta real capturada por el `fetch_text` del propio adaptador
+y recortada, y el recorte se verificó por partida doble en vez de mirarlo a ojo: con el
+arreglo produce un resultado idéntico al del cuerpo completo de 117 KB, y sin el arreglo
+sigue reproduciendo la falla original, así que el caso discrimina por el motivo correcto.
+
+**Reintento por piso, 2026-09-11.** El commit `c4382da` cierra el punto anterior. La
+condición era *"¿la fuente contestó?"* y tenía que ser *"¿contestó algo que sirva?"*. Un
+listado de FilmAffinity para `Der Untergang` devuelve cinco películas, la mejor "El
+hundimiento" a 17.4 contra un piso de 28.0 — la fuente no aportó nada y el reintento que la
+recupera no corría, porque un listado no está vacío. El puente de IMDb dispara con esa
+condición desde [Q3]; a las otras dos fuentes les llegó sólo la mitad.
+
+Lo que más vale la pena anotar es de dónde salió. `docs/search-quality.md` tenía archivada
+como *"limitación conocida"* la falta de casos de corpus para Wikipedia y FilmAffinity, con
+el motivo: encontrar una búsqueda que volviera genuinamente vacía *"resultó más difícil de
+lo esperado"* porque `gsrsearch` casi siempre devuelve algo. **Esa dificultad no era un
+problema del corpus: era el defecto, escrito y no reconocido.** Una búsqueda casi nunca
+vuelve vacía y vuelve inútil todo el tiempo. La nota quedó marcada como resuelta con lo que
+resultó ser.
+
+Verificado en vivo antes de escribir nada: grabar FilmAffinity para `Der Untergang` hace
+seis peticiones —el listado, las cuatro de Wikidata y un reintento sobre "El hundimiento"—
+y devuelve la película a **100.0** llevando "Der Untergang" como título original.
+
+De paso, `with_alias_identity` dejó de tirar un título confirmado cuando la fuente ya había
+ocupado ese campo: FilmAffinity etiqueta como español todo título que devuelve, así que una
+película cuya fila viene titulada en catalán bloqueaba el título español confirmado fuera de
+su propio campo. Ahora el valor desplazado cae en `alternative_titles`, que el puntaje
+también lee.
+
+- **El costo, escrito en vez de dejarlo implícito**: el reintento no cambió por disparo,
+  pero ahora se dispara cada vez que una respuesta es mala en vez de sólo cuando falta. El
+  presupuesto de `docs/search-quality.md` quedó actualizado con eso.
+- **Diferencia de tipo que se dejó a propósito**: "Light" sigue trayendo "Moonlight", pero
+  a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
+  palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
+  deshonesta a 82.
+- **Dependencia del frente visual**: `catalog-search.js` descarta las consultas de menos de
+  dos caracteres antes de salir del navegador. Mientras eso siga, la consulta de una letra
+  funciona por API y por CLI pero no desde la caja de búsqueda.
+
+**Composición entre fuentes, 2026-09-11.** El commit `bc8a2ba`. Último punto del alcance
+declarado de [B1].
+
+- **Lo que es a propósito y quedó con prueba que lo cuida**: la composición es **por
+  fuente**. Cada una conserva su estante y la misma obra encontrada por dos de ellas se
+  muestra dos veces, porque son dos registros de la obra y no uno. Colapsarlas tiraría el
+  que haya contestado segundo. Hay una prueba que lo fija para que nadie lo "arregle" en un
+  dedupe entre fuentes.
+- **Lo que estaba mal es la misma obra dos veces dentro de un mismo estante.** A un
+  artículo de Wikipedia se llega por dos caminos: su buscador, y una resolución por título
+  exacto cuando el buscador no devolvió el título pedido. La resolución contesta con la
+  `canonicalurl` del artículo; el buscador no la pedía, así que la URL se **construía** a
+  partir del título — y una URL construida escribe los paréntesis de "The Fly (1986 film)"
+  escapados, mientras Wikipedia los escribe literales. Dos cadenas, un artículo, y el
+  dedupe las comparaba como texto. Casi toda ficha de cine está desambiguada así, y la
+  resolución se dispara justo cuando la consulta está en otro idioma que el artículo.
+- **Arreglado por los dos lados**: el buscador ahora pide `inprop=url`, así que la
+  dirección la da Wikipedia en vez de adivinarse —confirmado contra la API en vivo, que
+  devuelve los paréntesis literales—, y la clave de dedupe dejó de ser sensible a cómo está
+  escapada una URL.
+- **El hueco del instrumento, que es el hallazgo más útil**: `UnrecordedRequestError`
+  heredaba de `Exception`, y todos los adaptadores capturan `Exception` alrededor de sus
+  propias llamadas —así es como una fuente caída se convierte en un estante vacío—, o sea
+  que **un fixture faltante era indistinguible de una fuente que no contestó nada**. Ya
+  había costado algo: al cambiar la URL de búsqueda, el caso de Wikipedia quedó apuntando a
+  una grabación que ya no coincidía y **siguió pasando**, por un camino que no fue escrito
+  para ejercitar. Ahora hereda de `BaseException` para que llegue al harness, que lo captura
+  por nombre. Apenas se cambió, encontró un segundo fixture viejo en las pruebas de replay.
+
+**Medición de la consulta por fuente, 2026-09-11.** Seis títulos cuyo original no está en
+español, corriendo los adaptadores de verdad contra los sitios de verdad.
+
+- **FilmAffinity: no hay headroom.** La primera consulta supera el piso en **5 de 6**, la
+  respuesta final en **6 de 6**, con 11 peticiones en total. El único que falla —
+  `Der Untergang` — lo recupera el reintento por piso a un costo de 5 peticiones extra.
+  FilmAffinity indexa bien los títulos originales; mandarle a propósito el título en
+  español como primera consulta no compraría corrección, sólo cambiaría de lugar el gasto.
+  **No se cambia la construcción de la consulta: se midió y no rendía.**
+- **Wikipedia: medición inválida, no se reporta.** Devolvió `429 Too Many Requests` y los
+  dos supuestos fallos de búsqueda eran eso. Vale la pena anotar por qué: el script llamaba
+  a los adaptadores **directo**, salteando `ExternalSourceService`, que es justamente quien
+  maneja el 429 —`rate_limited` más un cooldown leído del header `Retry-After`
+  (`registry.py::_source_error_state`)—. El sistema hace lo correcto; la medición no. Y el
+  abanico paralelo en/es de Wikipedia duplica el ritmo de pedidos, así que llega al límite
+  antes que las otras dos.
+- **Si esto se retoma**: medir Wikipedia con el registry en el medio y a ritmo bajo, o no
+  medirlo. [Q3] ya le da a Wikipedia el título original como primer alias, que es
+  exactamente lo que su cobertura en/es no cubre, así que la hipótesis a refutar es que ya
+  esté resuelto.
+
+**Cerrada el 2026-09-11, con el criterio acordado con el owner.** Once arreglos, 23
+commits y cinco archivos de prueba nuevos.
+
+El criterio no podía ser *"la búsqueda está bien"*: la calidad de búsqueda no tiene fondo y
+siempre hay un defecto más si se lo busca. Es un criterio sobre **los instrumentos** — que
+cualquier defecto futuro llegue necesariamente con evidencia en vez de con una opinión:
+
+1. **Las cuatro superficies del alcance tienen al menos un caso que falla si se revierte su
+   arreglo**, verificado uno por uno y no asumido. Ranking: 32 casos del corpus dorado.
+   Fuentes externas: 6 casos de diagnóstico, las tres fuentes, cuatro idiomas. Colecciones:
+   19 pruebas. Composición: 7 pruebas.
+2. **El gate de v0.3.0 intacto**: cero falsos positivos conocidos en auto-match, precisión
+   1.000. Ninguno de los once arreglos abre un auto-match nuevo; la aceptación se decide en
+   `decide_match`, que corre sobre todo el catálogo sin leer el gate de búsqueda.
+3. **Los dos instrumentos corren en CI**: `search-lab run --enforce` y `search-lab
+   external-diagnostics --enforce`, en `.github/workflows/tests.yml`.
+4. **Lo que queda sin hacer está escrito con su número y con dueño**, no implícito: ver
+   [B2].
+
+**La regla que deja escrita**, que es lo que encontró los once defectos y vale más que
+cualquiera de ellos:
+
+> Todo cambio de algoritmo se mide antes y después, y llega con un caso que **falla si se
+> revierte el arreglo**. Un caso que pasa igual con y sin el arreglo es decoración.
+
+Dos veces esa regla encontró que la documentación **ya tenía escrito el defecto sin
+reconocerlo**: la "limitación conocida" de [Q3] sobre lo difícil que era hallar una
+búsqueda genuinamente vacía era, en realidad, el defecto —una búsqueda casi nunca vuelve
+vacía y vuelve inútil todo el tiempo—, y el diagnóstico del 2026-08-26 seguía listando como
+abiertos dos puntos que [Q3] y [U3] ya habían cerrado.
+
+**Decisión tomada a propósito, que no es deuda**: `"Light"` sigue trayendo `"Moonlight"`,
+pero a 41.4 por similitud de caracteres en vez de a 82 por una regla que afirmaba que la
+palabra estaba ahí. Las dos cadenas son 71% iguales; esa afirmación es honesta a 41 y
+deshonesta a 82.
 
 #### [F2.1] Definir composicion, identidad y autoridad para anime
 La decision del owner del 2026-08-29 se conserva: Jikan es la opcion primaria aceptada
@@ -1568,6 +3042,15 @@ detector Impeccable y `git diff --check`. 2026-09-01, commit `1d5ebc8`.
 ---
 
 ### Frente: Fuentes externas y especializacion de anime
+
+La epica [F2] quedo cerrada en tres entregas: contrato de composicion [F2.1], fuente
+en vivo [F2.2] e indice/fallback [F2.3]. La evaluacion [F3] se dividio
+en terminos/operacion [F3.1] y matriz/decision [F3.2], ambas cerradas; su implementacion
+queda aislada en [F5]. [F4] se dividio en contrato de secretos/ciclo de vida [F4.1] e
+ingreso operativo seguro [F4.2], ambas cerradas. La numeracion decimal expresa partes
+de una epica, no una fase adicional del roadmap. [F5] queda dividido en nucleo de
+consulta [F5.1], identidad/retirada [F5.2] y cumplimiento/UX [F5.3] (las tres cerradas).
+[F5] queda completo.
 
 #### [F1] Prototipo del indice no comercial de IMDb
 Comando nuevo `movie-inbox imdb-dataset sync/stats/lookup` que descarga

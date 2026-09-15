@@ -1,0 +1,12 @@
+[
+  {
+    "id": "bezel-alpha",
+    "source": "C:/Users/Lucas/Documents/Codex/2026-04-27/tengo-una-lista-de-peliculas-en/docs/design/u4-2a-material-kit-v1/aperture-bezel-v1.png",
+    "prompt": "Use case: background-extraction. Edit target: Image 1. This PNG currently contains a DRAWN grey/white checkerboard and wrinkled white texture, and its file is RGB instead of transparent. Remove ALL of that drawn checkerboard/white fabric, both outside the metal rim AND throughout the inner aperture. Produce a real RGBA PNG with alpha=0 outside and inside the rim. Preserve ONLY the metal border itself exactly: same square geometry, antique brass lip, petrol chamfer, black inner walls, same lighting, wear, size and placement. No resizing, redesign, new elements or text. Do not replace the pattern with solid black, solid white, another checkerboard or simulated transparency. The new file must have actual transparent alpha pixels. Genuine background removal, isolated bezel asset."
+  },
+  {
+    "id": "plaque-alpha",
+    "source": "C:/Users/Lucas/Documents/Codex/2026-04-27/tengo-una-lista-de-peliculas-en/docs/design/u4-2a-material-kit-v1/category-plaque-blank-v1.png",
+    "prompt": "Use case: background-extraction. Edit target: Image 1. Remove the entire grey/white DRAWN CHECKERBOARD and white wrinkles OUTSIDE the horizontal metal plaque. Deliver a genuine transparent-background RGBA PNG, alpha=0 for all exterior pixels. Preserve the complete plaque exactly, including the opaque dark blue blank center, gold inner edge, two screw heads, geometry, placement, texture and lighting. Do not change the plate, write any text, or replace the background with white, black, a checkerboard illustration or any opaque color. This is a real alpha cutout, not an image of a cutout. Keep the blank painted center fully opaque."
+  }
+]

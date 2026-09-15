@@ -1,27 +1,75 @@
-      /* Marco reusable: la carcasa no contiene títulos, estados ni datos del owner. */
-      .vhs-cassette {
-        background: transparent;
-        border: 0;
-        border-radius: 0;
+      /* Lomo reusable: la estantería muestra cada obra de perfil, sin texto ni
+         datos del owner incrustados en imagen. Título, año y disponibilidad
+         siguen siendo HTML vivo dentro del botón. */
+      .vhs-spine {
+        background: linear-gradient(180deg, var(--case), #050612 88%);
+        border: 1px solid color-mix(in srgb, var(--violet) 42%, var(--line));
+        border-radius: var(--radius-case);
+        box-shadow: -3px 0 12px rgba(0, 0, 0, 0.4);
         color: var(--ink);
-        display: block;
-        overflow: visible;
-        padding: 0;
+        display: grid;
+        gap: 6px;
+        grid-template-rows: 4px minmax(0, 1fr) 18px;
+        justify-items: center;
+        overflow: hidden;
+        padding: 9px 7px 10px;
         position: relative;
+        text-align: center;
+        transition: box-shadow 180ms var(--ease-out), border-color 180ms var(--ease-out), transform 180ms var(--ease-out);
       }
-      .vhs-cassette-shell {
-        background: url("../img/vhs-cassette-frame-v1.png") center / contain no-repeat;
-        inset: 0;
-        pointer-events: none;
-        position: absolute;
-        transition: filter 180ms var(--ease-out), transform 260ms var(--ease-out);
+      .vhs-spine-sticker {
+        background: var(--gold);
+        border-radius: 0;
+        width: 100%;
       }
-      .vhs-cassette[data-vhs-state="closed"] .vhs-cassette-shell { filter: saturate(0.78) brightness(0.86); }
-      .vhs-cassette[data-vhs-state="selected"] .vhs-cassette-shell {
-        filter: saturate(1.06) brightness(1.12);
-        transform: translateY(-3px);
+      .vhs-spine[data-vhs-state="closed"] .vhs-spine-sticker { opacity: 0.62; }
+      .vhs-spine-title {
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        display: -webkit-box;
+        font-family: var(--font-display);
+        font-size: var(--text-caption);
+        font-style: italic;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        line-height: 1.1;
+        max-height: 100%;
+        overflow: hidden;
+        text-orientation: mixed;
+        text-transform: uppercase;
+        width: 100%;
+        writing-mode: vertical-rl;
       }
-      .vhs-cassette:focus-visible { outline: var(--focus-ring); outline-offset: 5px; }
+      .vhs-spine-meta {
+        align-items: center;
+        align-self: stretch;
+        color: var(--muted);
+        display: flex;
+        font-family: var(--font-label);
+        font-size: var(--text-label);
+        gap: 4px;
+        justify-content: space-between;
+        line-height: 1;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        width: 100%;
+        writing-mode: horizontal-tb;
+      }
+      .vhs-spine-meta span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .vhs-spine[data-vhs-state="closed"] { filter: saturate(0.82) brightness(0.9); }
+      .vhs-spine[data-vhs-state="selected"] {
+        border-color: var(--gold);
+        box-shadow: 0 0 0 2px rgba(var(--gold-rgb), 0.4), -3px 0 16px rgba(0, 0, 0, 0.4);
+        filter: none;
+        transform: translateY(-4px);
+      }
+      .vhs-spine:hover { transform: translateY(-2px); }
+      .vhs-spine:focus-visible { outline: var(--focus-ring); outline-offset: 3px; }
       .vhs-case {
         background: linear-gradient(105deg, color-mix(in srgb, var(--violet) 10%, var(--surface-deep)), var(--surface-deep) 52%);
         border-block: 1px solid var(--line);
@@ -37,3 +85,42 @@
         position: absolute;
         width: 1px;
       }
+      /* Caja frontal de la previsualización: mismo marco que la carcasa VHS,
+         detrás de la portada real (o su placeholder), nunca sustituyéndola. */
+      .home-shelf-preview-frame {
+        background: url("../img/vhs-cassette-frame-v1.png") center / contain no-repeat;
+        inset: -16% -12%;
+        pointer-events: none;
+        position: absolute;
+        transition: filter 180ms var(--ease-out);
+        z-index: 2;
+      }
+      /* Cassette VHS negro del dossier: 100% CSS, sin ventana de etiqueta (a
+         diferencia del marco frontal de arriba). Decorativo, siempre detrás de
+         la portada real o su placeholder — nunca los sustituye ni les quita
+         los estados de carga/error ya existentes. */
+      .drawer-vhs-case {
+        background: linear-gradient(160deg, #0b0c16, var(--case) 78%);
+        border: 1px solid color-mix(in srgb, var(--violet) 30%, var(--line));
+        border-radius: var(--radius-case);
+        bottom: -38px;
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.4);
+        left: -14px;
+        pointer-events: none;
+        position: absolute;
+        right: -14px;
+        top: -14px;
+        z-index: 0;
+      }
+      /* Alineados con el borde inferior de la carcasa (no el de la portada), para
+         que asomen debajo de ella en vez de quedar tapados. */
+      .drawer-vhs-reel {
+        background: radial-gradient(circle, var(--case) 0 38%, color-mix(in srgb, var(--violet) 38%, var(--case)) 40% 46%, transparent 48%);
+        border-radius: 50%;
+        bottom: 8px;
+        height: 26px;
+        position: absolute;
+        width: 26px;
+      }
+      .drawer-vhs-reel:first-of-type { left: 18px; }
+      .drawer-vhs-reel:last-of-type { right: 18px; }

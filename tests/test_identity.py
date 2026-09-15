@@ -23,6 +23,7 @@ from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 from movie_inbox.infrastructure.identity_repository import (
     INSTANCE_SCHEMA_V1,
+    INSTANCE_SCHEMA_VERSION,
     SqliteIdentityRepository,
 )
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
@@ -291,8 +292,13 @@ class IdentityTests(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
-            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+            # Every migration runs, in order, with no gaps. Derived from the
+            # constant so adding one does not need this list edited by hand.
+            self.assertEqual(versions, list(range(1, INSTANCE_SCHEMA_VERSION + 1)))
             self.assertIn("user_privacy_preferences", tables)
+            self.assertIn("streaming_regions", tables)
+            self.assertIn("streaming_providers", tables)
+            self.assertIn("member_streaming_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
             self.assertIn("curated_collections", tables)
@@ -340,6 +346,7 @@ class IdentityTests(unittest.TestCase):
                     CREATE TABLE library_scan_runs (id TEXT PRIMARY KEY);
                     CREATE TABLE media_libraries (id TEXT PRIMARY KEY);
                     CREATE TABLE curated_collections (id TEXT PRIMARY KEY);
+                    CREATE TABLE import_drafts (id TEXT PRIMARY KEY);
                     """
                 )
                 connection.executemany(
@@ -363,7 +370,7 @@ class IdentityTests(unittest.TestCase):
                     "FROM scanner_history"
                 ).fetchone()
 
-            self.assertEqual(version, 12)
+            self.assertEqual(version, INSTANCE_SCHEMA_VERSION)
             self.assertTrue(
                 {"catalog_before_json", "catalog_after_json", "catalog_path"} <= columns
             )

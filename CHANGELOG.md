@@ -2,6 +2,166 @@
 
 Los cambios relevantes del proyecto se documentan en este archivo.
 
+## [Sin publicar]
+
+Va a ser la **0.9.0**. La versión está abierta en la rama `release/0.9.0` y se cierra al
+fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios. Todavía no está
+pulida: varias capacidades nuevas del servidor no tienen pantalla —cada entrada lo dice— y
+el trabajo visual de Inicio sigue en curso.
+
+### Antes de actualizar
+
+- **Hacé un backup: la base de la instancia no vuelve atrás.** La 0.9.0 migra `instance.db`
+  del esquema v11 al v19 apenas abre la instancia, y la 0.8.0 se niega a abrir una base
+  v19: volver a la 0.8.0 exige restaurar el backup (`movie-inbox backup` o, en Docker,
+  `bash scripts/docker-backup.sh`).
+- **Si usás el índice local de IMDb, regeneralo** con `movie-inbox imdb-dataset sync`. Su
+  formato cambió, y hasta regenerarlo la instancia enriquece como si no lo tuviera y no
+  muestra puntajes de IMDb.
+- `pip install` y la imagen de Docker instalan solos `segno`, la dependencia nueva.
+- No se retira nada: subcomandos, opciones de la CLI, rutas web, variables de entorno, el
+  esquema de la base del catálogo y el JSON portable siguen como en la 0.8.0.
+
+### Agregado
+
+- Inicio ahora se presenta como una videoteca empotrada: una cartelera diaria a la
+  izquierda, otra de consulta a la derecha y una consola única. La obra consultada se
+  conserva separada de la rotación Hoy/Ayer y sus acciones respetan si pertenece al
+  catálogo personal o a una colección seguida del Club.
+- La estantería usa lomos VHS más legibles, placas de categoría activables y material
+  compartido de petróleo/latón. Las imágenes de la consola reservan su espacio, admiten
+  cero, una o dos imágenes y dejan abrir la ficha aunque una carga falle.
+
+- La instancia puede decir dónde se ve en streaming cada obra del catálogo propio. El
+  owner elige en Administrar qué mercados se consultan, cuál es el predeterminado y si
+  los miembros pueden elegir el suyo; las plataformas se traen de TMDb, con la
+  atribución a JustWatch que exigen sus términos. Cada consulta se guarda como una
+  observación fechada: se refresca a los 30 días y deja de servirse a los 180. Tener el
+  archivo y estar en una plataforma siguen siendo cosas distintas, y "no lo consultamos"
+  nunca se presenta como "no está disponible". La ficha todavía no lo muestra.
+- Los puntajes públicos de IMDb y de TMDb se sirven al lado del puntaje propio, nunca en
+  su lugar: ningún camino lleva un puntaje público al puntaje personal. Los de IMDb
+  salen del índice local; los de TMDb se guardan con fecha, igual que la disponibilidad.
+  Un puntaje con menos de 50 votos llega marcado como poco representativo. La ficha
+  todavía no los muestra.
+- Con el índice local de IMDb configurado, la instancia lo usa como primera fuente para
+  siete campos —título, título original, títulos alternativos, tipo de obra, año,
+  duración y géneros—, como ya indicaba la política de autoridad; los títulos
+  alternativos se suman a los que ya había en vez de reemplazarlos. Se consulta sólo por
+  identificador de IMDb, nunca por título, y una instalación sin índice enriquece igual
+  que antes.
+- Mazos de charadas deterministas sobre el catálogo propio y las colecciones seguidas:
+  las mismas opciones sobre las mismas obras dan el mismo mazo, con un código corto para
+  que dos jugadores comprueben que tienen el mismo. La dificultad se sugiere sólo en los
+  extremos; el resto lo decide una persona, y esa decisión sobrevive a cualquier
+  recálculo. Todavía no tiene pantalla.
+- Una API versionada para clientes de dispositivo, bajo `/api/v1/`, con su contrato
+  publicado en `docs/openapi/device-api-v1.openapi.json`. Cubre lo que necesita un
+  teléfono: iniciar, renovar y cerrar su sesión, listar, buscar y leer el catálogo
+  propio, y editar estado, fecha de visionado, puntaje y review. Las sesiones son por
+  dispositivo: el acceso vence a los 15 minutos y la renovación a los 30 días, viajan
+  sólo en el encabezado `Authorization` —nunca en una cookie ni en la URL—, se guardan
+  como hashes y se invalidan al cambiar la contraseña o al desactivar o archivar la
+  cuenta; el inicio de sesión tiene límite de intentos. Cada obra se identifica con un
+  id opaco que no revela rutas ni archivos, y que no cambia al rotar el token de la API
+  ni al mover el archivo del catálogo. Scanner, administración y Curaduría quedan
+  afuera. Todavía no hay aplicación que la use.
+- Un dispositivo se puede aparear con una cuenta mediante un ticket de un solo uso, sin
+  que viaje una contraseña: una sesión web lo emite para su propia cuenta y el servidor
+  lo dibuja como QR. El ticket vence a los cinco minutos, y cambiar la contraseña o
+  desactivar la cuenta lo anula junto con las sesiones. `serve` puede servir HTTPS por su
+  cuenta con un certificado propio (`--ssl-certfile`, `--ssl-keyfile`) y calcula la
+  huella que el QR le lleva al teléfono; `movie-inbox pairing-pin` la imprime para cuando
+  HTTPS lo termina un proxy. Todavía no hay pantalla que muestre el QR ni aplicación que
+  lo escanee.
+- La API de dispositivo también recibe el alta sin conexión —lo que un teléfono agrega
+  sin red entra en un borrador que no vence y pasa por la revisión de siempre— y sirve
+  las colecciones seguidas, la disponibilidad en streaming, los puntajes públicos y lo
+  que un teléfono necesita para repartir sin conexión el mismo mazo de charadas que el
+  servidor. La disponibilidad y los puntajes de TMDb llegan con la fecha en que el
+  teléfono tiene que dejar de mostrarlos.
+- `movie-inbox images coverage` cuenta, por causa, por qué las obras no llenan las dos
+  ventanas de imágenes de la consola: campo vacío, dirección que el proxy rechazaría o
+  imagen todavía sin caché, y cuántas imágenes distintas tiene cada obra —dos tamaños de
+  la misma imagen cuentan como una—. Lo separa por tipo, por origen —catálogo o Club— y
+  por identidad. No descarga nada ni consulta proveedores, y sólo imprime totales: no
+  nombra títulos, direcciones ni rutas.
+
+### Cambiado
+
+- Elegir un VHS programa la lista con el conjunto editorial de ese estante, actualiza
+  consola y cartelera de consulta, y ofrece «Volver a programación» sin alterar el
+  carrusel diario. Teclado, foco, anuncios de selección y listas largas conservan el
+  contexto al cambiar fuente, día, tamaño o disponibilidad.
+
+- La búsqueda del catálogo dejó de leer una coincidencia de letras como si fuera una
+  palabra compartida. Un artículo en común ya no acerca dos títulos, una palabra corta
+  metida adentro de otra más larga ya no cuenta, y la comparación de respaldo mide las
+  palabras con contenido en vez de las cadenas crudas: buscar "The Fly" ya no trae
+  "M. Butterfly" por encima de "The Flies".
+- Un término corto encuentra el título al que pertenece. "Ed" llega a "Ed Wood", y un
+  título de una sola letra como "M" se puede buscar por su propio título, con o sin año;
+  antes la consulta se descartaba entera. Nada de esto habilita un auto-match nuevo: la
+  aceptación se sigue decidiendo con la misma evidencia de identidad de siempre.
+- El índice local de IMDb ocupa unas siete veces menos: guarda sólo los tipos de obra y
+  las regiones que el catálogo usa. Un índice construido antes se detecta como viejo y
+  pide volver a sincronizarse.
+- La instalación suma una dependencia, `segno`, que dibuja en el servidor el QR de
+  apareamiento. Es Python puro y no trae dependencias propias.
+
+### Corregido
+
+- Abrir una colección, refrescar una importación y armar la pantalla de inicio dejan de
+  ponerse lentos a medida que crece el catálogo. Las tres comparaban cada ficha contra
+  el catálogo entero y volvían a normalizarlo de cero en cada comparación: con 5000
+  fichas y una colección de 200, eso eran 25 de los 28 segundos que tardaba la página.
+  Ahora el catálogo se prepara una vez por pantalla.
+- Compartir la disponibilidad de una biblioteca dejaba de funcionar en silencio si la
+  biblioteca tenía dos copias de la misma película y una se había escaneado antes de que
+  su ficha se enriqueciera: la obra se reportaba dos veces, la colección no se llegaba a
+  crear y la única señal era que el interruptor volvía sin publicar nada. Ahora las
+  copias se cuentan juntas, como siempre debieron.
+- Un mismo artículo de Wikipedia dejó de aparecer dos veces en su estante. Wikipedia se
+  alcanza por dos caminos —su buscador y una resolución por título exacto— y las dos
+  filas traían el mismo artículo con direcciones que sólo se diferenciaban en cómo
+  estaban escapados los paréntesis de "The Fly (1986 film)". Como casi toda ficha de
+  cine está desambiguada así, pasaba seguido, y justo cuando la consulta estaba en otro
+  idioma que el artículo.
+- Cuando una fuente externa contesta pero nada de lo que trae sirve, Movie Inbox vuelve
+  a intentar con un título alternativo confirmado, igual que hacía cuando la respuesta
+  venía vacía. Antes bastaba con que la fuente devolviera cualquier cosa para que no se
+  reintentara: buscar "Der Untergang" en FilmAffinity traía cinco películas y ninguna
+  era la buscada, y el reintento que la encuentra no llegaba a correr.
+- FilmAffinity vuelve a encontrar una película buscada por su título original. Cuando la
+  búsqueda resuelve a una sola película el sitio no devuelve un listado sino la ficha, y
+  Movie Inbox la leía como si fuera un listado: devolvía los enlaces de navegación de la
+  propia página ("Ficha", "Imágenes") como si fueran películas, y la que se estaba
+  buscando quedaba afuera. Buscar "Sen to Chihiro no kamikakushi" devolvía ocho filas y
+  ninguna era El viaje de Chihiro, que estaba arriba de todo en la respuesta.
+- Buscar una película por su título original en otro idioma vuelve a encontrarla en
+  Wikipedia y en FilmAffinity. El reintento con un alias confirmado por Wikidata ya
+  existía, pero la fila que encontraba llegaba sin rastro de la consulta que la había
+  encontrado, así que el puntaje la descartaba salvo que el título de mercado se
+  pareciera al original. "Der Untergang" contra "El hundimiento" daba 13.9 sobre un piso
+  de 28; ahora la fila viaja con el título original que la encontró.
+- La colección que publica una biblioteca ya no sale ordenada por un identificador
+  interno. Se lee alfabéticamente por el título que se muestra, igual que la grilla del
+  catálogo, y una película ya no cambia de lugar en una colección que otros están
+  mirando sólo porque el enriquecimiento le encontró un id.
+- La descarga de los datasets de IMDb vuelve a verificar el certificado en modo
+  estricto. La excepción que se había agregado culpaba a la cadena de Amazon por lo que
+  en realidad hacía un antivirus que intercepta HTTPS; sin él, la cadena verifica sin
+  relajar nada.
+- Los resultados de TMDb dejan de mostrarse como "Sin fuente". La etiqueta faltaba en el
+  frontend desde que la fuente existe, y además de verse mal le quitaba un dato real a
+  la desambiguación de duplicados, que compara etiquetas.
+- Traer los datos de una obra desde una dirección de FilmAffinity deja de fallar cuando
+  el sitio responde vacío. Python 3.11.16 y 3.14.7 cambiaron por dentro el lector de HTML
+  de la biblioteca estándar, que empezó a guardar su estado con un nombre que el lector de
+  fichas de FilmAffinity ya usaba para el suyo: con una respuesta vacía, el pedido
+  terminaba en un error en vez de volver sin datos. Pasa desde esas versiones de Python, y
+  la imagen de Docker toma la última 3.11 cada vez que se reconstruye.
+
 ## [0.8.0] - 2026-09-02
 
 ### Agregado

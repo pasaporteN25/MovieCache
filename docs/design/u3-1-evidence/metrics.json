@@ -1,0 +1,82 @@
+[
+  {
+    "state": "browse",
+    "viewport": 1440,
+    "pageOverflow": 0,
+    "consoleHeight": 191,
+    "gridTop": 376.5,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 0
+  },
+  {
+    "state": "filters-open",
+    "viewport": 1440,
+    "pageOverflow": 0,
+    "consoleHeight": 191,
+    "gridTop": 376.5,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 0
+  },
+  {
+    "state": "local-search",
+    "viewport": 1440,
+    "pageOverflow": 0,
+    "consoleHeight": 686,
+    "gridTop": 0,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 1
+  },
+  {
+    "state": "empty-search",
+    "viewport": 1440,
+    "pageOverflow": 0,
+    "consoleHeight": 292,
+    "gridTop": 0,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 1
+  },
+  {
+    "state": "browse",
+    "viewport": 390,
+    "pageOverflow": 0,
+    "consoleHeight": 264,
+    "gridTop": 555.34375,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 0
+  },
+  {
+    "state": "filters-open",
+    "viewport": 390,
+    "pageOverflow": 0,
+    "consoleHeight": 264,
+    "gridTop": 555.34375,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 0
+  },
+  {
+    "state": "local-search",
+    "viewport": 390,
+    "pageOverflow": 0,
+    "consoleHeight": 819,
+    "gridTop": 0,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 1
+  },
+  {
+    "state": "empty-search",
+    "viewport": 390,
+    "pageOverflow": 0,
+    "consoleHeight": 433,
+    "gridTop": 0,
+    "activeMode": "browse",
+    "visibleQuickGroups": 3,
+    "visibleSearchSections": 1
+  }
+]

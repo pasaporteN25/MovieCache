@@ -1,0 +1,218 @@
+# Charadas v1 — contrato de datos, generador y dificultad
+
+- **Tarea:** [G1]. Contrato, sin implementación. La implementación es [G2].
+- **Fecha:** 2026-09-07.
+- **Depende de:** ADR-0005 (dirección móvil), que fija dónde se calcula la dificultad.
+- **No es:** [M1]. Esa épica es un catálogo de videojuegos y música — qué poseo, en qué
+  consola, qué quiero conseguir. Charadas es una **superficie de juego sobre el catálogo
+  audiovisual que ya existe**. No agrega valores a `kind` ni campos a la obra.
+
+## Qué es
+
+Un **generador determinista** de paquetes de títulos para actuar, más un temporizador. Se
+juega con uno o dos teléfonos **desincronizados**: eligiendo las mismas opciones, dos
+personas obtienen el **mismo paquete**. Saltear un título ya salido es responsabilidad del
+jugador, no del sistema.
+
+Consecuencia buscada: **cero estado compartido y cero tiempo real**. No hay WebSocket
+—decisión de despliegue ya tomada y documentada en `docs/deployment.md`— ni sesión de
+juego en el servidor.
+
+## Qué título se actúa
+
+Decisión necesaria porque una obra tiene varios títulos. El juego usa, en orden:
+
+1. `spanish_title`
+2. `title`
+3. `original_title`
+
+Se actúa **un solo título**, el mismo para todos los jugadores del paquete, y viaja
+resuelto dentro del paquete. Si un jugador viera un título distinto del de su compañero, el
+juego se rompe en silencio: el determinismo tiene que cubrir también qué texto se muestra,
+no sólo qué obras salen.
+
+Una obra sin ningún título utilizable queda fuera del mazo.
+
+## Mínimo de datos
+
+El owner fijó **300 obras**. El contrato agrega la parte que importa de verdad:
+
+- **300 obras elegibles** en total para habilitar el juego.
+- **Al menos 25 por categoría de dificultad** para que esa categoría se ofrezca.
+
+El total no es el límite real: 300 obras repartidas en cuatro categorías dan ~75 cada una,
+pero si el reparto sale desparejo, **la categoría más flaca define si el juego funciona**.
+Una categoría por debajo del mínimo no se ofrece, en vez de ofrecerse y repetir seis
+títulos.
+
+**Advertencia medida, no teórica.** Un catálogo de autor sesga el mazo entero: Kurosawa,
+Tarkovski y compañía caen casi todos en las categorías difíciles. Para que exista una
+categoría fácil hacen falta títulos masivamente conocidos, que no son los que acumula un catálogo
+curado de cinéfilo. Al elegir los directores que se sumen al Club conviene tenerlo presente.
+
+## El generador determinista
+
+La semilla **no puede ser sólo las opciones elegidas**.
+
+"Mismas opciones → mismo mazo" sólo se cumple si los dos teléfonos miran los mismos datos.
+Si uno sincronizó y el otro no, las mismas opciones producen mazos distintos y el juego se
+rompe sin avisar. Por eso la semilla es:
+
+```
+semilla = hash(opciones elegidas + huella del conjunto de obras elegibles)
+```
+
+La **huella** es un hash estable sobre los identificadores de las obras elegibles,
+ordenados. Cambia cuando cambia el mazo, y sólo entonces.
+
+Esa huella se muestra en pantalla como un código corto legible, para que dos jugadores
+verifiquen de un vistazo que están en el mismo mazo antes de empezar. Un mazo distinto es
+una condición detectable, no una sorpresa a mitad de partida.
+
+El precedente de implementación ya existe: `back-cover.js` mapea un ID opaco a una de cinco
+plantillas estables con un FNV-1a puro. El mazo se arma igual.
+
+**Vectores para portarlo.** `docs/briefs/charades-v1-vectors.json` fija el generador para
+quien lo reimplemente —el teléfono de [A2.4]—: las constantes, el orden exacto de cada
+paso y casos calculados por el propio servidor para FNV-1a, huella, semilla y mazo.
+`tests/test_charades_vectors.py` los recalcula, así que un cambio del servidor que haría
+repartir otros mazos a los teléfonos instalados rompe la suite en vez de pasar en
+silencio. Uno de los casos es una trampa a propósito: claves donde el orden por punto de
+código y el orden por unidad UTF-16 —el que usa Kotlin por defecto— no coinciden.
+
+## Dificultad
+
+### El hallazgo que define el diseño
+
+Se prototipó una clasificación automática combinando dos señales —qué tan representable es
+el título y qué tan conocida es la obra, esta última desde el conteo de votos públicos de
+[F6.2]— y se midió contra un corpus de 28 títulos. **No funciona como clasificador**, y el
+motivo no es de calibración:
+
+| Obra | Votos | Reconocimiento real |
+| --- | --- | --- |
+| Los siete samuráis | 370.000 | pocos |
+| Batman | 400.000 | todos |
+| Relatos salvajes | 190.000 | casi todos (en Argentina) |
+| Akira | 190.000 | pocos |
+| Rashomon | 180.000 | muy pocos |
+
+Números casi idénticos, percepción opuesta. Ninguna función monótona del conteo de votos
+separa esos casos, porque **el conteo mide atención cinéfila global, no reconocimiento en
+la sala** — y es ciego a lo cultural: una película argentina que todos conocen acá puntúa
+igual que un clásico japonés de autor. Recalibrar la curva mueve los números sin arreglar
+el orden.
+
+### La política que sí funciona
+
+En vez de fingir un clasificador, se automatiza sólo lo que es seguro y el resto va a una
+persona — la misma disciplina que el proyecto ya aplica al matching (invariante 3), a la
+curaduría y a las importaciones.
+
+| Señal | Decisión |
+| --- | --- |
+| Menos de ~10.000 votos | **Difícil**, automático. Es genuinamente oscura. |
+| Más de ~1.000.000 de votos | **Fácil**, automático por notoriedad. |
+| Entre medio | **Sugerencia**, no clasificación. Va a revisión humana. |
+| Sin datos de votos | Sugerencia por forma del título, siempre revisable. |
+
+La banda intermedia es donde vive casi todo un catálogo real, así que la revisión humana
+**no es un plan de contingencia: es el camino principal**, y la interfaz tiene que tratarla
+como tal. Una pasada de "repartí estas obras en cuatro categorías", rápida y reanudable, no un
+formulario por obra.
+
+### La clasificación manual es autoritativa
+
+Una dificultad puesta por una persona **sobrevive a cualquier recálculo**, exactamente como
+`locked_fields` sobrevive al enriquecimiento (invariante 5). Recalcular nunca pisa una
+decisión humana; a lo sumo llena lo que nadie decidió.
+
+### Dónde se calcula
+
+**En el servidor.** La señal de notoriedad sale del índice IMDb, que pesa ~1,1 GB y no va a
+un teléfono (ADR-0005). La dificultad viaja al cliente como **un campo chico por obra**, ya
+resuelto. El teléfono nunca es autónomo para *clasificar*; sí lo es para *jugar*.
+
+Lo que viaja es `GET /api/v1/charades` (2026-09-12): todas las obras elegibles de la
+cuenta —catálogo y colecciones seguidas, cada obra una vez— con su clave, el título que se
+actúa, el año, la dificultad resuelta y el origen, más la huella, los conteos, los mínimos
+y los tiempos del temporizador. No se pagina, porque la huella cubre todo el conjunto. Y
+las claves viajan tal como las calcula el servidor: el mazo se ordena y se firma con
+ellas, y un id opaco en su lugar repartiría otro orden.
+
+## El temporizador
+
+Tres opciones por dificultad, escalando con ella. Tocar la opción arranca la cuenta; se
+puede reiniciar.
+
+| Dificultad | Opciones |
+| --- | --- |
+| Fácil | 1:00 · 2:00 · 3:00 |
+| Medio | 1:30 · 2:30 · 4:00 |
+| Medio alto | 2:00 · 3:00 · 5:00 |
+| Difícil | 3:00 · 4:00 · 6:00 |
+
+Los valores de fácil y medio son los que fijó el owner; los dos últimos extienden la misma
+progresión y son ajustables tras jugar. El temporizador es local y no se sincroniza.
+
+## Fuera de alcance de v1
+
+- Estado compartido, sesión de juego, marcador, turnos o cualquier tiempo real.
+- Recordar qué títulos ya salieron: es responsabilidad del jugador, por decisión del owner.
+- Aprender la dificultad a partir de partidas jugadas. Es tentador y probablemente lo mejor
+  a futuro, pero exige guardar resultados y eso reabre el estado compartido.
+- Cualquier cambio a `kind`, al esquema portable o a las rutas existentes.
+
+## De dónde salen las obras
+
+**Decidido: las dos fuentes.** El catálogo personal y las colecciones de Club seguidas.
+
+Se verificó que no se complica: un ítem de colección guarda `SHARED_CATALOG_FIELDS`, que
+incluye los tres campos de título, `year`, `kind` y los identificadores externos fuertes
+(`tmdb_id`, `imdb_url`, `wikidata_id`). Tiene todo lo que el mazo necesita, incluso para
+deduplicar. El respaldo de "sólo Club" que el owner ofreció no hace falta.
+
+Importa porque **seguir una colección no copia las obras** (`PRODUCT.md`): una obra de una
+colección seguida no está en el catálogo personal, así que el mazo se arma leyendo dos
+almacenes distintos y uniéndolos, no uno solo.
+
+### Deduplicar en el mazo puede ser más laxo que en el catálogo
+
+Una obra puede estar en el catálogo personal **y** en una colección seguida. En el mazo
+tiene que aparecer una sola vez, o alguien actúa la misma película dos veces.
+
+Se unifica por identificador externo fuerte y, además, por título normalizado más año
+exacto. **Eso es deliberadamente más laxo que `decide_match`, y no contradice la invariante
+3**, porque el costo del error es distinto: una fusión equivocada en el catálogo pierde
+datos personales de forma difícil de revertir, mientras que en un mazo cuesta *una entrada
+menos en una lista de juego*. Nada se escribe: la unificación vive en la construcción del
+mazo y no toca ninguna ficha.
+
+Ante un empate gana la copia del catálogo personal, que es la que el dueño mantiene.
+
+## Qué obras entran
+
+**Decidido: todas.** `status` no filtra. Una obra pendiente puede ser perfectamente
+conocida por el grupo, y una vista puede no serlo — el estado personal del dueño del
+teléfono no dice nada sobre qué sabe la gente en la sala.
+
+Las únicas exclusiones son estructurales: una obra sin ningún título utilizable, y una obra
+cuya categoría de dificultad todavía nadie determinó.
+
+## Cuántas categorías de dificultad
+
+**Decidido: cuatro** — fácil, medio, medio alto y difícil, las que nombró el owner. Los
+umbrales son ajustables tras jugar sin cambiar la estructura, y agregar una quinta más
+adelante no rompe nada: el mínimo por categoría y la tabla de tiempos crecen con ella.
+
+(Estas categorías son las de la **obra**. Las tres opciones de tiempo por categoría son
+otra cosa y están en la tabla del temporizador.)
+
+## Qué queda abierto
+
+Nada bloquea a [G2]. Quedan dos ajustes que sólo se pueden resolver jugando:
+
+1. **Los umbrales de los extremos** (~10.000 y ~1.000.000 de votos) son un punto de partida
+   razonado, no medido contra partidas reales.
+2. **Los tiempos de medio alto y difícil** extienden la progresión que fijó el owner para
+   fácil y medio; conviene revisarlos después de la primera noche de juego.

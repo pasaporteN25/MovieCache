@@ -1,4 +1,5 @@
 import { cachedImageSrc, card, posterVariant } from "./card.js";
+import { renderBackCover } from "./back-cover.js";
 import { load, loadCatalog } from "./catalog-data.js";
 import { fields } from "./fields.js";
 import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localFilesText, meta, normalizeRating, titleSubtitle } from "./format.js";
@@ -31,6 +32,24 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       export let detailFeedbackTimer = null;
 
       export let pendingDetailTransition = null;
+
+      export let detailOpenedWithCaseTransition = false;
+
+      export let detailPresentation = "dossier";
+
+      export function runWithCaseTransition(update) {
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (reducedMotion || !document.startViewTransition) {
+          update();
+          return;
+        }
+        document.startViewTransition(update);
+      }
+
+      export function openDetailWithCaseTransition(target, id) {
+        detailOpenedWithCaseTransition = true;
+        runWithCaseTransition(() => openDetailFromTrigger(target, id, { presentation: "back-cover" }));
+      }
 
       export function openRandomDetail() {
         const candidates = randomCandidates();
@@ -72,8 +91,13 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         };
       }
 
-      export function openDetailFromTrigger(target, id) {
+      export function openDetailFromTrigger(target, id, options = {}) {
+        openDetail(id, { ...options, context: detailContextForTrigger(target) });
+      }
+
+      export function openDetailForPersonalEdit(target, id) {
         openDetail(id, { context: detailContextForTrigger(target) });
+        editPersonalRecord();
       }
 
       export function personalRecordPanel(item) {
@@ -245,17 +269,19 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         </div>`;
       }
 
-      export function openDetail(id, { updateHistory = true, context = null, skipGuard = false } = {}) {
+      export function openDetail(id, { updateHistory = true, context = null, skipGuard = false, presentation = "dossier" } = {}) {
         if (!id) return;
         if (!skipGuard && selectedDetailId && selectedDetailId !== id && hasUnsavedDetailChanges()) {
-          requestDetailTransition(() => openDetail(id, { updateHistory, context, skipGuard: true }));
+          requestDetailTransition(() => openDetail(id, { updateHistory, context, skipGuard: true, presentation }));
           return;
         }
         const activeElement = document.activeElement;
-        detailReturnFocus = activeElement?.matches?.("[data-click='open-detail']")
+        detailReturnFocus = (activeElement?.dataset?.click?.startsWith("open-detail") || activeElement?.dataset?.click === "edit-home-shelf-entry")
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
+        detailPresentation = presentation === "back-cover" ? "back-cover" : "dossier";
+        if (detailPresentation !== "back-cover") detailOpenedWithCaseTransition = false;
         setDetailContext(context, id);
         selectedDetailId = id;
         detailPersonalEditing = false;
@@ -275,24 +301,38 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           requestDetailTransition(() => closeDetail({ restoreFocus, updateHistory, skipGuard: true }));
           return;
         }
-        selectedDetailId = "";
-        if (fields.detailDrawer.open) fields.detailDrawer.close();
-        fields.detailBody.innerHTML = "";
-        fields.detailNavigation.innerHTML = "";
-        document.body.classList.remove("drawer-open");
-        detailPersonalEditing = false;
-        detailDirtyScopes.clear();
-        pendingDetailTransition = null;
-        clearDetailFeedback();
-        if (updateHistory) syncRoute({ movie: "" }, "replace");
-        const currentCard = [...document.querySelectorAll(".dvd-card")]
-          .find((card) => card.dataset.id === detailReturnCardId);
-        const returnTarget = detailReturnFocus?.isConnected
-          ? detailReturnFocus
-          : currentCard?.querySelector(".dvd-open-surface");
-        if (restoreFocus) returnTarget?.focus();
-        detailReturnFocus = null;
-        detailReturnCardId = "";
+        const useCaseTransition = detailOpenedWithCaseTransition;
+        detailOpenedWithCaseTransition = false;
+        const performClose = () => {
+          selectedDetailId = "";
+          if (fields.detailDrawer.open) fields.detailDrawer.close();
+          fields.detailBody.innerHTML = "";
+          fields.detailNavigation.innerHTML = "";
+          fields.detailDrawer.removeAttribute("data-detail-mode");
+          fields.detailDrawerTitle.textContent = "Ficha // lado B";
+          document.body.classList.remove("drawer-open");
+          detailPersonalEditing = false;
+          detailDirtyScopes.clear();
+          pendingDetailTransition = null;
+          clearDetailFeedback();
+          if (updateHistory) syncRoute({ movie: "" }, "replace");
+          const currentCard = [...document.querySelectorAll(".dvd-card")]
+            .find((card) => card.dataset.id === detailReturnCardId);
+          // Home autoplay replaces the console while a detail dialog is open.
+          const currentHomeAction = detailReturnFocus?.closest?.(".spotlight-preview, .home-consulted-poster")
+            ? [...document.querySelectorAll(".spotlight-preview [data-click], .home-consulted-poster [data-click]")].find((action) =>
+              action.dataset.id === detailReturnCardId && action.dataset.click === detailReturnFocus.dataset.click
+              && action.dataset.homeFocus === detailReturnFocus.dataset.homeFocus)
+            : null;
+          const returnTarget = detailReturnFocus?.isConnected
+            ? detailReturnFocus
+            : currentHomeAction || currentCard?.querySelector(".dvd-open-surface");
+          if (restoreFocus) returnTarget?.focus();
+          detailReturnFocus = null;
+          detailReturnCardId = "";
+        };
+        if (useCaseTransition) runWithCaseTransition(performClose);
+        else performClose();
       }
 
       export function setDetailContext(context, selectedId) {
@@ -314,7 +354,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       }
 
       export function renderDetailNavigation() {
-        if (!selectedDetailId) {
+        if (!selectedDetailId || detailPresentation === "back-cover") {
           fields.detailNavigation.innerHTML = "";
           return;
         }
@@ -383,6 +423,16 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const summary = item.wikipedia_extract || item.description || item.notes || "";
         const watched = item.status === "watched";
         const availability = availabilityState(item);
+        fields.detailDrawer.dataset.detailMode = detailPresentation;
+        fields.detailDrawerTitle.textContent = detailPresentation === "back-cover"
+          ? `Contratapa VHS // ${title}`
+          : "Ficha // lado B";
+        if (detailPresentation === "back-cover") {
+          fields.detailNavigation.innerHTML = "";
+          fields.detailBody.innerHTML = renderBackCover(item);
+          clearDetailFeedback();
+          return;
+        }
         const metadataSection = detailPersonalEditing ? "" : `
           <details class="drawer-accordion drawer-editor">
             <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>
@@ -448,7 +498,13 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const image = item.page_image
           ? `<img class="drawer-poster" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" loading="eager" fetchpriority="high" decoding="async">`
           : "";
-        return `<div class="drawer-poster-frame">${image}${placeholder}</div>`;
+        return `<div class="drawer-poster-frame">
+          <span class="drawer-vhs-case" aria-hidden="true">
+            <span class="drawer-vhs-reel"></span>
+            <span class="drawer-vhs-reel"></span>
+          </span>
+          ${image}${placeholder}
+        </div>`;
       }
 
       export function editPersonalRecord() {

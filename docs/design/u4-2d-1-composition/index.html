@@ -1,0 +1,42 @@
+<!doctype html>
+<!--
+THESIS: Un frente centrado con una sola consola; el recorrido del archivo vive dentro de su abertura.
+OWN-WORLD: Petróleo v2 y latón aprobados, Oswald/Barlow/Plex locales, profundidad hacia adentro.
+STORY: Ver la programación y explorar VHS con un único lugar previsto para consultar la selección.
+FIRST VIEWPORT: Cabecera y cartelera comparten ancho con el estante; seis filas completas, VHS de 308 px,
+sin segunda consola al pie. En pantallas grandes se aprovecha más ancho con márgenes simétricos.
+FORM: Laboratorio histórico d.1 que carga los componentes actuales de d.3.
+La comparación original se conserva en capturas, no en un modo Anterior dinámico.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="movie-inbox-token" content="isolated-specimen-no-api">
+  <title>U4.2d · Reencuadre y selección compartida</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/composition.css">
+  <script type="module" src="/composition.js"></script>
+</head>
+<body>
+  <aside class="composition-toolbar" aria-label="Controles de la muestra visual">
+    <div class="composition-toolbar-row">
+      <strong>U4.2d · Laboratorio de componentes actuales</strong>
+      <label class="fixture-control">Muestra <select id="fixtureMode">
+        <option value="populated">Archivo poblado</option>
+        <option value="sparse">Una categoría · títulos largos</option>
+        <option value="missing">Sin imágenes</option>
+        <option value="empty">Editorial vacía</option>
+      </select></label>
+      <button type="button" id="advanceRotation">Probar rotación del póster</button>
+    </div>
+    <p>Datos de demostración. U4.2d.3 ya integra el encuadre y la consola única en Home. Este laboratorio carga componentes actuales; las capturas guardadas conservan la comparación histórica de d.1.</p>
+    <p id="labFeedback" role="status">Probá un lomo y luego la rotación: la obra consultada debe mantenerse. Ficha, edición y navegación exterior están fuera de esta muestra.</p>
+  </aside>
+  <main id="mount"><p role="status">Cargando composición…</p></main>
+  <footer class="composition-footer"><details><summary>Alcance y fuentes</summary>
+    <p>No consulta tu catálogo ni ofrece acciones de escritura. Para probar ficha, edición y navegación, usar la aplicación real de revisión.</p>
+    <p>Veintitrés títulos y todos los estados personales son sintéticos. Portada de Metropolis: Boris Bilinsky, 1927, <a href="https://commons.wikimedia.org/wiki/File:Boris_Bilinski_-_Filmplakat_f%C3%BCr_Metropolis.jpg">Wikimedia Commons</a>. Créditos y duración desconocidos permanecen vacíos.</p>
+  </details></footer>
+</body>
+</html>
