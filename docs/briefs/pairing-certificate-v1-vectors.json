@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "description": "Test vectors for a client port of certificate pinning and pairing-payload validation ([X1.1], docs/analisis/lo-que-viene-del-servidor-2026-09-13.md of the movieIndexAndroid repository). A phone trusts the certificate presented over TLS only if the pin it derives matches the one carried in the QR payload, using the same SPKI derivation as the server; tests/test_pairing_certificate_vectors.py recomputes every value here from the server's own functions, so a change that would change what a phone accepts fails this suite.",
+  "generator": {
+    "spki_pin": "SHA-256 of the certificate's SubjectPublicKeyInfo (the whole ASN.1 substructure, not just the key bytes), base64-encoded with padding: openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl enc -base64. 32 bytes -> 44 base64 characters, one trailing '='.",
+    "qr_payload": "The four fields a QR carries -- origin, ticket, account, and certificate_pin when the instance has one -- JSON-encoded with no whitespace (separators ',' and ':'), UTF-8. fits_in_qr is true when the encoded byte length is at most max_payload_bytes."
+  },
+  "max_payload_bytes": 1024,
+  "certificates": [
+    {
+      "label": "ec_p256_short_form_der_length",
+      "description": "P-256, CN=casa.local, OpenSSL 3.5.7, generated 2026-09-09. Real, throwaway, self-signed; no private key was ever committed. Its SubjectPublicKeyInfo is short enough for a single-byte DER length -- the common case.",
+      "pem": "-----BEGIN CERTIFICATE-----\nMIIBlTCCATygAwIBAgIUScBmTJog26kQOeqdhK5fME0ISZgwCgYIKoZIzj0EAwIw\nFTETMBEGA1UEAwwKY2FzYS5sb2NhbDAeFw0yNjA5MDkwNDMzMDlaFw0yNjEwMDkw\nNDMzMDlaMBUxEzARBgNVBAMMCmNhc2EubG9jYWwwWTATBgcqhkjOPQIBBggqhkjO\nPQMBBwNCAATY3AR3PXLUYKApdiIIV6oKFtlUqNkJScAaYIoE3ekGIC3pOw1TW6i0\ndNK1wTkENlBSB8AKXwjTWoZSwZ2cMZ2Qo2owaDAdBgNVHQ4EFgQU65Bw1CdjbW6d\nADdH+196beXrZNgwHwYDVR0jBBgwFoAU65Bw1CdjbW6dADdH+196beXrZNgwDwYD\nVR0TAQH/BAUwAwEB/zAVBgNVHREEDjAMggpjYXNhLmxvY2FsMAoGCCqGSM49BAMC\nA0cAMEQCIANca0jJBrjiqfYzgufQTpAjs2mp44mT6U9cmoDg1tjlAiBXxP34rdwO\nqOQxH+srr20r4Nn3YoCX0r0o2NJOSXuudw==\n-----END CERTIFICATE-----",
+      "spki_pin": "F8vo74MFdMBlfc3rAORbve09MS+A4TvZGHEhVA7vVWs="
+    },
+    {
+      "label": "rsa_2048_long_form_der_length",
+      "description": "RSA-2048, CN=192.168.1.50 with an IP SAN, OpenSSL 3.5.7, generated 2026-09-09. Real, throwaway, self-signed; no private key was ever committed. Its SubjectPublicKeyInfo needs a long-form DER length, which the EC one above does not exercise -- the shape a hand-written parser is most likely to get wrong.",
+      "pem": "-----BEGIN CERTIFICATE-----\nMIIDIDCCAgigAwIBAgIUe1mlfJ1MKVZhtU8z7tc/0paGma4wDQYJKoZIhvcNAQEL\nBQAwFzEVMBMGA1UEAwwMMTkyLjE2OC4xLjUwMB4XDTI2MDkwOTA0MzIzM1oXDTI4\nMTIxMjA0MzIzM1owFzEVMBMGA1UEAwwMMTkyLjE2OC4xLjUwMIIBIjANBgkqhkiG\n9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuqUicb9zUrzObPgcqEJAIlMPgOsb2eFgSHQ+\nM2C1GybykhvLiD438H8pqHsh698hshYWJ2CRN6sQgN7D8GgkmRwvKdqo6jrc8lP9\nC6bZMLx6kSCXUHygqFbbBp5+5HxpWXwP2xyrjSZqgqPAtC1de7n+0J6Kosln22JL\nxFJ9maxr+8kggVQauM+GIrjDmSqHSr6ftT01prEpfbogTilaPgh/XeYgD1wEApH5\nvXEq3cBf5LwC68s8Y5hWoXJAYtLrDUU8whNQ6ZQvIW+hNTtKfP+a0mM33or76kHS\niwbXYmlPoYWDslAvqMBK+c7Xgg6l5x7MnkMvFUtzz45FKwkD1wIDAQABo2QwYjAd\nBgNVHQ4EFgQUFnJDwQ0nthdgDta9km4dSoPM624wHwYDVR0jBBgwFoAUFnJDwQ0n\nthdgDta9km4dSoPM624wDwYDVR0TAQH/BAUwAwEB/zAPBgNVHREECDAGhwTAqAEy\nMA0GCSqGSIb3DQEBCwUAA4IBAQCxX4x9psLN1orKMIIMcE//EFwv0mAWVe/jk5hO\nPfjgXAy0U+UMWqa9/gl2vfNyv9lw7V/qnvx2JZ3dbLj1ueMg/hjRrshNpUkqdjRy\n1q5Yf7RFgSF1fpnLkVZWNRkaLdYHwsZbrlS0qcjhGejCeabP9Rezy/p/WC7JOA/0\n/ErPu40Ids1/ZCgygOsHtcASeJXozWS+/WTFDSe6Dfjmg3g0PyNSs8HdzbvW+oBW\nQ03ZLdYmexi1evnMtvI1mbClKpHQWB4NSZEUqTh4MWrdSxwGIYZTmJ/K2mrivS5O\nap4lQ15fNi4Kppxsqtihl+woUiDxq0nmNZxiMVSnan4ZWzp2\n-----END CERTIFICATE-----",
+      "spki_pin": "v3AM6ArSTRz3oSt/9ca+8gwPTn5C43Xs5DdpUz+fOps="
+    }
+  ],
+  "qr_payloads": [
+    {
+      "label": "full_payload_with_pin",
+      "input": {
+        "origin": "https://peliculas.example.com",
+        "token": "un-ticket",
+        "expires_at": 1800000000,
+        "instance_id": "abc123",
+        "account_username": "lucas",
+        "certificate_pin": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "expect": {
+        "fields": {
+          "origin": "https://peliculas.example.com",
+          "ticket": "un-ticket",
+          "account": "lucas",
+          "certificate_pin": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        },
+        "fits_in_qr": true
+      }
+    },
+    {
+      "label": "no_pin_omits_the_field_rather_than_sending_it_empty",
+      "input": {
+        "origin": "https://peliculas.example.com",
+        "token": "t",
+        "expires_at": 1,
+        "instance_id": "abc",
+        "account_username": "lucas"
+      },
+      "expect": {
+        "fields": {
+          "origin": "https://peliculas.example.com",
+          "ticket": "t",
+          "account": "lucas"
+        },
+        "absent_fields": ["certificate_pin"],
+        "fits_in_qr": true
+      }
+    },
+    {
+      "label": "oversized_token_does_not_fit_a_qr",
+      "input": {
+        "origin": "https://peliculas.example.com",
+        "token_length": 1034,
+        "expires_at": 1,
+        "instance_id": "abc",
+        "account_username": "lucas"
+      },
+      "expect": {
+        "fits_in_qr": false
+      }
+    }
+  ]
+}

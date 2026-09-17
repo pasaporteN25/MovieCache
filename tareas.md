@@ -418,10 +418,11 @@ recalcula, para que un cambio que alteraría los resultados del teléfono falle 
 suite. El análisis completo está en
 `docs/analisis/lo-que-viene-del-servidor-2026-09-13.md` del repositorio del cliente.
 
-- [ ] **[X1.1] Vectores del pin SPKI.** `tests/test_pairing_certificate.py` ya tiene dos
-  certificados reales —P-256 y RSA-2048— con el pin que imprimió OpenSSL. Llevarlos a un
-  JSON, junto con payloads del QR válidos y rechazados. El cliente los usa en [A3.1] para
-  confiar en el certificado igual que el servidor. **Modelo sugerido**: Chico.
+- [x] **[X1.1] Vectores del pin SPKI.** 2026-09-17. Los dos certificados reales de
+  `tests/test_pairing_certificate.py` con su pin SPKI, más tres payloads de QR (completo,
+  sin pin, sobredimensionado), en `docs/briefs/pairing-certificate-v1-vectors.json`.
+  `tests/test_pairing_certificate_vectors.py` los recalcula contra las funciones del
+  servidor.
 - [ ] **[X1.2] Vectores de normalización de títulos.** `normalize_search_text`,
   `title_match_key` y `title_similarity`, que el cliente porta en [A3.2] para avisar si un
   alta se parece a algo que ya está. Los casos que importan son los que Python resuelve
