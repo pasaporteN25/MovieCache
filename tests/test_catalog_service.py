@@ -17,6 +17,7 @@ from pathlib import Path
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 
 
@@ -176,6 +177,100 @@ class AppendItemStrongMatchTests(unittest.TestCase):
             self.assertEqual(reason, "possible_duplicate")
             self.assertEqual(extra["candidates"][0]["id"], "heat-tmdb")
             self.assertEqual(len(repository.read()), 1)
+
+
+class PatchPersonalPreconditionTests(unittest.TestCase):
+    """[X2]: an optional `base` on patch_personal guards against a lost update.
+
+    Reproduces the case ADR-0005's sync matrix ([A5.1] case 8, confirmed
+    2026-09-15 against a real instance by the client harness [A5.3]): a phone
+    uploads what it saw when it last downloaded, without looking at the
+    server again first, silently overwriting a change made elsewhere in the
+    meantime. With `base` declared, that upload is refused instead.
+    """
+
+    def service(self, catalog_path: Path) -> tuple[CatalogService, JsonCatalogRepository]:
+        repository = JsonCatalogRepository(catalog_path, normalize_item)
+        repository.write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
+        )
+        return CatalogService(repository), repository
+
+    def _get(self, repository: JsonCatalogRepository, item_id: str = "heat") -> CatalogItem:
+        item = repository.get(item_id)
+        assert item is not None
+        return item
+
+    def test_without_a_base_the_last_write_still_wins_as_before(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            updated, reason = service.patch_personal("heat", {"rating": 8})
+
+            self.assertTrue(updated)
+            self.assertEqual(reason, "updated")
+            self.assertEqual(self._get(repository).rating, 8)
+
+    def test_a_base_matching_the_stored_value_applies_normally(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            updated, reason = service.patch_personal(
+                "heat", {"rating": 8, "base": {"status": "to_watch", "rating": None}}
+            )
+
+            self.assertTrue(updated)
+            self.assertEqual(reason, "updated")
+            self.assertEqual(self._get(repository).rating, 8)
+
+    def test_the_lost_update_a_phone_reproduced_is_refused_instead_of_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            service, repository = self.service(catalog_path)
+
+            # The web (or another phone) rates it while this phone is offline.
+            first = service.patch_personal("heat", {"rating": 9})
+            self.assertEqual(first, (True, "updated"))
+
+            # This phone uploads a review, believing rating is still unset --
+            # its own base is what it downloaded before going offline.
+            second = service.patch_personal(
+                "heat", {"review": "Buenisima.", "base": {"rating": None}}
+            )
+
+            self.assertEqual(second, (False, "conflict"))
+            after = self._get(repository)
+            self.assertEqual(after.rating, 9, "the web's rating must survive")
+            self.assertEqual(after.review, "", "the phone's review must not apply either")
+
+    def test_a_base_field_that_is_not_being_changed_still_guards_the_patch(self) -> None:
+        # A conflict is about anything the caller declared it still trusts,
+        # not only the fields this particular call is writing.
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            service, repository = self.service(catalog_path)
+            service.patch_personal("heat", {"status": "watched", "watched_at": "2026-09-14"})
+
+            updated, reason = service.patch_personal(
+                "heat", {"rating": 7, "base": {"status": "to_watch"}}
+            )
+
+            self.assertEqual((updated, reason), (False, "conflict"))
+            self.assertEqual(self._get(repository).rating, 0)
+
+    def test_an_unrecognized_base_field_is_refused_up_front(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, _ = self.service(Path(temporary) / "catalog.json")
+
+            with self.assertRaises(ValueError):
+                service.patch_personal("heat", {"rating": 7, "base": {"tmdb_id": "949"}})
+
+    def test_a_base_that_is_not_an_object_is_refused_up_front(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, _ = self.service(Path(temporary) / "catalog.json")
+
+            with self.assertRaises(ValueError):
+                service.patch_personal("heat", {"rating": 7, "base": "rating:0"})
 
 
 if __name__ == "__main__":

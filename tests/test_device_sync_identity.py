@@ -12,6 +12,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -178,6 +179,99 @@ class TwoSourceCatalogueTests(unittest.TestCase):
         self.assertEqual(patched.status_code, 200, patched.content)
         self.assertEqual(self._status_in(self.second), "watched")
         self.assertNotEqual(self._status_in(self.first), "watched")
+
+
+class PersonalPatchConflictHttpTests(unittest.TestCase):
+    """[X2] over HTTP: the exact case [A5.3] of movieIndexAndroid reproduced
+    2026-09-15 -- a phone uploads what it saw when it last downloaded, without
+    looking at the server again first, and used to silently overwrite a
+    change another session made in between.
+    """
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        self.catalog = root / "catalog.json"
+        JsonCatalogRepository(self.catalog, normalize_item).write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
+        )
+        instance = root / "instance.db"
+        password = "a-long-local-password"
+        AuthService(SqliteIdentityRepository(instance)).bootstrap_owner(
+            "lucas",
+            password,
+            catalog_name="Catalogo",
+            source_paths=[str(self.catalog)],
+            write_path=str(self.catalog),
+        )
+        media = root / "media"
+        media.mkdir()
+        config = ViewerConfig(
+            patterns=[str(self.catalog)],
+            title="Movie Inbox Test",
+            write_json=str(self.catalog),
+            image_cache=False,
+            image_cache_dir=str(root / "images"),
+            image_cache_max_bytes=1024,
+            port=8765,
+            api_token="test-token",
+            instance_db=str(instance),
+            member_catalog_dir=str(root / "member-catalogs"),
+            library_allowed_roots=(str(media),),
+            library_scheduler_poll_seconds=3600,
+        )
+        context = TestClient(create_app(config), base_url="http://127.0.0.1:8765")
+        self.client = context.__enter__()
+        self.addCleanup(context.__exit__, None, None, None)
+        login = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps({"username": "lucas", "password": password, "device_name": "Pixel"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(login.status_code, 201, login.content)
+        self.bearer = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        first = self.client.get("/api/v1/catalog/items", headers=self.bearer).json()["items"][0]
+        self.item_id = first["id"]
+        self.base_personal = first["personal"]
+
+    def _patch(self, body: dict[str, Any]) -> Any:
+        return self.client.patch(
+            f"/api/v1/catalog/items/{self.item_id}/personal",
+            content=json.dumps(body),
+            headers={**self.bearer, "Content-Type": "application/json"},
+        )
+
+    def test_a_stale_base_is_refused_with_409_and_the_other_change_survives(self) -> None:
+        # The web rates it while the phone is offline, holding the personal
+        # state it downloaded before that (self.base_personal) as its base.
+        rated = self._patch({"rating": 9})
+        self.assertEqual(rated.status_code, 200, rated.content)
+
+        stale_upload = self._patch({"review": "Buenisima.", "base": self.base_personal})
+
+        self.assertEqual(stale_upload.status_code, 409, stale_upload.content)
+        self.assertEqual(stale_upload.json(), {"error": {"code": "personal_conflict"}})
+        current = self.client.get(
+            f"/api/v1/catalog/items/{self.item_id}", headers=self.bearer
+        ).json()
+        self.assertEqual(current["personal"]["rating"], 9, "the web's rating must survive")
+        self.assertIsNone(current["personal"]["review"], "the stale upload must not apply")
+
+    def test_a_base_that_still_matches_applies_normally(self) -> None:
+        response = self._patch({"rating": 9, "base": self.base_personal})
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["personal"]["rating"], 9)
+
+    def test_omitting_base_keeps_last_write_wins(self) -> None:
+        self._patch({"rating": 9})
+
+        response = self._patch({"review": "Sin comparar nada."})
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()["personal"]["rating"], 9)
+        self.assertEqual(response.json()["personal"]["review"], "Sin comparar nada.")
 
 
 class CursorSurvivesRestartTests(unittest.TestCase):

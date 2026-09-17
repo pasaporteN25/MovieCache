@@ -73,6 +73,40 @@ LIST_METADATA_FIELDS = {
 }
 
 
+class PersonalPreconditionFailed(Exception):
+    """[X2]: a `patch_personal` base value no longer matches the stored item.
+
+    Raised from inside the mutation callback, so the repository's own
+    transaction never commits the change -- there is nothing to roll back.
+    """
+
+    def __init__(self, fields: Sequence[str]) -> None:
+        super().__init__(f"Personal state changed since base was read: {', '.join(fields)}")
+        self.fields = tuple(fields)
+
+
+def _wire_personal_value(field: str, value: Any) -> Any:
+    """Shape a stored personal field the way the API already reports it.
+
+    `PersonalState`/`PersonalPatch` never send an unset field as `""` or `0`;
+    they send `null` (status excepted, which defaults to `to_watch`). A `base`
+    value from the client is always one the client itself read off the wire,
+    so the comparison has to use the same shape or every precondition would
+    fail on a field nobody actually changed.
+    """
+
+    if field == "status":
+        return str(value or "") or "to_watch"
+    if field == "rating":
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if 1 <= parsed <= 10 else None
+    text = str(value or "").strip()
+    return text or None
+
+
 class CatalogService:
     def __init__(self, repository: CatalogRepository) -> None:
         self.repository = repository
@@ -398,11 +432,24 @@ class CatalogService:
         return self._update_item(item_id, update)
 
     def patch_personal(self, item_id: str, values: Mapping[str, Any]) -> tuple[bool, str]:
-        """Apply a partial personal-state edit without accepting metadata fields."""
+        """Apply a partial personal-state edit without accepting metadata fields.
+
+        [X2]: `values` may carry an optional `base` mapping -- the field
+        values the caller last read from the server. Present and no longer
+        current, the whole patch is refused as a conflict instead of applied,
+        so a change from elsewhere in the meantime is never silently lost.
+        Omitted, behaviour is exactly as before: last write wins.
+        """
         if not item_id:
             raise ValueError("Missing item id")
         allowed = {"status", "watched_at", "rating", "review"}
-        requested = set(values)
+        base_raw = values.get("base")
+        base: dict[str, Any] = {}
+        if base_raw is not None:
+            if not isinstance(base_raw, Mapping) or set(base_raw) - allowed:
+                raise ValueError("Invalid base")
+            base = dict(base_raw)
+        requested = set(values) - {"base"}
         if not requested or requested - allowed:
             raise ValueError("Invalid personal fields")
         status = ""
@@ -442,6 +489,14 @@ class CatalogService:
                 raise ValueError("Review is too long")
 
         def update(item: dict[str, Any]) -> None:
+            if base:
+                mismatched = [
+                    field
+                    for field, expected in base.items()
+                    if _wire_personal_value(field, item.get(field)) != expected
+                ]
+                if mismatched:
+                    raise PersonalPreconditionFailed(mismatched)
             if status:
                 item["status"] = status
                 if status == "to_watch":
@@ -455,7 +510,10 @@ class CatalogService:
             if "review" in values:
                 item["review"] = review or ""
 
-        return self._update_item(item_id, update)
+        try:
+            return self._update_item(item_id, update)
+        except PersonalPreconditionFailed:
+            return False, "conflict"
 
     def update_link_curation(self, item_id: str, status: str) -> tuple[bool, str]:
         if not item_id:

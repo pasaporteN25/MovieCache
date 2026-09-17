@@ -409,25 +409,6 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X2] Precondición en el `PATCH` personal
-
-`PATCH /api/v1/catalog/items/{id}/personal` aplica lo que llega sin comparar con nada. Si la
-web u otro teléfono cambió el mismo campo entre que un teléfono bajó el estado y lo subió,
-gana el último y el otro cambio se pierde sin aviso: la fusión a tres bandas del cliente
-decide con lo que bajó, no con lo que hay al subir. Encontrado el 2026-09-13, al plantear la
-casuística de sincronización que pidió el owner, y **confirmado el 2026-09-15** contra una
-instancia real: el arnés del cliente ([A5.3] de `movieIndexAndroid`) reproduce el caso
-exacto —un teléfono sube con lo que vio al bajar, sin volver a mirar el servidor— y hoy pisa
-en silencio un cambio que otro dispositivo hizo en el medio, sin que nadie se entere.
-
-- **Alcance**: que el `PATCH` pueda recibir, por campo, el valor que el cliente tenía como
-  base, y rechazar el cambio si el servidor ya no vale eso, para que el cliente vuelva a
-  bajar y fusionar. Opcional para quien no lo mande, así cabe en la v1 del contrato según la
-  regla de versionado de ADR-0003.
-- **Criterio de cierre**: el mismo caso que hoy reproduce el arnés del cliente ([A5.3])
-  converge sin perder ningún cambio, con la precondición puesta.
-- **Depende de**: nada, ya está confirmado. **Modelo sugerido**: Grande: toca el contrato.
-
 #### [X3] Registrar cuándo cambia cada campo personal
 
 Pedido del owner el 2026-09-14, al responder la matriz de sincronización del cliente
@@ -753,6 +734,14 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   `tests/test_pairing_certificate_vectors.py` y `tests/test_title_normalization_vectors.py`
   recalculan cada valor contra las funciones reales del servidor. La pantalla que genera el
   QR sigue como traspaso al frente visual, ya anotada en esa sección.
+- [x] **[X2] Precondición en el `PATCH` personal.** 2026-09-17. `patch_personal` acepta un
+  `base` opcional por campo; si el servidor ya no vale eso, responde `409 personal_conflict`
+  sin escribir nada, dentro de la misma transacción atómica del repositorio (sin condición de
+  carrera: la comparación corre dentro del callback que el repositorio ya ejecuta bajo lock).
+  Sin `base`, el comportamiento es exactamente el de antes. `tests/test_catalog_service.py::
+  PatchPersonalPreconditionTests` y `tests/test_device_sync_identity.py::
+  PersonalPatchConflictHttpTests` reproducen el caso exacto que confirmó el arnés del cliente
+  ([A5.3]) el 2026-09-15.
 
 ### Frente: Integración material de Home
 

@@ -106,7 +106,12 @@ class DeviceApiContractTests(unittest.TestCase):
         item = document["components"]["schemas"]["CatalogItem"]
         self.assertNotIn("source_file", item["properties"])
         self.assertNotIn("_source_file", item["properties"])
-        self.assertEqual(
-            document["paths"]["/api/v1/catalog/items/{itemId}/personal"]["patch"]["operationId"],
-            "patchPersonalItemState",
-        )
+        personal = document["paths"]["/api/v1/catalog/items/{itemId}/personal"]["patch"]
+        self.assertEqual(personal["operationId"], "patchPersonalItemState")
+        # [X2]: a declared, stale base turns the patch into a conflict rather
+        # than a silent overwrite.
+        self.assertIn("409", personal["responses"])
+        patch = document["components"]["schemas"]["PersonalPatch"]
+        self.assertIn("base", patch["properties"])
+        base = document["components"]["schemas"]["PersonalPatchBase"]
+        self.assertEqual(set(base["properties"]), {"status", "watched_at", "rating", "review"})

@@ -131,6 +131,10 @@ def patch_personal_item(
         )
     except (ValueError, CatalogRepositoryError) as error:
         raise _catalog_error(error) from error
+    if reason == "conflict":
+        # [X2]: a declared `base` value no longer matches what is stored.
+        # Nothing was written; the caller re-reads and merges before retrying.
+        raise DeviceApiRequestError("personal_conflict", 409)
     if not updated or reason == "not_found":
         raise DeviceApiRequestError("item_not_found", 404)
     refreshed = _entry_by_id(_device_catalog_entries(request, identity), item_id)
