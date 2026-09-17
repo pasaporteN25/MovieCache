@@ -414,22 +414,36 @@ el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue ab
 Pedido del owner el 2026-09-14, al responder la matriz de sincronización del cliente
 ([A5.1] de `movieIndexAndroid`). Hoy el servidor no guarda cuándo cambió un campo personal:
 `patch_personal` y la ficha web escriben el valor y nada más, y ADR-0005 (§6.1) decidió no
-exponer una marca que no existía.
+exponer una marca que no existía. Subdividida el 2026-09-17 para poder avanzarla y
+commitearla en pasos, como [X1].
 
-- **Alcance**: guardar, por obra, cuándo cambió por última vez cada campo personal —`status`
-  con `watched_at`, `rating` y `review`— y exponerlo en la API de dispositivo. Sirve para
-  mostrarle a la persona de cuándo es cada valor en un conflicto, para un historial de
-  cambios y, más adelante, para una sincronización que baje sólo lo que cambió.
-- **Lo que no hace**: decidir un conflicto. La marca informa, y la fusión sigue siendo a tres
-  bandas contra la base (ADR-0005, §4): el reloj de un teléfono puede estar mal, y "gana el
-  último" pierde datos sin aviso.
-- **Por qué es grande**: los campos personales viven en el contrato portable
-  `catalog.schema.json` y en la base del catálogo, así que la marca es un cambio de esquema
-  versionado, con migración, y no un campo más de la API.
-- **Criterio de cierre**: una edición desde la web o desde un teléfono deja su marca, la marca
-  viaja en la API de dispositivo, y sobrevive a exportar e importar el catálogo.
-- **Depende de**: nada; no frena [A2.2]. **Modelo sugerido**: Grande: toca el contrato
-  portable.
+- **Lo que no hace, en ninguno de los pasos**: decidir un conflicto. La marca informa, y la
+  fusión sigue siendo a tres bandas contra la base (ADR-0005, §4): el reloj de un teléfono
+  puede estar mal, y "gana el último" pierde datos sin aviso.
+- **Decisión de diseño (X3.1)**: una marca por `status` (agrupa `watched_at`, porque
+  `patch_personal` ya los cambia juntos desde una sola decisión), otra por `rating`, otra por
+  `review` — tres, no cuatro. Revisar si no es la lectura correcta de "por campo".
+- [x] **[X3.1] Modelo y esquema, sin escritura todavía.** 2026-09-17. `personal_changed_at`
+  (`{status, rating, review} -> ISO-8601`) en `CatalogItem`, `catalog.schema.json` (bump
+  `SCHEMA_VERSION` 9→10, migración `v9_to_v10`) y SQLite (`DATABASE_SCHEMA_VERSION` 5→6,
+  tabla `personal_changes` con `ON DELETE CASCADE`, siguiendo el patrón ya usado por
+  `duplicate_decisions`/`metadata_provenance`). Nada todavía escribe la marca: siempre `{}`.
+  De paso, `catalog.schema.json` (el documento JSON Schema en la raíz del repo) estaba
+  desalineado desde v7 — le faltaban `myanimelist_url`/`mal_id`/`tmdb_url` de v8/v9, y nada
+  lo probaba; se puso al día junto con v10 y se agregó
+  `tests/test_schema_and_repository.py::PortableSchemaDocumentTests` para que no vuelva a
+  desalinearse en silencio.
+- [ ] **[X3.2] Registrar la marca al escribir.** `CatalogService.patch_personal` (dispositivo)
+  y `update_personal` (web) graban la marca del campo que tocan, con la hora UTC actual.
+  Depende de X3.1. **Modelo sugerido**: Medio.
+- [ ] **[X3.3] Exponerla en la API de dispositivo.** `PersonalState`/`CatalogItem` en el
+  contrato OpenAPI (aditivo, v1) y `_device_item_payload`. Depende de X3.2. **Modelo
+  sugerido**: Chico–Medio.
+- [ ] **[X3.4] Verificar que sobrevive exportar e importar el catálogo.** Es el criterio de
+  cierre explícito de la tarea original; confirmar con test (y arreglar si hace falta) que
+  `movie-inbox db export`/`import` conservan la marca íntegra. Depende de X3.2. **Modelo
+  sugerido**: Chico.
+- **Depende de**: nada; no frena [A2.2].
 
 #### [X4] Sesiones de dispositivo que no se pierden por un corte
 

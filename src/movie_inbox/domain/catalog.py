@@ -65,6 +65,20 @@ LIST_FIELDS = {
     "writers",
     "cast",
 }
+# [X3]: watched_at changes together with status (patch_personal writes both
+# from one decision), so they share one mark rather than getting one each.
+PERSONAL_CHANGE_FIELDS = ("status", "rating", "review")
+
+
+def normalize_personal_changed_at(value: Any) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        return {}
+    normalized: dict[str, str] = {}
+    for field in PERSONAL_CHANGE_FIELDS:
+        changed_at = str(value.get(field) or "").strip()
+        if changed_at:
+            normalized[field] = changed_at
+    return normalized
 
 
 def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
@@ -105,6 +119,7 @@ def normalize_item(row: Mapping[str, Any]) -> CatalogItem:
         item["year"] = str(item["release_dates"][0]["date"])[:4]
     item["locked_fields"] = normalize_locked_fields(item.get("locked_fields"))
     item["metadata_sources"] = normalize_metadata_sources(item.get("metadata_sources"))
+    item["personal_changed_at"] = normalize_personal_changed_at(item.get("personal_changed_at"))
     alias_values = {
         "original_title": item.get("original_title") or item.get("originalTitle"),
         "spanish_title": item.get("spanish_title") or item.get("spanishTitle"),

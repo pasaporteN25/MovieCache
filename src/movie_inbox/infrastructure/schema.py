@@ -11,6 +11,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from movie_inbox.domain.catalog import normalize_personal_changed_at
 from movie_inbox.domain.curation import (
     DUPLICATE_DECISION_STATUSES,
     LINK_CURATION_STATUSES,
@@ -38,7 +39,7 @@ from movie_inbox.domain.releases import (
     normalize_release_dates,
 )
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 BACKUP_LIMIT = 1
 CATALOG_FIELDS = [
     "id",
@@ -90,6 +91,7 @@ CATALOG_FIELDS = [
     "duplicate_decisions",
     "curation_updated_at",
     "added_at",
+    "personal_changed_at",
 ]
 
 REQUIRED_ITEM_FIELDS = {
@@ -109,6 +111,7 @@ REQUIRED_ITEM_FIELDS = {
     "original_languages",
     "producers",
     "composers",
+    "personal_changed_at",
 }
 LOCAL_FILE_FIELDS = {
     "path",
@@ -146,6 +149,7 @@ STRING_ITEM_FIELDS = (
         "metadata_sources",
         "duplicate_decisions",
         "release_dates",
+        "personal_changed_at",
     }
 )
 
@@ -219,6 +223,7 @@ def migrate_catalog_document(raw: Any) -> dict[str, Any]:
         6: v6_to_v7,
         7: v7_to_v8,
         8: v8_to_v9,
+        9: v9_to_v10,
     }
     while document["schema_version"] < SCHEMA_VERSION:
         migration = migrations.get(document["schema_version"])
@@ -343,6 +348,15 @@ def v8_to_v9(document: dict[str, Any]) -> dict[str, Any]:
     return {"schema_version": 9, "items": rows}
 
 
+def v9_to_v10(document: dict[str, Any]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for row in copy_item_rows(document.get("items"), "v9"):
+        item = normalize_legacy_item(row)
+        item["personal_changed_at"] = normalize_personal_changed_at(item.get("personal_changed_at"))
+        rows.append(item)
+    return {"schema_version": 10, "items": rows}
+
+
 def validate_catalog_document(document: Mapping[str, Any]) -> None:
     extra = set(document) - {"schema_version", "items"}
     if extra:
@@ -422,6 +436,7 @@ def validate_catalog_item(row: Any, index: int = 0) -> None:
     validate_local_files(row.get("local_files"), index)
     validate_release_dates(row.get("release_dates"), index)
     validate_metadata_sources(row.get("metadata_sources"), index)
+    validate_personal_changed_at(row.get("personal_changed_at"), index)
 
 
 def validate_release_dates(value: Any, item_index: int) -> None:
@@ -513,6 +528,13 @@ def validate_metadata_sources(value: Any, item_index: int) -> None:
             raise CatalogSchemaError(
                 f"items[{item_index}].metadata_sources.{field}.inferred must be boolean"
             )
+
+
+def validate_personal_changed_at(value: Any, item_index: int) -> None:
+    if not isinstance(value, Mapping):
+        raise CatalogSchemaError(f"items[{item_index}].personal_changed_at must be an object")
+    if value != normalize_personal_changed_at(value):
+        raise CatalogSchemaError(f"items[{item_index}].personal_changed_at must be canonical")
 
 
 def plain_value(value: Any) -> Any:

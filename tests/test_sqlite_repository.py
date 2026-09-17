@@ -97,6 +97,11 @@ def sample_item(item_id: str = "heat-1995") -> CatalogItem:
             },
             "curation_updated_at": "2026-07-25T00:00:00Z",
             "added_at": "2026-07-15T00:00:00Z",
+            "personal_changed_at": {
+                "status": "2026-08-01T00:00:00Z",
+                "rating": "2026-08-02T00:00:00Z",
+                "review": "2026-08-03T00:00:00Z",
+            },
             "custom_field": "preserved",
         }
     )
@@ -115,7 +120,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 connection.commit()
 
             repository = SqliteCatalogRepository(path, normalize_item)
-            self.assertEqual(repository.database_version(), 5)
+            self.assertEqual(repository.database_version(), 6)
             with closing(sqlite3.connect(path)) as connection:
                 columns = {row[1] for row in connection.execute("PRAGMA table_info(catalog_items)")}
                 tables = {
@@ -136,6 +141,7 @@ class SqliteRepositoryTests(unittest.TestCase):
             )
             self.assertIn("duplicate_decisions", tables)
             self.assertIn("release_dates", tables)
+            self.assertIn("personal_changes", tables)
 
     def test_relational_round_trip_preserves_catalog_data(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -167,6 +173,14 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded.local_files[0].library_id, "movies-a")
             self.assertEqual(loaded.metadata_sources["title"].source, "imdb")
             self.assertEqual(loaded.extra["custom_field"], "preserved")
+            self.assertEqual(
+                loaded.personal_changed_at,
+                {
+                    "status": "2026-08-01T00:00:00Z",
+                    "rating": "2026-08-02T00:00:00Z",
+                    "review": "2026-08-03T00:00:00Z",
+                },
+            )
 
             with closing(sqlite3.connect(path)) as connection:
                 tables = {
@@ -187,7 +201,7 @@ class SqliteRepositoryTests(unittest.TestCase):
                 }
                 <= tables
             )
-            self.assertEqual(repository.database_version(), 5)
+            self.assertEqual(repository.database_version(), 6)
 
             with closing(sqlite3.connect(path)) as connection:
                 mal_row = connection.execute(
@@ -195,6 +209,25 @@ class SqliteRepositoryTests(unittest.TestCase):
                     ("heat-1995", "jikan"),
                 ).fetchone()
             self.assertEqual(mal_row, ("32281", "https://myanimelist.net/anime/32281"))
+
+    def test_deleting_an_item_cascades_its_personal_change_marks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.sqlite"
+            repository = SqliteCatalogRepository(path, normalize_item)
+            repository.write([sample_item()])
+            with closing(sqlite3.connect(path)) as connection:
+                before = connection.execute(
+                    "SELECT COUNT(*) FROM personal_changes WHERE item_id = ?", ("heat-1995",)
+                ).fetchone()[0]
+            self.assertEqual(before, 3)
+
+            self.assertTrue(repository.delete_by_id("heat-1995"))
+
+            with closing(sqlite3.connect(path)) as connection:
+                after = connection.execute(
+                    "SELECT COUNT(*) FROM personal_changes WHERE item_id = ?", ("heat-1995",)
+                ).fetchone()[0]
+            self.assertEqual(after, 0)
 
     def test_catalog_service_mutates_sqlite_transactionally(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

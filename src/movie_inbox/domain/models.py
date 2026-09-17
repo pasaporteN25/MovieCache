@@ -166,6 +166,7 @@ class CatalogItem(ModelMapping):
     duplicate_decisions: dict[str, dict[str, str]] = field(default_factory=dict)
     curation_updated_at: str = ""
     added_at: str = ""
+    personal_changed_at: dict[str, str] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self) -> None:

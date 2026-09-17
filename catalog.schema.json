@@ -6,7 +6,7 @@
   "required": ["schema_version", "items"],
   "properties": {
     "schema_version": {
-      "const": 7
+      "const": 10
     },
     "items": {
       "type": "array",
@@ -70,7 +70,7 @@
         "id", "title", "kind", "status", "en_catalogo", "local_files",
         "metadata_sources", "locked_fields", "link_curation_status", "duplicate_decisions",
         "release_dates", "duration_minutes", "countries", "original_languages",
-        "producers", "composers"
+        "producers", "composers", "personal_changed_at"
       ],
       "properties": {
         "id": {"type": "string"},
@@ -91,6 +91,8 @@
         "wikipedia_url": {"type": "string"},
         "imdb_url": {"type": "string"},
         "filmaffinity_url": {"type": "string"},
+        "myanimelist_url": {"type": "string"},
+        "tmdb_url": {"type": "string"},
         "wikipedia_title": {"type": "string"},
         "wikidata_id": {"type": "string"},
         "duration_minutes": {"type": ["integer", "null"], "minimum": 1},
@@ -105,6 +107,7 @@
         "page_image": {"type": "string"},
         "backdrop_image": {"type": "string"},
         "tmdb_id": {"type": "string"},
+        "mal_id": {"type": "string"},
         "wikipedia_extract": {"type": "string"},
         "en_catalogo": {"type": "boolean"},
         "local_files": {"type": "array", "items": {"$ref": "#/$defs/localFile"}},
@@ -155,7 +158,12 @@
           }
         },
         "curation_updated_at": {"type": "string"},
-        "added_at": {"type": "string"}
+        "added_at": {"type": "string"},
+        "personal_changed_at": {
+          "type": "object",
+          "propertyNames": {"enum": ["status", "rating", "review"]},
+          "additionalProperties": {"type": "string", "minLength": 1}
+        }
       },
       "additionalProperties": true
     }

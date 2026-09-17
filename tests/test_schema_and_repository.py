@@ -10,6 +10,8 @@ from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.models import CatalogItem, LocalFile, MetadataSource
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.schema import (
+    CATALOG_FIELDS,
+    SCHEMA_VERSION,
     CatalogSchemaError,
     UnsupportedCatalogVersion,
     atomic_write_json,
@@ -18,8 +20,27 @@ from movie_inbox.infrastructure.schema import (
 )
 
 
+class PortableSchemaDocumentTests(unittest.TestCase):
+    """The published contract has to describe what the code actually writes.
+
+    Found while adding [X3]: this file had drifted to v7 while `SCHEMA_VERSION`
+    moved on to v9 -- two migrations' worth of fields (myanimelist_url,
+    mal_id, tmdb_url) were undocumented here. Nothing enforced the two
+    staying in step, so it happened silently.
+    """
+
+    def test_the_published_version_and_fields_match_the_code(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        document = json.loads((root / "catalog.schema.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(document["properties"]["schema_version"]["const"], SCHEMA_VERSION)
+        published = set(document["$defs"]["catalogItem"]["properties"])
+        missing = set(CATALOG_FIELDS) - published
+        self.assertFalse(missing, f"catalog.schema.json is missing: {sorted(missing)}")
+
+
 class SchemaAndRepositoryTests(unittest.TestCase):
-    def test_legacy_list_is_migrated_to_v9_shape(self) -> None:
+    def test_legacy_list_is_migrated_to_v10_shape(self) -> None:
         rows = extract_catalog_items([{"title": "Heat", "year": "1995", "en_catalogo": "si"}])
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["kind"], "pelicula")
@@ -38,10 +59,11 @@ class SchemaAndRepositoryTests(unittest.TestCase):
         self.assertEqual(rows[0]["myanimelist_url"], "")
         self.assertEqual(rows[0]["mal_id"], "")
         self.assertEqual(rows[0]["tmdb_url"], "")
+        self.assertEqual(rows[0]["personal_changed_at"], {})
 
     def test_future_and_malformed_catalogs_are_rejected(self) -> None:
         with self.assertRaises(UnsupportedCatalogVersion):
-            extract_catalog_items({"schema_version": 10, "items": []})
+            extract_catalog_items({"schema_version": 11, "items": []})
         with self.assertRaises(CatalogSchemaError):
             extract_catalog_items({"schema_version": 8, "items": "not-an-array"})
         with self.assertRaises(CatalogSchemaError):
@@ -85,9 +107,9 @@ class SchemaAndRepositoryTests(unittest.TestCase):
             self.assertEqual(loaded[0].title, "Heat")
             self.assertEqual(loaded[0].duration_minutes, 172)
             self.assertEqual(loaded[0].countries, ["Estados Unidos"])
-            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 9)
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["schema_version"], 10)
 
-            path.write_text('{"schema_version": 10, "items": []}', encoding="utf-8")
+            path.write_text('{"schema_version": 11, "items": []}', encoding="utf-8")
             with self.assertRaises(CatalogFormatError):
                 repository.read()
 
@@ -146,6 +168,40 @@ class SchemaAndRepositoryTests(unittest.TestCase):
         rows = extract_catalog_items({"schema_version": 8, "items": [item]})
 
         self.assertEqual(rows[0]["tmdb_url"], "")
+
+    def test_v9_catalog_is_migrated_with_empty_personal_changed_at(self) -> None:
+        item = normalize_item({"id": "heat", "title": "Heat", "kind": "pelicula"}).to_dict()
+        item.pop("personal_changed_at")
+
+        rows = extract_catalog_items({"schema_version": 9, "items": [item]})
+
+        self.assertEqual(rows[0]["personal_changed_at"], {})
+
+    def test_personal_changed_at_drops_unknown_fields_and_empty_values(self) -> None:
+        # [X3]: a stray or blank mark is dropped rather than kept as noise --
+        # an absent key already means "never edited".
+        item = normalize_item(
+            {
+                "id": "heat",
+                "title": "Heat",
+                "kind": "pelicula",
+                "personal_changed_at": {
+                    "status": "2026-09-17T00:00:00Z",
+                    "rating": "",
+                    "watched_at": "2026-09-17T00:00:00Z",
+                    "not_a_field": "2026-09-17T00:00:00Z",
+                },
+            }
+        )
+
+        self.assertEqual(item.personal_changed_at, {"status": "2026-09-17T00:00:00Z"})
+
+    def test_a_non_canonical_personal_changed_at_cannot_be_written(self) -> None:
+        item = normalize_item({"id": "heat", "title": "Heat", "kind": "pelicula"}).to_dict()
+        item["personal_changed_at"] = {"status": "2026-09-17T00:00:00Z", "not_a_field": "x"}
+
+        with self.assertRaises(CatalogSchemaError):
+            catalog_document([item])
 
     def test_normalization_repairs_identifier_titles_and_detects_series(self) -> None:
         item = normalize_item(

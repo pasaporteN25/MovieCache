@@ -26,7 +26,7 @@ from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.releases import normalize_release_dates
 from movie_inbox.infrastructure.schema import CATALOG_FIELDS, CatalogSchemaError, catalog_document
 
-DATABASE_SCHEMA_VERSION = 5
+DATABASE_SCHEMA_VERSION = 6
 LIST_METADATA_FIELDS = (
     "countries",
     "original_languages",
@@ -218,6 +218,17 @@ MIGRATIONS = {
         (
             "ALTER TABLE catalog_items ADD COLUMN duration_minutes INTEGER DEFAULT NULL "
             "CHECK (duration_minutes IS NULL OR duration_minutes > 0)",
+        ),
+    ),
+    6: (
+        "personal state change timestamps [X3]",
+        (
+            """CREATE TABLE personal_changes (
+                item_id TEXT NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
+                field TEXT NOT NULL CHECK (field IN ('status', 'rating', 'review')),
+                changed_at TEXT NOT NULL,
+                PRIMARY KEY (item_id, field)
+            )""",
         ),
     ),
 }
@@ -588,6 +599,7 @@ class SqliteCatalogRepository:
             "duplicate_decisions": self._duplicate_decisions(connection, item_id),
             "curation_updated_at": row["curation_updated_at"],
             "added_at": row["added_at"],
+            "personal_changed_at": self._personal_changed_at(connection, item_id),
         }
         for field in LIST_METADATA_FIELDS:
             item[field] = self._metadata_values(connection, item_id, field)
@@ -687,6 +699,14 @@ class SqliteCatalogRepository:
             }
             for row in rows
         }
+
+    @staticmethod
+    def _personal_changed_at(connection: sqlite3.Connection, item_id: str) -> dict[str, str]:
+        rows = connection.execute(
+            "SELECT field, changed_at FROM personal_changes WHERE item_id = ?",
+            (item_id,),
+        ).fetchall()
+        return {str(row["field"]): str(row["changed_at"]) for row in rows}
 
     @staticmethod
     def _duplicate_decisions(
@@ -927,6 +947,15 @@ class SqliteCatalogRepository:
         if previous is None or previous.get("metadata_sources") != item.get("metadata_sources"):
             connection.execute("DELETE FROM metadata_provenance WHERE item_id = ?", (item_id,))
             self._insert_metadata_sources(connection, item_id, item.get("metadata_sources", {}))
+        if previous is None or previous.get("personal_changed_at") != item.get(
+            "personal_changed_at"
+        ):
+            connection.execute("DELETE FROM personal_changes WHERE item_id = ?", (item_id,))
+            for field, changed_at in item.get("personal_changed_at", {}).items():
+                connection.execute(
+                    "INSERT INTO personal_changes(item_id, field, changed_at) VALUES (?, ?, ?)",
+                    (item_id, str(field), str(changed_at)),
+                )
 
     @staticmethod
     def _insert_positioned(
