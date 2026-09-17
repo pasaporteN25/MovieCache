@@ -409,27 +409,6 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X1] Vectores de prueba para el cliente Android
-
-Lo que el cliente tiene que reimplementar con resultados idénticos a los del servidor se
-prueba contra vectores que genera el propio servidor, como ya se hizo con
-`docs/briefs/charades-v1-vectors.json`: un JSON versionado y una prueba acá que lo
-recalcula, para que un cambio que alteraría los resultados del teléfono falle en esta
-suite. El análisis completo está en
-`docs/analisis/lo-que-viene-del-servidor-2026-09-13.md` del repositorio del cliente.
-
-- [x] **[X1.1] Vectores del pin SPKI.** 2026-09-17. Los dos certificados reales de
-  `tests/test_pairing_certificate.py` con su pin SPKI, más tres payloads de QR (completo,
-  sin pin, sobredimensionado), en `docs/briefs/pairing-certificate-v1-vectors.json`.
-  `tests/test_pairing_certificate_vectors.py` los recalcula contra las funciones del
-  servidor.
-- [ ] **[X1.2] Vectores de normalización de títulos.** `normalize_search_text`,
-  `title_match_key` y `title_similarity`, que el cliente porta en [A3.2] para avisar si un
-  alta se parece a algo que ya está. Los casos que importan son los que Python resuelve
-  solo: `html.unescape`, NFKC, el plegado de diacríticos sólo en letras latinas y los años
-  que son títulos. **Modelo sugerido**: Medio.
-- La pantalla que genera el QR sigue entre los traspasos al frente visual, más abajo.
-
 #### [X2] Precondición en el `PATCH` personal
 
 `PATCH /api/v1/catalog/items/{id}/personal` aplica lo que llega sin comparar con nada. Si la
@@ -766,6 +745,14 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   que deriva los ids opacos) en vez de con `api_token`, que `serve` regenera al azar en cada
   arranque. `tests/test_device_sync_identity.py::CursorSurvivesRestartTests` reproduce el
   caso exacto — un reinicio a mitad de descarga — y confirma que ya no corta al teléfono.
+- [x] **[X1] Vectores de prueba para el cliente Android.** 2026-09-17. **[X1.1]** el pin SPKI
+  de los dos certificados reales de `tests/test_pairing_certificate.py` más tres payloads de
+  QR, en `docs/briefs/pairing-certificate-v1-vectors.json`. **[X1.2]** `normalize_search_text`,
+  `title_match_key` y `title_similarity` con sus casos límite (diacríticos, no-latino,
+  ligature NFKC, años en el título), en `docs/briefs/title-normalization-v1-vectors.json`.
+  `tests/test_pairing_certificate_vectors.py` y `tests/test_title_normalization_vectors.py`
+  recalculan cada valor contra las funciones reales del servidor. La pantalla que genera el
+  QR sigue como traspaso al frente visual, ya anotada en esa sección.
 
 ### Frente: Integración material de Home
 
