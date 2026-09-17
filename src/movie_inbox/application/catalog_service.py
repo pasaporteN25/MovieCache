@@ -28,6 +28,7 @@ from movie_inbox.domain.catalog import (
 from movie_inbox.domain.curation import (
     apply_duplicate_curation_decision,
     apply_link_curation_decision,
+    curation_timestamp,
 )
 from movie_inbox.domain.matching import decide_match
 from movie_inbox.domain.metadata import (
@@ -423,11 +424,20 @@ class CatalogService:
     ) -> tuple[bool, str]:
         if not item_id:
             raise ValueError("Missing item id")
+        now = curation_timestamp()
 
         def update(item: dict[str, Any]) -> None:
             item["watched_at"] = normalize_date(watched_at)
             item["rating"] = normalize_rating(rating)
             item["review"] = review.strip()
+            # [X3]: this call always overwrites all three fields ([X8] is the
+            # open fix for that), so all three marks move together with it.
+            item["personal_changed_at"] = {
+                **item.get("personal_changed_at", {}),
+                "status": now,
+                "rating": now,
+                "review": now,
+            }
 
         return self._update_item(item_id, update)
 
@@ -487,6 +497,7 @@ class CatalogService:
             review = str(raw_review or "").strip()
             if len(review) > 10_000:
                 raise ValueError("Review is too long")
+        now = curation_timestamp()
 
         def update(item: dict[str, Any]) -> None:
             if base:
@@ -509,6 +520,22 @@ class CatalogService:
                 item["rating"] = rating or 0
             if "review" in values:
                 item["review"] = review or ""
+            # [X3]: watched_at shares the status mark -- patch_personal already
+            # changes them together from one decision.
+            changed = {
+                field
+                for field, present in (
+                    ("status", status or "watched_at" in values),
+                    ("rating", "rating" in values),
+                    ("review", "review" in values),
+                )
+                if present
+            }
+            if changed:
+                item["personal_changed_at"] = {
+                    **item.get("personal_changed_at", {}),
+                    **dict.fromkeys(changed, now),
+                }
 
         try:
             return self._update_item(item_id, update)

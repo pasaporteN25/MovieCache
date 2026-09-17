@@ -433,9 +433,11 @@ commitearla en pasos, como [X1].
   lo probaba; se puso al día junto con v10 y se agregó
   `tests/test_schema_and_repository.py::PortableSchemaDocumentTests` para que no vuelva a
   desalinearse en silencio.
-- [ ] **[X3.2] Registrar la marca al escribir.** `CatalogService.patch_personal` (dispositivo)
-  y `update_personal` (web) graban la marca del campo que tocan, con la hora UTC actual.
-  Depende de X3.1. **Modelo sugerido**: Medio.
+- [x] **[X3.2] Registrar la marca al escribir.** 2026-09-17. `CatalogService.patch_personal`
+  (dispositivo) marca sólo los campos que efectivamente toca en esa llamada, incluso si la
+  precondición de [X2] rechaza el patch (ahí no marca nada, porque no escribió nada).
+  `update_personal` (ficha web) marca las tres siempre, porque hoy sobrescribe los tres
+  campos siempre — mismo comportamiento que ya tenía, [X8] es quien lo va a acotar.
 - [ ] **[X3.3] Exponerla en la API de dispositivo.** `PersonalState`/`CatalogItem` en el
   contrato OpenAPI (aditivo, v1) y `_device_item_payload`. Depende de X3.2. **Modelo
   sugerido**: Chico–Medio.

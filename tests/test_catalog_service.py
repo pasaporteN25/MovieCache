@@ -273,5 +273,84 @@ class PatchPersonalPreconditionTests(unittest.TestCase):
                 service.patch_personal("heat", {"rating": 7, "base": "rating:0"})
 
 
+class PersonalChangedAtStampingTests(unittest.TestCase):
+    """[X3.2]: patch_personal and update_personal mark the fields they touch.
+
+    Three marks, not four: watched_at shares the status mark, because
+    patch_personal already changes them together from one decision.
+    """
+
+    def service(self, catalog_path: Path) -> tuple[CatalogService, JsonCatalogRepository]:
+        repository = JsonCatalogRepository(catalog_path, normalize_item)
+        repository.write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
+        )
+        return CatalogService(repository), repository
+
+    def _get(self, repository: JsonCatalogRepository, item_id: str = "heat") -> CatalogItem:
+        item = repository.get(item_id)
+        assert item is not None
+        return item
+
+    def test_patch_personal_marks_only_the_fields_it_touches(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.patch_personal("heat", {"rating": 8})
+
+            marks = self._get(repository).personal_changed_at
+            self.assertEqual(set(marks), {"rating"})
+
+    def test_a_watched_at_only_patch_marks_status_not_rating_or_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.patch_personal("heat", {"watched_at": "2026-09-17"})
+
+            self.assertEqual(set(self._get(repository).personal_changed_at), {"status"})
+
+    def test_touching_two_fields_at_once_marks_both(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.patch_personal("heat", {"status": "watched", "review": "Buenisima."})
+
+            self.assertEqual(set(self._get(repository).personal_changed_at), {"status", "review"})
+
+    def test_an_untouched_field_s_mark_survives_a_later_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"rating": 8})
+            first_marks = dict(self._get(repository).personal_changed_at)
+
+            service.patch_personal("heat", {"review": "Buenisima."})
+
+            marks = self._get(repository).personal_changed_at
+            self.assertEqual(marks["rating"], first_marks["rating"])
+            self.assertIn("review", marks)
+
+    def test_a_refused_conflicting_patch_marks_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"rating": 9})
+
+            updated, reason = service.patch_personal(
+                "heat", {"review": "Buenisima.", "base": {"rating": None}}
+            )
+
+            self.assertEqual((updated, reason), (False, "conflict"))
+            self.assertEqual(set(self._get(repository).personal_changed_at), {"rating"})
+
+    def test_update_personal_marks_all_three_since_it_overwrites_all_three(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.update_personal("heat", "2026-09-17", 8, "Buenisima.")
+
+            self.assertEqual(
+                set(self._get(repository).personal_changed_at), {"status", "rating", "review"}
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
