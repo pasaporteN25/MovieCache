@@ -581,6 +581,43 @@ class SqliteRepositoryTests(unittest.TestCase):
             self.assertEqual(payload["schema_version"], SCHEMA_VERSION)
             self.assertEqual(payload["items"][0]["id"], "heat-1995")
 
+    def test_personal_changed_at_survives_export_and_import(self) -> None:
+        # [X3.4]: the task's own closing criterion -- a mark made on either
+        # side has to survive a full JSON -> SQLite -> JSON round trip, not
+        # just a repository's own read-after-write.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "catalog.json"
+            database = root / "catalog.db"
+            reexported = root / "backup.json"
+            JsonCatalogRepository(source, normalize_item).write([sample_item()])
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(import_json(source, database), 0)
+
+            marks = {
+                "status": "2026-08-04T00:00:00Z",
+                "rating": "2026-08-05T00:00:00Z",
+                "review": "2026-08-06T00:00:00Z",
+            }
+            imported_repository = SqliteCatalogRepository(database, normalize_item)
+            updated = imported_repository.update_item(
+                "heat-1995",
+                lambda item: item.__setitem__("personal_changed_at", marks),
+            )
+            self.assertTrue(updated)
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(export_json(database, reexported), 0)
+            reexported_item = json.loads(reexported.read_text(encoding="utf-8"))["items"][0]
+            self.assertEqual(reexported_item["personal_changed_at"], marks)
+
+            reimported_database = root / "reimported.db"
+            with redirect_stdout(StringIO()):
+                self.assertEqual(import_json(reexported, reimported_database), 0)
+            round_tripped = SqliteCatalogRepository(reimported_database, normalize_item).read()[0]
+            self.assertEqual(round_tripped.personal_changed_at, marks)
+
     def test_json_import_reads_source_without_creating_a_sidecar_lock(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

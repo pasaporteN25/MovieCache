@@ -409,44 +409,6 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X3] Registrar cuándo cambia cada campo personal
-
-Pedido del owner el 2026-09-14, al responder la matriz de sincronización del cliente
-([A5.1] de `movieIndexAndroid`). Hoy el servidor no guarda cuándo cambió un campo personal:
-`patch_personal` y la ficha web escriben el valor y nada más, y ADR-0005 (§6.1) decidió no
-exponer una marca que no existía. Subdividida el 2026-09-17 para poder avanzarla y
-commitearla en pasos, como [X1].
-
-- **Lo que no hace, en ninguno de los pasos**: decidir un conflicto. La marca informa, y la
-  fusión sigue siendo a tres bandas contra la base (ADR-0005, §4): el reloj de un teléfono
-  puede estar mal, y "gana el último" pierde datos sin aviso.
-- **Decisión de diseño (X3.1)**: una marca por `status` (agrupa `watched_at`, porque
-  `patch_personal` ya los cambia juntos desde una sola decisión), otra por `rating`, otra por
-  `review` — tres, no cuatro. Revisar si no es la lectura correcta de "por campo".
-- [x] **[X3.1] Modelo y esquema, sin escritura todavía.** 2026-09-17. `personal_changed_at`
-  (`{status, rating, review} -> ISO-8601`) en `CatalogItem`, `catalog.schema.json` (bump
-  `SCHEMA_VERSION` 9→10, migración `v9_to_v10`) y SQLite (`DATABASE_SCHEMA_VERSION` 5→6,
-  tabla `personal_changes` con `ON DELETE CASCADE`, siguiendo el patrón ya usado por
-  `duplicate_decisions`/`metadata_provenance`). Nada todavía escribe la marca: siempre `{}`.
-  De paso, `catalog.schema.json` (el documento JSON Schema en la raíz del repo) estaba
-  desalineado desde v7 — le faltaban `myanimelist_url`/`mal_id`/`tmdb_url` de v8/v9, y nada
-  lo probaba; se puso al día junto con v10 y se agregó
-  `tests/test_schema_and_repository.py::PortableSchemaDocumentTests` para que no vuelva a
-  desalinearse en silencio.
-- [x] **[X3.2] Registrar la marca al escribir.** 2026-09-17. `CatalogService.patch_personal`
-  (dispositivo) marca sólo los campos que efectivamente toca en esa llamada, incluso si la
-  precondición de [X2] rechaza el patch (ahí no marca nada, porque no escribió nada).
-  `update_personal` (ficha web) marca las tres siempre, porque hoy sobrescribe los tres
-  campos siempre — mismo comportamiento que ya tenía, [X8] es quien lo va a acotar.
-- [x] **[X3.3] Exponerla en la API de dispositivo.** 2026-09-17. `PersonalState.changed_at`
-  (`PersonalChangedAt`, aditivo en v1) y `_device_item_payload`. Ausente por campo hasta la
-  primera edición.
-- [ ] **[X3.4] Verificar que sobrevive exportar e importar el catálogo.** Es el criterio de
-  cierre explícito de la tarea original; confirmar con test (y arreglar si hace falta) que
-  `movie-inbox db export`/`import` conservan la marca íntegra. Depende de X3.2. **Modelo
-  sugerido**: Chico.
-- **Depende de**: nada; no frena [A2.2].
-
 #### [X4] Sesiones de dispositivo que no se pierden por un corte
 
 Lo encontró la matriz de sincronización del cliente ([A5.1], casos 8, 12 y 18), y lo acotan
@@ -735,6 +697,18 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   `tests/test_pairing_certificate_vectors.py` y `tests/test_title_normalization_vectors.py`
   recalculan cada valor contra las funciones reales del servidor. La pantalla que genera el
   QR sigue como traspaso al frente visual, ya anotada en esa sección.
+- [x] **[X3] Registrar cuándo cambia cada campo personal.** 2026-09-17. Pedido del owner el
+  2026-09-14 ([A5.1] de `movieIndexAndroid`). Subdividida en cuatro pasos y commiteada por
+  separado, como [X1]: **[X3.1]** modelo, contrato portable (`catalog.schema.json` v9→v10) y
+  SQLite (`DATABASE_SCHEMA_VERSION` 5→6, tabla `personal_changes`); **[X3.2]**
+  `patch_personal`/`update_personal` marcan al escribir; **[X3.3]** `PersonalState.changed_at`
+  en la API de dispositivo; **[X3.4]** `tests/test_sqlite_repository.py::
+  test_personal_changed_at_survives_export_and_import` confirma el criterio de cierre
+  explícito contra el JSON → SQLite → JSON real (`movie-inbox db export`/`import`), no sólo
+  contra el read-after-write de un repositorio. Tres marcas, no cuatro: `watched_at`
+  comparte la de `status`, porque siempre cambian juntos. De paso: `catalog.schema.json`
+  estaba desalineado desde v7, sin nada que lo probara; se puso al día junto con v10 y quedó
+  cubierto por `PortableSchemaDocumentTests`.
 - [x] **[X2] Precondición en el `PATCH` personal.** 2026-09-17. `patch_personal` acepta un
   `base` opcional por campo; si el servidor ya no vale eso, responde `409 personal_conflict`
   sin escribir nada, dentro de la misma transacción atómica del repositorio (sin condición de
