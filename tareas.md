@@ -563,21 +563,6 @@ web.
 - **Depende de**: [X2], si se elige compartir el mecanismo de precondición. **Modelo
   sugerido**: Medio; con el frente visual.
 
-#### [X9] Cursor de catálogo firmado con el secreto durable
-
-Encontrado en la matriz de sincronización del cliente ([A5.1], caso 15). El cursor de
-`GET /api/v1/catalog/items` va firmado con `api_token`, que `serve` genera al azar en cada
-arranque: un reinicio a mitad de una descarga larga corta al teléfono con un 400
-`invalid_request` en la página siguiente. El cliente ya tiene que manejar ese corte
-empezando la descarga de nuevo ([A5.2] de `movieIndexAndroid`, regla 2), así que esto es una
-mejora, no un arreglo obligatorio.
-
-- **Alcance**: firmar el cursor con el secreto durable de la instancia (el mismo que deriva
-  los ids opacos), en vez de con `api_token`.
-- **Criterio de cierre**: un reinicio del servidor a mitad de una descarga no invalida el
-  cursor de la página siguiente.
-- **Depende de**: nada. **Modelo sugerido**: Chico, opcional.
-
 #### [X10] Paginar el catálogo de dispositivo por clave, no por posición
 
 Encontrado en la matriz de sincronización del cliente ([A5.1], caso 16). `_device_catalog_entries`
@@ -775,6 +760,11 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   `draft_limit_reached` en `POST /catalog/drafts` y 400 `invalid_request` en
   `GET /catalog/items`, sin cambiar ningún comportamiento del servidor.
   `tests/test_device_api_contract.py` lo verifica.
+- [x] **[X9] Cursor de catálogo firmado con el secreto durable.** 2026-09-17. El cursor de
+  `GET /api/v1/catalog/items` firma ahora con el secreto durable de la instancia (el mismo
+  que deriva los ids opacos) en vez de con `api_token`, que `serve` regenera al azar en cada
+  arranque. `tests/test_device_sync_identity.py::CursorSurvivesRestartTests` reproduce el
+  caso exacto — un reinicio a mitad de descarga — y confirma que ya no corta al teléfono.
 
 ### Frente: Integración material de Home
 

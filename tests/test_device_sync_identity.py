@@ -180,5 +180,87 @@ class TwoSourceCatalogueTests(unittest.TestCase):
         self.assertNotEqual(self._status_in(self.first), "watched")
 
 
+class CursorSurvivesRestartTests(unittest.TestCase):
+    """[X9]: the pagination cursor is signed with the durable instance secret,
+    not api_token, so a restart mid-download no longer orphans the next page.
+    Same defect shape as [MB1], applied to `_cursor_signature` instead of
+    `_opaque_item_id`.
+    """
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.catalog = self.root / "catalog.json"
+        JsonCatalogRepository(self.catalog, normalize_item).write(
+            [
+                normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}),
+                normalize_item(
+                    {"id": "akira", "title": "Akira", "year": "1988", "kind": "pelicula"}
+                ),
+            ]
+        )
+        self.instance = self.root / "instance.db"
+        self.password = "a-long-local-password"
+        AuthService(SqliteIdentityRepository(self.instance)).bootstrap_owner(
+            "lucas",
+            self.password,
+            catalog_name="Catalogo",
+            source_paths=[str(self.catalog)],
+            write_path=str(self.catalog),
+        )
+        (self.root / "media").mkdir()
+
+    def _login(self, api_token: str) -> tuple[TestClient, dict[str, str]]:
+        config = ViewerConfig(
+            patterns=[str(self.catalog)],
+            title="Movie Inbox Test",
+            write_json=str(self.catalog),
+            image_cache=False,
+            image_cache_dir=str(self.root / "images"),
+            image_cache_max_bytes=1024,
+            port=8765,
+            api_token=api_token,
+            instance_db=str(self.instance),
+            member_catalog_dir=str(self.root / "member-catalogs"),
+            library_allowed_roots=(str(self.root / "media"),),
+            library_scheduler_poll_seconds=3600,
+        )
+        context = TestClient(create_app(config), base_url="http://127.0.0.1:8765")
+        client = context.__enter__()
+        self.addCleanup(context.__exit__, None, None, None)
+        login = client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {"username": "lucas", "password": self.password, "device_name": "Pixel"}
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(login.status_code, 201, login.content)
+        return client, {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    def test_a_cursor_minted_before_a_restart_still_pages_after_it(self) -> None:
+        before_run, before_bearer = self._login("token-before-restart")
+        first_page = before_run.get(
+            "/api/v1/catalog/items", params={"limit": "1"}, headers=before_bearer
+        )
+        self.assertEqual(first_page.status_code, 200, first_page.content)
+        cursor = first_page.json()["next_cursor"]
+        self.assertIsNotNone(cursor)
+        first_id = first_page.json()["items"][0]["id"]
+
+        # `serve` mints a fresh random api_token on every restart; this used
+        # to be the cursor's signing key, so the next page died with it.
+        after_run, after_bearer = self._login("token-after-restart")
+        second_page = after_run.get(
+            "/api/v1/catalog/items",
+            params={"limit": "1", "cursor": cursor},
+            headers=after_bearer,
+        )
+        self.assertEqual(second_page.status_code, 200, second_page.content)
+        second_id = second_page.json()["items"][0]["id"]
+        self.assertNotEqual(first_id, second_id)
+
+
 if __name__ == "__main__":
     unittest.main()

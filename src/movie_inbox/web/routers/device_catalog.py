@@ -550,7 +550,10 @@ def _cursor(request: Request, context: str, offset: int) -> str:
 
 
 def _cursor_signature(request: Request, encoded_payload: str) -> str:
-    secret = request.app.state.viewer_config.api_token.encode("utf-8")
+    """[X9]: signed with the durable instance secret, not api_token, so a
+    restart mid-download does not invalidate the next page's cursor."""
+
+    secret = _sync_secret(request)
     return hmac.new(secret, encoded_payload.encode("ascii"), hashlib.sha256).hexdigest()[:32]
 
 
