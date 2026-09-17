@@ -438,9 +438,9 @@ commitearla en pasos, como [X1].
   precondición de [X2] rechaza el patch (ahí no marca nada, porque no escribió nada).
   `update_personal` (ficha web) marca las tres siempre, porque hoy sobrescribe los tres
   campos siempre — mismo comportamiento que ya tenía, [X8] es quien lo va a acotar.
-- [ ] **[X3.3] Exponerla en la API de dispositivo.** `PersonalState`/`CatalogItem` en el
-  contrato OpenAPI (aditivo, v1) y `_device_item_payload`. Depende de X3.2. **Modelo
-  sugerido**: Chico–Medio.
+- [x] **[X3.3] Exponerla en la API de dispositivo.** 2026-09-17. `PersonalState.changed_at`
+  (`PersonalChangedAt`, aditivo en v1) y `_device_item_payload`. Ausente por campo hasta la
+  primera edición.
 - [ ] **[X3.4] Verificar que sobrevive exportar e importar el catálogo.** Es el criterio de
   cierre explícito de la tarea original; confirmar con test (y arreglar si hace falta) que
   `movie-inbox db export`/`import` conservan la marca íntegra. Depende de X3.2. **Modelo

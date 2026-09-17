@@ -94,6 +94,11 @@ class DeviceApiContractTests(unittest.TestCase):
             self.assertIn(field, snapshot["required"])
         self.assertNotIn("/api/scanner", document["paths"])
         self.assertNotIn("/api/admin", document["paths"])
+        # [X3.3]: a device knows when a field was last personally edited.
+        personal_state = document["components"]["schemas"]["PersonalState"]
+        self.assertIn("changed_at", personal_state["required"])
+        changed_at = document["components"]["schemas"]["PersonalChangedAt"]
+        self.assertEqual(set(changed_at["properties"]), {"status", "rating", "review"})
 
     def test_v1_contract_requires_bearer_tokens_and_hides_server_paths(self) -> None:
         root = Path(__file__).resolve().parents[1]

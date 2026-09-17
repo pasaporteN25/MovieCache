@@ -491,6 +491,9 @@ def _device_item_payload(entry: DeviceCatalogItem) -> dict[str, Any]:
             "watched_at": _optional_text(row.get("watched_at")),
             "rating": _optional_rating(row.get("rating")),
             "review": _optional_text(row.get("review")),
+            # [X3.3]: absent per field until it is edited once; status covers
+            # watched_at too, since patch_personal changes them together.
+            "changed_at": dict(row.get("personal_changed_at") or {}),
         },
         "availability": {
             "state": "available" if effective else "unavailable",

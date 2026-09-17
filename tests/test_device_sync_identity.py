@@ -233,7 +233,11 @@ class PersonalPatchConflictHttpTests(unittest.TestCase):
         self.bearer = {"Authorization": f"Bearer {login.json()['access_token']}"}
         first = self.client.get("/api/v1/catalog/items", headers=self.bearer).json()["items"][0]
         self.item_id = first["id"]
-        self.base_personal = first["personal"]
+        # [X3.3] added changed_at to the wire payload; base only accepts the
+        # four writable fields, so a real client would not echo it back either.
+        self.base_personal = {
+            key: value for key, value in first["personal"].items() if key != "changed_at"
+        }
 
     def _patch(self, body: dict[str, Any]) -> Any:
         return self.client.patch(
@@ -272,6 +276,13 @@ class PersonalPatchConflictHttpTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.json()["personal"]["rating"], 9)
         self.assertEqual(response.json()["personal"]["review"], "Sin comparar nada.")
+
+    def test_a_patched_field_gets_a_changed_at_mark_and_others_stay_absent(self) -> None:
+        response = self._patch({"rating": 9})
+
+        changed_at = response.json()["personal"]["changed_at"]
+        self.assertEqual(set(changed_at), {"rating"})
+        self.assertNotIn("review", changed_at)
 
 
 class CursorSurvivesRestartTests(unittest.TestCase):

@@ -271,8 +271,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(search.status_code, 200, search.content)
         self.assertEqual([item["title"] for item in search.json()["items"]], ["Heat"])
         self.assertEqual(patched.status_code, 200, patched.content)
+        patched_personal = dict(patched.json()["personal"])
+        changed_at = patched_personal.pop("changed_at")
         self.assertEqual(
-            patched.json()["personal"],
+            patched_personal,
             {
                 "status": "watched",
                 "watched_at": "2026-09-02",
@@ -280,6 +282,8 @@ class ViewerHttpTests(unittest.TestCase):
                 "review": "Una noche intensa.",
             },
         )
+        # [X3.3]: one call touching all three groups marks all three.
+        self.assertEqual(set(changed_at), {"status", "rating", "review"})
         self.assertEqual(cleared.status_code, 200, cleared.content)
         self.assertIsNone(cleared.json()["personal"]["rating"])
         self.assertIsNone(cleared.json()["personal"]["review"])
