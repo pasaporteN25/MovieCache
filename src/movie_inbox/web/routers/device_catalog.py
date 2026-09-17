@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import bisect
 import hashlib
 import hmac
 import json
@@ -89,7 +90,11 @@ def list_catalog_items(
 ) -> JSONResponse:
     entries = _device_catalog_entries(request, identity)
     return JSONResponse(
-        _page(
+        # [X10]: keyset, not positional -- an add or remove elsewhere during a
+        # paged download must not shift where this page starts. Search below
+        # keeps positional pagination: its order is per-query relevance, not
+        # the stable (title, year, id) order a resume key relies on.
+        _page_by_key(
             request,
             entries,
             cursor=cursor,
@@ -508,6 +513,74 @@ def _page(
     next_offset = offset + len(page)
     next_cursor = _cursor(request, context, next_offset) if next_offset < len(entries) else None
     return {"items": [_device_item_payload(entry) for entry in page], "next_cursor": next_cursor}
+
+
+def _sort_key(entry: DeviceCatalogItem) -> tuple[str, str, str]:
+    return (*_title_key(entry.row), entry.device_id)
+
+
+def _page_by_key(
+    request: Request,
+    entries: Sequence[DeviceCatalogItem],
+    *,
+    cursor: str,
+    limit: str,
+    context: str,
+) -> dict[str, Any]:
+    """[X10]: resume after a stable (title, year, device id) key.
+
+    `entries` is already sorted by exactly this key. A position survives only
+    while nothing anywhere in the list changes; a key does not move just
+    because some other work was added or removed, so a work already on its
+    way to the device is neither skipped nor repeated by that alone.
+    """
+
+    size = _page_size(limit)
+    after = _page_after(request, cursor, context)
+    keys = [_sort_key(entry) for entry in entries]
+    start = bisect.bisect_right(keys, after) if after is not None else 0
+    page = list(entries[start : start + size])
+    next_cursor = (
+        _key_cursor(request, context, _sort_key(page[-1]))
+        if start + len(page) < len(entries)
+        else None
+    )
+    return {"items": [_device_item_payload(entry) for entry in page], "next_cursor": next_cursor}
+
+
+def _page_after(request: Request, cursor: str, context: str) -> tuple[str, str, str] | None:
+    if not cursor:
+        return None
+    if len(cursor) > 512:
+        raise DeviceApiRequestError("invalid_request", 400)
+    try:
+        encoded_payload, signature = cursor.split(".", 1)
+        payload = _decode(encoded_payload)
+        expected = _cursor_signature(request, encoded_payload)
+        after = payload["after"]
+        if (
+            not isinstance(after, list)
+            or len(after) != 3
+            or not all(isinstance(part, str) for part in after)
+        ):
+            raise ValueError("Invalid cursor")
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+        UnicodeDecodeError,
+        binascii.Error,
+        json.JSONDecodeError,
+    ) as error:
+        raise DeviceApiRequestError("invalid_request", 400) from error
+    if not hmac.compare_digest(signature, expected) or payload.get("context") != context:
+        raise DeviceApiRequestError("invalid_request", 400)
+    return (after[0], after[1], after[2])
+
+
+def _key_cursor(request: Request, context: str, after: tuple[str, str, str]) -> str:
+    encoded_payload = _encode({"context": context, "after": list(after)})
+    return f"{encoded_payload}.{_cursor_signature(request, encoded_payload)}"
 
 
 def _page_size(raw_limit: str) -> int:

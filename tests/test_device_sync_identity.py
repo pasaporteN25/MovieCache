@@ -356,5 +356,101 @@ class CursorSurvivesRestartTests(unittest.TestCase):
         self.assertNotEqual(first_id, second_id)
 
 
+class KeysetPaginationTests(unittest.TestCase):
+    """[X10]: the catalog cursor resumes after a stable key, not a position.
+
+    Reproduces the two failure shapes [A5.1] case 16 describes: a work
+    removed during a paged download used to skip the one after it, and a
+    work added used to repeat the one just delivered -- both because every
+    later position shifted by one.
+    """
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.catalog = self.root / "catalog.json"
+        self.repository = JsonCatalogRepository(self.catalog, normalize_item)
+        self.repository.write(
+            [
+                normalize_item(
+                    {"id": "akira", "title": "Akira", "year": "1988", "kind": "pelicula"}
+                ),
+                normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"}),
+                normalize_item(
+                    {"id": "vertigo", "title": "Vertigo", "year": "1958", "kind": "pelicula"}
+                ),
+            ]
+        )
+        instance = self.root / "instance.db"
+        password = "a-long-local-password"
+        AuthService(SqliteIdentityRepository(instance)).bootstrap_owner(
+            "lucas",
+            password,
+            catalog_name="Catalogo",
+            source_paths=[str(self.catalog)],
+            write_path=str(self.catalog),
+        )
+        (self.root / "media").mkdir()
+        config = ViewerConfig(
+            patterns=[str(self.catalog)],
+            title="Movie Inbox Test",
+            write_json=str(self.catalog),
+            image_cache=False,
+            image_cache_dir=str(self.root / "images"),
+            image_cache_max_bytes=1024,
+            port=8765,
+            api_token="test-token",
+            instance_db=str(instance),
+            member_catalog_dir=str(self.root / "member-catalogs"),
+            library_allowed_roots=(str(self.root / "media"),),
+            library_scheduler_poll_seconds=3600,
+        )
+        context = TestClient(create_app(config), base_url="http://127.0.0.1:8765")
+        self.client = context.__enter__()
+        self.addCleanup(context.__exit__, None, None, None)
+        login = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps({"username": "lucas", "password": password, "device_name": "Pixel"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(login.status_code, 201, login.content)
+        self.bearer = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    def _page(self, cursor: str = "") -> Any:
+        params = {"limit": "1"}
+        if cursor:
+            params["cursor"] = cursor
+        return self.client.get("/api/v1/catalog/items", params=params, headers=self.bearer)
+
+    def test_removing_the_delivered_work_does_not_skip_the_next_one(self) -> None:
+        first = self._page()
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(first.json()["items"][0]["title"], "Akira")
+        cursor = first.json()["next_cursor"]
+
+        self.assertTrue(self.repository.delete_by_id("akira"))
+
+        second = self._page(cursor)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(second.json()["items"][0]["title"], "Heat")
+
+    def test_adding_a_work_that_sorts_earlier_does_not_repeat_the_delivered_one(self) -> None:
+        first = self._page()
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(first.json()["items"][0]["title"], "Akira")
+        cursor = first.json()["next_cursor"]
+
+        # Casefolds to "aaa test", sorting before "akira".
+        rows = self.repository.read()
+        self.repository.write(
+            [*rows, normalize_item({"id": "aaa", "title": "AAA Test", "kind": "pelicula"})]
+        )
+
+        second = self._page(cursor)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertEqual(second.json()["items"][0]["title"], "Heat")
+
+
 if __name__ == "__main__":
     unittest.main()

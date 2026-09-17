@@ -524,21 +524,6 @@ web.
 - **Depende de**: [X2], si se elige compartir el mecanismo de precondición. **Modelo
   sugerido**: Medio; con el frente visual.
 
-#### [X10] Paginar el catálogo de dispositivo por clave, no por posición
-
-Encontrado en la matriz de sincronización del cliente ([A5.1], caso 16). `_device_catalog_entries`
-pagina por posición: si una obra entra, sale o cambia de título entre dos páginas de una
-descarga, las siguientes se corren un lugar y la descarga puede saltear una obra o repetirla.
-El cliente ya tiene que tolerarlo —una obra repetida cuenta una vez, y una ausente no es una
-baja ([A5.2] de `movieIndexAndroid`, regla 3)—, así que esto elimina la causa en vez de sólo
-tolerar el síntoma.
-
-- **Alcance**: paginar por una clave estable —título, año e id— en vez de por posición, para
-  que un alta o una baja durante la descarga no corra a las obras que ya se bajaron.
-- **Criterio de cierre**: una obra agregada o quitada entre dos páginas de una descarga en
-  curso no hace que otra obra se saltee ni se repita.
-- **Depende de**: nada. **Modelo sugerido**: Medio, opcional.
-
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
   valores a `kind` ni reciclar campos audiovisuales antes de la decision.
@@ -742,6 +727,13 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   PatchPersonalPreconditionTests` y `tests/test_device_sync_identity.py::
   PersonalPatchConflictHttpTests` reproducen el caso exacto que confirmó el arnés del cliente
   ([A5.3]) el 2026-09-15.
+- [x] **[X10] Paginar el catálogo de dispositivo por clave, no por posición.** 2026-09-17.
+  `GET /api/v1/catalog/items` resume después de una clave estable (título, año, id de
+  dispositivo) en vez de un offset — la búsqueda (`/search`, orden por relevancia, no por esa
+  clave) sigue paginando por posición sin cambios. `tests/test_device_sync_identity.py::
+  KeysetPaginationTests` reproduce los dos síntomas exactos que describía la tarea (una baja
+  saltea la siguiente obra; un alta repite la ya entregada) contra la paginación vieja antes
+  de confirmar que la nueva no los tiene.
 
 ### Frente: Integración material de Home
 
