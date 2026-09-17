@@ -50,6 +50,16 @@ class DeviceApiContractTests(unittest.TestCase):
         self.assertEqual(drafts["operationId"], "addOfflineDrafts")
         self.assertIn("200", drafts["responses"])
         self.assertNotIn("201", drafts["responses"], "appending is not creating")
+        # [X7]: draft_busy, device_draft_full and draft_limit_reached are 409s the
+        # server already answers on this route; the contract has to say so.
+        self.assertIn("409", drafts["responses"])
+        conflict = document["components"]["responses"]["DraftConflict"]
+        for code in ("draft_busy", "device_draft_full", "draft_limit_reached"):
+            self.assertIn(code, conflict["description"])
+        # [X9]/[X7]: a restart-invalidated or tampered cursor answers 400
+        # invalid_request on this route, same as the other cursor-paged ones.
+        items_page = document["paths"]["/api/v1/catalog/items"]["get"]
+        self.assertIn("400", items_page["responses"])
         item = document["components"]["schemas"]["OfflineDraftItem"]
         self.assertEqual(sorted(item["required"]), ["id", "title"])
         # [A2.6]: a collection work carries identity and nothing personal --

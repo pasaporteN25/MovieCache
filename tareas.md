@@ -546,21 +546,6 @@ web, el reintento crea uno nuevo con las mismas obras.
   el borrador original no crea entradas nuevas.
 - **Depende de**: nada. **Modelo sugerido**: Grande: ruta nueva en el contrato.
 
-#### [X7] Declarar en el contrato los rechazos que el servidor ya da
-
-Encontrado en la matriz de sincronización del cliente ([A5.1], casos 10 y 15). El contrato
-declara sólo 200, 400 y 401 para `POST /api/v1/catalog/drafts`, pero el servidor ya responde
-409 `draft_busy` mientras el borrador se aplica en la web, 409 `device_draft_full` al pasar
-las 2000 obras y 409 `draft_limit_reached`; y una página de `GET /api/v1/catalog/items` con
-un cursor de antes de un reinicio da 400 `invalid_request` sin que el contrato lo avise. Un
-cliente fiel al contrato no los espera.
-
-- **Alcance**: agregar estas respuestas a `docs/openapi/device-api-v1.openapi.json`, sin
-  cambiar ningún comportamiento — el servidor ya las da, esto es sólo documentarlas.
-- **Criterio de cierre**: el contrato declara cada código que el servidor puede responder en
-  estas dos rutas, y `tests/test_device_api_contract.py` lo verifica.
-- **Depende de**: nada. **Modelo sugerido**: Chico.
-
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 
 Encontrado en la matriz de sincronización del cliente ([A5.1], caso 14). `/api/personal`
@@ -782,6 +767,14 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
 - [x] **[U7.5a] Cierre visual acotado aprobado.** 2026-09-13. Recuperación de
   imágenes desde ficha correcta y retorno de foco, con guardado de panorámica
   verificado sólo en datos descartables. U7.5b sigue abierta, no se cierra U7 completa.
+
+### Frente: Contrato de sincronización para el cliente Android
+
+- [x] **[X7] Declarar en el contrato los rechazos que el servidor ya da.** 2026-09-17.
+  `docs/openapi/device-api-v1.openapi.json` documenta 409 `draft_busy`/`device_draft_full`/
+  `draft_limit_reached` en `POST /catalog/drafts` y 400 `invalid_request` en
+  `GET /catalog/items`, sin cambiar ningún comportamiento del servidor.
+  `tests/test_device_api_contract.py` lo verifica.
 
 ### Frente: Integración material de Home
 

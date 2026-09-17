@@ -42,7 +42,7 @@
       "get": {
         "operationId": "listCatalogItems",
         "parameters": [{"$ref": "#/components/parameters/CatalogCursor"}, {"$ref": "#/components/parameters/PageSize"}],
-        "responses": {"200": {"description": "Personal catalog page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemPage"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+        "responses": {"200": {"description": "Personal catalog page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemPage"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
       }
     },
     "/api/v1/catalog/items/{itemId}": {
@@ -65,7 +65,7 @@
         "operationId": "addOfflineDrafts",
         "description": "Submit works recorded on the device while it had no connection. Nothing reaches the catalogue: each work is classified against it and parked in the account's pending pile for review, because an addition made offline has no shared base to merge against. Safe to retry -- works are keyed by the id the client generated, and a repeat is reported under duplicates instead of being stored twice. Responds 200, not 201: it appends to a pile that usually already exists.",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftRequest"}}}},
-        "responses": {"200": {"description": "What the server did with each work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+        "responses": {"200": {"description": "What the server did with each work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "409": {"$ref": "#/components/responses/DraftConflict"}}
       }
     },
     "/api/v1/availability": {
@@ -127,6 +127,7 @@
       "Unauthorized": {"description": "Missing, invalid, expired or revoked device session", "headers": {"WWW-Authenticate": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "RateLimited": {"description": "Login rate limit", "headers": {"Retry-After": {"schema": {"type": "integer", "minimum": 1}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "InvalidRequest": {"description": "Invalid request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "DraftConflict": {"description": "The pile of pending offline works cannot take this submission right now: draft_busy (the pile the account already has is being applied in the browser), device_draft_full (that pile cannot hold more pending works) or draft_limit_reached (an existing pile has to be removed before another can be created).", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "Unavailable": {"description": "A dependency this reads from is not answering", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "NotFound": {"description": "No accessible item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
     },
