@@ -435,6 +435,39 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
   fusionada termina en la obra que queda.
 - **Depende de**: nada para diseñarla; en el cliente, [A5.2] incorpora las reglas. **Modelo
   sugerido**: Grande: toca el contrato y la identidad de las obras.
+- **Subdividida el 2026-09-19**; el diseño y sus decisiones revisables están en
+  `docs/design/x5-removals-in-sync-2026-09-19.md`. En corto: los registros viven en
+  `instance.db` con el id opaco que el teléfono ya conoce; sólo cuenta lo que una persona
+  hizo (borrar, unir); el teléfono pregunta con una ruta nueva en vez de un 410; duran 365
+  días; y el id durable por obra **no hace falta** para esto ([X11] propone la alternativa
+  barata, por fuente).
+  - [x] **[X5.1] Diseño y subdivisión.** 2026-09-19. **Modelo sugerido**: Grande.
+  - [ ] **[X5.2] El registro.** Tabla `device_removals` (esquema de `instance.db` v23), su
+    repositorio y un servicio que sabe registrar, olvidar y responder por un id.
+    **Modelo sugerido**: Medio.
+  - [ ] **[X5.3] Registrar al borrar.** `delete_item` dice qué obra quitó y la ruta de la web
+    deja el registro (`deleted`). **Modelo sugerido**: Medio.
+  - [ ] **[X5.4] Registrar al unir y olvidar al deshacer.** Curaduría (unir dos, unir un
+    grupo, resolver los seguros) deja `merged` con la obra que quedó; deshacer borra esos
+    registros. **Modelo sugerido**: Grande: varias rutas y un deshacer.
+  - [ ] **[X5.5] La consulta.** `POST /api/v1/catalog/items/status`, contrato OpenAPI y
+    pruebas HTTP. **Modelo sugerido**: Medio.
+  - [ ] **[X5.6] La baja desde el teléfono.** `POST /api/v1/catalog/items/{itemId}/removal`,
+    con `409 removal_conflict`. **Modelo sugerido**: Grande.
+  - [ ] **[X5.7] Changelog y cierre.** **Modelo sugerido**: Chico.
+
+#### [X11] Un id durable por fuente, en lugar de su posición — *propuesta, decide el owner*
+
+Surge de evaluar la idea del owner en [X5]. El id que ve el teléfono incluye la posición de la
+fuente, así que quitar o reordenar una fuente cambia todos los ids (caso 17 de la matriz de
+[A5.1]). Un id **por fuente**, guardado en su propio almacén, lo arregla de raíz sin tocar
+las obras. Detalle y comparación con la alternativa por obra en el diseño de [X5], sección 6.
+
+- **Alcance**: un identificador por fuente en el almacén de cada catálogo (esquema portable
+  v11 y SQLite v7), con su migración, y la derivación del id del teléfono sobre él.
+- **Criterio de cierre**: agregar, quitar o reordenar fuentes no cambia ningún id de teléfono.
+- **Conviene antes** de que exista un cliente instalado: después, cambiar la derivación obliga
+  a re-descargar y deja huérfanos los cambios pendientes. **Modelo sugerido**: Grande.
 
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 
