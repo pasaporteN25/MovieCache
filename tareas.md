@@ -489,11 +489,13 @@ web.
     no se toca (hoy ausente = vacío = borra); un `base` viejo responde
     `409 {"ok": false, "reason": "personal_conflict"}` sin escribir. La ficha actual, que manda
     los tres campos, se comporta igual que antes. **Modelo sugerido**: Chico.
-  - [ ] **[X8.3] Traspaso a la ficha y changelog.** Lo que tiene que hacer `persistPersonalForm`
-    (`js/core/detail.js`) —del frente visual—: mandar sólo los campos que cambiaron respecto de
-    `form.dataset.initial`, y un `base` con lo que tenía cada uno al abrirse; ante un 409, no
-    perder lo tipeado. Anotado en `Traspasos`. **Modelo sugerido**: Chico (lógica), Medio
-    (ficha).
+  - [x] **[X8.3] Traspaso a la ficha y changelog.** 2026-09-19. Lo que tiene que hacer la
+    ficha queda escrito en `Traspasos`, con las reglas que no se pueden romper; el cambio de
+    `/api/personal` tiene su entrada en el changelog.
+  - [ ] **[X8.4] La ficha manda sólo lo que la persona tocó, con un `base`.** Del frente
+    visual: `persistPersonalForm` en `js/core/detail.js`. **Es lo que cierra X8**; hasta
+    entonces el servidor está listo y la ficha sigue mandando el formulario entero. Ver el
+    traspaso. **Modelo sugerido**: Medio.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
@@ -548,6 +550,26 @@ consumir y qué reglas no se pueden romper.
   pide confirmación con el nombre del teléfono; y la lista vacía es un estado normal, no un
   error. `expires_at` es el vencimiento **si no se sincroniza**: se corre 30 días con cada
   sincronización, así que no es una fecha para mostrar como "vence el ...".
+- [ ] **La ficha debe mandar sólo lo que la persona tocó** (de [X8.4], lo que cierra [X8]).
+  `persistPersonalForm` (`js/core/detail.js`, lo llaman el guardado de la ficha y el de
+  "guardar antes de salir") manda hoy `watched_at`, `rating` y `review` siempre, con lo que
+  tenían al abrirse: guardar la review vuelve el puntaje a lo que tenía la ficha, aunque un
+  teléfono lo haya cambiado mientras tanto. El servidor ya acepta otra cosa
+  (`POST /api/personal`, [X8.2]) y tres cosas tienen que cambiar en la ficha:
+  1. **Mandar sólo los campos que cambiaron** respecto de `form.dataset.initial`. Un campo
+     ausente no se toca; uno presente se escribe aunque esté vacío (`""` y `0` borran). Un
+     POST sin ningún campo da 400, así que sin cambios no se manda nada.
+  2. **Mandar un `base`**: `{watched_at, rating, review}` con lo que tenía cada campo cuando
+     se abrió la ficha. Los valores de la fila cargada sirven tal cual: el servidor les da la
+     misma forma a los dos lados, y `0` y `""` valen "sin poner". Mandar sólo el campo propio
+     **no alcanza**: no evita pisar ese mismo campo si otro dispositivo lo cambió.
+  3. **Ante `409 {"ok": false, "reason": "personal_conflict"}` no se escribió nada, y no se
+     puede perder lo que la persona tipeó.** Recargar la obra, decir qué cambió y dejarla
+     decidir —por ejemplo, dejar su texto en el campo y avisar—. Reenviar sin `base` para
+     "que pase" es exactamente el pisado que esto evita.
+  Criterio de cierre: guardar un campo desde la ficha no pisa un cambio que llegó por otro
+  lado después de abrirla, ni entre dos pestañas del navegador. Con una salvedad para el
+  navegador: el `409` sólo existe si la ficha manda el `base`.
 - **Bandeja en el teléfono** (de [MB2]): traspaso consolidado en **[MW1.4]**, al
   final de la cola a pedido del owner. La auditoría del 2026-09-07 es antecedente,
   no diagnóstico vigente; volver a medir antes de corregir.

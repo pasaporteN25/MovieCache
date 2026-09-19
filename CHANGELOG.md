@@ -141,6 +141,14 @@ el trabajo visual de Inicio sigue en curso.
 - La instalación suma una dependencia, `segno`, que dibuja en el servidor el QR de
   apareamiento. Es Python puro y no trae dependencias propias.
 
+- Guardar desde la ficha ya no borra los campos que no se mandaron: `POST /api/personal`
+  escribe sólo el puntaje, la fecha o la review que recibe, en vez de tomar los que faltaban
+  como vacíos. Acepta además un `base` —lo que tenía cada campo cuando se abrió la ficha— y,
+  si ya no coincide, responde 409 `personal_conflict` sin escribir. Un pedido sin ningún
+  campo es un 400. **La ficha todavía manda los tres campos y no manda `base`**, así que el
+  caso de un teléfono que sube un puntaje mientras la ficha está abierta no queda cerrado
+  hasta que la ficha lo use; ver `tareas.md`, [X8.4].
+
 ### Corregido
 
 - Abrir una colección, refrescar una importación y armar la pantalla de inicio dejan de
