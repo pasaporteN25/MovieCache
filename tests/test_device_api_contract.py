@@ -34,6 +34,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/collections",
                 "/api/v1/collections/{collectionId}/items",
                 "/api/v1/catalog/items",
+                "/api/v1/catalog/items/status",
                 "/api/v1/catalog/items/{itemId}",
                 "/api/v1/catalog/items/{itemId}/personal",
                 "/api/v1/search",
@@ -74,6 +75,17 @@ class DeviceApiContractTests(unittest.TestCase):
             receipt["properties"]["state"]["enum"], ["pending", "applied", "discarded", "unknown"]
         )
         self.assertEqual(sorted(receipt["required"]), ["item_id", "reason", "state"])
+        # [X5.5]: a device is told what became of a work it holds, and "unknown" is
+        # an answer of its own -- absence is never a removal.
+        statuses = document["paths"]["/api/v1/catalog/items/status"]["post"]
+        assert statuses["operationId"] == "getItemStatuses"
+        self.assertIn("NOT a removal", statuses["description"])
+        status = document["components"]["schemas"]["ItemStatus"]
+        self.assertEqual(status["properties"]["state"]["enum"], ["present", "removed", "unknown"])
+        self.assertEqual(
+            sorted(status["required"]), ["merged_into", "reason", "removed_at", "state"]
+        )
+        self.assertEqual(status["properties"]["reason"]["enum"], ["deleted", "merged", None])
         item = document["components"]["schemas"]["OfflineDraftItem"]
         self.assertEqual(sorted(item["required"]), ["id", "title"])
         # [A2.6]: a collection work carries identity and nothing personal --

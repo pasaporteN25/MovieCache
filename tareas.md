@@ -460,8 +460,13 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
     de confirmada la operación y sin cambiar lo que devuelven, para no meter rutas de archivo
     en las respuestas del navegador; lo que se quitó se lee del antes y el después de la
     propia operación. **Modelo sugerido**: Grande: varias rutas y un deshacer.
-  - [ ] **[X5.5] La consulta.** `POST /api/v1/catalog/items/status`, contrato OpenAPI y
-    pruebas HTTP. **Modelo sugerido**: Medio.
+  - [x] **[X5.5] La consulta.** 2026-09-19. `POST /api/v1/catalog/items/status` con hasta 100
+    ids responde por cada uno `present`, `removed` (`deleted` o `merged`, con la obra que quedó
+    y cuándo) o `unknown`, con su contrato OpenAPI. `unknown` es una respuesta con nombre y el
+    contrato dice en mayúsculas que **no** es una baja: una obra que desapareció sin pasar por
+    la aplicación (un archivo editado a mano) sale `unknown`, no `removed`. Es una ruta nueva
+    y no un 410 sobre `GET /items/{id}`, para no cambiar lo que ese 404 ya prometía. **Modelo
+    sugerido**: Medio.
   - [ ] **[X5.6] La baja desde el teléfono.** `POST /api/v1/catalog/items/{itemId}/removal`,
     con `409 removal_conflict`. **Modelo sugerido**: Grande.
   - [ ] **[X5.7] Changelog y cierre.** **Modelo sugerido**: Chico.

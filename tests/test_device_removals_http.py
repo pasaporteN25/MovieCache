@@ -1,4 +1,4 @@
-"""[X5.3]/[X5.4] Removing a work in the browser leaves a record a phone can be told.
+"""[X5.3]-[X5.5] Removing a work in the browser leaves a record a phone can be told.
 
 The record is asked of the service directly here: the route a phone asks it
 through is a later step, and what these settle is that the right id gets
@@ -108,6 +108,9 @@ class _RemovalHttpCase(unittest.TestCase):
             "/api/delete", content=json.dumps(body), headers=self._web_headers()
         )
 
+    def _device_headers(self) -> dict[str, str]:
+        return {**self.bearer, "Content-Type": "application/json"}
+
     def _phone_ids(self) -> dict[str, str]:
         rows = self.client.get("/api/v1/catalog/items", headers=self.bearer).json()["items"]
         return {str(row["title"]): str(row["id"]) for row in rows}
@@ -209,7 +212,9 @@ DUPLICATES: list[dict[str, Any]] = [
 ]
 
 
-class MergeLeavesARecordTests(_RemovalHttpCase):
+class _CurationHttpCase(_RemovalHttpCase):
+    """A catalogue with duplicates in it, and the routes that merge them."""
+
     works = DUPLICATES
 
     def _reference(self, item_id: str) -> dict[str, str]:
@@ -261,6 +266,8 @@ class MergeLeavesARecordTests(_RemovalHttpCase):
         ids = [self._phone_id(item_id) for item_id in item_ids]
         return dict(self._service().repository.get_many(self.catalog_id, ids))
 
+
+class MergeLeavesARecordTests(_CurationHttpCase):
     def test_the_phones_ids_are_the_ones_the_derivation_gives(self) -> None:
         # The rest of this class leans on _phone_id, so first prove it is what
         # a phone is actually shown.
@@ -362,6 +369,152 @@ class MergeLeavesARecordTests(_RemovalHttpCase):
 
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(self._still_in_catalogue(), {"heat-a", "heat-c", "ran"})
+
+
+class ItemStatusApiTests(_CurationHttpCase):
+    """[X5.5] What a phone is told when it asks about the works it holds.
+
+    Built on a catalogue with duplicates so a work can be deleted, merged and
+    merged-then-undone through the same routes a person uses.
+    """
+
+    def _status(self, *ids: str, headers: dict[str, str] | None = None) -> Any:
+        return self.client.post(
+            "/api/v1/catalog/items/status",
+            content=json.dumps({"ids": list(ids)}),
+            headers=headers if headers is not None else self._device_headers(),
+        )
+
+    def _answers(self, *ids: str) -> dict[str, Any]:
+        response = self._status(*ids)
+        self.assertEqual(response.status_code, 200, response.content)
+        answers: dict[str, Any] = response.json()["items"]
+        return answers
+
+    def test_a_work_that_is_still_there_is_present(self) -> None:
+        ran = self._phone_id("ran")
+
+        self.assertEqual(
+            self._answers(ran),
+            {ran: {"state": "present", "reason": None, "merged_into": None, "removed_at": None}},
+        )
+
+    def test_a_work_a_person_deleted_is_removed_and_says_when(self) -> None:
+        heat = self._phone_id("heat-a")
+        self._delete(id="heat-a", confirmed=True)
+
+        answer = self._answers(heat)[heat]
+
+        self.assertEqual(
+            (answer["state"], answer["reason"], answer["merged_into"]), ("removed", "deleted", None)
+        )
+        # ISO 8601 with an offset, like the personal change marks.
+        self.assertRegex(answer["removed_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$")
+
+    def test_a_merged_work_points_at_the_one_the_phone_can_ask_about_next(self) -> None:
+        gone, stayed = self._phone_id("heat-b"), self._phone_id("heat-a")
+        self._merge_pair("left")
+
+        answers = self._answers(gone, stayed)
+
+        self.assertEqual(answers[gone]["state"], "removed")
+        self.assertEqual(
+            (answers[gone]["reason"], answers[gone]["merged_into"]), ("merged", stayed)
+        )
+        self.assertEqual(answers[stayed]["state"], "present")
+        # The survivor is a work the phone can download: it is in the list.
+        listed = self.client.get("/api/v1/catalog/items", headers=self.bearer).json()["items"]
+        self.assertIn(stayed, {row["id"] for row in listed})
+
+    def test_an_id_nobody_recorded_is_unknown_and_that_is_not_a_removal(self) -> None:
+        answers = self._answers("an-id-the-server-never-issued")
+
+        self.assertEqual(
+            answers["an-id-the-server-never-issued"],
+            {"state": "unknown", "reason": None, "merged_into": None, "removed_at": None},
+        )
+
+    def test_a_work_that_vanished_without_a_record_is_unknown_not_removed(self) -> None:
+        # Somebody edited the catalogue file by hand, or a source was replaced:
+        # nothing a person did through the application, so nothing to announce.
+        heat = self._phone_id("heat-a")
+        stored = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        stored["items"] = [row for row in stored["items"] if row["id"] != "heat-a"]
+        self.catalog_path.write_text(json.dumps(stored), encoding="utf-8")
+
+        self.assertEqual(self._answers(heat)[heat]["state"], "unknown")
+
+    def test_undoing_a_merge_makes_the_work_present_again(self) -> None:
+        gone = self._phone_id("heat-b")
+        merged = self._merge_pair("left")
+        self.assertEqual(self._answers(gone)[gone]["state"], "removed")
+
+        self._post(
+            "/api/curation/undo",
+            {"operation_id": merged.json()["operation"]["id"], "history_mode": "persistent"},
+        )
+
+        self.assertEqual(self._answers(gone)[gone]["state"], "present")
+
+    def test_every_id_asked_about_is_answered_once_in_the_order_asked(self) -> None:
+        gone = self._phone_id("heat-a")
+        self._delete(id="heat-a", confirmed=True)
+        ran = self._phone_id("ran")
+
+        answers = self._answers(ran, gone, ran, "nobody")
+
+        self.assertEqual(list(answers), [ran, gone, "nobody"])
+        self.assertEqual(
+            [row["state"] for row in answers.values()], ["present", "removed", "unknown"]
+        )
+
+    def test_it_changes_nothing(self) -> None:
+        gone = self._phone_id("heat-a")
+        self._delete(id="heat-a", confirmed=True)
+        before = self._recorded("heat-a")
+
+        self._status(gone)
+        self._status(gone)
+
+        self.assertEqual(self._recorded("heat-a"), before)
+        self.assertEqual(self._still_in_catalogue(), {"heat-b", "heat-c", "ran"})
+
+    def test_a_malformed_question_is_refused(self) -> None:
+        bodies: list[Any] = [
+            {},
+            {"ids": []},
+            {"ids": "ran"},
+            {"ids": ["ran", 7]},
+            {"ids": [""]},
+            {"ids": ["x" * 65]},
+            {"ids": [f"id-{n}" for n in range(101)]},
+        ]
+        for body in bodies:
+            with self.subTest(body=str(body)[:60]):
+                response = self.client.post(
+                    "/api/v1/catalog/items/status",
+                    content=json.dumps(body),
+                    headers=self._device_headers(),
+                )
+                self.assertEqual(response.status_code, 400, response.content)
+
+    def test_a_hundred_ids_are_allowed(self) -> None:
+        answers = self._answers(*(f"id-{n}" for n in range(100)))
+
+        self.assertEqual(len(answers), 100)
+
+    def test_it_needs_a_device_session(self) -> None:
+        response = self._status("ran", headers={"Content-Type": "application/json"})
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_an_unavailable_record_is_a_503_not_a_wrong_answer(self) -> None:
+        with patch.object(
+            self._service(), "statuses", side_effect=RemovalRepositoryError("locked")
+        ):
+            response = self._status("ran")
+
+        self.assertEqual(response.status_code, 503, response.content)
 
 
 class RemovedWorksOfAnOperationTests(unittest.TestCase):

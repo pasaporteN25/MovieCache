@@ -14,6 +14,7 @@ import hmac
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -28,6 +29,7 @@ from movie_inbox.application.import_service import (
     ImportDraftLimit,
 )
 from movie_inbox.application.library_repository import LibraryRepositoryError
+from movie_inbox.application.removal_repository import RemovalRepositoryError
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.search_service import search_catalog_items
 from movie_inbox.application.streaming_repository import StreamingRepositoryError
@@ -330,6 +332,62 @@ def offline_draft_receipts(
             "item_id": works.get(row.item_id) if row and row.item_id else None,
         }
     return JSONResponse({"receipts": receipts})
+
+
+_MAX_STATUS_IDS = 100
+_MAX_DEVICE_ID_LENGTH = 64
+
+
+# A POST only because up to a hundred ids travel in a body, which would not
+# survive every proxy's limit on a query string. It changes nothing.
+@router.post("/api/v1/catalog/items/status")
+def item_status(
+    request: Request,
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+    body: dict[str, Any] = Depends(device_json),
+) -> JSONResponse:
+    """What became of works a device holds, by the ids it holds them under ([X5.5]).
+
+    `present` is still in the catalogue. `removed` left it because a person
+    deleted it or merged it into another work -- `merged_into` is the work that
+    took its place, so a change the device has not sent yet can follow it there.
+    `unknown` is an id with no record at all: never seen, or forgotten after a
+    year. That is **not** a removal, and a device must never delete on it: a work
+    missing from a download proves nothing, and this is the only place the server
+    says a person removed one.
+    """
+
+    ids = body.get("ids")
+    if (
+        not isinstance(ids, list)
+        or not 1 <= len(ids) <= _MAX_STATUS_IDS
+        or not all(
+            isinstance(value, str) and 1 <= len(value) <= _MAX_DEVICE_ID_LENGTH for value in ids
+        )
+    ):
+        raise DeviceApiRequestError("invalid_request", 400)
+    present = {entry.device_id for entry in _device_catalog_entries(request, identity)}
+    try:
+        answers = request.app.state.removal_service.statuses(identity.catalog.id, ids, present)
+    except RemovalRepositoryError as error:
+        raise DeviceApiRequestError("identity_store_unavailable", 503) from error
+    return JSONResponse(
+        {
+            "items": {
+                device_id: {
+                    "state": answer.state,
+                    "reason": answer.reason or None,
+                    "merged_into": answer.merged_into or None,
+                    "removed_at": _iso(answer.removed_at) if answer.removed_at else None,
+                }
+                for device_id, answer in answers.items()
+            }
+        }
+    )
+
+
+def _iso(epoch_seconds: int) -> str:
+    return datetime.fromtimestamp(epoch_seconds, UTC).replace(microsecond=0).isoformat()
 
 
 def _work_ids_for(
