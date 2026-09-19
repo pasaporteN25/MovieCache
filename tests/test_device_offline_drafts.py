@@ -22,6 +22,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from movie_inbox.application.auth_service import AuthService
+from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.import_service import (
     MAX_DEVICE_ITEMS_PER_REQUEST,
     ImportService,
@@ -161,6 +162,31 @@ class DeviceDraftServiceTests(unittest.TestCase):
         remaining = self.service.list_drafts(self.user_id)
         self.assertEqual([row["origin"] for row in remaining], [DEVICE_ORIGIN])
         self.assertEqual(remaining[0]["id"], result["draft_id"])
+
+    def test_a_phone_draft_can_be_applied_in_the_browser(self) -> None:
+        # A phone draft carries expires_at = 0, meaning "never". Claiming a draft
+        # for apply compared that against the clock as if it were a real deadline,
+        # found it already past, and refused with "being applied" -- so a work a
+        # phone had sent could be received but never applied.
+        first = self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+        repository = JsonCatalogRepository(
+            Path(self.temporary.name) / "catalog.json", normalize_item
+        )
+        repository.write([])
+
+        result = self.service.apply_draft(
+            self.user_id,
+            str(first["draft_id"]),
+            "catalog",
+            ["local-1"],
+            CatalogService(repository),
+            [],
+        )
+
+        self.assertEqual(result["summary"]["added"], 1)
+        self.assertEqual([item.title for item in repository.read()], ["Stalker"])
+        (summary,) = self.service.list_drafts(self.user_id)
+        self.assertEqual(summary["status"], "applied")
 
     def test_a_web_import_still_says_it_came_from_the_web(self) -> None:
         created = self.service.create_draft(

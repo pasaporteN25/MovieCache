@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from movie_inbox.application.import_repository import ImportRepositoryError
-from movie_inbox.domain.imports import ImportDraft, ImportDraftItem
+from movie_inbox.domain.imports import NEVER_EXPIRES, ImportDraft, ImportDraftItem
 
 STALE_APPLY_GRACE_SECONDS = 15 * 60
 
@@ -138,7 +138,12 @@ class SqliteImportDraftRepository:
                     if row is None:
                         connection.rollback()
                         return None
-                    if str(row["status"]) == "applied" or int(row["expires_at"]) <= now:
+                    # `expires_at = 0` is "never" (a phone draft), not a deadline in
+                    # 1970: purge_expired already knows that, and the claim has to
+                    # as well or a phone draft can never be applied.
+                    expires_at = int(row["expires_at"])
+                    lapsed = expires_at != NEVER_EXPIRES and expires_at <= now
+                    if str(row["status"]) == "applied" or lapsed:
                         connection.rollback()
                         return self._draft(connection, row)
                     can_claim = str(row["status"]) in {"ready", "failed"} or (
