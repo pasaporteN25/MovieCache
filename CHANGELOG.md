@@ -11,16 +11,20 @@ el trabajo visual de Inicio sigue en curso.
 
 ### Antes de actualizar
 
-- **Hacé un backup: la base de la instancia no vuelve atrás.** La 0.9.0 migra `instance.db`
-  del esquema v11 al v19 apenas abre la instancia, y la 0.8.0 se niega a abrir una base
-  v19: volver a la 0.8.0 exige restaurar el backup (`movie-inbox backup` o, en Docker,
-  `bash scripts/docker-backup.sh`).
+- **Hacé un backup: las bases no vuelven atrás.** La 0.9.0 migra `instance.db` del esquema
+  v11 al v21 y la base del catálogo (`movie-inbox.db`) del v5 al v6 apenas las abre, y
+  guarda un catálogo JSON en el formato v10 —antes v9— en cuanto lo escribe. La 0.8.0 se
+  niega a abrir cualquiera de las tres ("newer than supported"): volver a la 0.8.0 exige
+  restaurar el backup (`movie-inbox backup` o, en Docker, `bash scripts/docker-backup.sh`).
+  Un catálogo JSON suelto no lo cubre `movie-inbox backup`: copialo antes.
 - **Si usás el índice local de IMDb, regeneralo** con `movie-inbox imdb-dataset sync`. Su
   formato cambió, y hasta regenerarlo la instancia enriquece como si no lo tuviera y no
   muestra puntajes de IMDb.
 - `pip install` y la imagen de Docker instalan solos `segno`, la dependencia nueva.
-- No se retira nada: subcomandos, opciones de la CLI, rutas web, variables de entorno, el
-  esquema de la base del catálogo y el JSON portable siguen como en la 0.8.0.
+- No se retira nada: subcomandos, opciones de la CLI, rutas web, variables de entorno y
+  campos del JSON portable y de la base del catálogo siguen como en la 0.8.0. Lo único que
+  cambia en ellos es que suman un campo, `personal_changed_at` (ver más abajo), y por eso
+  suben de versión.
 
 ### Agregado
 
@@ -80,6 +84,34 @@ el trabajo visual de Inicio sigue en curso.
   que un teléfono necesita para repartir sin conexión el mismo mazo de charadas que el
   servidor. La disponibilidad y los puntajes de TMDb llegan con la fecha en que el
   teléfono tiene que dejar de mostrarlos.
+- Cada obra recuerda cuándo cambió por última vez su estado (`status`, junto con la fecha
+  de visionado), su puntaje y su review, y la API de dispositivo lo informa en
+  `personal.changed_at`. Sólo informa: no decide qué lado de un conflicto gana, porque el
+  reloj de un teléfono puede estar mal. Un campo que nunca se editó no figura, y las obras
+  que ya existían empiezan sin marcas: se llenan a medida que se editan. Es un campo nuevo
+  del JSON portable (`personal_changed_at`, esquema v10) y de la base del catálogo (v6), y
+  sobrevive a `movie-inbox db export` e `import`.
+- `PATCH /api/v1/catalog/items/{id}/personal` acepta un `base` opcional: el valor que el
+  cliente tenía de cada campo cuando lo bajó. Si el servidor ya no vale eso, responde `409
+  personal_conflict` y no escribe nada, en vez de pisar en silencio un cambio que hizo la
+  web u otro teléfono. Sin `base`, sigue como antes: gana el último. Antes de esto, un
+  teléfono que subía lo que vio al bajar perdía sin aviso lo que otro dispositivo había
+  cambiado en el medio.
+- Un teléfono cuya respuesta de renovación se perdió en un corte puede reintentar con el
+  token que le queda: el anterior sigue valiendo 120 segundos después de reemplazado, y
+  cada reintento devuelve un par nuevo. La ventana no se extiende con los reintentos y sólo
+  vale el token inmediatamente anterior. El vencimiento sigue contándose desde la última
+  sincronización.
+- Cada cuenta ve los teléfonos que apareó —nombre, cuándo se creó la sesión y cuándo se
+  usó por última vez— y puede desconectar cualquiera: `GET /api/device-sessions` y
+  `DELETE /api/device-sessions/{id}`, para cualquier cuenta y sólo sobre las propias. El
+  teléfono desconectado queda afuera en su próxima llamada y tiene que volver a aparearse.
+  La respuesta no trae nada que sirva para autenticar. Todavía no hay pantalla que lo
+  muestre.
+- Vectores de prueba para el cliente Android, calculados por el propio servidor y
+  verificados en cada corrida de pruebas: la huella del certificado con los payloads del QR
+  (`docs/briefs/pairing-certificate-v1-vectors.json`) y la normalización de títulos
+  (`docs/briefs/title-normalization-v1-vectors.json`).
 - `movie-inbox images coverage` cuenta, por causa, por qué las obras no llenan las dos
   ventanas de imágenes de la consola: campo vacío, dirección que el proxy rechazaría o
   imagen todavía sin caché, y cuántas imágenes distintas tiene cada obra —dos tamaños de
@@ -161,6 +193,17 @@ el trabajo visual de Inicio sigue en curso.
   fichas de FilmAffinity ya usaba para el suyo: con una respuesta vacía, el pedido
   terminaba en un error en vez de volver sin datos. Pasa desde esas versiones de Python, y
   la imagen de Docker toma la última 3.11 cada vez que se reconstruye.
+- Bajar el catálogo a un teléfono por páginas ya no se corta cuando el servidor se reinicia
+  a mitad: el cursor se firmaba con el token de la API, que `serve` regenera al azar en
+  cada arranque, y la página siguiente respondía 400. Ahora se firma con el secreto
+  durable de la instancia, el mismo que fija los ids de las obras.
+- Esa misma descarga por páginas ya no se saltea una obra ni repite otra cuando el
+  catálogo cambia mientras se baja: paginaba por posición, así que una obra agregada o
+  quitada corría todas las siguientes. Ahora retoma después de una clave estable —título,
+  año e id—. La búsqueda sigue paginando por posición, porque su orden es por relevancia.
+- El contrato de la API de dispositivo declara los rechazos que el servidor ya daba y no
+  avisaba: 409 (`draft_busy`, `device_draft_full`, `draft_limit_reached`) al enviar altas
+  sin conexión, y 400 al pedir una página con un cursor inválido.
 
 ## [0.8.0] - 2026-09-02
 

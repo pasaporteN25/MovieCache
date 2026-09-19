@@ -409,61 +409,6 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X4] Sesiones de dispositivo que no se pierden por un corte
-
-Lo encontró la matriz de sincronización del cliente ([A5.1], casos 8, 12 y 18), y lo acotan
-dos decisiones del owner del 2026-09-14. Primero pidió que un teléfono pudiera usar la
-instancia sin límite de tiempo; ese mismo día lo revisó por seguridad: **la llave vence, y
-pasado un mes hay que volver a escanear el QR**, y podría pedirse más seguido. Quedan dos
-obstáculos:
-
-1. La renovación rota el refresh token sin período de gracia (`rotate_device_session`): si la
-   respuesta se pierde en un corte, el teléfono se queda sin sesión y hay que volver a aparear
-   antes de tiempo.
-2. Una sesión sólo se corta cambiando la contraseña, desactivando la cuenta o desde el propio
-   teléfono. No hay forma de ver ni de revocar teléfonos desde la web, así que un teléfono
-   perdido conserva el acceso hasta que vence.
-
-- **Alcance**:
-  - La renovación se puede reintentar: acepta el refresh token anterior durante unos
-    segundos, o devuelve el mismo par si se repite.
-  - Cada cuenta ve sus teléfonos apareados, con el nombre y la última vez que se conectaron, y
-    puede revocar cualquiera. El backend es de este frente; la pantalla, un traspaso al frente
-    visual.
-  - El vencimiento sigue como hoy: 30 días desde la última sincronización
-    (`DEFAULT_DEVICE_REFRESH_TTL_SECONDS`), como decidió el owner el 2026-09-14.
-- **Sigue igual**: cambiar la contraseña o desactivar la cuenta corta todas las sesiones.
-- **Criterio de cierre**: una renovación cuya respuesta se perdió se reintenta con éxito, un
-  teléfono revocado desde la web queda afuera en su próxima llamada, y el vencimiento se sigue
-  contando desde la última sincronización.
-- **Depende de**: nada. **Modelo sugerido**: Grande: es seguridad.
-- **Subdividida el 2026-09-19** en cinco pasos, cada uno commiteable solo (los dos primeros
-  cambian el esquema de `instance.db`, v19→v20 y v20→v21):
-  - [x] **[X4.1] Renovación reintentable.** 2026-09-19. `device_sessions` guarda el refresh token
-    anterior y hasta cuándo se acepta (v20); `rotate_device_session` lo acepta dentro de esa
-    ventana y devuelve un par nuevo. **Decisión de diseño:** el par perdido no se puede
-    reenviar —sólo se guardan hashes—, así que un reintento mintea uno nuevo; la ventana se
-    ancla a la primera rotación y un reintento no la extiende (si no, quien tuviera un token
-    viejo la mantendría abierta para siempre). Un token dos rotaciones atrás no vale. La
-    ventana es `DEFAULT_DEVICE_REFRESH_GRACE_SECONDS`, 120 s —la tarea decía "unos
-    segundos"; un corte real dura más que un par de segundos, y es un número del owner—.
-    **Modelo sugerido**: Grande: es seguridad.
-  - [x] **[X4.2] Id estable de sesión y listado.** 2026-09-19. Hoy la clave de `device_sessions` es el
-    hash del access token, que cambia en cada renovación, así que no sirve para nombrar un
-    teléfono desde la web. Columna `session_id` aleatoria (v21, con relleno de las filas
-    existentes) y `list_device_sessions` en repositorio y servicio: id, nombre, creado,
-    último uso, vencimiento; nunca un hash. **Modelo sugerido**: Medio.
-  - [x] **[X4.3] Revocar un teléfono por id.** 2026-09-19. Repositorio y servicio, acotado a la cuenta:
-    una cuenta sólo revoca los suyos. **Modelo sugerido**: Chico.
-  - [x] **[X4.4] Endpoints web.** 2026-09-19. `GET /api/device-sessions` y
-    `DELETE /api/device-sessions/{id}` con las mismas guardas que el apareamiento (token,
-    origen, cuenta lista), y el traspaso de la pantalla al frente visual. **Modelo
-    sugerido**: Medio.
-  - [ ] **[X4.5] Changelog.** "Antes de actualizar" sigue diciendo v11→v19 y que el JSON
-    portable y la base del catálogo "siguen como en la 0.8.0", que ya no es cierto desde
-    [X3.1]; y faltan las entradas de [X2], [X3], [X9], [X10] y [X4]. **Modelo sugerido**:
-    Chico.
-
 #### [X5] Bajas que viajan en la sincronización
 
 Decisión del owner del 2026-09-14, que revierte "la sincronización nunca borra" de ADR-0005
@@ -746,6 +691,22 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   comparte la de `status`, porque siempre cambian juntos. De paso: `catalog.schema.json`
   estaba desalineado desde v7, sin nada que lo probara; se puso al día junto con v10 y quedó
   cubierto por `PortableSchemaDocumentTests`.
+- [x] **[X4] Sesiones de dispositivo que no se pierden por un corte.** 2026-09-19. Lo
+  encontró la matriz de sincronización del cliente ([A5.1], casos 8, 12 y 18). Subdividida en
+  cinco pasos y commiteada por separado: **[X4.1]** la renovación se puede reintentar (esquema
+  de `instance.db` v20): el refresh token recién reemplazado vale
+  `DEFAULT_DEVICE_REFRESH_GRACE_SECONDS`, 120 s, la ventana se ancla a la primera rotación y un
+  reintento no la extiende, y un reintento mintea un par nuevo porque sólo se guardan hashes;
+  **[X4.2]** `session_id` estable y aleatorio (v21, con relleno de las filas que ya había) y
+  `list_device_sessions`; **[X4.3]** `revoke_device_session` por id, acotado a la cuenta;
+  **[X4.4]** `GET /api/device-sessions` y `DELETE /api/device-sessions/{id}` para cualquier
+  cuenta, con las guardas del apareamiento; **[X4.5]** el changelog, que además de estas
+  entradas y las de [X2], [X3], [X9] y [X10] estaba diciendo que el JSON portable y la base del
+  catálogo "siguen como en la 0.8.0", cosa que ya no era cierta desde [X3.1]. El vencimiento
+  sigue contándose desde la última sincronización, y cambiar la contraseña o desactivar la
+  cuenta sigue cortando todas las sesiones. **Un número para revisar:** la ventana de 120 s;
+  la tarea decía "unos segundos", pero un corte real dura más y es del owner. La pantalla es un
+  traspaso al frente visual, anotado en su sección.
 - [x] **[X2] Precondición en el `PATCH` personal.** 2026-09-17. `patch_personal` acepta un
   `base` opcional por campo; si el servidor ya no vale eso, responde `409 personal_conflict`
   sin escribir nada, dentro de la misma transacción atómica del repositorio (sin condición de
