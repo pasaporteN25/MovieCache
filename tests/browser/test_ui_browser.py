@@ -64,8 +64,26 @@ def run_library_scan(page, base_url: str, headers: dict[str, str], library_id: s
             raise RuntimeError(f"Library {mode} run did not finish in time")
 
 
-def click_desktop_menu_action(page, action: str) -> None:
+def wait_for_app_ready(page) -> None:
+    """Wait for the first catalog load to finish rendering.
+
+    #homeView is aria-busy until then, and `#homeView` being visible says nothing
+    about it. The router closes the system menu when it restores the route, in the
+    same task that ends the busy state, so a menu opened before that is closed again
+    under the click that follows. It only shows on a slow machine, where the load
+    loses the race against the test."""
+    page.wait_for_function(
+        "document.querySelector('#homeView').getAttribute('aria-busy') === 'false'"
+    )
+
+
+def open_desktop_menu(page) -> None:
+    wait_for_app_ready(page)
     page.locator("#systemMenu > summary").click()
+
+
+def click_desktop_menu_action(page, action: str) -> None:
+    open_desktop_menu(page)
     page.locator(f'[data-click="menu-{action}"]').click()
 
 
@@ -1185,7 +1203,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         page = self.page
 
         def open_menu() -> None:
-            page.locator("#systemMenu > summary").click()
+            open_desktop_menu(page)
             self.assertTrue(page.locator("#systemMenu").get_attribute("open") is not None)
 
         self._open_and_wait_for_catalog(page)
@@ -1214,6 +1232,26 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator('[data-click="menu-add"]').click()
         page.wait_for_selector("#collectionView:not([hidden])")
         self.assertIsNone(page.locator("#systemMenu").get_attribute("open"))
+
+    def test_opening_the_menu_waits_for_a_slow_first_load(self) -> None:
+        # The router closes the system menu when it restores the route after the
+        # first catalog load. A menu opened before that closes under the next
+        # click -- which used to fail the tests above whenever the machine was slow
+        # enough for the load to lose the race. Delaying the load makes the race
+        # certain, so the helpers cannot quietly stop waiting.
+        page = self.page
+
+        def slow_catalog(route) -> None:
+            time.sleep(1.5)
+            route.continue_()
+
+        page.route("**/api/items*", slow_catalog)
+        page.goto(BrowserInterfaceTests.base_url)
+        page.wait_for_selector("#homeView:not([hidden])")
+
+        click_desktop_menu_action(page, "club")
+
+        page.wait_for_selector("#clubView:not([hidden])")
 
     def test_home_shelves_use_existing_sections_with_keyboard_preview_and_touch_scroll(
         self,
@@ -3356,7 +3394,7 @@ class ScannerBrowserTests(unittest.TestCase):
         # loadCatalog() populates both counts asynchronously after the home
         # view is already visible, so wait for the scanner badge specifically
         # rather than reading a snapshot right after page load.
-        page.locator("#systemMenu > summary").click()
+        open_desktop_menu(page)
         page.locator("[data-menu-scanner-badge]").wait_for(state="visible")
         self.assertFalse(page.locator("[data-menu-inbox-badge]").is_visible())
         self.assertEqual(page.locator("[data-menu-scanner-badge]").inner_text(), "1")
