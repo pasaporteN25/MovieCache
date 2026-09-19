@@ -453,9 +453,13 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
     registro `deleted` con el id del teléfono, **después** de borrar y sin poder deshacer el
     borrado si el registro falla. La derivación del id del teléfono pasó a `web/device_ids.py`
     para que otras rutas la usen. **Modelo sugerido**: Medio.
-  - [ ] **[X5.4] Registrar al unir y olvidar al deshacer.** Curaduría (unir dos, unir un
-    grupo, resolver los seguros) deja `merged` con la obra que quedó; deshacer borra esos
-    registros. **Modelo sugerido**: Grande: varias rutas y un deshacer.
+  - [x] **[X5.4] Registrar al unir y olvidar al deshacer.** 2026-09-19. Unir dos, unir un
+    grupo y "resolver los seguros" dejan `merged` con la obra que quedó (que puede estar en
+    otra fuente); deshacer la unión borra el registro. `merge`, `merge_group`,
+    `auto_resolve_duplicates` y `undo` aceptan un observador opcional que se llama **después**
+    de confirmada la operación y sin cambiar lo que devuelven, para no meter rutas de archivo
+    en las respuestas del navegador; lo que se quitó se lee del antes y el después de la
+    propia operación. **Modelo sugerido**: Grande: varias rutas y un deshacer.
   - [ ] **[X5.5] La consulta.** `POST /api/v1/catalog/items/status`, contrato OpenAPI y
     pruebas HTTP. **Modelo sugerido**: Medio.
   - [ ] **[X5.6] La baja desde el teléfono.** `POST /api/v1/catalog/items/{itemId}/removal`,

@@ -14,30 +14,15 @@ decide. It can never be a record of a removal that did not happen.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 
 from fastapi import Request
 
 from movie_inbox.application.identity_repository import IdentityRepositoryError
 from movie_inbox.application.removal_repository import RemovalRepositoryError
 from movie_inbox.domain.identity import AuthenticatedIdentity
-from movie_inbox.domain.removals import DeviceRemoval
+from movie_inbox.domain.removals import DeviceRemoval, RemovedWork
 from movie_inbox.web.dependencies import SessionCatalog
 from movie_inbox.web.device_ids import device_id_for, sync_secret
-
-
-@dataclass(frozen=True)
-class RemovedWork:
-    """A catalogue work that was removed, by the file and id it had.
-
-    `survivor_*` name the work it was merged into, when it was a merge. The
-    survivor can live in another source than the work that went away.
-    """
-
-    source_path: str
-    item_id: str
-    survivor_source_path: str = ""
-    survivor_item_id: str = ""
 
 
 def record_removed_works(
@@ -74,7 +59,7 @@ def forget_removed_works(
             for work in works
             if (
                 device_id := device_id_for(
-                    secret, identity, catalog, work.source_path, work.item_id
+                    secret, identity, catalog, work.source_file, work.item_id
                 )
             )
         ]
@@ -91,7 +76,7 @@ def _removals(
 ) -> list[DeviceRemoval]:
     removals: list[DeviceRemoval] = []
     for work in works:
-        device_id = device_id_for(secret, identity, catalog, work.source_path, work.item_id)
+        device_id = device_id_for(secret, identity, catalog, work.source_file, work.item_id)
         if device_id is None:
             continue
         survivor = (
@@ -99,7 +84,7 @@ def _removals(
                 secret,
                 identity,
                 catalog,
-                work.survivor_source_path or work.source_path,
+                work.survivor_source_file or work.source_file,
                 work.survivor_item_id,
             )
             if work.survivor_item_id

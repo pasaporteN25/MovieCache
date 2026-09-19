@@ -15,6 +15,7 @@ from movie_inbox.application.curation_workflow import CatalogPointer, CurationCo
 from movie_inbox.application.identity_repository import IdentityRepositoryError
 from movie_inbox.application.library_repository import LibraryRepositoryError
 from movie_inbox.application.repository import CatalogRepositoryError
+from movie_inbox.domain.removals import RemovedWork
 from movie_inbox.infrastructure.export import catalog_csv_text
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION, catalog_document
@@ -49,7 +50,7 @@ from movie_inbox.web.dependencies import (
     session_catalog_rows,
 )
 from movie_inbox.web.image_proxy import cached_image
-from movie_inbox.web.removals import RemovedWork, record_removed_works
+from movie_inbox.web.removals import record_removed_works
 from movie_inbox.web.responses import (
     application_error_response,
     error_response,

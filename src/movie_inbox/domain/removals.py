@@ -35,3 +35,18 @@ class DeviceRemoval:
             raise ValueError("A deleted work is not merged into anything")
         if self.merged_into == self.device_id:
             raise ValueError("A work cannot be merged into itself")
+
+
+@dataclass(frozen=True)
+class RemovedWork:
+    """A catalogue work that left the catalogue, by the file and id it had there.
+
+    The catalogue's own ids, not a phone's: the web layer turns them into the
+    ones a phone holds. `survivor_*` name the work it was merged into, when it
+    was a merge, and the survivor can live in another source file.
+    """
+
+    source_file: str
+    item_id: str
+    survivor_source_file: str = ""
+    survivor_item_id: str = ""

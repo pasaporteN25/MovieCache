@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from movie_inbox.application.curation_history import CurationHistoryError
-from movie_inbox.application.curation_workflow import CurationWorkflowError
+from movie_inbox.application.curation_workflow import CurationWorkflowError, RemovalObserver
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain.merge_review import MergeReviewError
 from movie_inbox.web.catalog_api import build_curation_payload, load_items
 from movie_inbox.web.dependencies import (
+    SessionCatalog,
     authorized_json,
     catalog_pointer,
     comparison_inputs,
@@ -23,9 +25,16 @@ from movie_inbox.web.dependencies import (
     session_catalog,
     session_catalog_rows,
 )
+from movie_inbox.web.removals import forget_removed_works, record_removed_works
 from movie_inbox.web.responses import curation_application_error_response, repository_error_response
 
 router = APIRouter()
+
+
+def _removal_recorder(request: Request, catalog: SessionCatalog) -> RemovalObserver:
+    """[X5.4]: what a merge removed is recorded for the phones that still hold it."""
+
+    return partial(record_removed_works, request, require_ready_identity(request), catalog)
 
 
 @router.get("/api/curation", dependencies=[Depends(require_token)])
@@ -95,6 +104,7 @@ def merge_curation(
                 reference_aliases=member_references,
                 history_mode=str(body.get("history_mode") or "persistent"),
                 session_id=history_session_id(request),
+                on_removed=_removal_recorder(request, catalog),
             )
             return JSONResponse({"ok": True, "reason": "merged", **result})
         left, right, incoming = comparison_inputs(catalog, body)
@@ -107,6 +117,7 @@ def merge_curation(
             expected_review_id=str(body.get("review_id") or ""),
             history_mode=str(body.get("history_mode") or "persistent"),
             session_id=history_session_id(request),
+            on_removed=_removal_recorder(request, catalog),
         )
         return JSONResponse({"ok": True, "reason": "merged", **result})
     except (
@@ -131,6 +142,7 @@ def auto_resolve_curation_duplicates(
             items,
             history_mode=str(body.get("history_mode") or "persistent"),
             session_id=history_session_id(request),
+            on_removed=_removal_recorder(request, catalog),
         )
         return JSONResponse({"ok": True, "reason": "auto_resolved", **result})
     except (
@@ -149,10 +161,15 @@ def undo_curation(
     body: dict[str, Any] = Depends(authorized_json),
 ) -> JSONResponse:
     try:
+        catalog = session_catalog(request)
         operation = request_workflow(request).undo(
             str(body.get("operation_id") or ""),
             history_mode=str(body.get("history_mode") or "persistent"),
             session_id=history_session_id(request),
+            # [X5.4]: the works an undone merge brings back are not removed any more.
+            on_restored=partial(
+                forget_removed_works, request, require_ready_identity(request), catalog
+            ),
         )
         return JSONResponse({"ok": True, "reason": "undone", "operation": operation})
     except (

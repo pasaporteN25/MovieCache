@@ -29,8 +29,14 @@ from movie_inbox.domain.merge_review import (
     build_group_merge_review,
     build_merge_review,
 )
+from movie_inbox.domain.removals import RemovedWork
 
 RepositoryFactory = Callable[[Path], CatalogRepository]
+
+# [X5.4]: told about the works an operation removed from, or brought back to, the
+# catalogue -- after it is done, and never in what the workflow returns, because
+# these carry file paths and the responses are the browser's.
+RemovalObserver = Callable[[Sequence[RemovedWork]], None]
 
 
 class CurationWorkflowError(RuntimeError):
@@ -135,6 +141,7 @@ class CurationWorkflowService:
         expected_review_id: str = "",
         history_mode: str = "persistent",
         session_id: str = "",
+        on_removed: RemovalObserver | None = None,
     ) -> dict[str, Any]:
         left_state = self._capture(left)
         right_state, right_item, external = self._right_state(right, incoming)
@@ -206,6 +213,7 @@ class CurationWorkflowService:
                 "external": external,
             },
         )
+        _tell(on_removed, operation)
         return {
             "item": self._decorated_item(merged_item),
             "operation": public_operation(operation),
@@ -221,6 +229,7 @@ class CurationWorkflowService:
         reference_aliases: Sequence[str] = (),
         history_mode: str = "persistent",
         session_id: str = "",
+        on_removed: RemovalObserver | None = None,
     ) -> dict[str, Any]:
         states = self._capture_group(members)
         survivor_state = self._group_survivor_state(states, survivor)
@@ -271,6 +280,7 @@ class CurationWorkflowService:
                 "external": False,
             },
         )
+        _tell(on_removed, operation)
         return {
             "item": self._decorated_item(merged_item),
             "operation": public_operation(operation),
@@ -282,6 +292,7 @@ class CurationWorkflowService:
         *,
         history_mode: str,
         session_id: str,
+        on_removed: RemovalObserver | None = None,
     ) -> dict[str, Any]:
         """Resolve each safe duplicate component as one atomic N-to-1 operation."""
         cases = build_curation_payload(items)["cases"]
@@ -305,6 +316,7 @@ class CurationWorkflowService:
                     expected_review_id=review["review_id"],
                     history_mode=history_mode,
                     session_id=session_id,
+                    on_removed=on_removed,
                 )
                 resolved += 1
             except (MergeReviewError, CurationConflict, CurationItemNotFound):
@@ -477,6 +489,7 @@ class CurationWorkflowService:
         *,
         history_mode: str,
         session_id: str,
+        on_restored: RemovalObserver | None = None,
     ) -> dict[str, Any]:
         _, repository, namespace = self._history_repository(history_mode, session_id)
         operation = next(
@@ -500,6 +513,7 @@ class CurationWorkflowService:
         except Exception:
             self._transition(before, after)
             raise
+        _tell(on_restored, operation)
         return public_operation(updated)
 
     def _right_state(
@@ -757,6 +771,50 @@ def _states_by_path(states: list[dict[str, Any]]) -> dict[str, list[dict[str, An
             raise CurationWorkflowError("Operation state is missing its catalog path")
         grouped.setdefault(path, []).append(state)
     return grouped
+
+
+def _tell(observer: RemovalObserver | None, operation: Mapping[str, Any]) -> None:
+    """Hand the observer the works this operation removed, if it removed any."""
+
+    if observer is None:
+        return
+    removed = _removed_works(operation)
+    if removed:
+        observer(removed)
+
+
+def _removed_works(operation: Mapping[str, Any]) -> list[RemovedWork]:
+    """The works an applied operation took out of the catalogue.
+
+    A merge leaves the survivor with its merged item and each other member as an
+    empty state. Only a member that had an item before counts as removed, so an
+    operation that merely edits works, or a merge with an external result that
+    never was in the catalogue, removes nothing.
+    """
+
+    before = {
+        (str(state.get("source_file") or ""), str(state.get("item_id") or "")): state
+        for state in _operation_states(operation, "before")
+    }
+    after = _operation_states(operation, "after")
+    survivor = next((state for state in after if state.get("item") is not None), None)
+    removed: list[RemovedWork] = []
+    for state in after:
+        if state.get("item") is not None:
+            continue
+        source_file = str(state.get("source_file") or "")
+        item_id = str(state.get("item_id") or "")
+        if before.get((source_file, item_id), {}).get("item") is None:
+            continue
+        removed.append(
+            RemovedWork(
+                source_file,
+                item_id,
+                str(survivor.get("source_file") or "") if survivor else "",
+                str(survivor.get("item_id") or "") if survivor else "",
+            )
+        )
+    return removed
 
 
 def _operation_states(operation: Mapping[str, Any], key: str) -> list[dict[str, Any]]:
