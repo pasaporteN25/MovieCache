@@ -14,6 +14,7 @@ import urllib.parse
 import xml.etree.ElementTree as ElementTree
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 from fastapi.testclient import TestClient
 
@@ -534,6 +535,100 @@ class PairingApiTests(unittest.TestCase):
         self.assertEqual(
             self.client.get("/api/device-pairing", headers=self._headers()).status_code, 405
         )
+
+    # [X4.4]: listing and revoking the paired phones.
+
+    def _pair_a_phone(self, name: str = "Pixel de Lucas") -> dict[str, Any]:
+        response = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {"username": "lucas", "password": self.password, "device_name": name}
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        session: dict[str, Any] = response.json()
+        return session
+
+    def test_a_stranger_can_neither_list_nor_revoke_phones(self) -> None:
+        listed = self.client.get("/api/device-sessions", headers=self._headers())
+        revoked = self.client.delete("/api/device-sessions/anything", headers=self._headers())
+
+        self.assertEqual(listed.status_code, 401)
+        self.assertEqual(revoked.status_code, 401)
+
+    def test_the_list_needs_the_page_token_like_any_other_web_api(self) -> None:
+        self._login()
+
+        response = self.client.get("/api/device-sessions")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_the_account_sees_its_phone_and_nothing_that_could_authenticate_one(self) -> None:
+        session = self._pair_a_phone()
+        self._login()
+
+        response = self.client.get("/api/device-sessions", headers=self._headers())
+
+        self.assertEqual(response.status_code, 200, response.content)
+        (device,) = response.json()["devices"]
+        self.assertEqual(device["device_name"], "Pixel de Lucas")
+        self.assertEqual(
+            set(device), {"id", "device_name", "created_at", "last_seen_at", "expires_at"}
+        )
+        self.assertTrue(device["created_at"].endswith("Z"))
+        for secret in (session["access_token"], session["refresh_token"]):
+            self.assertNotIn(secret, response.text)
+            self.assertNotIn(session_token_hash(secret), response.text)
+
+    def test_revoking_a_phone_puts_it_out_on_its_next_call(self) -> None:
+        session = self._pair_a_phone()
+        self._login()
+        (device,) = self.client.get("/api/device-sessions", headers=self._headers()).json()[
+            "devices"
+        ]
+
+        revoked = self.client.delete(
+            f"/api/device-sessions/{device['id']}", headers=self._headers()
+        )
+
+        self.assertEqual(revoked.status_code, 200, revoked.content)
+        bearer = {"Authorization": f"Bearer {session['access_token']}"}
+        self.assertEqual(self.client.get("/api/v1/me", headers=bearer).status_code, 401)
+        refreshed = self.client.post(
+            "/api/v1/auth/refresh",
+            content=json.dumps({"refresh_token": session["refresh_token"]}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(refreshed.status_code, 401)
+        listed = self.client.get("/api/device-sessions", headers=self._headers())
+        self.assertEqual(listed.json()["devices"], [])
+
+    def test_revoking_needs_the_page_origin(self) -> None:
+        # A DELETE from another site must not be able to sign a phone out.
+        self._pair_a_phone()
+        self._login()
+        (device,) = self.client.get("/api/device-sessions", headers=self._headers()).json()[
+            "devices"
+        ]
+        headers = self._headers()
+        headers["Origin"] = "https://elsewhere.example"
+
+        response = self.client.delete(f"/api/device-sessions/{device['id']}", headers=headers)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            len(self.client.get("/api/device-sessions", headers=self._headers()).json()["devices"]),
+            1,
+        )
+
+    def test_an_unknown_phone_is_a_404(self) -> None:
+        self._login()
+
+        response = self.client.delete("/api/device-sessions/no-such-phone", headers=self._headers())
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["reason"], "device_not_found")
 
 
 if __name__ == "__main__":

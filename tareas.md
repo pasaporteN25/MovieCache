@@ -455,7 +455,7 @@ obstáculos:
     último uso, vencimiento; nunca un hash. **Modelo sugerido**: Medio.
   - [x] **[X4.3] Revocar un teléfono por id.** 2026-09-19. Repositorio y servicio, acotado a la cuenta:
     una cuenta sólo revoca los suyos. **Modelo sugerido**: Chico.
-  - [ ] **[X4.4] Endpoints web.** `GET /api/device-sessions` y
+  - [x] **[X4.4] Endpoints web.** 2026-09-19. `GET /api/device-sessions` y
     `DELETE /api/device-sessions/{id}` con las mismas guardas que el apareamiento (token,
     origen, cuenta lista), y el traspaso de la pantalla al frente visual. **Modelo
     sugerido**: Medio.
@@ -570,6 +570,17 @@ consumir y qué reglas no se pueden romper.
   estas obras en cuatro categorías", rápida y reanudable, no un formulario por obra
   (`docs/briefs/charades-v1.md`). Las pantallas de juego y el temporizador van en el
   teléfono, dentro de [A2.4].
+- [ ] **Teléfonos apareados: verlos y desconectarlos** (de [X4]). Consume `GET
+  /api/device-sessions` —`{"devices": [{id, device_name, created_at, last_seen_at,
+  expires_at}]}`, el más usado primero— y `DELETE /api/device-sessions/{id}`, que responde
+  `{"ok": true}` o 404 `device_not_found`. Va donde está la pantalla del QR, y como ella **no va
+  en `Administrar`**: cada cuenta ve y desconecta sólo los suyos, sea owner o miembro. Reglas
+  que no se pueden romper: el `id` sólo nombra al teléfono —no es una credencial, no se muestra
+  como si lo fuera, y no hay ninguna otra cosa de la sesión que mostrar—; desconectar es
+  inmediato e irreversible (el teléfono tiene que volver a aparearse con un QR nuevo), así que
+  pide confirmación con el nombre del teléfono; y la lista vacía es un estado normal, no un
+  error. `expires_at` es el vencimiento **si no se sincroniza**: se corre 30 días con cada
+  sincronización, así que no es una fecha para mostrar como "vence el ...".
 - **Bandeja en el teléfono** (de [MB2]): traspaso consolidado en **[MW1.4]**, al
   final de la cola a pedido del owner. La auditoría del 2026-09-07 es antecedente,
   no diagnóstico vigente; volver a medir antes de corregir.
