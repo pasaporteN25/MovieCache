@@ -23,13 +23,14 @@ from movie_inbox.domain.identity import (
     ArchivedMember,
     AuthenticatedIdentity,
     CatalogSource,
+    DeviceSessionRecord,
     PersonalCatalog,
     UserAccount,
     username_key,
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 20
+INSTANCE_SCHEMA_VERSION = 21
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -471,6 +472,14 @@ CREATE INDEX ix_device_sessions_previous_refresh
 ON device_sessions(previous_refresh_token_hash);
 """
 
+# The access token hash is the table's key and changes on every renovation, so
+# it cannot name a phone from the web. This label is random and never changes.
+INSTANCE_SCHEMA_V21 = """
+ALTER TABLE device_sessions ADD COLUMN session_id TEXT NOT NULL DEFAULT '';
+UPDATE device_sessions SET session_id = lower(hex(randomblob(16)));
+CREATE UNIQUE INDEX ix_device_sessions_session_id ON device_sessions(session_id);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -491,6 +500,7 @@ INSTANCE_MIGRATIONS = {
     18: ("single-use device pairing tickets", INSTANCE_SCHEMA_V18),
     19: ("import drafts remember whether a phone or a browser made them", INSTANCE_SCHEMA_V19),
     20: ("device refresh tokens tolerate one retry after a lost response", INSTANCE_SCHEMA_V20),
+    21: ("device sessions carry a stable id a browser can name them by", INSTANCE_SCHEMA_V21),
 }
 
 
@@ -1239,8 +1249,9 @@ class SqliteIdentityRepository:
                     connection.execute(
                         """INSERT INTO device_sessions(
                             access_token_hash, refresh_token_hash, user_id, device_name,
-                            created_at, access_expires_at, refresh_expires_at, last_seen_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            created_at, access_expires_at, refresh_expires_at, last_seen_at,
+                            session_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             access_token_hash,
                             refresh_token_hash,
@@ -1250,6 +1261,7 @@ class SqliteIdentityRepository:
                             access_expires_at,
                             refresh_expires_at,
                             created_at,
+                            uuid.uuid4().hex,
                         ),
                     )
                     connection.commit()
@@ -1409,6 +1421,34 @@ class SqliteIdentityRepository:
             except sqlite3.Error as error:
                 raise IdentityRepositoryError(
                     f"Cannot update device session in: {self.path}"
+                ) from error
+
+    def list_device_sessions(self, user_id: str, now: int) -> list[DeviceSessionRecord]:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    rows = connection.execute(
+                        """SELECT session_id, device_name, created_at, last_seen_at,
+                            refresh_expires_at
+                        FROM device_sessions
+                        WHERE user_id = ? AND refresh_expires_at > ?
+                        ORDER BY last_seen_at DESC, created_at DESC, session_id""",
+                        (user_id, now),
+                    ).fetchall()
+                    return [
+                        DeviceSessionRecord(
+                            id=str(row["session_id"]),
+                            device_name=str(row["device_name"]),
+                            created_at=int(row["created_at"]),
+                            last_seen_at=int(row["last_seen_at"]),
+                            expires_at=int(row["refresh_expires_at"]),
+                        )
+                        for row in rows
+                    ]
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot list device sessions from: {self.path}"
                 ) from error
 
     def delete_device_session(self, access_token_hash: str) -> None:

@@ -9,6 +9,7 @@ from pathlib import Path
 from movie_inbox.application.auth_service import (
     AuthenticationError,
     AuthService,
+    DeviceSession,
     PasswordHasher,
     PasswordPolicyError,
     session_token_hash,
@@ -582,6 +583,130 @@ class DeviceRefreshRetryTests(unittest.TestCase):
         self.service.change_password(identity, "a-long-local-password", "a-different-password!")
 
         self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+
+class DeviceSessionListTests(unittest.TestCase):
+    """[X4.2]: an account sees its paired phones, by a stable id and no credential."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        catalog_path = root / "catalog.json"
+        JsonCatalogRepository(catalog_path, normalize_item).write([])
+        self.database = root / "instance.db"
+        self.now = [1_000.0]
+        self.repository = SqliteIdentityRepository(self.database)
+        self.service = AuthService(
+            self.repository,
+            clock=lambda: self.now[0],
+            device_access_ttl_seconds=60,
+            device_refresh_ttl_seconds=500,
+        )
+        self.owner, _ = self.service.bootstrap_owner(
+            "owner",
+            "a-long-local-password",
+            catalog_name="Mi catalogo",
+            source_paths=[str(catalog_path)],
+            write_path=str(catalog_path),
+        )
+        _, self.identity = self.service.login("owner", "a-long-local-password")
+        self.members = MemberService(
+            self.repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs")
+        )
+
+    def _pair(self, name: str) -> DeviceSession:
+        return self.service.login_device("owner", "a-long-local-password", name)
+
+    def test_it_lists_the_account_s_phones_most_recently_used_first(self) -> None:
+        self._pair("Pixel")
+        self.now[0] += 5
+        tablet = self._pair("Tablet")
+        self.now[0] += 5
+        self.service.authenticate_device(tablet.access_token)
+
+        names = [row.device_name for row in self.service.list_device_sessions(self.identity)]
+
+        self.assertEqual(names, ["Tablet", "Pixel"])
+
+    def test_the_id_survives_a_refresh(self) -> None:
+        session = self._pair("Pixel")
+        (before,) = self.service.list_device_sessions(self.identity)
+
+        self.now[0] += 10
+        self.service.refresh_device_session(session.refresh_token)
+
+        (after,) = self.service.list_device_sessions(self.identity)
+        self.assertEqual(after.id, before.id)
+
+    def test_last_seen_follows_authenticated_use(self) -> None:
+        session = self._pair("Pixel")
+        self.now[0] += 30
+
+        self.service.authenticate_device(session.access_token)
+
+        (row,) = self.service.list_device_sessions(self.identity)
+        self.assertEqual(row.created_at, 1_000)
+        self.assertEqual(row.last_seen_at, 1_030)
+
+    def test_a_row_carries_no_credential(self) -> None:
+        session = self._pair("Pixel")
+        (row,) = self.service.list_device_sessions(self.identity)
+
+        self.assertEqual(
+            set(vars(row)), {"id", "device_name", "created_at", "last_seen_at", "expires_at"}
+        )
+        rendered = repr(row)
+        for secret in (
+            session.access_token,
+            session.refresh_token,
+            session_token_hash(session.access_token),
+            session_token_hash(session.refresh_token),
+        ):
+            self.assertNotIn(secret, rendered)
+
+    def test_another_account_s_phones_are_not_listed(self) -> None:
+        self._pair("Pixel")
+        member = self.members.create_member(self.owner, "maria").member
+        self.repository.save_device_session(
+            "member-access-hash",
+            "member-refresh-hash",
+            member.user.id,
+            "Telefono de Maria",
+            1_000,
+            1_060,
+            1_500,
+        )
+
+        names = [row.device_name for row in self.service.list_device_sessions(self.identity)]
+
+        self.assertEqual(names, ["Pixel"])
+
+    def test_an_expired_session_is_not_listed(self) -> None:
+        self._pair("Pixel")
+
+        self.now[0] += 501
+
+        self.assertEqual(self.service.list_device_sessions(self.identity), [])
+
+    def test_the_migration_gives_existing_sessions_distinct_ids(self) -> None:
+        self._pair("Pixel")
+        self._pair("Tablet")
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.executescript(
+                """
+                DROP INDEX ix_device_sessions_session_id;
+                ALTER TABLE device_sessions DROP COLUMN session_id;
+                DELETE FROM instance_migrations WHERE version = 21;
+                """
+            )
+            connection.commit()
+
+        rows = SqliteIdentityRepository(self.database).list_device_sessions(self.owner.id, 1_000)
+
+        ids = {row.id for row in rows}
+        self.assertEqual(len(ids), 2)
+        self.assertNotIn("", ids)
 
 
 if __name__ == "__main__":

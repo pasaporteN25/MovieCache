@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from movie_inbox.application.identity_repository import IdentityRepository
 from movie_inbox.domain.identity import (
     AuthenticatedIdentity,
+    DeviceSessionRecord,
     PersonalCatalog,
     UserAccount,
     normalize_username,
@@ -220,6 +221,11 @@ class AuthService:
     def logout_device(self, access_token: str) -> None:
         if access_token and len(access_token) <= 512:
             self.repository.delete_device_session(session_token_hash(access_token))
+
+    def list_device_sessions(self, identity: AuthenticatedIdentity) -> list[DeviceSessionRecord]:
+        """The phones paired to this account -- only this account's, never a token."""
+
+        return self.repository.list_device_sessions(identity.user.id, int(self.clock()))
 
     def _authenticated_user(
         self, username: str, password: str

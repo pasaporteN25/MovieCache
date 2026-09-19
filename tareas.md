@@ -448,7 +448,7 @@ obstáculos:
     ventana es `DEFAULT_DEVICE_REFRESH_GRACE_SECONDS`, 120 s —la tarea decía "unos
     segundos"; un corte real dura más que un par de segundos, y es un número del owner—.
     **Modelo sugerido**: Grande: es seguridad.
-  - [ ] **[X4.2] Id estable de sesión y listado.** Hoy la clave de `device_sessions` es el
+  - [x] **[X4.2] Id estable de sesión y listado.** 2026-09-19. Hoy la clave de `device_sessions` es el
     hash del access token, que cambia en cada renovación, así que no sirve para nombrar un
     teléfono desde la web. Columna `session_id` aleatoria (v21, con relleno de las filas
     existentes) y `list_device_sessions` en repositorio y servicio: id, nombre, creado,

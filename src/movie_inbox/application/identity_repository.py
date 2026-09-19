@@ -8,6 +8,7 @@ from typing import Protocol
 from movie_inbox.domain.identity import (
     ArchivedMember,
     AuthenticatedIdentity,
+    DeviceSessionRecord,
     PersonalCatalog,
     UserAccount,
 )
@@ -172,6 +173,10 @@ class IdentityRepository(Protocol):
         ...
 
     def touch_device_session(self, access_token_hash: str, seen_at: int) -> None: ...
+
+    def list_device_sessions(self, user_id: str, now: int) -> list[DeviceSessionRecord]:
+        """The account's unexpired device sessions, most recently used first."""
+        ...
 
     def delete_device_session(self, access_token_hash: str) -> None: ...
 
