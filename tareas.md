@@ -472,6 +472,28 @@ web.
   lado después de que la ficha se abrió.
 - **Depende de**: [X2], si se elige compartir el mecanismo de precondición. **Modelo
   sugerido**: Medio; con el frente visual.
+- **Subdividida el 2026-09-19** en tres pasos. Los dos primeros son del frente lógico y dejan
+  el servidor listo; el tercero es el que de verdad cierra la tarea, y es de la ficha. **No se
+  cierra hasta que la ficha deje de mandar el formulario entero**: el servidor solo no alcanza,
+  porque el criterio de cierre habla de lo que pasa al guardar desde la ficha.
+  - [x] **[X8.1] Guardado parcial y precondición compartida.** 2026-09-19.
+    `CatalogService.update_personal_fields` guarda sólo los campos que recibe y marca sólo esos;
+    acepta el mismo `base` que el `PATCH` de [X2]. La precondición (`_stale_personal_fields`) se
+    comparte entre los dos, y ahora **da forma a los dos lados** antes de comparar: un `base`
+    leído de una fila web (`0`, `""`) y uno leído de la API de dispositivo (`null`) significan lo
+    mismo, y ninguno da conflicto en un campo que nadie tocó. Cambia también el `PATCH` de [X2]:
+    un `base` con `0` para un puntaje sin poner ya no da un 409 falso. Conserva la tolerancia
+    del formulario (fecha vacía la borra, puntaje acotado, sin tope de largo en la review),
+    para que el navegador no vea rechazos nuevos. `update_personal` pasa a delegar en él.
+  - [ ] **[X8.2] `/api/personal` acepta sólo los campos enviados y un `base`.** Un campo ausente
+    no se toca (hoy ausente = vacío = borra); un `base` viejo responde
+    `409 {"ok": false, "reason": "personal_conflict"}` sin escribir. La ficha actual, que manda
+    los tres campos, se comporta igual que antes. **Modelo sugerido**: Chico.
+  - [ ] **[X8.3] Traspaso a la ficha y changelog.** Lo que tiene que hacer `persistPersonalForm`
+    (`js/core/detail.js`) —del frente visual—: mandar sólo los campos que cambiaron respecto de
+    `form.dataset.initial`, y un `base` con lo que tenía cada uno al abrirse; ante un 409, no
+    perder lo tipeado. Anotado en `Traspasos`. **Modelo sugerido**: Chico (lógica), Medio
+    (ficha).
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar

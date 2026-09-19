@@ -108,6 +108,34 @@ def _wire_personal_value(field: str, value: Any) -> Any:
     return text or None
 
 
+PERSONAL_BASE_FIELDS = frozenset({"status", "watched_at", "rating", "review"})
+
+
+def _validated_personal_base(raw: Any) -> dict[str, Any]:
+    """[X2]/[X8]: the field values a caller last read, or nothing to check."""
+
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or set(raw) - PERSONAL_BASE_FIELDS:
+        raise ValueError("Invalid base")
+    return dict(raw)
+
+
+def _stale_personal_fields(item: Mapping[str, Any], base: Mapping[str, Any]) -> list[str]:
+    """Which of the caller's base values no longer match what is stored.
+
+    Both sides go through the same shaping, so a base echoed from the device API
+    (`null` for unset) and one read off a web row (`0`, `""`) mean the same thing
+    and neither raises a conflict on a field nobody changed.
+    """
+
+    return [
+        field
+        for field, expected in base.items()
+        if _wire_personal_value(field, item.get(field)) != _wire_personal_value(field, expected)
+    ]
+
+
 class CatalogService:
     def __init__(self, repository: CatalogRepository) -> None:
         self.repository = repository
@@ -422,24 +450,64 @@ class CatalogService:
     def update_personal(
         self, item_id: str, watched_at: str, rating: Any, review: str
     ) -> tuple[bool, str]:
+        """Save all three form fields, unconditionally -- the whole-form save."""
+
+        return self.update_personal_fields(
+            item_id, {"watched_at": watched_at, "rating": rating, "review": review}
+        )
+
+    def update_personal_fields(
+        self,
+        item_id: str,
+        values: Mapping[str, Any],
+        base: Mapping[str, Any] | None = None,
+    ) -> tuple[bool, str]:
+        """Save only the personal fields a form actually sent.
+
+        [X8]: a form used to send `watched_at`, `rating` and `review` together
+        with whatever they held when it opened, so saving one of them put the
+        other two back to their old values -- undoing, without a word, a rating a
+        phone had uploaded in the meantime. A field absent from `values` is left
+        exactly as it is, and only the fields present get their change mark.
+
+        `base` is the same guard `patch_personal` takes ([X2]): the values the
+        form read when it opened. If any no longer matches, nothing is written
+        and the answer is `(False, "conflict")`, because a save that only touched
+        its own field can still overwrite that very field.
+
+        Unlike `patch_personal`, this keeps the web form's leniency (a blank date
+        clears it, a rating is clamped, no length limit on the review) so the
+        browser sees no new refusals.
+        """
+
         if not item_id:
             raise ValueError("Missing item id")
+        if not values or set(values) - {"watched_at", "rating", "review"}:
+            raise ValueError("Invalid personal fields")
+        guard = _validated_personal_base(base)
         now = curation_timestamp()
 
         def update(item: dict[str, Any]) -> None:
-            item["watched_at"] = normalize_date(watched_at)
-            item["rating"] = normalize_rating(rating)
-            item["review"] = review.strip()
-            # [X3]: this call always overwrites all three fields ([X8] is the
-            # open fix for that), so all three marks move together with it.
+            stale = _stale_personal_fields(item, guard)
+            if stale:
+                raise PersonalPreconditionFailed(stale)
+            if "watched_at" in values:
+                item["watched_at"] = normalize_date(str(values["watched_at"] or ""))
+            if "rating" in values:
+                item["rating"] = normalize_rating(values["rating"])
+            if "review" in values:
+                item["review"] = str(values["review"] or "").strip()
+            # [X3]: watched_at shares the status mark.
+            marks = {"status" if field == "watched_at" else field for field in values}
             item["personal_changed_at"] = {
                 **item.get("personal_changed_at", {}),
-                "status": now,
-                "rating": now,
-                "review": now,
+                **dict.fromkeys(marks, now),
             }
 
-        return self._update_item(item_id, update)
+        try:
+            return self._update_item(item_id, update)
+        except PersonalPreconditionFailed:
+            return False, "conflict"
 
     def patch_personal(self, item_id: str, values: Mapping[str, Any]) -> tuple[bool, str]:
         """Apply a partial personal-state edit without accepting metadata fields.
@@ -452,15 +520,9 @@ class CatalogService:
         """
         if not item_id:
             raise ValueError("Missing item id")
-        allowed = {"status", "watched_at", "rating", "review"}
-        base_raw = values.get("base")
-        base: dict[str, Any] = {}
-        if base_raw is not None:
-            if not isinstance(base_raw, Mapping) or set(base_raw) - allowed:
-                raise ValueError("Invalid base")
-            base = dict(base_raw)
+        base = _validated_personal_base(values.get("base"))
         requested = set(values) - {"base"}
-        if not requested or requested - allowed:
+        if not requested or requested - PERSONAL_BASE_FIELDS:
             raise ValueError("Invalid personal fields")
         status = ""
         if "status" in values:
@@ -500,14 +562,9 @@ class CatalogService:
         now = curation_timestamp()
 
         def update(item: dict[str, Any]) -> None:
-            if base:
-                mismatched = [
-                    field
-                    for field, expected in base.items()
-                    if _wire_personal_value(field, item.get(field)) != expected
-                ]
-                if mismatched:
-                    raise PersonalPreconditionFailed(mismatched)
+            stale = _stale_personal_fields(item, base)
+            if stale:
+                raise PersonalPreconditionFailed(stale)
             if status:
                 item["status"] = status
                 if status == "to_watch":
