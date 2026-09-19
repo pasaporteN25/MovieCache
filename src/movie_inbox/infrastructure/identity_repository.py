@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 22
+INSTANCE_SCHEMA_VERSION = 23
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -500,6 +500,23 @@ CREATE INDEX ix_device_receipts_draft ON device_receipts(user_id, draft_id);
 CREATE INDEX ix_device_receipts_retention ON device_receipts(state, updated_at);
 """
 
+# [X5]: which works a person removed from a catalogue -- by deleting them or by
+# merging them into another -- so a paired phone that still holds one can be told
+# what became of it. Both ids are the opaque ones a phone knows, not the
+# catalogue's own, and this lives here rather than beside the catalogue because
+# it is sync state, not part of a work: the portable formats do not carry it.
+INSTANCE_SCHEMA_V23 = """
+CREATE TABLE device_removals (
+    catalog_id TEXT NOT NULL REFERENCES catalogs(id) ON DELETE CASCADE,
+    device_id TEXT NOT NULL,
+    reason TEXT NOT NULL CHECK (reason IN ('deleted', 'merged')),
+    merged_into TEXT NOT NULL DEFAULT '',
+    removed_at INTEGER NOT NULL,
+    PRIMARY KEY (catalog_id, device_id)
+);
+CREATE INDEX ix_device_removals_retention ON device_removals(removed_at);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -522,6 +539,7 @@ INSTANCE_MIGRATIONS = {
     20: ("device refresh tokens tolerate one retry after a lost response", INSTANCE_SCHEMA_V20),
     21: ("device sessions carry a stable id a browser can name them by", INSTANCE_SCHEMA_V21),
     22: ("receipts for works a phone added while offline", INSTANCE_SCHEMA_V22),
+    23: ("the record of works removed from a catalogue", INSTANCE_SCHEMA_V23),
 }
 
 

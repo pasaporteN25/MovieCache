@@ -40,6 +40,7 @@ from movie_inbox.application.pairing_service import PairingService
 from movie_inbox.application.privacy_service import PrivacyService
 from movie_inbox.application.public_presentation_service import PublicPresentationService
 from movie_inbox.application.public_ratings_service import PublicRatingsService
+from movie_inbox.application.removal_service import RemovalService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.application.streaming_service import StreamingService
@@ -68,6 +69,7 @@ from movie_inbox.infrastructure.public_presentation_repository import (
 from movie_inbox.infrastructure.public_ratings_repository import (
     SqlitePublicRatingsRepository,
 )
+from movie_inbox.infrastructure.removal_repository import SqliteRemovalRepository
 from movie_inbox.infrastructure.scanner_history import SqliteScannerHistoryRepository
 from movie_inbox.infrastructure.starter_collections import (
     AKIRA_KUROSAWA_SEED_KEY,
@@ -333,6 +335,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.home_snapshot_repository = home_snapshot_repository
     app.state.import_repository = import_repository
     app.state.import_service = import_service
+    app.state.removal_service = RemovalService(SqliteRemovalRepository(instance_db))
     app.state.library_repository = library_repository
     app.state.library_service = library_service
     app.state.availability_service = availability_service

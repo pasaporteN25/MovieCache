@@ -442,9 +442,12 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
   días; y el id durable por obra **no hace falta** para esto ([X11] propone la alternativa
   barata, por fuente).
   - [x] **[X5.1] Diseño y subdivisión.** 2026-09-19. **Modelo sugerido**: Grande.
-  - [ ] **[X5.2] El registro.** Tabla `device_removals` (esquema de `instance.db` v23), su
-    repositorio y un servicio que sabe registrar, olvidar y responder por un id.
-    **Modelo sugerido**: Medio.
+  - [x] **[X5.2] El registro.** 2026-09-19. Tabla `device_removals` (esquema de `instance.db`
+    v23), su repositorio y `RemovalService`, que registra, olvida y responde por una lista de
+    ids: `present` si la obra existe (gana sobre cualquier registro viejo), `removed` con
+    `deleted` o `merged`, o `unknown`. Una cadena de uniones se sigue hasta el final, con un
+    tope contra ciclos. Todavía nadie registra nada: eso es [X5.3] y [X5.4]. **Modelo
+    sugerido**: Medio.
   - [ ] **[X5.3] Registrar al borrar.** `delete_item` dice qué obra quitó y la ruta de la web
     deja el registro (`deleted`). **Modelo sugerido**: Medio.
   - [ ] **[X5.4] Registrar al unir y olvidar al deshacer.** Curaduría (unir dos, unir un

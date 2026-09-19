@@ -65,8 +65,10 @@ Es una ruta nueva y **no** un 410 en `GET /items/{id}`: el 404 de esa ruta ya es
 contrato, y cambiar lo que responde rompería a un cliente fiel a él (ADR-0003: sólo aditivo).
 Es del mismo estilo que los recibos de altas ([X6.3]).
 
-Una unión encadenada (A→B y después B→C) se responde con el final: `merged_into` es siempre
-una obra que existe, o el `state` es `removed` con `deleted` si la última también se borró.
+Una unión encadenada (A→B y después B→C) se responde con el final: `merged_into` es la última
+obra de la cadena que se conoce, y si esa también se borró el `state` es `removed` con
+`deleted`. Si el final de la cadena no tiene registro (por ejemplo, ya pasó el plazo del
+punto 4), se devuelve tal cual y el teléfono pregunta por esa obra a su vez.
 
 ### 4. Cuánto duran los registros
 
