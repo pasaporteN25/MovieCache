@@ -45,10 +45,8 @@ from movie_inbox.web.dependencies import (
     require_device_identity,
     session_catalog_rows,
 )
+from movie_inbox.web.device_ids import opaque_item_id, sync_secret
 from movie_inbox.web.responses import ApiRequestError, DeviceApiRequestError, identity_payload
-
-# Name of the persistent secret the device sync key is derived from.
-DEVICE_SYNC_SECRET = "device_sync_key"
 
 # Namespaces for collection ids, so an id minted for a collection can never be
 # mistaken for one minted for an item inside it.
@@ -220,7 +218,7 @@ def list_followed_collections(
         collections = request.app.state.collection_service.followed_collections(identity.user.id)
     except (LibraryRepositoryError, IdentityRepositoryError) as error:
         raise _catalog_error(error) from error
-    secret = _sync_secret(request)
+    secret = sync_secret(request)
     return JSONResponse(
         {
             "collections": [
@@ -257,7 +255,7 @@ def collection_items(
         collections = request.app.state.collection_service.followed_collections(identity.user.id)
     except (LibraryRepositoryError, IdentityRepositoryError) as error:
         raise _catalog_error(error) from error
-    secret = _sync_secret(request)
+    secret = sync_secret(request)
     found = next(
         (
             collection
@@ -508,7 +506,7 @@ def _device_catalog_entries(
     # from api_token, and from the source's position rather than its path.
     # Rotating the token or relocating a catalogue are both normal operations
     # and must not re-key every work in a paired client's local replica.
-    secret = _sync_secret(request)
+    secret = sync_secret(request)
     for row in rows:
         # Item ids are only unique within one source file, so the source still
         # takes part in the key -- by position, which carries no path. The rows
@@ -521,7 +519,7 @@ def _device_catalog_entries(
             continue
         entries.append(
             DeviceCatalogItem(
-                _opaque_item_id(secret, identity.catalog.id, source_reference, catalog_item_id),
+                opaque_item_id(secret, identity.catalog.id, source_reference, catalog_item_id),
                 source_reference,
                 catalog_item_id,
                 dict(row),
@@ -705,7 +703,7 @@ def _cursor_signature(request: Request, encoded_payload: str) -> str:
     """[X9]: signed with the durable instance secret, not api_token, so a
     restart mid-download does not invalidate the next page's cursor."""
 
-    secret = _sync_secret(request)
+    secret = sync_secret(request)
     return hmac.new(secret, encoded_payload.encode("ascii"), hashlib.sha256).hexdigest()[:32]
 
 
@@ -721,17 +719,6 @@ def _decode(value: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Invalid cursor")
     return payload
-
-
-def _opaque_item_id(secret: bytes, catalog_id: str, source_slot: str, item_id: str) -> str:
-    message = "\x1f".join((catalog_id, source_slot, item_id)).encode("utf-8")
-    digest = hmac.new(secret, message, hashlib.sha256).digest()[:24]
-    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
-
-
-def _sync_secret(request: Request) -> bytes:
-    secret: str = request.app.state.identity_repository.instance_secret(DEVICE_SYNC_SECRET)
-    return secret.encode("utf-8")
 
 
 def _opaque_id(secret: bytes, namespace: str, value: str) -> str:

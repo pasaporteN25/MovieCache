@@ -395,20 +395,40 @@ class CatalogService:
         local_name: str,
         confirmed: bool,
     ) -> tuple[bool, str]:
+        deleted, reason, _ = self.remove_item(item_id, item_url, title, year, local_name, confirmed)
+        return deleted, reason
+
+    def remove_item(
+        self,
+        item_id: str,
+        item_url: str,
+        title: str,
+        year: str,
+        local_name: str,
+        confirmed: bool,
+    ) -> tuple[bool, str, str]:
+        """Delete an item, and say which one it was.
+
+        [X5.3]: an item can be named by its url or its title rather than its
+        id, so the caller cannot know the id of what went -- and a paired
+        phone can only be told about a removal by that id.
+        """
+
         if not confirmed:
             raise ValueError("Deletion requires confirmation")
         if not any([item_id, item_url, title, local_name]):
             raise ValueError("Missing item reference")
 
         if item_id and self.repository.delete_by_id(item_id):
-            return True, "deleted"
+            return True, "deleted", item_id
 
-        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str]]:
+        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str, str]]:
             for index, item in enumerate(items):
                 if same_catalog_item(item, item_id, item_url, title, year, local_name):
+                    removed_id = str(item.get("id") or "")
                     del items[index]
-                    return True, (True, "deleted")
-            return False, (False, "not_found")
+                    return True, (True, "deleted", removed_id)
+            return False, (False, "not_found", "")
 
         return self.repository.mutate(mutation)
 

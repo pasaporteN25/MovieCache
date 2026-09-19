@@ -49,6 +49,7 @@ from movie_inbox.web.dependencies import (
     session_catalog_rows,
 )
 from movie_inbox.web.image_proxy import cached_image
+from movie_inbox.web.removals import RemovedWork, record_removed_works
 from movie_inbox.web.responses import (
     application_error_response,
     error_response,
@@ -273,7 +274,7 @@ def add(
 def delete(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
     try:
         catalog = session_catalog(request)
-        deleted, reason = delete_item_anywhere(
+        deleted, reason, removed = delete_item_anywhere(
             catalog.config,
             source_file=catalog.source_path(str(body.get("source_file") or "")),
             item_id=str(body.get("id") or ""),
@@ -283,6 +284,15 @@ def delete(request: Request, body: dict[str, Any] = Depends(authorized_json)) ->
             local_name=str(body.get("local_name") or ""),
             confirmed=bool(body.get("confirmed")),
         )
+        if removed is not None:
+            # [X5.3]: a paired phone that still holds this work is told a
+            # person deleted it, rather than finding a 404 it cannot explain.
+            record_removed_works(
+                request,
+                require_ready_identity(request),
+                catalog,
+                [RemovedWork(str(removed[0]), removed[1])],
+            )
         return operation_response(deleted, reason)
     except (ValueError, CatalogRepositoryError) as error:
         return application_error_response(error)

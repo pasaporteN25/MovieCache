@@ -17,12 +17,13 @@ from typing import Any
 from fastapi.testclient import TestClient
 
 from movie_inbox.application.auth_service import AuthService
+from movie_inbox.application.pairing_service import DEVICE_SYNC_SECRET
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.web.app import create_app
 from movie_inbox.web.config import ViewerConfig
-from movie_inbox.web.routers.device_catalog import DEVICE_SYNC_SECRET, _opaque_item_id
+from movie_inbox.web.device_ids import opaque_item_id as _opaque_item_id
 
 
 class OpaqueItemIdTests(unittest.TestCase):

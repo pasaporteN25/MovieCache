@@ -448,8 +448,11 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
     `deleted` o `merged`, o `unknown`. Una cadena de uniones se sigue hasta el final, con un
     tope contra ciclos. Todavía nadie registra nada: eso es [X5.3] y [X5.4]. **Modelo
     sugerido**: Medio.
-  - [ ] **[X5.3] Registrar al borrar.** `delete_item` dice qué obra quitó y la ruta de la web
-    deja el registro (`deleted`). **Modelo sugerido**: Medio.
+  - [x] **[X5.3] Registrar al borrar.** 2026-09-19. `CatalogService.remove_item` dice qué obra
+    quitó (un pedido puede nombrarla por URL o título, sin id) y `/api/delete` deja el
+    registro `deleted` con el id del teléfono, **después** de borrar y sin poder deshacer el
+    borrado si el registro falla. La derivación del id del teléfono pasó a `web/device_ids.py`
+    para que otras rutas la usen. **Modelo sugerido**: Medio.
   - [ ] **[X5.4] Registrar al unir y olvidar al deshacer.** Curaduría (unir dos, unir un
     grupo, resolver los seguros) deja `merged` con la obra que quedó; deshacer borra esos
     registros. **Modelo sugerido**: Grande: varias rutas y un deshacer.

@@ -260,7 +260,14 @@ def delete_item_anywhere(
     year: str,
     local_name: str,
     confirmed: bool,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, tuple[Path, str] | None]:
+    """Delete an item from whichever source holds it.
+
+    The third value is the file it was in and the id it had, when something was
+    deleted -- [X5.3]: the request may name it by url or title, and the record
+    a paired phone is told from needs the id.
+    """
+
     paths = [write_path_for(config, source_file)]
     for file in resolved_files(config.patterns):
         path = Path(file)
@@ -268,23 +275,13 @@ def delete_item_anywhere(
             paths.append(path)
     last_reason = "not_found"
     for path in paths:
-        deleted, reason = delete_item(path, item_id, item_url, title, year, local_name, confirmed)
+        deleted, reason, removed_id = catalog_service(path).remove_item(
+            item_id, item_url, title, year, local_name, confirmed
+        )
         if deleted:
-            return True, reason
+            return True, reason, (path, removed_id)
         last_reason = reason
-    return False, last_reason
-
-
-def delete_item(
-    path: Path,
-    item_id: str,
-    item_url: str,
-    title: str,
-    year: str,
-    local_name: str,
-    confirmed: bool,
-) -> tuple[bool, str]:
-    return catalog_service(path).delete_item(item_id, item_url, title, year, local_name, confirmed)
+    return False, last_reason, None
 
 
 def update_item_status(
