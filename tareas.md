@@ -409,76 +409,6 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X5] Bajas que viajan en la sincronización
-
-Decisión del owner del 2026-09-14, que revierte "la sincronización nunca borra" de ADR-0005
-(ver su enmienda de esa fecha): borrar una obra en un lado la borra en el otro al
-sincronizar. Hoy el servidor borra sin rastro (`delete_item`), y una fusión de duplicados hace
-desaparecer una de las dos obras sin decir con cuál se unió. Un teléfono sólo ve un 404, sin
-saber qué pasó (caso 9 de la matriz de [A5.1]).
-
-- **Alcance**:
-  - Un registro de baja por obra borrada, con el id que conocía el dispositivo y la fecha, y
-    una forma de consultarlo desde la API de dispositivo. Una obra ausente sin registro nunca
-    se trata como baja.
-  - Una fusión deja un registro que dice con qué obra se unió, para que un cambio pendiente del
-    teléfono pase a la obra que queda.
-  - Recibir bajas desde un teléfono y aplicarlas al catálogo. Una baja sobre una obra que se
-    editó en el servidor después de la última sincronización de ese teléfono no se aplica
-    sola: decide la persona.
-  - Cuánto tiempo se conservan los registros, y qué pasa con un teléfono que sincroniza
-    después de ese plazo.
-  - Evaluar la idea del owner: seguir cada obra con un identificador propio y durable, que no
-    dependa de la posición de la fuente (caso 17) y que los registros de baja puedan citar.
-- **Criterio de cierre**: una baja en la web llega al teléfono y una baja en el teléfono llega
-  al servidor, sin que una obra ausente borre nada; y un cambio pendiente sobre una obra
-  fusionada termina en la obra que queda.
-- **Depende de**: nada para diseñarla; en el cliente, [A5.2] incorpora las reglas. **Modelo
-  sugerido**: Grande: toca el contrato y la identidad de las obras.
-- **Subdividida el 2026-09-19**; el diseño y sus decisiones revisables están en
-  `docs/design/x5-removals-in-sync-2026-09-19.md`. En corto: los registros viven en
-  `instance.db` con el id opaco que el teléfono ya conoce; sólo cuenta lo que una persona
-  hizo (borrar, unir); el teléfono pregunta con una ruta nueva en vez de un 410; duran 365
-  días; y el id durable por obra **no hace falta** para esto ([X11] propone la alternativa
-  barata, por fuente).
-  - [x] **[X5.1] Diseño y subdivisión.** 2026-09-19. **Modelo sugerido**: Grande.
-  - [x] **[X5.2] El registro.** 2026-09-19. Tabla `device_removals` (esquema de `instance.db`
-    v23), su repositorio y `RemovalService`, que registra, olvida y responde por una lista de
-    ids: `present` si la obra existe (gana sobre cualquier registro viejo), `removed` con
-    `deleted` o `merged`, o `unknown`. Una cadena de uniones se sigue hasta el final, con un
-    tope contra ciclos. Todavía nadie registra nada: eso es [X5.3] y [X5.4]. **Modelo
-    sugerido**: Medio.
-  - [x] **[X5.3] Registrar al borrar.** 2026-09-19. `CatalogService.remove_item` dice qué obra
-    quitó (un pedido puede nombrarla por URL o título, sin id) y `/api/delete` deja el
-    registro `deleted` con el id del teléfono, **después** de borrar y sin poder deshacer el
-    borrado si el registro falla. La derivación del id del teléfono pasó a `web/device_ids.py`
-    para que otras rutas la usen. **Modelo sugerido**: Medio.
-  - [x] **[X5.4] Registrar al unir y olvidar al deshacer.** 2026-09-19. Unir dos, unir un
-    grupo y "resolver los seguros" dejan `merged` con la obra que quedó (que puede estar en
-    otra fuente); deshacer la unión borra el registro. `merge`, `merge_group`,
-    `auto_resolve_duplicates` y `undo` aceptan un observador opcional que se llama **después**
-    de confirmada la operación y sin cambiar lo que devuelven, para no meter rutas de archivo
-    en las respuestas del navegador; lo que se quitó se lee del antes y el después de la
-    propia operación. **Modelo sugerido**: Grande: varias rutas y un deshacer.
-  - [x] **[X5.5] La consulta.** 2026-09-19. `POST /api/v1/catalog/items/status` con hasta 100
-    ids responde por cada uno `present`, `removed` (`deleted` o `merged`, con la obra que quedó
-    y cuándo) o `unknown`, con su contrato OpenAPI. `unknown` es una respuesta con nombre y el
-    contrato dice en mayúsculas que **no** es una baja: una obra que desapareció sin pasar por
-    la aplicación (un archivo editado a mano) sale `unknown`, no `removed`. Es una ruta nueva
-    y no un 410 sobre `GET /items/{id}`, para no cambiar lo que ese 404 ya prometía. **Modelo
-    sugerido**: Medio.
-  - [x] **[X5.6] La baja desde el teléfono.** 2026-09-19. `POST
-    /api/v1/catalog/items/{itemId}/removal` con la `base` de estado personal que el teléfono
-    vio, o con `force`. Si el servidor tiene otra cosa (alguien puntuó o reseñó desde la última
-    sincronización de ese teléfono) responde `409 removal_conflict` y no borra: decide la
-    persona. La comprobación y el borrado son una sola transacción, así que una edición no se
-    cuela en el medio; la `base` tiene que traer los cuatro campos, porque una parcial no
-    prueba lo que el teléfono vio; sólo se compara el estado personal, no el resto de la ficha
-    (revisable). Un reintento después de un éxito responde 200 con cómo se fue, y una obra ya
-    unida a otra lo dice sin tocar la que quedó. Deja el registro `deleted`, así que los demás
-    teléfonos de la cuenta se enteran. **Modelo sugerido**: Grande.
-  - [ ] **[X5.7] Changelog y cierre.** **Modelo sugerido**: Chico.
-
 #### [X11] Un id durable por fuente, en lugar de su posición — *propuesta, decide el owner*
 
 Surge de evaluar la idea del owner en [X5]. El id que ve el teléfono incluye la posición de la
@@ -787,6 +717,25 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   cuenta sigue cortando todas las sesiones. **Un número para revisar:** la ventana de 120 s;
   la tarea decía "unos segundos", pero un corte real dura más y es del owner. La pantalla es un
   traspaso al frente visual, anotado en su sección.
+- [x] **[X5] Bajas que viajan en la sincronización.** 2026-09-19. Decisión del owner del
+  2026-09-14 (revierte "nunca borra" de ADR-0005), diseñada en
+  `docs/design/x5-removals-in-sync-2026-09-19.md` y commiteada por pasos: **[X5.2]**
+  `device_removals` (esquema de `instance.db` v23) y su servicio; **[X5.3]** borrar en la web
+  deja el registro; **[X5.4]** unir en Curaduría (dos, un grupo, "resolver los seguros") deja
+  `merged` con la obra que quedó, y deshacer lo borra; **[X5.5]** `POST
+  /api/v1/catalog/items/status`; **[X5.6]** `POST /api/v1/catalog/items/{itemId}/removal`, con
+  `409 removal_conflict` si el servidor tiene una edición personal que el teléfono no vio;
+  **[X5.7]** el changelog. Cumple las tres condiciones del owner: una baja viaja sólo como
+  registro explícito (una obra que falta, o que un archivo editado a mano hizo desaparecer,
+  sale `unknown` y **nunca** se borra); si un lado borró y el otro editó decide la persona; y
+  unir cuenta como borrar el duplicado, con un puntero a la obra que queda. **Decisiones
+  revisables:** los registros duran 365 días; una baja desde el teléfono sólo mira el estado
+  personal, no el resto de la ficha; la `base` tiene que traer los cuatro campos. **Fuera de
+  alcance, anotado:** deshacer una operación del Scanner también quita obras y no deja
+  registro; esas obras las agregó un proceso, no una decisión sobre una obra. **El
+  identificador durable que sugirió el owner no hace falta para esto:** el `id` de cada obra ya
+  es durable y lo frágil es la posición de la fuente dentro del id del teléfono; queda como
+  propuesta [X11] (un id por fuente), que conviene decidir antes del primer cliente instalado.
 - [x] **[X6] Recibos de altas sin conexión.** 2026-09-19. Encontrado en la matriz de
   sincronización del cliente ([A5.1], caso 10). Subdividida en cuatro pasos y commiteada por
   separado: **[X6.1]** `device_receipts` (esquema de `instance.db` v22), un recibo por

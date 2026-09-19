@@ -12,7 +12,7 @@ el trabajo visual de Inicio sigue en curso.
 ### Antes de actualizar
 
 - **Hacé un backup: las bases no vuelven atrás.** La 0.9.0 migra `instance.db` del esquema
-  v11 al v22 y la base del catálogo (`movie-inbox.db`) del v5 al v6 apenas las abre, y
+  v11 al v23 y la base del catálogo (`movie-inbox.db`) del v5 al v6 apenas las abre, y
   guarda un catálogo JSON en el formato v10 —antes v9— en cuanto lo escribe. La 0.8.0 se
   niega a abrir cualquiera de las tres ("newer than supported"): volver a la 0.8.0 exige
   restaurar el backup (`movie-inbox backup` o, en Docker, `bash scripts/docker-backup.sh`).
@@ -118,6 +118,20 @@ el trabajo visual de Inicio sigue en curso.
   a una candidata del catálogo, y un borrador aplicado no se reabre, así que lo que quedó sin
   aplicar se informa como descartado. Los recibos ya resueltos se olvidan al año; los
   pendientes no.
+- **Las bajas viajan a los teléfonos** (decisión del owner del 2026-09-14, que revierte "la
+  sincronización nunca borra" de ADR-0005). Borrar una obra en la web, o unirla con otra en
+  Curaduría, deja un registro con el id que el teléfono conocía; unir dice además con qué obra
+  se unió, para que un cambio pendiente del teléfono la siga. Deshacer la unión borra el
+  registro. `POST /api/v1/catalog/items/status` responde por hasta 100 obras: `present`,
+  `removed` (con el motivo, la obra que quedó y cuándo) o `unknown`. `unknown` **no** es una baja:
+  una obra que falta en una descarga, o que desapareció sin pasar por la aplicación, nunca se
+  anuncia como borrada; sólo lo es lo que una persona hizo. Los registros se olvidan al año.
+- **Un teléfono puede borrar una obra:** `POST /api/v1/catalog/items/{itemId}/removal`, con el
+  estado personal que vio. Si alguien puntuó o reseñó la obra en el servidor desde la última
+  sincronización de ese teléfono no se borra sola —responde `409 removal_conflict`— y decide la
+  persona, que puede insistir con `force`. La comprobación y el borrado son una sola operación,
+  y un reintento después de un éxito responde 200 en vez de fallar. Los demás teléfonos de la
+  cuenta se enteran.
 - Vectores de prueba para el cliente Android, calculados por el propio servidor y
   verificados en cada corrida de pruebas: la huella del certificado con los payloads del QR
   (`docs/briefs/pairing-certificate-v1-vectors.json`) y la normalización de títulos

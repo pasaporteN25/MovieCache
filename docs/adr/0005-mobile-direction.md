@@ -296,6 +296,11 @@ consultarlos: es [X5] en `tareas.md`. La sección 3 pedía para las bajas "su pr
 enmienda fija la decisión, y el diseño detallado va en [X5], que además evalúa una idea del
 owner: seguir cada obra con un identificador propio y durable.
 
+**Diseño hecho el 2026-09-19:** `docs/design/x5-removals-in-sync-2026-09-19.md`. Dónde viven los
+registros, qué cuenta como baja, cómo pregunta el teléfono, cuánto duran, cuándo un teléfono
+puede borrar y la evaluación del identificador durable (que no hace falta para las bajas;
+se propone [X11] como alternativa barata, por fuente).
+
 ### Los conflictos de estado personal se resuelven solos
 
 **Reemplaza el "conflicto: decide la persona" de la sección 4** para los cuatro campos
