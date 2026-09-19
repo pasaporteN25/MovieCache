@@ -1451,6 +1451,24 @@ class SqliteIdentityRepository:
                     f"Cannot list device sessions from: {self.path}"
                 ) from error
 
+    def delete_device_session_by_id(self, user_id: str, session_id: str) -> bool:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    # Scoped to the account: an id from another account matches
+                    # nothing, exactly as an id that does not exist.
+                    cursor = connection.execute(
+                        "DELETE FROM device_sessions WHERE user_id = ? AND session_id = ?",
+                        (user_id, session_id),
+                    )
+                    connection.commit()
+                    return bool(cursor.rowcount == 1)
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot revoke device session in: {self.path}"
+                ) from error
+
     def delete_device_session(self, access_token_hash: str) -> None:
         with self._thread_lock:
             try:

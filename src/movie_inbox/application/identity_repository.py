@@ -178,6 +178,10 @@ class IdentityRepository(Protocol):
         """The account's unexpired device sessions, most recently used first."""
         ...
 
+    def delete_device_session_by_id(self, user_id: str, session_id: str) -> bool:
+        """Revoke one of `user_id`'s phones; False if it is not theirs or not there."""
+        ...
+
     def delete_device_session(self, access_token_hash: str) -> None: ...
 
     def save_pairing_ticket(

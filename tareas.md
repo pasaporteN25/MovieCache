@@ -453,7 +453,7 @@ obstáculos:
     teléfono desde la web. Columna `session_id` aleatoria (v21, con relleno de las filas
     existentes) y `list_device_sessions` en repositorio y servicio: id, nombre, creado,
     último uso, vencimiento; nunca un hash. **Modelo sugerido**: Medio.
-  - [ ] **[X4.3] Revocar un teléfono por id.** Repositorio y servicio, acotado a la cuenta:
+  - [x] **[X4.3] Revocar un teléfono por id.** 2026-09-19. Repositorio y servicio, acotado a la cuenta:
     una cuenta sólo revoca los suyos. **Modelo sugerido**: Chico.
   - [ ] **[X4.4] Endpoints web.** `GET /api/device-sessions` y
     `DELETE /api/device-sessions/{id}` con las mismas guardas que el apareamiento (token,

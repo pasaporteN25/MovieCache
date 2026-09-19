@@ -227,6 +227,19 @@ class AuthService:
 
         return self.repository.list_device_sessions(identity.user.id, int(self.clock()))
 
+    def revoke_device_session(self, identity: AuthenticatedIdentity, session_id: str) -> bool:
+        """Cut one of this account's phones off; it is out on its next call.
+
+        Deleting the row ends the access token and the refresh token alike, and
+        the previous refresh token [X4.1] keeps for retries: they live in it.
+        A phone that is not this account's, or does not exist, answers False --
+        the same way, so the answer says nothing about other accounts.
+        """
+
+        if not session_id or len(session_id) > 64:
+            return False
+        return self.repository.delete_device_session_by_id(identity.user.id, session_id)
+
     def _authenticated_user(
         self, username: str, password: str
     ) -> tuple[UserAccount, PersonalCatalog]:

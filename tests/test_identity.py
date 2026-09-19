@@ -689,6 +689,78 @@ class DeviceSessionListTests(unittest.TestCase):
 
         self.assertEqual(self.service.list_device_sessions(self.identity), [])
 
+    def _id_of(self, name: str) -> str:
+        return next(
+            row.id
+            for row in self.service.list_device_sessions(self.identity)
+            if row.device_name == name
+        )
+
+    def test_a_revoked_phone_is_out_on_its_next_call(self) -> None:
+        session = self._pair("Pixel")
+
+        self.assertTrue(self.service.revoke_device_session(self.identity, self._id_of("Pixel")))
+
+        self.assertIsNone(self.service.authenticate_device(session.access_token))
+        self.assertIsNone(self.service.refresh_device_session(session.refresh_token))
+
+    def test_revoking_also_closes_the_retry_window(self) -> None:
+        # [X4.1] keeps the replaced refresh token usable for a while; a phone
+        # someone just cut off must not get back in through it.
+        session = self._pair("Pixel")
+        rotated = self.service.refresh_device_session(session.refresh_token)
+        assert rotated is not None
+
+        self.service.revoke_device_session(self.identity, self._id_of("Pixel"))
+
+        self.assertIsNone(self.service.refresh_device_session(session.refresh_token))
+        self.assertIsNone(self.service.refresh_device_session(rotated.refresh_token))
+
+    def test_revoking_one_phone_leaves_the_others(self) -> None:
+        self._pair("Pixel")
+        tablet = self._pair("Tablet")
+
+        self.service.revoke_device_session(self.identity, self._id_of("Pixel"))
+
+        self.assertIsNotNone(self.service.authenticate_device(tablet.access_token))
+        self.assertEqual(
+            [row.device_name for row in self.service.list_device_sessions(self.identity)],
+            ["Tablet"],
+        )
+
+    def test_an_account_cannot_revoke_another_account_s_phone(self) -> None:
+        member = self.members.create_member(self.owner, "maria").member
+        self.repository.save_device_session(
+            "member-access-hash",
+            "member-refresh-hash",
+            member.user.id,
+            "Telefono de Maria",
+            1_000,
+            1_060,
+            1_500,
+        )
+        (theirs,) = self.repository.list_device_sessions(member.user.id, 1_000)
+
+        revoked = self.service.revoke_device_session(self.identity, theirs.id)
+
+        self.assertFalse(revoked)
+        self.assertEqual(len(self.repository.list_device_sessions(member.user.id, 1_000)), 1)
+
+    def test_an_unknown_or_malformed_id_revokes_nothing(self) -> None:
+        self._pair("Pixel")
+
+        for bad in ("", "no-such-phone", "x" * 65, "%' OR '1'='1"):
+            with self.subTest(session_id=bad[:12]):
+                self.assertFalse(self.service.revoke_device_session(self.identity, bad))
+        self.assertEqual(len(self.service.list_device_sessions(self.identity)), 1)
+
+    def test_revoking_twice_is_not_an_error(self) -> None:
+        self._pair("Pixel")
+        session_id = self._id_of("Pixel")
+
+        self.assertTrue(self.service.revoke_device_session(self.identity, session_id))
+        self.assertFalse(self.service.revoke_device_session(self.identity, session_id))
+
     def test_the_migration_gives_existing_sessions_distinct_ids(self) -> None:
         self._pair("Pixel")
         self._pair("Tablet")
