@@ -467,8 +467,16 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
     la aplicación (un archivo editado a mano) sale `unknown`, no `removed`. Es una ruta nueva
     y no un 410 sobre `GET /items/{id}`, para no cambiar lo que ese 404 ya prometía. **Modelo
     sugerido**: Medio.
-  - [ ] **[X5.6] La baja desde el teléfono.** `POST /api/v1/catalog/items/{itemId}/removal`,
-    con `409 removal_conflict`. **Modelo sugerido**: Grande.
+  - [x] **[X5.6] La baja desde el teléfono.** 2026-09-19. `POST
+    /api/v1/catalog/items/{itemId}/removal` con la `base` de estado personal que el teléfono
+    vio, o con `force`. Si el servidor tiene otra cosa (alguien puntuó o reseñó desde la última
+    sincronización de ese teléfono) responde `409 removal_conflict` y no borra: decide la
+    persona. La comprobación y el borrado son una sola transacción, así que una edición no se
+    cuela en el medio; la `base` tiene que traer los cuatro campos, porque una parcial no
+    prueba lo que el teléfono vio; sólo se compara el estado personal, no el resto de la ficha
+    (revisable). Un reintento después de un éxito responde 200 con cómo se fue, y una obra ya
+    unida a otra lo dice sin tocar la que quedó. Deja el registro `deleted`, así que los demás
+    teléfonos de la cuenta se enteran. **Modelo sugerido**: Grande.
   - [ ] **[X5.7] Changelog y cierre.** **Modelo sugerido**: Chico.
 
 #### [X11] Un id durable por fuente, en lugar de su posición — *propuesta, decide el owner*

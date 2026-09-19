@@ -315,6 +315,14 @@ def patch_item_personal(
     return catalog_service(path).patch_personal(item_id, values)
 
 
+def remove_item_unless_edited(
+    path: Path,
+    item_id: str,
+    base: dict[str, Any] | None,
+) -> tuple[bool, str]:
+    return catalog_service(path).remove_item_unless_edited(item_id, base)
+
+
 def update_link_curation(path: Path, item_id: str, status: str) -> tuple[bool, str]:
     return catalog_service(path).update_link_curation(item_id, status)
 

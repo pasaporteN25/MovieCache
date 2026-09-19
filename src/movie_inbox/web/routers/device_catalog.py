@@ -12,6 +12,7 @@ import bisect
 import hashlib
 import hmac
 import json
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -35,12 +36,17 @@ from movie_inbox.application.search_service import search_catalog_items
 from movie_inbox.application.streaming_repository import StreamingRepositoryError
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.imdb_dataset import IMDB_ATTRIBUTION_NOTICE
+from movie_inbox.domain.removals import RemovedWork
 from movie_inbox.domain.streaming import (
     JUSTWATCH_ATTRIBUTION_NOTICE,
     retention_expires_at,
 )
 from movie_inbox.external.tmdb import TMDB_ATTRIBUTION_NOTICE
-from movie_inbox.web.catalog_api import load_items, patch_item_personal
+from movie_inbox.web.catalog_api import (
+    load_items,
+    patch_item_personal,
+    remove_item_unless_edited,
+)
 from movie_inbox.web.dependencies import (
     SessionCatalog,
     device_json,
@@ -48,6 +54,7 @@ from movie_inbox.web.dependencies import (
     session_catalog_rows,
 )
 from movie_inbox.web.device_ids import opaque_item_id, sync_secret
+from movie_inbox.web.removals import record_removed_works
 from movie_inbox.web.responses import ApiRequestError, DeviceApiRequestError, identity_payload
 
 # Namespaces for collection ids, so an id minted for a collection can never be
@@ -382,6 +389,101 @@ def item_status(
                 }
                 for device_id, answer in answers.items()
             }
+        }
+    )
+
+
+_REMOVAL_BASE_FIELDS = frozenset({"status", "watched_at", "rating", "review"})
+
+
+@router.post("/api/v1/catalog/items/{item_id}/removal")
+def remove_catalog_item(
+    item_id: str,
+    request: Request,
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+    body: dict[str, Any] = Depends(device_json),
+) -> JSONResponse:
+    """Remove a work at the request of a device that deleted it ([X5.6]).
+
+    The device sends `base`: the personal state (`status`, `watched_at`,
+    `rating`, `review`) it last saw. If the server holds something different now
+    -- somebody rated it, or wrote a review, since that device last synced -- the
+    answer is 409 `removal_conflict` and nothing is deleted: a person decides,
+    and deletes anyway by asking again with `force: true`.
+
+    Safe to retry. A work that is already removed answers 200 with how it left,
+    so a request that succeeded and whose response was lost cannot then fail.
+    """
+
+    force = body.get("force", False)
+    base = body.get("base")
+    if (
+        not isinstance(force, bool)
+        or set(body) - {"base", "force"}
+        or (not force and not _is_full_removal_base(base))
+        or (force and base is not None and not isinstance(base, dict))
+    ):
+        raise DeviceApiRequestError("invalid_request", 400)
+
+    entries = _device_catalog_entries(request, identity)
+    entry = _entry_by_id(entries, item_id)
+    if entry is None:
+        return _already_removed(request, identity, item_id)
+    catalog = _session_catalog(request, identity)
+    path = Path(catalog.source_path(entry.source_reference))
+    try:
+        removed, reason = remove_item_unless_edited(
+            path, entry.catalog_item_id, None if force else base
+        )
+    except (ValueError, CatalogRepositoryError) as error:
+        raise _catalog_error(error) from error
+    if reason == "conflict":
+        raise DeviceApiRequestError("removal_conflict", 409)
+    if not removed:
+        # Removed between the lookup above and the deletion.
+        return _already_removed(request, identity, item_id)
+    record_removed_works(
+        request, identity, catalog, [RemovedWork(str(path), entry.catalog_item_id)]
+    )
+    return JSONResponse(
+        {
+            "state": "removed",
+            "reason": "deleted",
+            "merged_into": None,
+            "removed_at": _iso(int(time.time())),
+        }
+    )
+
+
+def _is_full_removal_base(base: Any) -> bool:
+    """A base has to describe the whole personal state, or it proves nothing.
+
+    A device that sends only the rating would delete a work somebody just
+    reviewed, and never know it had not checked.
+    """
+
+    return isinstance(base, dict) and set(base) == _REMOVAL_BASE_FIELDS
+
+
+def _already_removed(
+    request: Request, identity: AuthenticatedIdentity, item_id: str
+) -> JSONResponse:
+    """200 for a work a person already removed, 404 for one nobody knows."""
+
+    try:
+        answer = request.app.state.removal_service.statuses(identity.catalog.id, [item_id], set())[
+            item_id
+        ]
+    except RemovalRepositoryError as error:
+        raise DeviceApiRequestError("identity_store_unavailable", 503) from error
+    if answer.state != "removed":
+        raise DeviceApiRequestError("item_not_found", 404)
+    return JSONResponse(
+        {
+            "state": answer.state,
+            "reason": answer.reason or None,
+            "merged_into": answer.merged_into or None,
+            "removed_at": _iso(answer.removed_at) if answer.removed_at else None,
         }
     )
 

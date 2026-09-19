@@ -37,6 +37,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/catalog/items/status",
                 "/api/v1/catalog/items/{itemId}",
                 "/api/v1/catalog/items/{itemId}/personal",
+                "/api/v1/catalog/items/{itemId}/removal",
                 "/api/v1/search",
             },
         )
@@ -86,6 +87,23 @@ class DeviceApiContractTests(unittest.TestCase):
             sorted(status["required"]), ["merged_into", "reason", "removed_at", "state"]
         )
         self.assertEqual(status["properties"]["reason"]["enum"], ["deleted", "merged", None])
+        # [X5.6]: a phone can remove a work, but not over a personal edit it never
+        # saw: without force the request has to say what the phone saw, all of it.
+        removal = document["paths"]["/api/v1/catalog/items/{itemId}/removal"]["post"]
+        assert removal["operationId"] == "removeCatalogItem"
+        self.assertIn("409", removal["responses"])
+        self.assertIn(
+            "removal_conflict",
+            document["components"]["responses"]["RemovalConflict"]["description"],
+        )
+        removal_base = document["components"]["schemas"]["RemovalBase"]
+        self.assertEqual(
+            sorted(removal_base["required"]), ["rating", "review", "status", "watched_at"]
+        )
+        self.assertEqual(
+            sorted(document["components"]["schemas"]["RemovalRequest"]["properties"]),
+            ["base", "force"],
+        )
         item = document["components"]["schemas"]["OfflineDraftItem"]
         self.assertEqual(sorted(item["required"]), ["id", "title"])
         # [A2.6]: a collection work carries identity and nothing personal --

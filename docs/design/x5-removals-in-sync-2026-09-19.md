@@ -85,17 +85,21 @@ comportamiento correcto para un teléfono que estuvo un año sin sincronizar.
 `POST /api/v1/catalog/items/{itemId}/removal` con `{"base": {...}}` o `{"force": true}`.
 
 - **Sin `base` ni `force`** es un 400: una baja sin saber qué vio el teléfono no se aplica
-  sola.
+  sola. Y la `base` tiene que traer los **cuatro** campos: una parcial (sólo el puntaje) no
+  prueba lo que el teléfono vio y dejaría borrar una obra que alguien acaba de reseñar.
 - **La regla del owner** —*una baja sobre una obra que se editó en el servidor después de la
   última sincronización de ese teléfono no se aplica sola*— se lee sobre el estado personal:
   si `status`/`watched_at`, `rating` o `review` valen hoy otra cosa que en la `base` (las mismas
   cuatro que ya entiende el `PATCH`, con la misma comparación normalizada de [X2]), la
-  respuesta es **409 `removal_conflict`** con el estado actual, y no se borra nada. Decide la
-  persona, en el teléfono: conservar la obra, o repetir con `force: true`.
+  respuesta es **409 `removal_conflict`** y no se borra nada. Como con `personal_conflict`, el
+  teléfono relee la obra con su `GET`; decide la persona, en el teléfono: conservar la obra, o
+  repetir con `force: true`. La comprobación y el borrado ocurren en una sola transacción del
+  repositorio, así que una edición no puede colarse en el medio.
 - No se mira el resto de la ficha: enriquecer o corregir metadatos no es "editar la obra" en el
   sentido del owner. *Revisable.*
-- **Idempotente:** pedir la baja de lo que ya está dado de baja responde 200. Un reintento
-  después de un corte no puede fallar por haber funcionado.
+- **Idempotente:** pedir la baja de lo que ya está dado de baja responde 200, con cómo se fue
+  (si se había unido a otra, lo dice: nunca se borra la que quedó). Un reintento después de un
+  corte no puede fallar por haber funcionado.
 - Una obra que no existe y no tiene registro es 404 `item_not_found`, como el resto.
 
 ### 6. El identificador durable que sugirió el owner

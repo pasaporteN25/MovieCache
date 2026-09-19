@@ -1,4 +1,4 @@
-"""[X5.3]-[X5.5] Removing a work in the browser leaves a record a phone can be told.
+"""[X5.3]-[X5.6] Removing a work in the browser leaves a record a phone can be told.
 
 The record is asked of the service directly here: the route a phone asks it
 through is a later step, and what these settle is that the right id gets
@@ -515,6 +515,205 @@ class ItemStatusApiTests(_CurationHttpCase):
             response = self._status("ran")
 
         self.assertEqual(response.status_code, 503, response.content)
+
+
+class PhoneRemovalApiTests(_CurationHttpCase):
+    """[X5.6] A phone that deleted a work asks the server to remove it.
+
+    The rule under test is the owner's: a removal that meets a personal edit made
+    on the server since that phone last synced is not applied on its own.
+    """
+
+    def _base(self, item_id: str) -> dict[str, Any]:
+        """The personal state a phone would hold: what the server shows for it."""
+
+        shown = self.client.get(
+            f"/api/v1/catalog/items/{self._phone_id(item_id)}", headers=self.bearer
+        ).json()["personal"]
+        return {key: shown[key] for key in ("status", "watched_at", "rating", "review")}
+
+    def _remove(self, item_id: str, body: dict[str, Any]) -> Any:
+        return self.client.post(
+            f"/api/v1/catalog/items/{self._phone_id(item_id)}/removal",
+            content=json.dumps(body),
+            headers=self._device_headers(),
+        )
+
+    def _edit_on_the_server(self, item_id: str, **fields: Any) -> None:
+        response = self.client.patch(
+            f"/api/v1/catalog/items/{self._phone_id(item_id)}/personal",
+            content=json.dumps(fields),
+            headers=self._device_headers(),
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def test_a_work_nobody_touched_is_removed_and_the_catalogue_loses_it(self) -> None:
+        response = self._remove("heat-a", {"base": self._base("heat-a")})
+
+        self.assertEqual(response.status_code, 200, response.content)
+        answer = response.json()
+        self.assertEqual(
+            (answer["state"], answer["reason"], answer["merged_into"]), ("removed", "deleted", None)
+        )
+        self.assertRegex(answer["removed_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$")
+        self.assertEqual(self._still_in_catalogue(), {"heat-b", "heat-c", "ran"})
+
+    def test_the_removal_is_remembered_so_another_phone_is_told(self) -> None:
+        gone = self._phone_id("heat-a")
+        self._remove("heat-a", {"base": self._base("heat-a")})
+        other = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {"username": "lucas", "password": self.password, "device_name": "Tablet"}
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(other.status_code, 201, other.content)
+        tablet = {
+            "Authorization": f"Bearer {other.json()['access_token']}",
+            "Content-Type": "application/json",
+        }
+
+        response = self.client.post(
+            "/api/v1/catalog/items/status", content=json.dumps({"ids": [gone]}), headers=tablet
+        )
+
+        self.assertEqual(response.json()["items"][gone]["state"], "removed")
+        self.assertEqual(response.json()["items"][gone]["reason"], "deleted")
+
+    def test_a_change_made_on_the_server_since_the_base_stops_the_removal(self) -> None:
+        base = self._base("heat-a")
+        self._edit_on_the_server("heat-a", rating=9)
+
+        response = self._remove("heat-a", {"base": base})
+
+        self.assertEqual(response.status_code, 409, response.content)
+        self.assertEqual(response.json(), {"error": {"code": "removal_conflict"}})
+        self.assertIn("heat-a", self._still_in_catalogue())
+        self.assertEqual(self._recorded("heat-a"), {})
+
+    def test_each_personal_field_counts_as_an_edit(self) -> None:
+        edits: dict[str, dict[str, Any]] = {
+            "status": {"status": "watched", "watched_at": "2026-09-01"},
+            "rating": {"rating": 7},
+            "review": {"review": "Better on the second watch."},
+        }
+        for name, fields in edits.items():
+            with self.subTest(field=name):
+                item_id = f"heat-{'abc'[list(edits).index(name)]}"
+                base = self._base(item_id)
+                self._edit_on_the_server(item_id, **fields)
+
+                response = self._remove(item_id, {"base": base})
+
+                self.assertEqual(response.status_code, 409, response.content)
+                self.assertIn(item_id, self._still_in_catalogue())
+
+    def test_a_person_who_chose_to_delete_anyway_can_force_it(self) -> None:
+        base = self._base("heat-a")
+        self._edit_on_the_server("heat-a", rating=9)
+        self.assertEqual(self._remove("heat-a", {"base": base}).status_code, 409)
+
+        forced = self._remove("heat-a", {"base": base, "force": True})
+
+        self.assertEqual(forced.status_code, 200, forced.content)
+        self.assertNotIn("heat-a", self._still_in_catalogue())
+
+    def test_force_needs_no_base_at_all(self) -> None:
+        response = self._remove("heat-a", {"force": True})
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertNotIn("heat-a", self._still_in_catalogue())
+
+    def test_a_base_that_says_the_same_thing_another_way_is_not_an_edit(self) -> None:
+        # Nothing was rated. A phone may hold that as null or as 0, and neither
+        # is a change; the comparison is the personal patch's own ([X2]).
+        base = {**self._base("heat-a"), "rating": 0}
+
+        response = self._remove("heat-a", {"base": base})
+
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def test_a_removal_without_a_complete_base_or_force_is_refused(self) -> None:
+        whole = self._base("heat-a")
+        bodies: list[Any] = [
+            {},
+            {"base": {}},
+            {"base": {"rating": None}},
+            {"base": {key: whole[key] for key in ("status", "rating", "review")}},
+            {"base": "everything"},
+            {"base": {**whole, "title": "Heat"}},
+            {"force": "yes"},
+            {"force": False},
+            {"force": True, "base": "everything"},
+            {"force": True, "surprise": 1},
+        ]
+        for body in bodies:
+            with self.subTest(body=str(body)[:70]):
+                response = self._remove("heat-a", body)
+
+                self.assertEqual(response.status_code, 400, response.content)
+                self.assertIn("heat-a", self._still_in_catalogue())
+
+    def test_asking_again_after_it_worked_answers_ok_instead_of_failing(self) -> None:
+        base = self._base("heat-a")
+        self.assertEqual(self._remove("heat-a", {"base": base}).status_code, 200)
+
+        again = self._remove("heat-a", {"base": base})
+
+        self.assertEqual(again.status_code, 200, again.content)
+        self.assertEqual((again.json()["state"], again.json()["reason"]), ("removed", "deleted"))
+
+    def test_a_work_that_was_merged_away_answers_with_where_it_went_and_leaves_that_alone(
+        self,
+    ) -> None:
+        base = self._base("heat-b")
+        stayed = self._phone_id("heat-a")
+        self._merge_pair("left")
+
+        response = self._remove("heat-b", {"base": base})
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            (response.json()["reason"], response.json()["merged_into"]), ("merged", stayed)
+        )
+        self.assertIn("heat-a", self._still_in_catalogue())
+
+    def test_a_work_nobody_ever_had_is_not_found(self) -> None:
+        response = self.client.post(
+            "/api/v1/catalog/items/an-id-the-server-never-issued/removal",
+            content=json.dumps({"force": True}),
+            headers=self._device_headers(),
+        )
+
+        self.assertEqual(response.status_code, 404, response.content)
+
+    def test_it_needs_a_device_session(self) -> None:
+        response = self.client.post(
+            f"/api/v1/catalog/items/{self._phone_id('heat-a')}/removal",
+            content=json.dumps({"force": True}),
+            headers={"Content-Type": "application/json"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("heat-a", self._still_in_catalogue())
+
+    def test_a_record_that_cannot_be_written_does_not_turn_a_removal_into_an_error(self) -> None:
+        with patch.object(
+            self._service(), "record", side_effect=RemovalRepositoryError("disk full")
+        ):
+            response = self._remove("heat-a", {"force": True})
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertNotIn("heat-a", self._still_in_catalogue())
+        self.assertEqual(self._recorded("heat-a"), {})
+
+    def test_removing_one_work_leaves_the_others_and_their_state_alone(self) -> None:
+        before = {name: self._base(name) for name in ("heat-b", "heat-c", "ran")}
+
+        self._remove("heat-a", {"base": self._base("heat-a")})
+
+        self.assertEqual({name: self._base(name) for name in ("heat-b", "heat-c", "ran")}, before)
 
 
 class RemovedWorksOfAnOperationTests(unittest.TestCase):

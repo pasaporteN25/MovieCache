@@ -432,6 +432,40 @@ class CatalogService:
 
         return self.repository.mutate(mutation)
 
+    def remove_item_unless_edited(
+        self, item_id: str, base: Mapping[str, Any] | None
+    ) -> tuple[bool, str]:
+        """Delete an item, unless its personal state changed since `base` was read.
+
+        [X5.6]: a phone that deletes a work sends the personal state it last saw.
+        If the server holds something else now -- somebody rated it, or wrote a
+        review, since that phone last synced -- the deletion is refused as a
+        `"conflict"` and nothing is written: the person decides, because deleting
+        would throw away an edit they may not know about. Compared exactly as the
+        personal patch's `base` is ([X2]).
+
+        `base=None` deletes unconditionally, which is what a person who was told
+        about the conflict and chose to delete anyway asks for. The check and the
+        deletion happen in one repository transaction, so an edit cannot slip in
+        between them.
+        """
+
+        if not item_id:
+            raise ValueError("Missing item id")
+        guard = _validated_personal_base(base)
+
+        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str]]:
+            for index, item in enumerate(items):
+                if str(item.get("id") or "") != item_id:
+                    continue
+                if _stale_personal_fields(item, guard):
+                    return False, (False, "conflict")
+                del items[index]
+                return True, (True, "deleted")
+            return False, (False, "not_found")
+
+        return self.repository.mutate(mutation)
+
     def update_status(self, item_id: str, status: str, watched_at: str = "") -> tuple[bool, str]:
         if not item_id:
             raise ValueError("Missing item id")
