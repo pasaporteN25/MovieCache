@@ -44,6 +44,10 @@ class DeviceApiContractTests(unittest.TestCase):
         self.assertEqual(pair["operationId"], "redeemPairingTicket")
         self.assertEqual(pair["security"], [], "a device pairing has no session yet")
         self.assertIn("429", pair["responses"], "redemption is rate limited like login")
+        # [X4.1]: a lost refresh response is recoverable, and a client has to
+        # be told so or it will re-pair a phone that only needed a retry.
+        refresh = document["paths"]["/api/v1/auth/refresh"]["post"]
+        self.assertIn("try again", refresh["description"])
         # [A2.3]: adding offline is an import, not a merge, so the contract
         # says plainly that nothing here reaches the catalogue.
         drafts = document["paths"]["/api/v1/catalog/drafts"]["post"]

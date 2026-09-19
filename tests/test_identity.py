@@ -124,6 +124,9 @@ class IdentityTests(unittest.TestCase):
                 clock=lambda: now[0],
                 device_access_ttl_seconds=60,
                 device_refresh_ttl_seconds=300,
+                # This test is about rotation and revocation, not the retry
+                # window [X4.1] adds -- see DeviceRefreshRetryTests.
+                device_refresh_grace_seconds=0,
             )
             service.bootstrap_owner(
                 "owner",
@@ -151,6 +154,7 @@ class IdentityTests(unittest.TestCase):
             self.assertNotEqual(rotated.access_token, session.access_token)
             self.assertNotEqual(rotated.refresh_token, session.refresh_token)
             self.assertIsNone(service.authenticate_device(session.access_token))
+            now[0] = 1_011.0
             self.assertIsNone(service.refresh_device_session(session.refresh_token))
             self.assertIsNotNone(service.authenticate_device(rotated.access_token))
 
@@ -470,6 +474,114 @@ class IdentityTests(unittest.TestCase):
             with self.assertRaises(IdentityNotFound):
                 members.archive_member(owner, member.user.id, confirmed_username="maria")
             self.assertIsNotNone(repository.account(member.user.id))
+
+
+class DeviceRefreshRetryTests(unittest.TestCase):
+    """[X4.1]: a refresh whose response was lost can be retried.
+
+    The phone sent its refresh token, the server rotated, and the response never
+    arrived: the phone still holds only the token it just spent. Without a retry
+    window that phone is locked out until someone scans a QR again.
+    """
+
+    GRACE = 120
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        catalog_path = root / "catalog.json"
+        JsonCatalogRepository(catalog_path, normalize_item).write([])
+        self.database = root / "instance.db"
+        self.now = [1_000.0]
+        self.service = AuthService(
+            SqliteIdentityRepository(self.database),
+            clock=lambda: self.now[0],
+            device_access_ttl_seconds=60,
+            device_refresh_ttl_seconds=10_000,
+            device_refresh_grace_seconds=self.GRACE,
+        )
+        self.service.bootstrap_owner(
+            "owner",
+            "a-long-local-password",
+            catalog_name="Mi catalogo",
+            source_paths=[str(catalog_path)],
+            write_path=str(catalog_path),
+        )
+        self.first = self.service.login_device("owner", "a-long-local-password", "Pixel")
+
+    def test_only_hashes_of_the_previous_token_are_stored(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+
+        with closing(sqlite3.connect(self.database)) as connection:
+            previous, valid_until = connection.execute(
+                "SELECT previous_refresh_token_hash, previous_refresh_valid_until"
+                " FROM device_sessions"
+            ).fetchone()
+
+        self.assertEqual(previous, session_token_hash(self.first.refresh_token))
+        self.assertNotEqual(previous, self.first.refresh_token)
+        self.assertEqual(valid_until, int(self.now[0]) + self.GRACE)
+
+    def test_the_token_a_lost_response_left_behind_still_refreshes(self) -> None:
+        # The server rotated, the phone never saw the answer.
+        self.assertIsNotNone(self.service.refresh_device_session(self.first.refresh_token))
+        self.now[0] += 10
+
+        retried = self.service.refresh_device_session(self.first.refresh_token)
+
+        assert retried is not None
+        self.assertIsNotNone(self.service.authenticate_device(retried.access_token))
+        self.assertIsNotNone(self.service.refresh_device_session(retried.refresh_token))
+
+    def test_a_retry_replaces_the_pair_the_phone_never_received(self) -> None:
+        lost = self.service.refresh_device_session(self.first.refresh_token)
+        assert lost is not None
+
+        retried = self.service.refresh_device_session(self.first.refresh_token)
+
+        assert retried is not None
+        self.assertIsNone(self.service.authenticate_device(lost.access_token))
+        self.assertIsNotNone(self.service.authenticate_device(retried.access_token))
+
+    def test_the_window_closes(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+
+        self.now[0] += self.GRACE + 1
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_a_retry_does_not_extend_the_window(self) -> None:
+        # Otherwise anyone holding an old token could keep it alive by using it.
+        self.service.refresh_device_session(self.first.refresh_token)
+        self.now[0] += self.GRACE - 10
+        self.assertIsNotNone(self.service.refresh_device_session(self.first.refresh_token))
+
+        self.now[0] += 20
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_a_token_two_rotations_back_is_unknown(self) -> None:
+        second = self.service.refresh_device_session(self.first.refresh_token)
+        assert second is not None
+        self.service.refresh_device_session(second.refresh_token)
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_a_retry_does_not_outlive_the_session(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+        retried = self.service.refresh_device_session(self.first.refresh_token)
+        assert retried is not None
+        self.service.logout_device(retried.access_token)
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_changing_the_password_still_ends_every_device_session(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+        _, identity = self.service.login("owner", "a-long-local-password")
+        self.service.change_password(identity, "a-long-local-password", "a-different-password!")
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
 
 
 if __name__ == "__main__":

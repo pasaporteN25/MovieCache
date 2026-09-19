@@ -150,6 +150,33 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(refresh_after_logout.status_code, 401, refresh_after_logout.content)
         self.assertEqual(web_session.status_code, 200, web_session.content)
 
+    def test_a_lost_refresh_response_can_be_retried_with_the_same_token(self) -> None:
+        # [X4.1]: the phone sent its refresh token, the server rotated, the
+        # answer never arrived. The phone only has the token it just spent.
+        headers = {"Content-Type": "application/json"}
+        created = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {"username": "lucas", "password": self.owner_password, "device_name": "Pixel"}
+            ),
+            headers=headers,
+        )
+        spent = created.json()["refresh_token"]
+        lost = self.client.post(
+            "/api/v1/auth/refresh", content=json.dumps({"refresh_token": spent}), headers=headers
+        )
+        self.assertEqual(lost.status_code, 200, lost.content)
+
+        retried = self.client.post(
+            "/api/v1/auth/refresh", content=json.dumps({"refresh_token": spent}), headers=headers
+        )
+
+        self.assertEqual(retried.status_code, 200, retried.content)
+        me = self.client.get(
+            "/api/v1/me", headers={"Authorization": f"Bearer {retried.json()['access_token']}"}
+        )
+        self.assertEqual(me.status_code, 200, me.content)
+
     def test_device_login_uses_the_shared_credential_rate_limit(self) -> None:
         body = json.dumps(
             {

@@ -162,7 +162,14 @@ class IdentityRepository(Protocol):
         now: int,
         access_expires_at: int,
         refresh_expires_at: int,
-    ) -> AuthenticatedIdentity | None: ...
+        previous_valid_until: int,
+    ) -> AuthenticatedIdentity | None:
+        """Swap a device session's tokens for new ones.
+
+        The refresh token being replaced stays acceptable until
+        `previous_valid_until`, so a caller whose response was lost can retry.
+        """
+        ...
 
     def touch_device_session(self, access_token_hash: str, seen_at: int) -> None: ...
 

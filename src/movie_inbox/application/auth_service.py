@@ -24,6 +24,10 @@ SESSION_TOKEN_BYTES = 48
 DEFAULT_SESSION_TTL_SECONDS = 14 * 24 * 60 * 60
 DEFAULT_DEVICE_ACCESS_TTL_SECONDS = 15 * 60
 DEFAULT_DEVICE_REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60
+# [X4.1]: how long a refresh token stays valid after the rotation that replaced
+# it. Long enough to outlast a real dropout, short enough that a stale token is
+# not a standing credential.
+DEFAULT_DEVICE_REFRESH_GRACE_SECONDS = 120
 SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
@@ -106,6 +110,7 @@ class AuthService:
         session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS,
         device_access_ttl_seconds: int = DEFAULT_DEVICE_ACCESS_TTL_SECONDS,
         device_refresh_ttl_seconds: int = DEFAULT_DEVICE_REFRESH_TTL_SECONDS,
+        device_refresh_grace_seconds: int = DEFAULT_DEVICE_REFRESH_GRACE_SECONDS,
         clock: Callable[[], float] = time.time,
         hasher: PasswordHasher | None = None,
     ) -> None:
@@ -116,6 +121,7 @@ class AuthService:
             self.device_access_ttl_seconds + 60,
             int(device_refresh_ttl_seconds),
         )
+        self.device_refresh_grace_seconds = max(0, int(device_refresh_grace_seconds))
         self.clock = clock
         self.hasher = hasher or PasswordHasher()
         self._dummy_hash = self.hasher.hash("movie-inbox-dummy-password")
@@ -189,6 +195,7 @@ class AuthService:
             now,
             access_expires_at,
             refresh_expires_at,
+            now + self.device_refresh_grace_seconds,
         )
         if identity is None or identity.user.must_change_password:
             return None

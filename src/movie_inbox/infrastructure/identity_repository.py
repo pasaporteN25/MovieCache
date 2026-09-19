@@ -29,7 +29,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 19
+INSTANCE_SCHEMA_VERSION = 20
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -464,6 +464,13 @@ INSTANCE_SCHEMA_V19 = """
 ALTER TABLE import_drafts ADD COLUMN origin TEXT NOT NULL DEFAULT 'web';
 """
 
+INSTANCE_SCHEMA_V20 = """
+ALTER TABLE device_sessions ADD COLUMN previous_refresh_token_hash TEXT;
+ALTER TABLE device_sessions ADD COLUMN previous_refresh_valid_until INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX ix_device_sessions_previous_refresh
+ON device_sessions(previous_refresh_token_hash);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -483,6 +490,7 @@ INSTANCE_MIGRATIONS = {
     17: ("dated public score snapshots", INSTANCE_SCHEMA_V17),
     18: ("single-use device pairing tickets", INSTANCE_SCHEMA_V18),
     19: ("import drafts remember whether a phone or a browser made them", INSTANCE_SCHEMA_V19),
+    20: ("device refresh tokens tolerate one retry after a lost response", INSTANCE_SCHEMA_V20),
 }
 
 
@@ -1293,6 +1301,7 @@ class SqliteIdentityRepository:
         now: int,
         access_expires_at: int,
         refresh_expires_at: int,
+        previous_valid_until: int,
     ) -> AuthenticatedIdentity | None:
         with self._thread_lock:
             try:
@@ -1300,7 +1309,7 @@ class SqliteIdentityRepository:
                     self._initialize(connection)
                     connection.execute("BEGIN IMMEDIATE")
                     row = connection.execute(
-                        """SELECT users.*, device_sessions.device_name
+                        """SELECT users.*
                         FROM device_sessions
                         JOIN users ON users.id = device_sessions.user_id
                         WHERE device_sessions.refresh_token_hash = ?
@@ -1308,6 +1317,23 @@ class SqliteIdentityRepository:
                             AND users.active = 1""",
                         (refresh_token_hash, now),
                     ).fetchone()
+                    retry = False
+                    if row is None:
+                        # [X4.1]: the token a phone just replaced is still honoured
+                        # for a short window, so a response lost in a dropout does not
+                        # strand it. Only the token replaced by the latest rotation
+                        # is kept: anything older is simply unknown.
+                        row = connection.execute(
+                            """SELECT users.*
+                            FROM device_sessions
+                            JOIN users ON users.id = device_sessions.user_id
+                            WHERE device_sessions.previous_refresh_token_hash = ?
+                                AND device_sessions.previous_refresh_valid_until >= ?
+                                AND device_sessions.refresh_expires_at > ?
+                                AND users.active = 1""",
+                            (refresh_token_hash, now, now),
+                        ).fetchone()
+                        retry = row is not None
                     if row is None:
                         connection.execute(
                             "DELETE FROM device_sessions WHERE refresh_expires_at <= ?", (now,)
@@ -1319,21 +1345,47 @@ class SqliteIdentityRepository:
                     if catalog is None:
                         connection.rollback()
                         return None
-                    cursor = connection.execute(
-                        """UPDATE device_sessions
-                        SET access_token_hash = ?, refresh_token_hash = ?, access_expires_at = ?,
-                            refresh_expires_at = ?, last_seen_at = ?
-                        WHERE refresh_token_hash = ? AND refresh_expires_at > ?""",
-                        (
-                            access_token_hash,
-                            next_refresh_token_hash,
-                            access_expires_at,
-                            refresh_expires_at,
-                            now,
-                            refresh_token_hash,
-                            now,
-                        ),
-                    )
+                    if retry:
+                        # The window stays anchored to the rotation that opened it: a
+                        # retry must not extend it, or whoever holds an old token
+                        # could keep it open indefinitely.
+                        cursor = connection.execute(
+                            """UPDATE device_sessions
+                            SET access_token_hash = ?, refresh_token_hash = ?,
+                                access_expires_at = ?, refresh_expires_at = ?, last_seen_at = ?
+                            WHERE previous_refresh_token_hash = ?
+                                AND previous_refresh_valid_until >= ?
+                                AND refresh_expires_at > ?""",
+                            (
+                                access_token_hash,
+                                next_refresh_token_hash,
+                                access_expires_at,
+                                refresh_expires_at,
+                                now,
+                                refresh_token_hash,
+                                now,
+                                now,
+                            ),
+                        )
+                    else:
+                        cursor = connection.execute(
+                            """UPDATE device_sessions
+                            SET access_token_hash = ?, refresh_token_hash = ?,
+                                access_expires_at = ?, refresh_expires_at = ?, last_seen_at = ?,
+                                previous_refresh_token_hash = ?, previous_refresh_valid_until = ?
+                            WHERE refresh_token_hash = ? AND refresh_expires_at > ?""",
+                            (
+                                access_token_hash,
+                                next_refresh_token_hash,
+                                access_expires_at,
+                                refresh_expires_at,
+                                now,
+                                refresh_token_hash,
+                                previous_valid_until,
+                                refresh_token_hash,
+                                now,
+                            ),
+                        )
                     if cursor.rowcount != 1:
                         connection.rollback()
                         return None

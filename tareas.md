@@ -437,6 +437,32 @@ obstáculos:
   teléfono revocado desde la web queda afuera en su próxima llamada, y el vencimiento se sigue
   contando desde la última sincronización.
 - **Depende de**: nada. **Modelo sugerido**: Grande: es seguridad.
+- **Subdividida el 2026-09-19** en cinco pasos, cada uno commiteable solo (los dos primeros
+  cambian el esquema de `instance.db`, v19→v20 y v20→v21):
+  - [x] **[X4.1] Renovación reintentable.** 2026-09-19. `device_sessions` guarda el refresh token
+    anterior y hasta cuándo se acepta (v20); `rotate_device_session` lo acepta dentro de esa
+    ventana y devuelve un par nuevo. **Decisión de diseño:** el par perdido no se puede
+    reenviar —sólo se guardan hashes—, así que un reintento mintea uno nuevo; la ventana se
+    ancla a la primera rotación y un reintento no la extiende (si no, quien tuviera un token
+    viejo la mantendría abierta para siempre). Un token dos rotaciones atrás no vale. La
+    ventana es `DEFAULT_DEVICE_REFRESH_GRACE_SECONDS`, 120 s —la tarea decía "unos
+    segundos"; un corte real dura más que un par de segundos, y es un número del owner—.
+    **Modelo sugerido**: Grande: es seguridad.
+  - [ ] **[X4.2] Id estable de sesión y listado.** Hoy la clave de `device_sessions` es el
+    hash del access token, que cambia en cada renovación, así que no sirve para nombrar un
+    teléfono desde la web. Columna `session_id` aleatoria (v21, con relleno de las filas
+    existentes) y `list_device_sessions` en repositorio y servicio: id, nombre, creado,
+    último uso, vencimiento; nunca un hash. **Modelo sugerido**: Medio.
+  - [ ] **[X4.3] Revocar un teléfono por id.** Repositorio y servicio, acotado a la cuenta:
+    una cuenta sólo revoca los suyos. **Modelo sugerido**: Chico.
+  - [ ] **[X4.4] Endpoints web.** `GET /api/device-sessions` y
+    `DELETE /api/device-sessions/{id}` con las mismas guardas que el apareamiento (token,
+    origen, cuenta lista), y el traspaso de la pantalla al frente visual. **Modelo
+    sugerido**: Medio.
+  - [ ] **[X4.5] Changelog.** "Antes de actualizar" sigue diciendo v11→v19 y que el JSON
+    portable y la base del catálogo "siguen como en la 0.8.0", que ya no es cierto desde
+    [X3.1]; y faltan las entradas de [X2], [X3], [X9], [X10] y [X4]. **Modelo sugerido**:
+    Chico.
 
 #### [X5] Bajas que viajan en la sincronización
 
