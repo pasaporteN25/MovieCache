@@ -574,6 +574,114 @@ class DeviceDraftApiTests(unittest.TestCase):
             with self.subTest(payload=payload):
                 self.assertEqual(self._post(payload).status_code, 400)
 
+    # [X6.3]: the phone asks what became of the works it sent.
+
+    def _receipts(self, *ids: str) -> Any:
+        return self.client.post(
+            "/api/v1/catalog/drafts/receipts",
+            content=json.dumps({"ids": list(ids)}),
+            headers=self.bearer,
+        )
+
+    def _import_service(self) -> Any:
+        return self.client.app.state.import_service  # type: ignore[attr-defined]
+
+    def _owner_id(self) -> str:
+        me = self.client.get("/api/v1/me", headers=self.bearer).json()
+        return str(me["user"]["id"])
+
+    def _apply_in_the_browser(self, draft_id: str, *ids: str) -> None:
+        catalog = CatalogService(JsonCatalogRepository(self.catalog_path, normalize_item))
+        self._import_service().apply_draft(
+            self._owner_id(), draft_id, "catalog", list(ids), catalog, [normalize_item(HEAT)]
+        )
+
+    def _device_id_of(self, title: str) -> str:
+        items = self.client.get("/api/v1/catalog/items", headers=self.bearer).json()["items"]
+        return str(next(item["id"] for item in items if item["title"] == title))
+
+    def test_a_work_still_waiting_is_pending_and_an_id_never_sent_is_unknown(self) -> None:
+        self._post({"items": [{"id": "local-1", "title": "Stalker", "year": "1979"}]})
+
+        response = self._receipts("local-1", "never-sent")
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            response.json()["receipts"],
+            {
+                "local-1": {"state": "pending", "reason": None, "item_id": None},
+                "never-sent": {"state": "unknown", "reason": None, "item_id": None},
+            },
+        )
+
+    def test_a_work_applied_in_the_browser_names_the_work_it_became(self) -> None:
+        sent = self._post({"items": [{"id": "local-1", "title": "Stalker", "year": "1979"}]})
+        self._apply_in_the_browser(sent.json()["draft_id"], "local-1")
+
+        receipt = self._receipts("local-1").json()["receipts"]["local-1"]
+
+        self.assertEqual((receipt["state"], receipt["reason"]), ("applied", "added"))
+        # The opaque id the catalogue endpoints use, not the catalogue's own id.
+        self.assertEqual(receipt["item_id"], self._device_id_of("Stalker"))
+
+    def test_the_retry_that_arrives_after_the_apply_adds_nothing(self) -> None:
+        payload: dict[str, Any] = {"items": [{"id": "local-1", "title": "Stalker", "year": "1979"}]}
+        sent = self._post(payload)
+        self._apply_in_the_browser(sent.json()["draft_id"], "local-1")
+
+        again = self._post(payload)
+
+        self.assertEqual(again.json()["duplicates"], ["local-1"])
+        self.assertEqual(again.json()["accepted"], [])
+        self.assertEqual(len(self._import_service().list_drafts(self._owner_id())), 1)
+        items = self.client.get("/api/v1/catalog/items", headers=self.bearer).json()["items"]
+        self.assertEqual([item["title"] for item in items].count("Stalker"), 1)
+
+    def test_a_draft_deleted_in_the_browser_is_reported_as_deleted(self) -> None:
+        sent = self._post({"items": [{"id": "local-1", "title": "Stalker", "year": "1979"}]})
+        self._import_service().delete_draft(self._owner_id(), sent.json()["draft_id"], True)
+
+        receipt = self._receipts("local-1").json()["receipts"]["local-1"]
+
+        self.assertEqual((receipt["state"], receipt["reason"]), ("discarded", "deleted"))
+
+    def test_an_applied_work_that_was_removed_since_has_no_item_to_point_at(self) -> None:
+        sent = self._post({"items": [{"id": "local-1", "title": "Stalker", "year": "1979"}]})
+        self._apply_in_the_browser(sent.json()["draft_id"], "local-1")
+        repository = JsonCatalogRepository(self.catalog_path, normalize_item)
+        repository.write([row for row in repository.read() if row.title != "Stalker"])
+
+        receipt = self._receipts("local-1").json()["receipts"]["local-1"]
+
+        self.assertEqual((receipt["state"], receipt["item_id"]), ("applied", None))
+
+    def test_a_malformed_question_is_refused(self) -> None:
+        bodies: list[dict[str, Any]] = [
+            {},
+            {"ids": []},
+            {"ids": "local-1"},
+            {"ids": [1]},
+            {"ids": [""]},
+            {"ids": [f"id-{n}" for n in range(MAX_DEVICE_ITEMS_PER_REQUEST + 1)]},
+        ]
+        for body in bodies:
+            with self.subTest(body=str(body)[:40]):
+                response = self.client.post(
+                    "/api/v1/catalog/drafts/receipts",
+                    content=json.dumps(body),
+                    headers=self.bearer,
+                )
+                self.assertEqual(response.status_code, 400, response.content)
+
+    def test_receipts_need_a_device_session(self) -> None:
+        anonymous = self.client.post(
+            "/api/v1/catalog/drafts/receipts",
+            content=json.dumps({"ids": ["local-1"]}),
+            headers={"Content-Type": "application/json"},
+        )
+
+        self.assertEqual(anonymous.status_code, 401)
+
     def test_it_needs_a_device_session(self) -> None:
         anonymous = self.client.post(
             "/api/v1/catalog/drafts",

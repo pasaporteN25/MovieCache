@@ -231,6 +231,41 @@ class ImportService:
             "counts": draft.counts() if draft is not None else {},
         }
 
+    def device_receipts(self, user_id: str, client_ids: Sequence[str]) -> dict[str, DeviceReceipt]:
+        """What the server can say about each work a phone asks after.
+
+        An id missing from the answer is one the server has no record of: never
+        received, or forgotten after the retention. The caller reports it as
+        unknown, and the phone sends it again.
+
+        A work that is in the pending pile with no receipt yet -- stored before
+        receipts existed, or before its receipt was written -- is `pending` all
+        the same, so nothing needs backfilling for that to be true.
+        """
+
+        if len(client_ids) > MAX_DEVICE_ITEMS_PER_REQUEST:
+            raise ValueError(f"At most {MAX_DEVICE_ITEMS_PER_REQUEST} ids can be asked at once")
+        wanted = [str(value or "").strip()[:64] for value in client_ids]
+        if not wanted or not all(wanted):
+            raise ValueError("Every id asked for must be a client id")
+        found = self.repository.receipts_for(user_id, wanted)
+        missing = [client_id for client_id in dict.fromkeys(wanted) if client_id not in found]
+        draft = self._device_draft(user_id) if missing else None
+        if draft is not None:
+            waiting = {entry.id: entry for entry in draft.items}
+            for client_id in missing:
+                entry = waiting.get(client_id)
+                if entry is None:
+                    continue
+                invalid = entry.state == "invalid"
+                found[client_id] = DeviceReceipt(
+                    client_id,
+                    "discarded" if invalid else "pending",
+                    "invalid" if invalid else "",
+                    draft_id=draft.id,
+                )
+        return found
+
     @staticmethod
     def _new_receipts(
         draft_id: str,

@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from movie_inbox.application.identity_repository import IdentityRepositoryError
+from movie_inbox.application.import_repository import ImportRepositoryError
 from movie_inbox.application.import_service import (
     DeviceDraftFull,
     ImportDraftBusy,
@@ -169,7 +170,9 @@ def add_offline_drafts(
 
     Safe to retry. Works are keyed by the id the phone generated, so a sync that
     succeeds here and fails on the way back does not duplicate anything: the
-    second attempt reports them under `duplicates`.
+    second attempt reports them under `duplicates`, and that holds even after the
+    draft was applied or deleted in the browser. What became of each work is
+    asked separately, at `/api/v1/catalog/drafts/receipts`.
     """
 
     entries = body.get("items")
@@ -290,6 +293,75 @@ def collection_items(
             else None,
         }
     )
+
+
+# [X6.3]: after sending works, the phone asks what became of them. A POST because
+# the ids travel in a body -- up to a hundred of them, which would not survive
+# every proxy's limit on a query string -- but it changes nothing.
+@router.post("/api/v1/catalog/drafts/receipts")
+def offline_draft_receipts(
+    request: Request,
+    identity: AuthenticatedIdentity = Depends(require_device_identity),
+    body: dict[str, Any] = Depends(device_json),
+) -> JSONResponse:
+    """What became of each work the phone sent while it had no connection.
+
+    `pending` is still waiting for a person to review it; `applied` became a work
+    in the catalogue -- `item_id` is the opaque id the rest of this API uses for
+    it, so the phone can link its local copy to the server's and drop it as its
+    own; `discarded` will not become one, and `reason` says why; `unknown` is an
+    id the server has no record of, so the phone should send it again.
+    """
+
+    ids = body.get("ids")
+    if not isinstance(ids, list) or not all(isinstance(value, str) for value in ids):
+        raise DeviceApiRequestError("invalid_request", 400)
+    try:
+        found = request.app.state.import_service.device_receipts(identity.user.id, ids)
+    except ValueError as error:
+        raise DeviceApiRequestError("invalid_request", 400) from error
+    except ImportRepositoryError as error:
+        raise DeviceApiRequestError("identity_store_unavailable", 503) from error
+    works = _work_ids_for(request, identity, {row.item_id for row in found.values() if row.item_id})
+    receipts: dict[str, Any] = {}
+    for client_id in dict.fromkeys(str(value).strip()[:64] for value in ids):
+        row = found.get(client_id)
+        receipts[client_id] = {
+            "state": row.state if row else "unknown",
+            "reason": (row.reason if row else "") or None,
+            "item_id": works.get(row.item_id) if row and row.item_id else None,
+        }
+    return JSONResponse({"receipts": receipts})
+
+
+def _work_ids_for(
+    request: Request, identity: AuthenticatedIdentity, catalog_item_ids: set[str]
+) -> dict[str, str]:
+    """The opaque device id of each catalogue item, for the ones asked about.
+
+    A catalogue item id is only unique within one source file, so when the same
+    id turns up in two, the one in the file new works are written to wins -- it
+    is the one an applied draft created.
+    """
+
+    if not catalog_item_ids:
+        return {}
+    entries = _device_catalog_entries(request, identity)
+    catalog = _session_catalog(request, identity)
+    try:
+        write_reference = catalog.references_by_path.get(
+            str(Path(catalog.config.write_json).resolve()), ""
+        )
+    except OSError:
+        write_reference = ""
+    resolved: dict[str, str] = {}
+    for entry in entries:
+        item_id = entry.catalog_item_id
+        if item_id in catalog_item_ids and (
+            item_id not in resolved or entry.source_reference == write_reference
+        ):
+            resolved[item_id] = entry.device_id
+    return resolved
 
 
 @router.get("/api/v1/availability")

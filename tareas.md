@@ -471,7 +471,7 @@ web, el reintento crea uno nuevo con las mismas obras.
     pasa a `applied` (con el id de la obra) o `discarded` (`not_applied`: no se eligió, o quedó
     en revisión, y un borrador aplicado no se vuelve a abrir); al borrarlo, lo que seguía
     pendiente pasa a `discarded` (`deleted`). **Modelo sugerido**: Medio.
-  - [ ] **[X6.3] Consulta y ruta.** `POST /api/v1/catalog/drafts/receipts` con `{"ids": [...]}`
+  - [x] **[X6.3] Consulta y ruta.** 2026-09-19. `POST /api/v1/catalog/drafts/receipts` con `{"ids": [...]}`
     (hasta 100) devuelve el estado de cada uno, con la obra resultante como el id opaco que ya
     usa el resto de la API. Contrato OpenAPI y pruebas HTTP. **Modelo sugerido**: Medio.
   - [ ] **[X6.4] Changelog.** **Modelo sugerido**: Chico.

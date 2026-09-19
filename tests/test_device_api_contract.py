@@ -28,6 +28,7 @@ class DeviceApiContractTests(unittest.TestCase):
                 "/api/v1/me",
                 "/api/v1/availability",
                 "/api/v1/catalog/drafts",
+                "/api/v1/catalog/drafts/receipts",
                 "/api/v1/ratings",
                 "/api/v1/charades",
                 "/api/v1/collections",
@@ -64,6 +65,15 @@ class DeviceApiContractTests(unittest.TestCase):
         # invalid_request on this route, same as the other cursor-paged ones.
         items_page = document["paths"]["/api/v1/catalog/items"]["get"]
         self.assertIn("400", items_page["responses"])
+        # [X6.3]: after sending works the device can ask what became of them, and
+        # an id the server has no record of is answered, not left out.
+        receipts = document["paths"]["/api/v1/catalog/drafts/receipts"]["post"]
+        self.assertEqual(receipts["operationId"], "getOfflineDraftReceipts")
+        receipt = document["components"]["schemas"]["Receipt"]
+        self.assertEqual(
+            receipt["properties"]["state"]["enum"], ["pending", "applied", "discarded", "unknown"]
+        )
+        self.assertEqual(sorted(receipt["required"]), ["item_id", "reason", "state"])
         item = document["components"]["schemas"]["OfflineDraftItem"]
         self.assertEqual(sorted(item["required"]), ["id", "title"])
         # [A2.6]: a collection work carries identity and nothing personal --
