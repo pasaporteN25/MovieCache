@@ -350,7 +350,12 @@ class ImportService:
             raise ImportDraftNotFound("Import draft was not found")
         if draft.status == "applying":
             raise ImportDraftBusy("Import draft is being applied")
-        return self.repository.delete(user_id, draft_id)
+        deleted = self.repository.delete(user_id, draft_id)
+        if deleted and draft.origin == DEVICE_ORIGIN:
+            # [X6]: what was still waiting in it is gone, and the phone has to be
+            # able to find that out.
+            self.repository.discard_pending_receipts(user_id, draft_id, "deleted", self._now())
+        return deleted
 
     def apply_draft(
         self,
@@ -428,6 +433,10 @@ class ImportService:
                 claimed.expires_at,
                 result,
             )
+            if claimed.origin == DEVICE_ORIGIN:
+                self._resolve_device_receipts(
+                    user_id, refreshed, result, {entry.id for entry in selected}, now
+                )
             return result
         except Exception:
             try:
@@ -435,6 +444,56 @@ class ImportService:
             except Exception:
                 pass
             raise
+
+    def _resolve_device_receipts(
+        self,
+        user_id: str,
+        draft: ImportDraft,
+        result: Mapping[str, Any],
+        selected_ids: set[str],
+        now: int,
+    ) -> None:
+        """Tell every phone work in an applied draft what became of it.
+
+        Runs after the draft is completed, never before: a receipt that says
+        `applied` for a work that was not is worse than one that says nothing.
+
+        A draft is applied once, as a whole, and is not reopened, so whatever
+        was not written is over: a work nobody selected, or one that stayed in
+        review, is `discarded` rather than left `pending` forever. `applied`
+        covers both a work that was added and one that turned out to be in the
+        catalog already -- either way the phone has a work to link to.
+        """
+
+        rows = {str(row.get("draft_item_id") or ""): row for row in result.get("results") or []}
+        receipts: list[DeviceReceipt] = []
+        for entry in draft.items:
+            if entry.state == "invalid":
+                continue  # discarded when it arrived
+            if result.get("destination") == "collection":
+                # It went into a private collection, which is not the catalogue a
+                # phone downloads, so there is no work for it to link to.
+                reason = "collection" if entry.id in selected_ids else "not_applied"
+                receipts.append(DeviceReceipt(entry.id, "discarded", reason, "", draft.id))
+                continue
+            row = rows.get(entry.id)
+            outcome = str(row.get("outcome") or "") if row else ""
+            if outcome == "added":
+                item_id = str((row or {}).get("item_id") or "")
+                receipts.append(DeviceReceipt(entry.id, "applied", "added", item_id, draft.id))
+            elif outcome == "present":
+                # The catalogue's own id for the work that was already there; the
+                # result row only carries the draft item's id.
+                existing = next(
+                    (str(candidate.get("id") or "") for candidate in entry.candidates), ""
+                )
+                item_id = existing or str((row or {}).get("item_id") or "")
+                receipts.append(
+                    DeviceReceipt(entry.id, "applied", "already_in_catalog", item_id, draft.id)
+                )
+            else:
+                receipts.append(DeviceReceipt(entry.id, "discarded", "not_applied", "", draft.id))
+        self.repository.save_receipts(user_id, receipts, now)
 
     def _apply_to_catalog(
         self,

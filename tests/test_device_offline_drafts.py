@@ -31,7 +31,13 @@ from movie_inbox.application.import_service import (
     ImportService,
 )
 from movie_inbox.domain.catalog import normalize_item
-from movie_inbox.domain.imports import DEVICE_ORIGIN, WEB_ORIGIN, DeviceReceipt
+from movie_inbox.domain.imports import (
+    DEVICE_ORIGIN,
+    WEB_ORIGIN,
+    DeviceReceipt,
+    ImportDraft,
+    ImportDraftItem,
+)
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import parse_import_content
@@ -307,6 +313,166 @@ class DeviceDraftServiceTests(unittest.TestCase):
         )
         self.assertEqual(self._receipt("done").item_id, "item-1")
         self.assertEqual(self._receipt("elsewhere").state, "pending")
+
+    # [X6.2]: applying or deleting the draft tells the phone what became of each work.
+
+    def _catalog_service(self) -> tuple[CatalogService, JsonCatalogRepository]:
+        repository = JsonCatalogRepository(
+            Path(self.temporary.name) / "catalog.json", normalize_item
+        )
+        repository.write([])
+        return CatalogService(repository), repository
+
+    def test_an_added_work_is_applied_and_names_the_catalogue_item_it_became(self) -> None:
+        first = self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+        service, repository = self._catalog_service()
+
+        self.service.apply_draft(
+            self.user_id, str(first["draft_id"]), "catalog", ["local-1"], service, []
+        )
+
+        receipt = self._receipt("local-1")
+        (created,) = repository.read()
+        self.assertEqual((receipt.state, receipt.reason), ("applied", "added"))
+        self.assertEqual(receipt.item_id, created.id)
+
+    def test_a_work_nobody_selected_is_discarded_because_the_draft_is_not_reopened(self) -> None:
+        first = self._add(
+            {"id": "local-1", "title": "Stalker", "year": "1979"},
+            {"id": "local-2", "title": "Solaris", "year": "1972"},
+        )
+        service, _ = self._catalog_service()
+
+        self.service.apply_draft(
+            self.user_id, str(first["draft_id"]), "catalog", ["local-1"], service, []
+        )
+
+        self.assertEqual(self._receipt("local-1").state, "applied")
+        self.assertEqual(
+            (self._receipt("local-2").state, self._receipt("local-2").reason),
+            ("discarded", "not_applied"),
+        )
+
+    def test_a_work_that_stayed_in_review_is_not_linked_to_a_catalogue_guess(self) -> None:
+        # Invariant 3: a doubtful match is a person's decision, so the phone is
+        # never pointed at the candidate. It learns the work was not applied.
+        self.catalog.append(normalize_item({"id": "persona", "title": "Persona", "year": "1966"}))
+        first = self._add({"id": "local-1", "title": "Persona", "year": "1966"})
+        self.assertEqual(first["accepted"][0]["state"], "review")
+        service, repository = self._catalog_service()
+
+        self.service.apply_draft(
+            self.user_id, str(first["draft_id"]), "catalog", ["local-1"], service, self.catalog
+        )
+
+        receipt = self._receipt("local-1")
+        self.assertEqual(
+            (receipt.state, receipt.reason, receipt.item_id), ("discarded", "not_applied", "")
+        )
+        self.assertEqual(repository.read(), [])
+
+    def test_a_draft_put_into_a_collection_leaves_no_catalogue_work_to_link(self) -> None:
+        first = self._add(
+            {"id": "local-1", "title": "Stalker", "year": "1979"},
+            {"id": "local-2", "title": "Solaris", "year": "1972"},
+        )
+        service, repository = self._catalog_service()
+
+        self.service.apply_draft(
+            self.user_id,
+            str(first["draft_id"]),
+            "collection",
+            ["local-1"],
+            service,
+            [],
+            collection_title="Del telefono",
+            can_create_collection=True,
+        )
+
+        self.assertEqual(self._receipt("local-1").reason, "collection")
+        self.assertEqual(self._receipt("local-2").reason, "not_applied")
+        self.assertEqual(repository.read(), [])
+
+    def test_deleting_the_draft_discards_what_was_still_waiting_in_it(self) -> None:
+        first = self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+
+        self.service.delete_draft(self.user_id, str(first["draft_id"]), True)
+
+        receipt = self._receipt("local-1")
+        self.assertEqual((receipt.state, receipt.reason), ("discarded", "deleted"))
+
+    def test_deleting_a_draft_leaves_an_applied_work_applied(self) -> None:
+        first = self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+        service, _ = self._catalog_service()
+        self.service.apply_draft(
+            self.user_id, str(first["draft_id"]), "catalog", ["local-1"], service, []
+        )
+
+        self.service.delete_draft(self.user_id, str(first["draft_id"]), True)
+
+        self.assertEqual(self._receipt("local-1").state, "applied")
+
+    def test_an_apply_that_failed_resolves_nothing(self) -> None:
+        class Failing(CatalogService):
+            def append_items(self, incoming: list[dict[str, Any]]) -> list[dict[str, Any]]:
+                raise RuntimeError("the catalogue could not be written")
+
+        first = self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+        _, repository = self._catalog_service()
+
+        with self.assertRaises(RuntimeError):
+            self.service.apply_draft(
+                self.user_id,
+                str(first["draft_id"]),
+                "catalog",
+                ["local-1"],
+                Failing(repository),
+                [],
+            )
+
+        self.assertEqual(self._receipt("local-1").state, "pending")
+
+    def test_a_work_the_catalogue_already_held_names_that_existing_item(self) -> None:
+        # Reachable only through a strong match, which a phone entry -- no
+        # identifiers, only what was typed -- almost never has; kept honest here.
+        draft = ImportDraft(
+            id="draft-1",
+            user_id=self.user_id,
+            source_name="x",
+            source_format="json",
+            source_hash="h",
+            status="applied",
+            created_at=1,
+            updated_at=1,
+            expires_at=0,
+            origin=DEVICE_ORIGIN,
+            items=(
+                ImportDraftItem(
+                    "local-1",
+                    0,
+                    "present",
+                    "already_in_catalog",
+                    "Heat",
+                    {"id": "draft-side-id", "title": "Heat"},
+                    ({"id": "catalogue-side-id", "title": "Heat"},),
+                    True,
+                ),
+            ),
+        )
+        result = {
+            "destination": "catalog",
+            "results": [
+                {"draft_item_id": "local-1", "outcome": "present", "item_id": "draft-side-id"}
+            ],
+        }
+
+        self.service._resolve_device_receipts(self.user_id, draft, result, {"local-1"}, self.now)
+
+        receipt = self._receipt("local-1")
+        self.assertEqual(
+            (receipt.state, receipt.reason, receipt.item_id),
+            ("applied", "already_in_catalog", "catalogue-side-id"),
+        )
 
     def test_a_web_import_still_says_it_came_from_the_web(self) -> None:
         created = self.service.create_draft(

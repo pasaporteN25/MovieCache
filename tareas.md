@@ -467,7 +467,7 @@ web, el reintento crea uno nuevo con las mismas obras.
     y sus operaciones en el repositorio. `append_device_items` deja un recibo `pending` por
     cada alta y **trata como duplicado a todo id que ya tiene recibo**, aunque su borrador ya
     no exista: cierra el hueco del reintento tardío. **Modelo sugerido**: Medio.
-  - [ ] **[X6.2] Resolver los recibos.** Al aplicar un borrador de dispositivo cada entrada
+  - [x] **[X6.2] Resolver los recibos.** 2026-09-19. Al aplicar un borrador de dispositivo cada entrada
     pasa a `applied` (con el id de la obra) o `discarded` (`not_applied`: no se eligió, o quedó
     en revisión, y un borrador aplicado no se vuelve a abrir); al borrarlo, lo que seguía
     pendiente pasa a `discarded` (`deleted`). **Modelo sugerido**: Medio.
