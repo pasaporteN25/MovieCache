@@ -436,46 +436,6 @@ saber qué pasó (caso 9 de la matriz de [A5.1]).
 - **Depende de**: nada para diseñarla; en el cliente, [A5.2] incorpora las reglas. **Modelo
   sugerido**: Grande: toca el contrato y la identidad de las obras.
 
-#### [X6] Recibos de altas sin conexión
-
-Encontrado en la matriz de sincronización del cliente ([A5.1] de `movieIndexAndroid`, caso
-10). `append_device_items` clasifica bien cada alta contra el catálogo y contra lo que ya
-tiene el borrador, pero el resultado no le llega al teléfono: ningún endpoint dice si una
-entrada terminó aplicada, unida a otra obra o descartada. Cuando la persona aplica el alta
-en la web, el teléfono baja la obra nueva y conserva su alta local: la ve dos veces. Además,
-la idempotencia del reintento sólo mira el borrador mientras sigue `status == "ready"`
-(`_device_draft`): si entre el envío y el reintento alguien aplicó o borró ese borrador en la
-web, el reintento crea uno nuevo con las mismas obras.
-
-- **Alcance**: recordar por cuenta los ids de cliente recibidos, más allá de la vida del
-  borrador, y exponer el estado de cada uno —pendiente, aplicada con el id de la obra
-  resultante, o descartada— por la API de dispositivo. Cierra los dos huecos a la vez: el
-  teléfono deja de ver dos veces lo aplicado, y un reintento tardío no duplica.
-- **Criterio de cierre**: una alta aplicada en la web deja de aparecer como pendiente en el
-  teléfono la próxima vez que consulta su estado, y un reintento después de aplicar o borrar
-  el borrador original no crea entradas nuevas.
-- **Depende de**: nada. **Modelo sugerido**: Grande: ruta nueva en el contrato.
-- **Subdividida el 2026-09-19** en cuatro pasos, cada uno commiteable solo (el primero cambia
-  el esquema de `instance.db`, v21→v22). **Decisiones de diseño**, todas revisables:
-  un recibo por (cuenta, id de cliente) en una tabla propia, porque tiene que vivir más allá
-  del borrador; los estados son `pending`, `applied` (con la obra resultante, tanto si se
-  agregó como si ya estaba) y `discarded`; un id que el servidor no conoce se informa como
-  `unknown` —el teléfono lo reenvía— en vez de omitirlo; los recibos ya resueltos se olvidan
-  a los 365 días, los pendientes nunca; y un borrador `ready` que ya tenía entradas antes de
-  esta tarea cuenta como `pending` sin necesidad de rellenar nada.
-  - [x] **[X6.1] Recibos persistentes y reintento idempotente.** 2026-09-19. Tabla `device_receipts` (v22)
-    y sus operaciones en el repositorio. `append_device_items` deja un recibo `pending` por
-    cada alta y **trata como duplicado a todo id que ya tiene recibo**, aunque su borrador ya
-    no exista: cierra el hueco del reintento tardío. **Modelo sugerido**: Medio.
-  - [x] **[X6.2] Resolver los recibos.** 2026-09-19. Al aplicar un borrador de dispositivo cada entrada
-    pasa a `applied` (con el id de la obra) o `discarded` (`not_applied`: no se eligió, o quedó
-    en revisión, y un borrador aplicado no se vuelve a abrir); al borrarlo, lo que seguía
-    pendiente pasa a `discarded` (`deleted`). **Modelo sugerido**: Medio.
-  - [x] **[X6.3] Consulta y ruta.** 2026-09-19. `POST /api/v1/catalog/drafts/receipts` con `{"ids": [...]}`
-    (hasta 100) devuelve el estado de cada uno, con la obra resultante como el id opaco que ya
-    usa el resto de la API. Contrato OpenAPI y pruebas HTTP. **Modelo sugerido**: Medio.
-  - [ ] **[X6.4] Changelog.** **Modelo sugerido**: Chico.
-
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 
 Encontrado en la matriz de sincronización del cliente ([A5.1], caso 14). `/api/personal`
@@ -771,6 +731,23 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
   cuenta sigue cortando todas las sesiones. **Un número para revisar:** la ventana de 120 s;
   la tarea decía "unos segundos", pero un corte real dura más y es del owner. La pantalla es un
   traspaso al frente visual, anotado en su sección.
+- [x] **[X6] Recibos de altas sin conexión.** 2026-09-19. Encontrado en la matriz de
+  sincronización del cliente ([A5.1], caso 10). Subdividida en cuatro pasos y commiteada por
+  separado: **[X6.1]** `device_receipts` (esquema de `instance.db` v22), un recibo por
+  (cuenta, id de cliente) que sobrevive al borrador, y un reintento que se juzga contra él en
+  vez de contra el borrador `ready` —cierra el hueco del reintento tardío—; **[X6.2]** aplicar
+  o borrar el borrador resuelve los recibos, después de completarlo y nunca antes; **[X6.3]**
+  `POST /api/v1/catalog/drafts/receipts` (hasta 100 ids, uno por respuesta, `unknown` incluido)
+  con la obra resultante como el id opaco de siempre; **[X6.4]** el changelog. Un borrador que
+  ya existía antes de la tarea cuenta como `pending` sin rellenar nada. Los recibos resueltos
+  se olvidan a los 365 días. **Encontrado en el camino:** aplicar en la web un borrador que
+  vino de un teléfono fallaba **siempre** (`ImportDraftBusy`) desde [A2.3]: `claim_for_apply`
+  leía `expires_at = 0` —"nunca"— como un vencimiento ya pasado. Arreglado en su propio commit
+  (`260d0d5`) con un test que aplica un borrador de teléfono de punta a punta; nada lo había
+  probado. **Dos límites conocidos:** una alta de teléfono trae sólo título y año, y contra un
+  ítem del catálogo que se identifica por un id externo queda en `review` —una semejanza no
+  es prueba (invariante 3)—, así que `already_in_catalog` es raro para esas altas; y un
+  borrador aplicado ocupa un lugar de los 20 por cuenta hasta que alguien lo borre.
 - [x] **[X2] Precondición en el `PATCH` personal.** 2026-09-17. `patch_personal` acepta un
   `base` opcional por campo; si el servidor ya no vale eso, responde `409 personal_conflict`
   sin escribir nada, dentro de la misma transacción atómica del repositorio (sin condición de

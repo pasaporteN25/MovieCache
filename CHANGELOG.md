@@ -12,7 +12,7 @@ el trabajo visual de Inicio sigue en curso.
 ### Antes de actualizar
 
 - **Hacé un backup: las bases no vuelven atrás.** La 0.9.0 migra `instance.db` del esquema
-  v11 al v21 y la base del catálogo (`movie-inbox.db`) del v5 al v6 apenas las abre, y
+  v11 al v22 y la base del catálogo (`movie-inbox.db`) del v5 al v6 apenas las abre, y
   guarda un catálogo JSON en el formato v10 —antes v9— en cuanto lo escribe. La 0.8.0 se
   niega a abrir cualquiera de las tres ("newer than supported"): volver a la 0.8.0 exige
   restaurar el backup (`movie-inbox backup` o, en Docker, `bash scripts/docker-backup.sh`).
@@ -108,6 +108,16 @@ el trabajo visual de Inicio sigue en curso.
   teléfono desconectado queda afuera en su próxima llamada y tiene que volver a aparearse.
   La respuesta no trae nada que sirva para autenticar. Todavía no hay pantalla que lo
   muestre.
+- Un teléfono puede preguntar qué pasó con las obras que mandó sin conexión:
+  `POST /api/v1/catalog/drafts/receipts` responde, por cada id que generó, si sigue esperando
+  revisión, si se aplicó —y entonces trae el id de la obra en que se convirtió, para que
+  enlace su copia local con la del servidor en vez de tener las dos—, si se descartó y por
+  qué, o si el servidor no tiene registro y hay que reenviarla. Un reintento que llega
+  después de que el borrador se aplicó o se borró en la web ya no agrega las obras otra vez:
+  antes sólo se miraba el borrador mientras seguía esperando. Una obra dudosa nunca se enlaza
+  a una candidata del catálogo, y un borrador aplicado no se reabre, así que lo que quedó sin
+  aplicar se informa como descartado. Los recibos ya resueltos se olvidan al año; los
+  pendientes no.
 - Vectores de prueba para el cliente Android, calculados por el propio servidor y
   verificados en cada corrida de pruebas: la huella del certificado con los payloads del QR
   (`docs/briefs/pairing-certificate-v1-vectors.json`) y la normalización de títulos
