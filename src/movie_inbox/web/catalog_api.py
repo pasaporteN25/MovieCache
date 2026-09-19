@@ -301,10 +301,13 @@ def update_item_catalog_status(path: Path, item_id: str, en_catalogo: Any) -> tu
     return catalog_service(path).update_catalog_status(item_id, en_catalogo)
 
 
-def update_item_personal(
-    path: Path, item_id: str, watched_at: str, rating: Any, review: str
+def update_item_personal_fields(
+    path: Path,
+    item_id: str,
+    values: dict[str, Any],
+    base: Any = None,
 ) -> tuple[bool, str]:
-    return catalog_service(path).update_personal(item_id, watched_at, rating, review)
+    return catalog_service(path).update_personal_fields(item_id, values, base)
 
 
 def patch_item_personal(

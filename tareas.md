@@ -485,7 +485,7 @@ web.
     un `base` con `0` para un puntaje sin poner ya no da un 409 falso. Conserva la tolerancia
     del formulario (fecha vacía la borra, puntaje acotado, sin tope de largo en la review),
     para que el navegador no vea rechazos nuevos. `update_personal` pasa a delegar en él.
-  - [ ] **[X8.2] `/api/personal` acepta sólo los campos enviados y un `base`.** Un campo ausente
+  - [x] **[X8.2] `/api/personal` acepta sólo los campos enviados y un `base`.** 2026-09-19. Un campo ausente
     no se toca (hoy ausente = vacío = borra); un `base` viejo responde
     `409 {"ok": false, "reason": "personal_conflict"}` sin escribir. La ficha actual, que manda
     los tres campos, se comporta igual que antes. **Modelo sugerido**: Chico.

@@ -32,7 +32,7 @@ from movie_inbox.web.catalog_api import (
     update_item_catalog_status,
     update_item_kind,
     update_item_metadata,
-    update_item_personal,
+    update_item_personal_fields,
     update_item_status,
     write_path_for,
 )
@@ -342,18 +342,27 @@ def catalog(request: Request, body: dict[str, Any] = Depends(authorized_json)) -
 
 @router.post("/api/personal")
 def personal(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    # [X8]: only the fields present in the body are written. A form used to send
+    # all three with whatever they held when it opened, and a missing one meant
+    # "empty", so saving the review put back a rating another device had changed.
+    # A body that sends all three still behaves as it always did.
+    #
+    # `base` is the values the form read when it opened; if any no longer matches
+    # what is stored, nothing is written and the answer is a 409.
+    values = {field: body[field] for field in ("watched_at", "rating", "review") if field in body}
     try:
         catalog = session_catalog(request)
-        updated, reason = update_item_personal(
+        updated, reason = update_item_personal_fields(
             write_path_for(
                 catalog.config,
                 catalog.source_path(str(body.get("source_file") or "")),
             ),
-            item_id=str(body.get("id") or ""),
-            watched_at=str(body.get("watched_at") or ""),
-            rating=body.get("rating"),
-            review=str(body.get("review") or ""),
+            str(body.get("id") or ""),
+            values,
+            body.get("base"),
         )
+        if reason == "conflict":
+            return error_response("personal_conflict", 409)
         return operation_response(updated, reason)
     except (ValueError, CatalogRepositoryError) as error:
         return application_error_response(error)

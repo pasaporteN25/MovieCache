@@ -3267,6 +3267,96 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(login.status_code, 403)
         self.assertEqual(login.json()["reason"], "invalid_origin")
 
+    # [X8]: the ficha saves through /api/personal, and used to undo a phone's edit.
+
+    def _phone(self) -> tuple[dict[str, str], str]:
+        login = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {"username": "lucas", "password": self.owner_password, "device_name": "Pixel"}
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        item = self.client.get("/api/v1/catalog/items", headers=headers).json()["items"][0]
+        return headers, str(item["id"])
+
+    def _phone_patch(self, headers: dict[str, str], item_id: str, body: dict[str, object]):
+        return self.client.patch(
+            f"/api/v1/catalog/items/{item_id}/personal",
+            content=json.dumps(body),
+            headers={**headers, "Content-Type": "application/json"},
+        )
+
+    def _phone_view(self, headers: dict[str, str], item_id: str) -> dict[str, object]:
+        response = self.client.get(f"/api/v1/catalog/items/{item_id}", headers=headers)
+        personal: dict[str, object] = response.json()["personal"]
+        return personal
+
+    def _save_from_ficha(self, body: dict[str, object]):
+        return self.client.post(
+            "/api/personal", content=json.dumps({"id": "heat", **body}), headers=self.post_headers()
+        )
+
+    def test_saving_one_field_from_the_ficha_does_not_undo_a_phone_s_rating(self) -> None:
+        headers, item_id = self._phone()
+        # The ficha is open. A phone uploads a rating. The ficha then saves only
+        # the review, because that is the only thing the person touched.
+        self._phone_patch(headers, item_id, {"rating": 9})
+
+        saved = self._save_from_ficha({"review": "Una noche intensa."})
+
+        self.assertEqual(saved.status_code, 200, saved.content)
+        personal = self._phone_view(headers, item_id)
+        self.assertEqual(personal["rating"], 9, "the phone's rating must survive")
+        self.assertEqual(personal["review"], "Una noche intensa.")
+
+    def test_a_form_that_still_sends_all_three_behaves_as_it_always_did(self) -> None:
+        headers, item_id = self._phone()
+        self._phone_patch(headers, item_id, {"rating": 9})
+
+        saved = self._save_from_ficha({"watched_at": "", "rating": 0, "review": "Sola."})
+
+        self.assertEqual(saved.status_code, 200, saved.content)
+        personal = self._phone_view(headers, item_id)
+        self.assertIsNone(personal["rating"])
+        self.assertEqual(personal["review"], "Sola.")
+
+    def test_a_stale_base_is_a_409_and_writes_nothing(self) -> None:
+        headers, item_id = self._phone()
+        self._phone_patch(headers, item_id, {"review": "Desde el telefono."})
+
+        saved = self._save_from_ficha({"review": "Desde la ficha.", "base": {"review": ""}})
+
+        self.assertEqual(saved.status_code, 409, saved.content)
+        self.assertEqual(saved.json(), {"ok": False, "reason": "personal_conflict"})
+        self.assertEqual(self._phone_view(headers, item_id)["review"], "Desde el telefono.")
+
+    def test_a_base_read_off_the_row_the_page_loaded_applies(self) -> None:
+        headers, item_id = self._phone()
+
+        saved = self._save_from_ficha(
+            {"review": "Buenisima.", "base": {"watched_at": "", "rating": 0, "review": ""}}
+        )
+
+        self.assertEqual(saved.status_code, 200, saved.content)
+        self.assertEqual(self._phone_view(headers, item_id)["review"], "Buenisima.")
+
+    def test_saving_no_fields_is_refused_instead_of_clearing_them(self) -> None:
+        headers, item_id = self._phone()
+        self._phone_patch(headers, item_id, {"rating": 9, "review": "Guardada."})
+
+        saved = self._save_from_ficha({})
+
+        self.assertEqual(saved.status_code, 400, saved.content)
+        personal = self._phone_view(headers, item_id)
+        self.assertEqual((personal["rating"], personal["review"]), (9, "Guardada."))
+
+    def test_a_malformed_base_is_a_400(self) -> None:
+        saved = self._save_from_ficha({"review": "x", "base": "rating:0"})
+
+        self.assertEqual(saved.status_code, 400, saved.content)
+
     def test_json_body_limit_is_enforced(self) -> None:
         body = json.dumps({"id": "heat", "review": "x" * MAX_JSON_BODY_BYTES})
         status, payload = self.request("POST", "/api/personal", body, self.post_headers())
