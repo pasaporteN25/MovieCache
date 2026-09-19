@@ -24,6 +24,7 @@ from movie_inbox.domain.collections import (
 from movie_inbox.domain.imports import (
     DEVICE_ORIGIN,
     NEVER_EXPIRES,
+    DeviceReceipt,
     ImportDraft,
     ImportDraftItem,
     ParsedImport,
@@ -42,6 +43,11 @@ MAX_DEVICE_ITEMS_PER_REQUEST = 100
 # One draft cannot grow without limit either, or a phone that loops on a failing
 # sync would fill the instance. Well above any realistic offline backlog.
 MAX_DEVICE_DRAFT_ITEMS = 2_000
+# [X6]: how long a resolved receipt is remembered. A pending one is never
+# forgotten -- its work is still waiting in a draft. After this, a retry of the
+# same client id would be taken for a new work; a phone that was offline for a
+# year has bigger problems than that.
+DEVICE_RECEIPT_RETENTION_SECONDS = 365 * 24 * 60 * 60
 IMPORT_APPLY_STALE_SECONDS = 5 * 60
 MAX_IMPORT_SELECTION = 10_000
 MAX_IMPORT_DRAFTS_PER_USER = 20
@@ -167,17 +173,28 @@ class ImportService:
             )
         now = self._now()
         self.repository.purge_expired(now)
+        self.repository.purge_receipts(now - DEVICE_RECEIPT_RETENTION_SECONDS)
         draft = self._device_draft(user_id)
         known = {entry.id for entry in draft.items} if draft is not None else set()
         position = max((entry.position for entry in draft.items), default=-1) if draft else -1
 
+        client_ids = [str(raw.get("id") or "").strip()[:64] for raw in entries]
+        if not all(client_ids):
+            raise ValueError("Every work needs a client id, so a retry cannot duplicate it")
+        # [X6]: a work the server already has an answer for is a duplicate whether or
+        # not its draft still exists. It used to be judged only against the draft
+        # still `ready`, so a retry after the draft was applied or deleted in the
+        # browser added the same works again.
+        answered = self.repository.receipts_for(user_id, client_ids)
+
         parsed_items: list[ParsedImportItem] = []
         duplicates: list[str] = []
-        for raw in entries:
-            entry_id = str(raw.get("id") or "").strip()[:64]
-            if not entry_id:
-                raise ValueError("Every work needs a client id, so a retry cannot duplicate it")
-            if entry_id in known or entry_id in {row.id for row in parsed_items}:
+        for raw, entry_id in zip(entries, client_ids, strict=True):
+            if (
+                entry_id in known
+                or entry_id in answered
+                or entry_id in {row.id for row in parsed_items}
+            ):
                 duplicates.append(entry_id)
                 continue
             position += 1
@@ -200,6 +217,11 @@ class ImportService:
             added = self._classify(parsed, seen)
             draft = self._store_device_items(user_id, draft, added, now)
 
+        if draft is not None:
+            self.repository.save_receipts(
+                user_id, self._new_receipts(draft.id, added, duplicates, known, answered), now
+            )
+
         return {
             "draft_id": draft.id if draft is not None else "",
             "accepted": [
@@ -208,6 +230,36 @@ class ImportService:
             "duplicates": duplicates,
             "counts": draft.counts() if draft is not None else {},
         }
+
+    @staticmethod
+    def _new_receipts(
+        draft_id: str,
+        added: Sequence[ImportDraftItem],
+        duplicates: Sequence[str],
+        known: set[str],
+        answered: Mapping[str, DeviceReceipt],
+    ) -> list[DeviceReceipt]:
+        """The receipts a request leaves behind, written after its works are stored.
+
+        Written after, not before: a receipt without its work would tell a retry
+        the work was safe when it was not. The reverse is harmless -- a work
+        without a receipt is still in the draft, so a retry finds it there and
+        the duplicate branch backfills the receipt it is missing.
+        """
+
+        receipts = {
+            entry.id: DeviceReceipt(
+                entry.id,
+                "discarded" if entry.state == "invalid" else "pending",
+                "invalid" if entry.state == "invalid" else "",
+                draft_id=draft_id,
+            )
+            for entry in added
+        }
+        for entry_id in duplicates:
+            if entry_id in known and entry_id not in answered and entry_id not in receipts:
+                receipts[entry_id] = DeviceReceipt(entry_id, "pending", draft_id=draft_id)
+        return list(receipts.values())
 
     def _device_draft(self, user_id: str) -> ImportDraft | None:
         for summary in self.repository.list_for_user(user_id):

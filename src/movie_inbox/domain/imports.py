@@ -23,6 +23,34 @@ IMPORT_DRAFT_ORIGINS = {WEB_ORIGIN, DEVICE_ORIGIN}
 # hours.
 NEVER_EXPIRES = 0
 
+# [X6]: what the server tells a phone about a work it sent while offline. It has
+# to outlive the draft the work was parked in, because that draft is applied or
+# deleted in the browser, and the phone asks afterwards.
+DEVICE_RECEIPT_STATES = {"pending", "applied", "discarded"}
+
+
+@dataclass(frozen=True)
+class DeviceReceipt:
+    """One offline addition, by the id the phone generated for it.
+
+    `item_id` is the catalog item the work ended up as, and is only set when
+    `state` is `applied`; it is the catalogue's own id, and translating it into
+    the opaque id a device sees is the web layer's job.
+    """
+
+    client_id: str
+    state: str
+    reason: str = ""
+    item_id: str = ""
+    draft_id: str = ""
+    updated_at: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.client_id:
+            raise ValueError("A receipt requires the client's id")
+        if self.state not in DEVICE_RECEIPT_STATES:
+            raise ValueError(f"Invalid receipt state: {self.state}")
+
 
 @dataclass(frozen=True)
 class ParsedImportItem:

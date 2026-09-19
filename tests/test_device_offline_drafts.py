@@ -13,9 +13,11 @@ the phone never decides identity.
 from __future__ import annotations
 
 import json
+import sqlite3
 import tempfile
 import unittest
 from collections.abc import Mapping
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -24,11 +26,12 @@ from fastapi.testclient import TestClient
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.import_service import (
+    DEVICE_RECEIPT_RETENTION_SECONDS,
     MAX_DEVICE_ITEMS_PER_REQUEST,
     ImportService,
 )
 from movie_inbox.domain.catalog import normalize_item
-from movie_inbox.domain.imports import DEVICE_ORIGIN, WEB_ORIGIN
+from movie_inbox.domain.imports import DEVICE_ORIGIN, WEB_ORIGIN, DeviceReceipt
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import parse_import_content
@@ -187,6 +190,123 @@ class DeviceDraftServiceTests(unittest.TestCase):
         self.assertEqual([item.title for item in repository.read()], ["Stalker"])
         (summary,) = self.service.list_drafts(self.user_id)
         self.assertEqual(summary["status"], "applied")
+
+    # [X6.1]: a receipt outlives the draft, so a retry is judged against it.
+
+    def _receipt(self, client_id: str, user_id: str = "") -> Any:
+        found = self.service.repository.receipts_for(user_id or self.user_id, [client_id])
+        return found.get(client_id)
+
+    def _apply(self, draft_id: str, *client_ids: str) -> dict[str, Any]:
+        repository = JsonCatalogRepository(
+            Path(self.temporary.name) / "catalog.json", normalize_item
+        )
+        repository.write([])
+        result: dict[str, Any] = self.service.apply_draft(
+            self.user_id, draft_id, "catalog", list(client_ids), CatalogService(repository), []
+        )
+        return result
+
+    def test_every_work_sent_leaves_a_pending_receipt_naming_its_draft(self) -> None:
+        result = self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+
+        receipt = self._receipt("local-1")
+
+        self.assertEqual(receipt.state, "pending")
+        self.assertEqual(receipt.draft_id, result["draft_id"])
+
+    def test_a_work_with_no_title_gets_a_discarded_receipt_so_the_phone_stops_waiting(
+        self,
+    ) -> None:
+        self._add({"id": "local-1", "title": "   "})
+
+        receipt = self._receipt("local-1")
+
+        self.assertEqual((receipt.state, receipt.reason), ("discarded", "invalid"))
+
+    def test_a_retry_after_the_draft_was_deleted_does_not_add_the_work_again(self) -> None:
+        entry: dict[str, Any] = {"id": "local-1", "title": "Persona", "year": "1966"}
+        first = self._add(entry)
+        self.service.delete_draft(self.user_id, str(first["draft_id"]), True)
+
+        again = self._add(entry)
+
+        self.assertEqual(again["accepted"], [])
+        self.assertEqual(again["duplicates"], ["local-1"])
+        self.assertEqual(self.service.list_drafts(self.user_id), [])
+
+    def test_a_retry_after_the_draft_was_applied_does_not_add_the_work_again(self) -> None:
+        entry: dict[str, Any] = {"id": "local-1", "title": "Persona", "year": "1966"}
+        first = self._add(entry)
+        self._apply(str(first["draft_id"]), "local-1")
+
+        again = self._add(entry)
+
+        self.assertEqual(again["accepted"], [])
+        self.assertEqual(again["duplicates"], ["local-1"])
+        self.assertEqual(len(self.service.list_drafts(self.user_id)), 1)
+
+    def test_receipts_belong_to_the_account_that_sent_the_work(self) -> None:
+        self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+
+        self.assertIsNone(self._receipt("local-1", user_id="someone-else"))
+
+    def test_a_work_in_the_draft_with_no_receipt_gets_one_when_the_phone_retries(self) -> None:
+        # Works are stored before their receipts, so a failure in between leaves
+        # a work with none. The retry finds it in the draft and repairs that.
+        entry: dict[str, Any] = {"id": "local-1", "title": "Stalker", "year": "1979"}
+        self._add(entry)
+
+        with closing(sqlite3.connect(self.instance)) as connection:
+            connection.execute("DELETE FROM device_receipts")
+            connection.commit()
+        self.assertIsNone(self._receipt("local-1"))
+
+        again = self._add(entry)
+
+        self.assertEqual(again["duplicates"], ["local-1"])
+        self.assertEqual(self._receipt("local-1").state, "pending")
+
+    def test_a_resolved_receipt_is_forgotten_after_the_retention_but_a_pending_one_is_not(
+        self,
+    ) -> None:
+        repository = self.service.repository
+        repository.save_receipts(
+            self.user_id,
+            [
+                DeviceReceipt("resolved", "discarded", "deleted"),
+                DeviceReceipt("waiting", "pending"),
+            ],
+            self.now,
+        )
+        self.now += DEVICE_RECEIPT_RETENTION_SECONDS + 1
+
+        self._add({"id": "local-1", "title": "Stalker", "year": "1979"})
+
+        self.assertIsNone(self._receipt("resolved"))
+        self.assertEqual(self._receipt("waiting").state, "pending")
+
+    def test_discarding_a_draft_s_receipts_only_touches_what_was_still_pending(self) -> None:
+        repository = self.service.repository
+        repository.save_receipts(
+            self.user_id,
+            [
+                DeviceReceipt("waiting", "pending", draft_id="draft-a"),
+                DeviceReceipt("done", "applied", "added", "item-1", "draft-a"),
+                DeviceReceipt("elsewhere", "pending", draft_id="draft-b"),
+            ],
+            self.now,
+        )
+
+        changed = repository.discard_pending_receipts(self.user_id, "draft-a", "deleted", self.now)
+
+        self.assertEqual(changed, 1)
+        self.assertEqual(
+            (self._receipt("waiting").state, self._receipt("waiting").reason),
+            ("discarded", "deleted"),
+        )
+        self.assertEqual(self._receipt("done").item_id, "item-1")
+        self.assertEqual(self._receipt("elsewhere").state, "pending")
 
     def test_a_web_import_still_says_it_came_from_the_web(self) -> None:
         created = self.service.create_draft(

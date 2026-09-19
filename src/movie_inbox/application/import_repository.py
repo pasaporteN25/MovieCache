@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
-from movie_inbox.domain.imports import ImportDraft, ImportDraftItem
+from movie_inbox.domain.imports import DeviceReceipt, ImportDraft, ImportDraftItem
 
 
 class ImportRepositoryError(RuntimeError):
@@ -57,3 +57,19 @@ class ImportDraftRepository(Protocol):
         ...
 
     def purge_expired(self, now: int) -> int: ...
+
+    def receipts_for(self, user_id: str, client_ids: Sequence[str]) -> dict[str, DeviceReceipt]:
+        """The receipts this account holds for those client ids, by id."""
+        ...
+
+    def save_receipts(self, user_id: str, receipts: Sequence[DeviceReceipt], now: int) -> None:
+        """Record or update receipts; `created_at` is kept when one already exists."""
+        ...
+
+    def discard_pending_receipts(self, user_id: str, draft_id: str, reason: str, now: int) -> int:
+        """Mark what a draft still held as pending `discarded`; returns how many."""
+        ...
+
+    def purge_receipts(self, resolved_before: int) -> int:
+        """Forget resolved receipts last updated before this moment; pending ones stay."""
+        ...

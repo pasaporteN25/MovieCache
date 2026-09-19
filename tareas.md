@@ -455,6 +455,26 @@ web, el reintento crea uno nuevo con las mismas obras.
   teléfono la próxima vez que consulta su estado, y un reintento después de aplicar o borrar
   el borrador original no crea entradas nuevas.
 - **Depende de**: nada. **Modelo sugerido**: Grande: ruta nueva en el contrato.
+- **Subdividida el 2026-09-19** en cuatro pasos, cada uno commiteable solo (el primero cambia
+  el esquema de `instance.db`, v21→v22). **Decisiones de diseño**, todas revisables:
+  un recibo por (cuenta, id de cliente) en una tabla propia, porque tiene que vivir más allá
+  del borrador; los estados son `pending`, `applied` (con la obra resultante, tanto si se
+  agregó como si ya estaba) y `discarded`; un id que el servidor no conoce se informa como
+  `unknown` —el teléfono lo reenvía— en vez de omitirlo; los recibos ya resueltos se olvidan
+  a los 365 días, los pendientes nunca; y un borrador `ready` que ya tenía entradas antes de
+  esta tarea cuenta como `pending` sin necesidad de rellenar nada.
+  - [x] **[X6.1] Recibos persistentes y reintento idempotente.** 2026-09-19. Tabla `device_receipts` (v22)
+    y sus operaciones en el repositorio. `append_device_items` deja un recibo `pending` por
+    cada alta y **trata como duplicado a todo id que ya tiene recibo**, aunque su borrador ya
+    no exista: cierra el hueco del reintento tardío. **Modelo sugerido**: Medio.
+  - [ ] **[X6.2] Resolver los recibos.** Al aplicar un borrador de dispositivo cada entrada
+    pasa a `applied` (con el id de la obra) o `discarded` (`not_applied`: no se eligió, o quedó
+    en revisión, y un borrador aplicado no se vuelve a abrir); al borrarlo, lo que seguía
+    pendiente pasa a `discarded` (`deleted`). **Modelo sugerido**: Medio.
+  - [ ] **[X6.3] Consulta y ruta.** `POST /api/v1/catalog/drafts/receipts` con `{"ids": [...]}`
+    (hasta 100) devuelve el estado de cada uno, con la obra resultante como el id opaco que ya
+    usa el resto de la API. Contrato OpenAPI y pruebas HTTP. **Modelo sugerido**: Medio.
+  - [ ] **[X6.4] Changelog.** **Modelo sugerido**: Chico.
 
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 

@@ -11,7 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from movie_inbox.application.import_repository import ImportRepositoryError
-from movie_inbox.domain.imports import NEVER_EXPIRES, ImportDraft, ImportDraftItem
+from movie_inbox.domain.imports import (
+    NEVER_EXPIRES,
+    DeviceReceipt,
+    ImportDraft,
+    ImportDraftItem,
+)
 
 STALE_APPLY_GRACE_SECONDS = 15 * 60
 
@@ -301,6 +306,106 @@ class SqliteImportDraftRepository:
             except sqlite3.Error as error:
                 raise ImportRepositoryError(
                     f"Cannot purge import drafts from: {self.path}"
+                ) from error
+
+    def receipts_for(self, user_id: str, client_ids: Sequence[str]) -> dict[str, DeviceReceipt]:
+        wanted = list(dict.fromkeys(client_ids))
+        if not wanted:
+            return {}
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    found: dict[str, DeviceReceipt] = {}
+                    # Chunked: SQLite bounds the number of bound parameters.
+                    for start in range(0, len(wanted), 200):
+                        chunk = wanted[start : start + 200]
+                        marks = ", ".join("?" for _ in chunk)
+                        rows = connection.execute(
+                            "SELECT client_id, state, reason, item_id, draft_id, updated_at "
+                            f"FROM device_receipts WHERE user_id = ? AND client_id IN ({marks})",
+                            (user_id, *chunk),
+                        ).fetchall()
+                        for row in rows:
+                            found[str(row["client_id"])] = DeviceReceipt(
+                                client_id=str(row["client_id"]),
+                                state=str(row["state"]),
+                                reason=str(row["reason"]),
+                                item_id=str(row["item_id"]),
+                                draft_id=str(row["draft_id"]),
+                                updated_at=int(row["updated_at"]),
+                            )
+                    return found
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot read device receipts from: {self.path}"
+                ) from error
+
+    def save_receipts(self, user_id: str, receipts: Sequence[DeviceReceipt], now: int) -> None:
+        if not receipts:
+            return
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    for receipt in receipts:
+                        connection.execute(
+                            """INSERT INTO device_receipts(
+                                user_id, client_id, state, reason, item_id, draft_id,
+                                created_at, updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(user_id, client_id) DO UPDATE SET
+                                state = excluded.state,
+                                reason = excluded.reason,
+                                item_id = excluded.item_id,
+                                draft_id = excluded.draft_id,
+                                updated_at = excluded.updated_at""",
+                            (
+                                user_id,
+                                receipt.client_id,
+                                receipt.state,
+                                receipt.reason,
+                                receipt.item_id,
+                                receipt.draft_id,
+                                now,
+                                now,
+                            ),
+                        )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot save device receipts in: {self.path}"
+                ) from error
+
+    def discard_pending_receipts(self, user_id: str, draft_id: str, reason: str, now: int) -> int:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    cursor = connection.execute(
+                        """UPDATE device_receipts
+                        SET state = 'discarded', reason = ?, item_id = '', updated_at = ?
+                        WHERE user_id = ? AND draft_id = ? AND state = 'pending'""",
+                        (reason, now, user_id, draft_id),
+                    )
+                    connection.commit()
+                    return max(0, cursor.rowcount)
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot discard device receipts in: {self.path}"
+                ) from error
+
+    def purge_receipts(self, resolved_before: int) -> int:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    cursor = connection.execute(
+                        "DELETE FROM device_receipts WHERE state != 'pending' AND updated_at < ?",
+                        (resolved_before,),
+                    )
+                    connection.commit()
+                    return max(0, cursor.rowcount)
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot purge device receipts from: {self.path}"
                 ) from error
 
     def _connect(self) -> sqlite3.Connection:

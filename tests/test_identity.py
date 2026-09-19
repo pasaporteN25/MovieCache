@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
 from movie_inbox.application.auth_service import (
     AuthenticationError,
@@ -762,19 +763,37 @@ class DeviceSessionListTests(unittest.TestCase):
         self.assertFalse(self.service.revoke_device_session(self.identity, session_id))
 
     def test_the_migration_gives_existing_sessions_distinct_ids(self) -> None:
-        self._pair("Pixel")
-        self._pair("Tablet")
-        with closing(sqlite3.connect(self.database)) as connection:
-            connection.executescript(
-                """
-                DROP INDEX ix_device_sessions_session_id;
-                ALTER TABLE device_sessions DROP COLUMN session_id;
-                DELETE FROM instance_migrations WHERE version = 21;
-                """
+        # A real instance at v20, built by the real migrations rather than by
+        # undoing the latest one, so this keeps meaning the same thing whichever
+        # version happens to be last.
+        root = Path(self.temporary.name)
+        catalog_path = root / "catalog.json"
+        old_database = root / "old-instance.db"
+        with patch("movie_inbox.infrastructure.identity_repository.INSTANCE_SCHEMA_VERSION", 20):
+            old_repository = SqliteIdentityRepository(old_database)
+            owner, _ = AuthService(old_repository).bootstrap_owner(
+                "owner",
+                "a-long-local-password",
+                catalog_name="Mi catalogo",
+                source_paths=[str(catalog_path)],
+                write_path=str(catalog_path),
             )
+        with closing(sqlite3.connect(old_database)) as connection:
+            for index, name in enumerate(("Pixel", "Tablet")):
+                connection.execute(
+                    """INSERT INTO device_sessions(
+                        access_token_hash, refresh_token_hash, user_id, device_name,
+                        created_at, access_expires_at, refresh_expires_at, last_seen_at
+                    ) VALUES (?, ?, ?, ?, 1000, 1060, 1500, 1000)""",
+                    (f"access-{index}", f"refresh-{index}", owner.id, name),
+                )
             connection.commit()
+            self.assertNotIn(
+                "session_id",
+                {row[1] for row in connection.execute("PRAGMA table_info(device_sessions)")},
+            )
 
-        rows = SqliteIdentityRepository(self.database).list_device_sessions(self.owner.id, 1_000)
+        rows = SqliteIdentityRepository(old_database).list_device_sessions(owner.id, 1_000)
 
         ids = {row.id for row in rows}
         self.assertEqual(len(ids), 2)

@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 21
+INSTANCE_SCHEMA_VERSION = 22
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -480,6 +480,26 @@ UPDATE device_sessions SET session_id = lower(hex(randomblob(16)));
 CREATE UNIQUE INDEX ix_device_sessions_session_id ON device_sessions(session_id);
 """
 
+# [X6]: what a phone is told about each work it sent while offline, by the id it
+# generated. Its own table because it has to outlive the draft the work was
+# parked in: that draft is applied or deleted in the browser, and the phone asks
+# afterwards. `item_id` is the catalog item the work became, when it did.
+INSTANCE_SCHEMA_V22 = """
+CREATE TABLE device_receipts (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    client_id TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('pending', 'applied', 'discarded')),
+    reason TEXT NOT NULL DEFAULT '',
+    item_id TEXT NOT NULL DEFAULT '',
+    draft_id TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, client_id)
+);
+CREATE INDEX ix_device_receipts_draft ON device_receipts(user_id, draft_id);
+CREATE INDEX ix_device_receipts_retention ON device_receipts(state, updated_at);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -501,6 +521,7 @@ INSTANCE_MIGRATIONS = {
     19: ("import drafts remember whether a phone or a browser made them", INSTANCE_SCHEMA_V19),
     20: ("device refresh tokens tolerate one retry after a lost response", INSTANCE_SCHEMA_V20),
     21: ("device sessions carry a stable id a browser can name them by", INSTANCE_SCHEMA_V21),
+    22: ("receipts for works a phone added while offline", INSTANCE_SCHEMA_V22),
 }
 
 
