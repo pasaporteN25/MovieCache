@@ -471,18 +471,28 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X11] Un id durable por fuente, en lugar de su posición — *propuesta, decide el owner*
+#### [X11] Un id durable por fuente, en lugar de su posición — *decidida el 2026-09-20; requisito para publicar el cliente Android*
 
 Surge de evaluar la idea del owner en [X5]. El id que ve el teléfono incluye la posición de la
 fuente, así que quitar o reordenar una fuente cambia todos los ids (caso 17 de la matriz de
 [A5.1]). Un id **por fuente**, guardado en su propio almacén, lo arregla de raíz sin tocar
 las obras. Detalle y comparación con la alternativa por obra en el diseño de [X5], sección 6.
 
+- **Decisión del owner, 2026-09-20:** un id por fuente, no un uid nuevo por obra (el `id` de
+  cada obra ya es durable). **No entra en la 0.9.0 y por ahora no se empieza.** Es un
+  **requisito para publicar el cliente Android**: su v0.1.0, que se publica al cerrar M2
+  (`docs/roadmap.md` de `movieIndexAndroid`), tiene que salir con esto hecho, porque desde
+  ese momento cambiar la derivación obliga a re-descargar la réplica y deja huérfanos los
+  cambios pendientes. El tablero del cliente tiene que citarlo en M2; ese repositorio no se
+  tocó desde acá.
 - **Alcance**: un identificador por fuente en el almacén de cada catálogo (esquema portable
   v11 y SQLite v7), con su migración, y la derivación del id del teléfono sobre él.
 - **Criterio de cierre**: agregar, quitar o reordenar fuentes no cambia ningún id de teléfono.
-- **Conviene antes** de que exista un cliente instalado: después, cambiar la derivación obliga
-  a re-descargar y deja huérfanos los cambios pendientes. **Modelo sugerido**: Grande.
+- **Al hacerlo, tener en cuenta:** los registros de bajas de [X5] (`device_removals`) guardan
+  el id **derivado**, no el interno, así que la migración los tiene que recalcular o dejar que
+  caduquen; y la primera derivación nueva cambia todos los ids una vez, así que conviene
+  hacerla mientras no haya réplicas que conserven cambios pendientes. **Modelo sugerido**:
+  Grande.
 
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 

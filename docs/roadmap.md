@@ -306,6 +306,9 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 2. [A2] Cliente Android autonomo, con almacen propio y sincronizacion que inicia una
    persona (ADR-0005). **Desde el 2026-09-13 es un repositorio aparte,
    `movieIndexAndroid`**, con su propia hoja de ruta; aca queda la API que consume.
+   **Requisito para publicar su v0.1.0: [X11]**, un id por fuente en lugar de su posicion
+   (decidido el 2026-09-20), porque despues de publicar cambiar como se derivan los ids de
+   las obras obliga a re-descargar y deja huerfanos los cambios pendientes.
 3. **Cerrado 2026-09-07.** [I1] Evaluar Radarr, Sonarr y Letterboxd: evaluacion hecha y
    construccion postergada por decision del owner (ADR-0006, ADR-0007 y ADR-0008).
 4. [M1] Investigar juegos y musica como verticales propias, nunca como simples valores

@@ -128,6 +128,10 @@ huérfanos los cambios pendientes. C no compra nada que B no dé: el `id` de la 
 que C pediría. Es una decisión del owner; nada de [X5] depende de ella, porque el registro se
 guarda con el id que el teléfono ya conoce.
 
+**Decidido el 2026-09-20: B, un id por fuente** ([X11]). No entra en la 0.9.0: es un requisito
+para publicar el cliente Android (su v0.1.0). Cuando se haga, los registros de bajas, que
+guardan el id derivado, se recalculan o se dejan caducar.
+
 ## Cómo se parte
 
 1. **[X5.1]** Este diseño y la subdivisión.
