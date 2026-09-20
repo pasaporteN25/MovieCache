@@ -5,8 +5,13 @@ from __future__ import annotations
 import html
 import json
 import re
-from collections.abc import Mapping
+import threading
+import time
+from collections import deque
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from math import ceil
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlparse
@@ -93,6 +98,67 @@ def fetch_json_safe(url: str, timeout: float = 5) -> dict[str, Any]:
         return {}
 
 
+# [B2.4b]: a 429 that an adapter swallows -- because the other language answered,
+# or because it is only the alias lookup -- used to look like a success to the
+# registry: no cooldown, and the partial answer cached for 15 minutes as if it
+# were whole. Every 429 is noted here, by host, so the registry can tell after
+# the fact that the source was limited even when its adapter carried on.
+DEFAULT_RETRY_AFTER_SECONDS = 45
+_RATE_LIMIT_NOTES_MAX = 64
+_rate_limit_notes: deque[tuple[float, str, int]] = deque(maxlen=_RATE_LIMIT_NOTES_MAX)
+_rate_limit_lock = threading.Lock()
+
+
+def retry_after_seconds(headers: Any, default: int = DEFAULT_RETRY_AFTER_SECONDS) -> int:
+    """How long a 429 asks to be left alone, from its `Retry-After` header."""
+
+    raw_value = str(headers.get("Retry-After") or "").strip() if headers else ""
+    try:
+        return max(1, ceil(float(raw_value)))
+    except (TypeError, ValueError):
+        pass
+    try:
+        parsed = parsedate_to_datetime(raw_value)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return max(1, ceil((parsed.astimezone(UTC) - datetime.now(UTC)).total_seconds()))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def note_rate_limit(url: str, retry_after: int) -> None:
+    try:
+        host = (urlparse(url).hostname or "").casefold()
+    except ValueError:
+        return
+    with _rate_limit_lock:
+        _rate_limit_notes.append((time.monotonic(), host, retry_after))
+
+
+def rate_limited_seconds(hosts: Sequence[str], since: float) -> int:
+    """The longest cooldown any of these hosts asked for since `since`, or 0.
+
+    `since` is a `time.monotonic()` reading taken before the source was asked, so a
+    429 from an earlier search is never charged to this one. The notes are by host,
+    not by search: two searches to the same source at once can see each other's
+    429, which is right, because a rate limit belongs to the host.
+    """
+
+    if not hosts:
+        return 0
+    with _rate_limit_lock:
+        notes = list(_rate_limit_notes)
+    return max(
+        (
+            seconds
+            for noted_at, host, seconds in notes
+            if noted_at >= since
+            and any(host == suffix or host.endswith(f".{suffix}") for suffix in hosts)
+        ),
+        default=0,
+    )
+
+
 def fetch_text(
     url: str,
     accept: str = "text/html,application/xhtml+xml",
@@ -108,7 +174,13 @@ def fetch_text(
         url,
         headers=request_headers,
     )
-    with urlopen(request, timeout=timeout) as response:
+    try:
+        opened = urlopen(request, timeout=timeout)
+    except HTTPError as error:
+        if error.code == 429:
+            note_rate_limit(url, retry_after_seconds(error.headers))
+        raise
+    with opened as response:
         charset = response.headers.get_content_charset() or "utf-8"
         text: str = response.read(800_000).decode(charset, errors="replace")
         return text

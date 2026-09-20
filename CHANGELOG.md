@@ -192,6 +192,11 @@ el trabajo visual de Inicio sigue en curso.
   su ficha se enriqueciera: la obra se reportaba dos veces, la colección no se llegaba a
   crear y la única señal era que el interruptor volvía sin publicar nada. Ahora las
   copias se cuentan juntas, como siempre debieron.
+- Cuando Wikipedia o Wikidata limitaban sólo una parte de una búsqueda —un idioma, o el
+  reintento por alias—, la app lo tomaba por un éxito: no esperaba, la búsqueda siguiente
+  chocaba contra el mismo límite y la respuesta incompleta quedaba guardada 15 minutos como
+  si fuera completa. Ahora un 429 en cualquier pedido cuenta: se muestran las filas que sí
+  llegaron, la fuente descansa lo que el sitio pidió y esa respuesta no se guarda.
 - Buscar una obra por su título original —por ejemplo `Sen to Chihiro no kamikakushi`—
   podía no devolver nada desde Wikipedia aunque Wikipedia la conociera: esa página redirige
   el título a "Spirited Away", el buscador la encontraba y la ficha se descartaba porque no

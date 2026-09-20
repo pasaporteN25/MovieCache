@@ -403,7 +403,7 @@ vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
   declara nombre del artículo, la misma superficie que el alias confirmado por Wikidata de
   [Q3]. El gate de auto-match sigue en precisión 1.000 y cero falsos positivos. **Modelo
   sugerido**: Medio.
-- [ ] **[B2.4] Identificarse ante Wikimedia y no esconder el 429 parcial.** *Decidido por el
+- [x] **[B2.4] Identificarse ante Wikimedia y no esconder el 429 parcial.** *Decidido por el
   owner el 2026-09-20: entra en la 0.9.0, con un `User-Agent` que trae el nombre, la versión
   y la URL del repositorio, más un contacto opcional que pone quien corre cada instancia, y
   sólo para los hosts de Wikimedia.* El `User-Agent` de `fetch_text` era `MovieInbox/0.2
@@ -418,9 +418,16 @@ vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
     Wikimedia— y llega por `--operator-contact` o `MOVIE_INBOX_OPERATOR_CONTACT` (en Docker,
     `.env`); se rechaza en vez de limpiarse si no es ASCII imprimible sin paréntesis, porque
     va en una cabecera. **Modelo sugerido**: Chico.
-  - [ ] **[B2.4b] Un 429 parcial cuenta.** Que un 429 dentro del reintento por alias o de un
-    idioma cuente para el cooldown de la fuente y no se cachee como respuesta completa.
-    **Modelo sugerido**: Medio.
+  - [x] **[B2.4b] Un 429 parcial cuenta.** 2026-09-20. `fetch_text` deja constancia de cada
+    429 por host (`external/common.py::note_rate_limit`) y el registry, al terminar de
+    consultar una fuente que declara sus hosts (`rate_limit_hosts`; hoy sólo Wikipedia:
+    `wikipedia.org` y `wikidata.org`), abre el cooldown con el `Retry-After` más largo, deja
+    su salud en `cooldown` / `rate_limited`, **conserva las filas que sí encontró** y no
+    cachea la respuesta. Es lo que mostró la medición de [B2.2]: un 429 sólo en el puente de
+    alias, o en un idioma, pasaba por éxito y la búsqueda siguiente chocaba contra el mismo
+    límite. Efecto visible: mientras dura el cooldown (hasta 36 s en lo medido) no se
+    consulta a Wikipedia, en lugar de pedir y recibir 429 uno por uno. **Modelo sugerido**:
+    Medio.
 - **Modelo sugerido**: Chico. Son dos puntas acotadas, no un frente.
 
 ### Frente: Fuentes externas y especializacion de anime

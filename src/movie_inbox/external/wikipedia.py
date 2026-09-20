@@ -42,6 +42,9 @@ from movie_inbox.external.wikidata import (
 class WikipediaAdapter:
     name = "wikipedia"
     label = "Wikipedia"
+    # Where a 429 counts against this source, even when the adapter carries on
+    # past it ([B2.4b]): its own two editions, and the Wikidata alias lookup.
+    rate_limit_hosts = ("wikipedia.org", "wikidata.org")
 
     def search(self, query: str) -> list[dict[str, Any]]:
         intent = parse_search_query(query)

@@ -7,7 +7,6 @@ import time
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
-from email.utils import parsedate_to_datetime
 from math import ceil
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -18,7 +17,13 @@ from movie_inbox.domain.search import (
     parse_search_query,
 )
 from movie_inbox.external.base import SourceAdapter
-from movie_inbox.external.common import clean_text, dedupe_results, utc_now
+from movie_inbox.external.common import (
+    clean_text,
+    dedupe_results,
+    rate_limited_seconds,
+    retry_after_seconds,
+    utc_now,
+)
 from movie_inbox.external.filmaffinity import FilmAffinityAdapter
 from movie_inbox.external.imdb import ImdbAdapter
 from movie_inbox.external.jikan import JikanAdapter
@@ -178,6 +183,12 @@ class ExternalSourceService:
         except Exception as error:
             self._record_error(name, error, started)
             return [], False
+        limited_for = rate_limited_seconds(getattr(adapter, "rate_limit_hosts", ()), started)
+        if limited_for:
+            # It answered, so what it found is kept -- but it was told to slow down,
+            # and an answer that was cut short is not one to remember as whole.
+            self._record_partial_rate_limit(name, results, limited_for, started)
+            return results, False
         latency_ms = round((time.monotonic() - started) * 1000)
         with self._lock:
             snapshot_date = str(results[0].get("snapshot_date") or "") if results else ""
@@ -259,6 +270,33 @@ class ExternalSourceService:
                     "result_count": 0,
                     "error": clean_text(str(error))[:160] or error.__class__.__name__,
                     "error_code": error_code,
+                    "cooldown_until": cooldown_until,
+                    "retry_after_seconds": cooldown_seconds,
+                }
+            )
+
+    def _record_partial_rate_limit(
+        self,
+        name: str,
+        results: list[dict[str, Any]],
+        cooldown_seconds: int,
+        started: float,
+    ) -> None:
+        """[B2.4b]: the source answered, but part of what it was asked was refused."""
+
+        cooldown_until = (datetime.now(UTC) + timedelta(seconds=cooldown_seconds)).isoformat()
+        with self._lock:
+            self._cooldowns[name] = time.monotonic() + cooldown_seconds
+            state = self._health[name]
+            state.update(
+                {
+                    "status": "cooldown",
+                    "last_attempt_at": utc_now(),
+                    "last_success_at": utc_now() if results else state.get("last_success_at", ""),
+                    "latency_ms": round((time.monotonic() - started) * 1000),
+                    "result_count": len(results),
+                    "error": "Part of the request was rate limited",
+                    "error_code": "rate_limited",
                     "cooldown_until": cooldown_until,
                     "retry_after_seconds": cooldown_seconds,
                 }
@@ -389,18 +427,7 @@ def _source_error_state(error: Exception) -> tuple[str, int]:
 
 
 def _retry_after_seconds(error: HTTPError) -> int:
-    raw_value = str(error.headers.get("Retry-After") or "").strip() if error.headers else ""
-    try:
-        return max(1, ceil(float(raw_value)))
-    except (TypeError, ValueError):
-        pass
-    try:
-        parsed = parsedate_to_datetime(raw_value)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=UTC)
-        return max(1, ceil((parsed.astimezone(UTC) - datetime.now(UTC)).total_seconds()))
-    except (TypeError, ValueError, OverflowError):
-        return DEFAULT_UPSTREAM_COOLDOWN_SECONDS
+    return retry_after_seconds(error.headers, default=DEFAULT_UPSTREAM_COOLDOWN_SECONDS)
 
 
 def default_source_adapters(tmdb_read_access_token: str = "") -> list[SourceAdapter]:
