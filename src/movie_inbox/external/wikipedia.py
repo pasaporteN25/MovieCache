@@ -147,7 +147,58 @@ class WikipediaAdapter:
             "&pithumbsize=480&inprop=url&format=json&formatversion=2"
             f"&titles={quote(query)}"
         )
-        return wikipedia_results_from_query(fetch_json(url, timeout=timeout), language)
+        raw = fetch_json(url, timeout=timeout)
+        return _with_redirect_titles(wikipedia_results_from_query(raw, language), raw)
+
+
+def _with_redirect_titles(
+    results: list[dict[str, Any]], raw: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Keep the title a person asked for when Wikipedia redirected it to an article.
+
+    [B2.3]: "Sen to Chihiro no kamikakushi" resolves, on English Wikipedia, to
+    "Spirited Away" -- Wikipedia itself saying the first is a name of the second.
+    That fact came back in the response's `redirects` and was dropped, so the row
+    was scored against a query it shares no words with (16.6, under the 28.0
+    floor) and thrown away. The registry then answered with nothing, though the
+    source had found the work.
+
+    The asked title goes to `alternative_titles`, where the scorer already reads
+    aliases -- the same place a Wikidata-confirmed alias is put ([Q3]). Only the
+    exact-title lookup passes through here, so a work reached by the search
+    endpoint is scored exactly as before.
+    """
+
+    redirects = {
+        str(row.get("from") or ""): str(row.get("to") or "")
+        for row in object_list(object_dict(raw.get("query")).get("redirects"))
+        if isinstance(row, dict)
+    }
+    if not redirects:
+        return results
+    annotated: list[dict[str, Any]] = []
+    for row in results:
+        title = str(row.get("title") or "")
+        aliases = [asked for asked in redirects if _redirect_target(asked, redirects) == title]
+        titles = list(row.get("alternative_titles") or [])
+        for asked in aliases:
+            if asked and search_key(asked) != search_key(title) and asked not in titles:
+                titles.append(asked)
+        annotated.append({**row, "alternative_titles": titles} if titles else row)
+    return annotated
+
+
+def _redirect_target(title: str, redirects: dict[str, str]) -> str:
+    """Where a title ends up after following a redirect chain (bounded)."""
+
+    seen = {title}
+    current = title
+    while current in redirects:
+        current = redirects[current]
+        if current in seen:
+            break
+        seen.add(current)
+    return current if current != title else ""
 
 
 def wikipedia_results_from_query(

@@ -185,6 +185,12 @@ el trabajo visual de Inicio sigue en curso.
   su ficha se enriqueciera: la obra se reportaba dos veces, la colección no se llegaba a
   crear y la única señal era que el interruptor volvía sin publicar nada. Ahora las
   copias se cuentan juntas, como siempre debieron.
+- Buscar una obra por su título original —por ejemplo `Sen to Chihiro no kamikakushi`—
+  podía no devolver nada desde Wikipedia aunque Wikipedia la conociera: esa página redirige
+  el título a "Spirited Away", el buscador la encontraba y la ficha se descartaba porque no
+  se parecía a lo que se había escrito. Ahora el título que se pidió cuenta como un nombre
+  del artículo al que Wikipedia lo redirige. Como el reintento por alias ya no hace falta
+  en esos casos, la búsqueda ahorra de 4 a 6 pedidos a Wikipedia y a Wikidata.
 - Un mismo artículo de Wikipedia dejó de aparecer dos veces en su estante. Wikipedia se
   alcanza por dos caminos —su buscador y una resolución por título exacto— y las dos
   filas traían el mismo artículo con direcciones que sólo se diferenciaban en cómo

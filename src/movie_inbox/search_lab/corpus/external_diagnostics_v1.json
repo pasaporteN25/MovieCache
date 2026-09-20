@@ -250,6 +250,263 @@
           }
         }
       }
+    },
+    {
+      "id": "external-wikipedia-redirect-carries-the-query",
+      "label": "Un titulo que Wikipedia redirige a un articulo es un nombre de ese articulo, y el articulo no se descarta por no parecerse a la consulta (HTTP real capturado el 2026-09-20 y recortado a lo que los adaptadores leen)",
+      "language": "ja",
+      "stage": "alias_expansion",
+      "top_k": 5,
+      "queries": [
+        "Sen to Chihiro no kamikakushi"
+      ],
+      "sources": {
+        "wikipedia": {
+          "expected_key": "https://en.wikipedia.org/wiki/spirited_away",
+          "recorded_responses": {
+            "https://es.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=Sen%20to%20Chihiro%20no%20kamikakushi%20pelicula&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url&exintro=1&explaintext=1&pithumbsize=480&format=json&formatversion=2": {
+              "query": {
+                "pages": [
+                  {
+                    "index": 1,
+                    "title": "El viaje de Chihiro",
+                    "canonicalurl": "https://es.wikipedia.org/wiki/El_viaje_de_Chihiro",
+                    "extract": "El viaje de Chihiro (千と千尋の神隠し, Sen to Chihiro no Kamikakushi?, lit. El rapto espiritual de Sen y Chihiro.)​ es una película de animación japonesa estrenada el 20 de julio de 2001. Fue dirigida por Hayao Miyazaki y produc",
+                    "pageprops": {
+                      "wikibase_item": "Q155653"
+                    }
+                  },
+                  {
+                    "index": 4,
+                    "title": "Joe Hisaishi",
+                    "canonicalurl": "https://es.wikipedia.org/wiki/Joe_Hisaishi",
+                    "extract": "Mamoru Fujisawa (藤澤守, Fujisawa Mamoru?), conocido profesionalmente como Joe Hisaishi (久石 譲, Hisaishi Jō?)​(Nagano, Japón, 6 de diciembre de 1950),​ es un prolífico compositor japonés​ y director de orquesta. Creador de u",
+                    "pageprops": {
+                      "wikibase_item": "Q275900"
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "title": "Keiko Miyazaki",
+                    "canonicalurl": "https://es.wikipedia.org/wiki/Keiko_Miyazaki",
+                    "extract": "Keiko Miyazaki(慶駿)es una guionista japonesa, nacida en Kioto el 20 de mayo de 1980. Ha contribuido en varios filmes del Estudio Ghibli de su abuelo Hayao Miyazaki.",
+                    "pageprops": {
+                      "wikibase_item": "Q5958878"
+                    }
+                  },
+                  {
+                    "index": 2,
+                    "title": "Sin Cara",
+                    "canonicalurl": "https://es.wikipedia.org/wiki/Sin_Cara",
+                    "extract": "«Sin Cara» puede referirse a:\n\nCinta de Oro, nombre artístico de José Jorge Arriaga Rodríguez (n. 5 de agosto de 1977), luchador profesional mexicano-estadounidense que trabajó en WWE bajo el pseudónimo de Sin Cara desde",
+                    "pageprops": {
+                      "wikibase_item": "Q1053503"
+                    }
+                  },
+                  {
+                    "index": 8,
+                    "title": "Studio Ghibli",
+                    "canonicalurl": "https://es.wikipedia.org/wiki/Studio_Ghibli",
+                    "extract": "Studio Ghibli (スタジオジブリ, Sutajio Jiburi?) es un estudio japonés de animación, considerado por la crítica especializada y muchos cinéfilos como uno de los mejores estudios de animación del mundo en la actualidad.​\nEl estud",
+                    "pageprops": {
+                      "wikibase_item": "Q182950"
+                    }
+                  }
+                ]
+              }
+            },
+            "https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=Sen%20to%20Chihiro%20no%20kamikakushi%20film&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url&exintro=1&explaintext=1&pithumbsize=480&format=json&formatversion=2": {
+              "query": {
+                "pages": [
+                  {
+                    "index": 1,
+                    "title": "Spirited Away",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/Spirited_Away",
+                    "extract": "Spirited Away is a 2001 Japanese animated fantasy film written and directed by Hayao Miyazaki. It was produced by Toshio Suzuki, animated by Studio Ghibli, and distributed by Toho. The film stars Rumi Hiiragi, alongside ",
+                    "pageprops": {
+                      "wikibase_item": "Q155653"
+                    }
+                  },
+                  {
+                    "index": 3,
+                    "title": "2002 in film",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/2002_in_film",
+                    "extract": "2002 in film is an overview of events, including the highest-grossing films, award ceremonies, festivals, a list of country- and genre- specific lists of films released, notable deaths and film debuts. Paramount Pictures",
+                    "pageprops": {
+                      "wikibase_item": "Q753338"
+                    }
+                  },
+                  {
+                    "index": 8,
+                    "title": "Florida Film Critics Circle Awards 2002",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/Florida_Film_Critics_Circle_Awards_2002",
+                    "extract": "The 7th Florida Film Critics Circle Awards, honoring the best in film for 2002, were announced on 3 January 2003.",
+                    "pageprops": {
+                      "wikibase_item": "Q5461367"
+                    }
+                  },
+                  {
+                    "index": 6,
+                    "title": "List of highest-grossing animated films",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/List_of_highest-grossing_animated_films",
+                    "extract": "Included in the list are charts of the top box-office earners, a chart of high-grossing animated films by the calendar year, a timeline showing the transition of the highest-grossing animated film record, and a chart of ",
+                    "pageprops": {
+                      "wikibase_item": "Q3745403"
+                    }
+                  },
+                  {
+                    "index": 5,
+                    "title": "List of highest-grossing Japanese films",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/List_of_highest-grossing_Japanese_films",
+                    "extract": "Films made in Japan produce revenue through various sources; the lists below only consider box office earnings at cinemas, not other sources of income such as merchandising or home video. The lists include both anime and",
+                    "pageprops": {
+                      "wikibase_item": "Q11546839"
+                    }
+                  }
+                ]
+              }
+            },
+            "https://es.wikipedia.org/w/api.php?action=query&redirects=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&exintro=1&explaintext=1&pithumbsize=480&inprop=url&format=json&formatversion=2&titles=Sen%20to%20Chihiro%20no%20kamikakushi": {
+              "query": {
+                "pages": [
+                  {
+                    "title": "El viaje de Chihiro",
+                    "canonicalurl": "https://es.wikipedia.org/wiki/El_viaje_de_Chihiro",
+                    "extract": "El viaje de Chihiro (千と千尋の神隠し, Sen to Chihiro no Kamikakushi?, lit. El rapto espiritual de Sen y Chihiro.)​ es una película de animación japonesa estrenada el 20 de julio de 2001. Fue dirigida por Hayao Miyazaki y produc",
+                    "pageprops": {
+                      "wikibase_item": "Q155653"
+                    }
+                  }
+                ],
+                "redirects": [
+                  {
+                    "from": "Sen to Chihiro no kamikakushi",
+                    "to": "El viaje de Chihiro"
+                  }
+                ]
+              }
+            },
+            "https://en.wikipedia.org/w/api.php?action=query&redirects=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&exintro=1&explaintext=1&pithumbsize=480&inprop=url&format=json&formatversion=2&titles=Sen%20to%20Chihiro%20no%20kamikakushi": {
+              "query": {
+                "pages": [
+                  {
+                    "title": "Spirited Away",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/Spirited_Away",
+                    "extract": "Spirited Away is a 2001 Japanese animated fantasy film written and directed by Hayao Miyazaki. It was produced by Toshio Suzuki, animated by Studio Ghibli, and distributed by Toho. The film stars Rumi Hiiragi, alongside ",
+                    "pageprops": {
+                      "wikibase_item": "Q155653"
+                    }
+                  }
+                ],
+                "redirects": [
+                  {
+                    "from": "Sen to Chihiro no kamikakushi",
+                    "to": "Spirited Away"
+                  }
+                ]
+              }
+            },
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=es&uselang=es&type=item&limit=5&search=Sen%20to%20Chihiro%20no%20kamikakushi": {
+              "search": [
+                {
+                  "id": "Q155653",
+                  "label": "El viaje de Chihiro"
+                }
+              ]
+            },
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&uselang=en&type=item&limit=5&search=Sen%20to%20Chihiro%20no%20kamikakushi": {
+              "search": [
+                {
+                  "id": "Q155653",
+                  "label": "Spirited Away"
+                }
+              ]
+            },
+            "https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=ja&uselang=ja&type=item&limit=5&search=Sen%20to%20Chihiro%20no%20kamikakushi": {
+              "search": [
+                {
+                  "id": "Q155653",
+                  "label": "千と千尋の神隠し"
+                }
+              ]
+            },
+            "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims%7Clabels%7Caliases&languages=es%7Cen%7Cja&ids=Q155653": {
+              "entities": {
+                "Q155653": {
+                  "claims": {
+                    "P345": [
+                      {
+                        "mainsnak": {
+                          "datavalue": {
+                            "value": "tt0245429"
+                          }
+                        },
+                        "rank": "normal"
+                      }
+                    ],
+                    "P1476": [
+                      {
+                        "mainsnak": {
+                          "datavalue": {
+                            "value": {
+                              "text": "千と千尋の神隠し",
+                              "language": "ja"
+                            }
+                          }
+                        },
+                        "rank": "preferred"
+                      }
+                    ]
+                  },
+                  "labels": {
+                    "es": {
+                      "value": "El viaje de Chihiro"
+                    },
+                    "en": {
+                      "value": "Spirited Away"
+                    },
+                    "ja": {
+                      "value": "千と千尋の神隠し"
+                    }
+                  },
+                  "aliases": {}
+                }
+              }
+            },
+            "https://en.wikipedia.org/w/api.php?action=query&redirects=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&exintro=1&explaintext=1&pithumbsize=480&inprop=url&format=json&formatversion=2&titles=%E5%8D%83%E3%81%A8%E5%8D%83%E5%B0%8B%E3%81%AE%E7%A5%9E%E9%9A%A0%E3%81%97": {
+              "query": {
+                "pages": [
+                  {
+                    "title": "Spirited Away",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/Spirited_Away",
+                    "extract": "Spirited Away is a 2001 Japanese animated fantasy film written and directed by Hayao Miyazaki. It was produced by Toshio Suzuki, animated by Studio Ghibli, and distributed by Toho. The film stars Rumi Hiiragi, alongside ",
+                    "pageprops": {
+                      "wikibase_item": "Q155653"
+                    }
+                  }
+                ],
+                "redirects": [
+                  {
+                    "from": "千と千尋の神隠し",
+                    "to": "Spirited Away"
+                  }
+                ]
+              }
+            },
+            "https://en.wikipedia.org/w/api.php?action=query&redirects=1&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&exintro=1&explaintext=1&pithumbsize=480&inprop=url&format=json&formatversion=2&titles=El%20viaje%20de%20Chihiro": {
+              "query": {
+                "pages": [
+                  {
+                    "title": "El viaje de Chihiro",
+                    "canonicalurl": "https://en.wikipedia.org/wiki/El_viaje_de_Chihiro",
+                    "missing": true
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

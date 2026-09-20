@@ -208,6 +208,23 @@ exploración en vivo antes de gastar más cupo en algo no crítico.
 > paga más seguido: ahora alcanza con que la respuesta sea mala, no hace
 > falta que sea vacía.
 
+> **Medido en vivo el 2026-09-20 ([B2.2]), y un hueco más ([B2.3]).** Con
+> `ExternalSourceService` en el medio y una consulta cada 12 s, ocho títulos cuyo original
+> no está en español: la primera consulta de Wikipedia encuentra la obra en **5 de 8** y la
+> respuesta final en **7 de 8** (el alias de Wikidata rescata `Addio zio Tom` y
+> `Le fabuleux destin d'Amélie Poulain`). La que faltaba, `Sen to Chihiro no kamikakushi`,
+> no era un fallo de cobertura: en.wikipedia lo redirige a "Spirited Away" y el adaptador lo
+> había encontrado, pero la fila puntuaba 16.6 contra el piso de 28.0 —no comparte palabras
+> con la consulta— y el registry la descartaba. La redirección es un dato que Wikipedia
+> declara en la propia respuesta (`redirects`) y se perdía; ahora el título pedido pasa a
+> `alternative_titles` de la fila, donde el puntaje ya lee los alias, sólo en la resolución
+> por título exacto. Sin ella el reintento por alias buscaba el título japonés y el español
+> en la Wikipedia en inglés, donde no son títulos de artículo.
+>
+> El caso `external-wikipedia-redirect-carries-the-query` (HTTP real recortado) falla sin el
+> arreglo con `discarded_by_threshold: score=16.6` —Recall@5 0,875 y el gate en rojo— y con
+> el arreglo pasa con 4 pedidos en vez de 8 a 10.
+
 ### Búsqueda por dirección como descubrimiento explícito ([Q4], 2026-08-29)
 
 `directors: list[str]` ya existía en el modelo (poblado desde Wikidata P57

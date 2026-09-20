@@ -385,10 +385,24 @@ vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
     `User-Agent` que identifica el proyecto en lugar de `MovieInbox/0.2 (+local personal
     catalog)`: **0 de 9** intentos limitados, contra 5 de 14. Una corrida por lado indica pero
     no prueba; por eso [B2.4] es una decisión del owner y no un cambio.
-- [ ] **[B2.3] Una redirección de Wikipedia es un nombre del artículo.** Sale de [B2.2]:
-  en.wikipedia redirige "Sen to Chihiro no kamikakushi" a "Spirited Away", el adaptador lo
-  encontraba, la fila puntuaba 16.6 contra el piso de 28.0 y el registry la descartaba.
-  **Modelo sugerido**: Medio.
+- [x] **[B2.3] Una redirección de Wikipedia es un nombre del artículo.** 2026-09-20. Sale de
+  [B2.2]: en.wikipedia redirige "Sen to Chihiro no kamikakushi" a "Spirited Away", el adaptador
+  lo encontraba, la fila puntuaba 16.6 contra el piso de 28.0 y el registry la descartaba; y el
+  reintento por alias buscaba el título japonés y el español en la Wikipedia en inglés, donde
+  no son títulos de artículo. **El arreglo:** la resolución por título exacto lee el
+  `redirects` de la respuesta y el título pedido pasa a `alternative_titles` del artículo al
+  que Wikipedia lo redirige (`external/wikipedia.py::_with_redirect_titles`); sólo en esa vía,
+  así que lo que llega por el buscador se puntúa igual que antes. Sube la fila de 16.6 a 100.
+  **Antes y después, en el laboratorio:** el caso nuevo
+  `external-wikipedia-redirect-carries-the-query` (HTTP real recortado) falla sin el arreglo
+  con `discarded_by_threshold: score=16.6` —6 de 7 casos, Recall@5 0,875, gate en rojo— y
+  pasa con él, 7 de 7 y Recall@5 1,0, con 4 pedidos en vez de 8 a 10. Dos pruebas de punta a
+  punta (adaptador más registry, sin red) también fallan si se revierte. **A revisar:**
+  `alternative_titles` también lo lee `title_match_keys_for_item` y por lo tanto
+  `decide_match`; el título que se agrega es exactamente el que la persona pidió y Wikipedia
+  declara nombre del artículo, la misma superficie que el alias confirmado por Wikidata de
+  [Q3]. El gate de auto-match sigue en precisión 1.000 y cero falsos positivos. **Modelo
+  sugerido**: Medio.
 - [ ] **[B2.4] Identificarse ante Wikimedia y no esconder el 429 parcial.** *Decide el owner.*
   El `User-Agent` de `external/common.py::fetch_text` es `MovieInbox/0.2 (+local personal
   catalog)`, sin forma de contacto; la política de Wikimedia pide uno descriptivo con dónde
