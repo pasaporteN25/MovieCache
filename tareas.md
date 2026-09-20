@@ -358,14 +358,45 @@ vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
   que el arreglo de servidor de `57ad234` —una consulta de una sola letra es una consulta
   real: `M`, `Z`, `9` son películas— funciona hoy por API y por CLI pero no desde la caja.
   **Es del frente visual**, se anota acá sólo para que no se pierda la dependencia.
-- [ ] **[B2.2] La consulta por fuente de Wikipedia, sin medir.** La medición del
-  2026-09-11 cerró el punto para FilmAffinity con número —primera consulta 5/6, final
-  6/6— pero la mitad de Wikipedia salió **inválida**: devolvió `429 Too Many Requests` y
-  los supuestos fallos de búsqueda eran eso. Si se retoma, medir **con
-  `ExternalSourceService` en el medio** —que es quien maneja el 429 con cooldown leído de
-  `Retry-After`— y a ritmo bajo. La hipótesis a refutar es que ya esté resuelto: [Q3] le da
-  a Wikipedia el título original como primer alias, que es exactamente lo que su cobertura
-  en/es no cubre.
+- [x] **[B2.2] La consulta por fuente de Wikipedia, medida.** 2026-09-20. Con
+  `ExternalSourceService` en el medio y sólo el adaptador de Wikipedia, una consulta cada
+  12 s: ocho obras cuyo original no está en español y una en español, más un control con el
+  título en inglés o español de cada una. Un intento que devuelve 429 se marca inválido y se
+  repite tras el cooldown; nunca cuenta como fallo de búsqueda (el defecto de la medición del
+  2026-09-11). **La hipótesis —"ya está resuelto por [Q3]"— se refuta a medias.** Primera
+  consulta **5 de 8**, respuesta final **7 de 8**, control **9 de 9**. El alias de Wikidata
+  rescata a `Addio zio Tom` y a `Le fabuleux destin d'Amélie Poulain`, a 9–10 pedidos cada
+  uno. La que queda, `Sen to Chihiro no kamikakushi`, no era cobertura sino un descarte:
+  ver [B2.3].
+  - **Una corrección a mi propia primera lectura.** El guion marcó como fallos a `Der
+    Untergang` y a `Cidade de Deus` por palabras clave mal elegidas: el artículo de
+    es.wikipedia se llama literalmente "Der Untergang", y "Ciudad de Dios" es la película (el
+    barrio, "Cidade de Deus, Rio de Janeiro", sale primero). Se verificó contra la API. Con
+    eso la cuenta es la de arriba.
+  - **El 429 no era culpa del guion.** A una búsqueda cada 12 s, **8 de 26 intentos** tuvieron
+    al menos un 429, y el `Retry-After` leído llegó a 36 s. Vienen de Wikipedia **y** de
+    Wikidata: una búsqueda por alias son 9–10 pedidos en un par de segundos, y la siguiente sale
+    limitada entera, con los cuatro pedidos.
+  - **Un 429 parcial se cuenta como éxito.** Si sólo se limita uno de los dos idiomas, o el
+    puente de alias, la respuesta llega al registry como buena: no abre cooldown y se cachea 15
+    minutos. Se vio con el control de `Amélie` (429, 200, 429) y su reintento salió de la caché
+    con 0 pedidos.
+  - **A/B, una corrida por lado.** Mismas consultas originales y mismo ritmo, con un
+    `User-Agent` que identifica el proyecto en lugar de `MovieInbox/0.2 (+local personal
+    catalog)`: **0 de 9** intentos limitados, contra 5 de 14. Una corrida por lado indica pero
+    no prueba; por eso [B2.4] es una decisión del owner y no un cambio.
+- [ ] **[B2.3] Una redirección de Wikipedia es un nombre del artículo.** Sale de [B2.2]:
+  en.wikipedia redirige "Sen to Chihiro no kamikakushi" a "Spirited Away", el adaptador lo
+  encontraba, la fila puntuaba 16.6 contra el piso de 28.0 y el registry la descartaba.
+  **Modelo sugerido**: Medio.
+- [ ] **[B2.4] Identificarse ante Wikimedia y no esconder el 429 parcial.** *Decide el owner.*
+  El `User-Agent` de `external/common.py::fetch_text` es `MovieInbox/0.2 (+local personal
+  catalog)`, sin forma de contacto; la política de Wikimedia pide uno descriptivo con dónde
+  encontrarlos, y el A/B de arriba sugiere que eso es lo que cuesta el 429. Alcance: (a) un
+  `User-Agent` con la URL del proyecto o un contacto que ponga el owner —lo comparten todas las
+  fuentes que pasan por `fetch_text`, así que conviene decidir si es uno para todas o por
+  host—; (b) que un 429 dentro del reintento por alias o de un idioma cuente para el cooldown
+  de la fuente y no se cachee como respuesta completa. **Modelo sugerido**: Medio.
 - **Modelo sugerido**: Chico. Son dos puntas acotadas, no un frente.
 
 ### Frente: Fuentes externas y especializacion de anime
@@ -1805,7 +1836,7 @@ español, corriendo los adaptadores de verdad contra los sitios de verdad.
 - **Si esto se retoma**: medir Wikipedia con el registry en el medio y a ritmo bajo, o no
   medirlo. [Q3] ya le da a Wikipedia el título original como primer alias, que es
   exactamente lo que su cobertura en/es no cubre, así que la hipótesis a refutar es que ya
-  esté resuelto.
+  esté resuelto. **Retomado y medido el 2026-09-20 en [B2.2]**: se refuta a medias.
 
 **Cerrada el 2026-09-11, con el criterio acordado con el owner.** Once arreglos, 23
 commits y cinco archivos de prueba nuevos.
