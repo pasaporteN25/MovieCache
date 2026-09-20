@@ -101,6 +101,8 @@ datos ajenos a la biblioteca. Las rutas registradas y los reportes de archivos v
 
 El proxy de imagenes acepta solamente los hosts conocidos de Wikimedia, IMDb y FilmAffinity. Si una fuente confiable nueva usa otro dominio, se agrega con `--image-host host.example`; no se recomienda permitir dominios aportados por usuarios. El cache se puede inspeccionar y mantener sin detener el servicio con `movie-inbox cache info|prune|clear --dir /var/lib/movie-inbox/image-cache`.
 
+`--operator-contact` (o `MOVIE_INBOX_OPERATOR_CONTACT` en Docker) es opcional: un email o una URL donde Wikimedia pueda ubicar a quien corre la instancia. Se manda en el `User-Agent` de los pedidos a Wikipedia y Wikidata —y de las portadas que vienen de `upload.wikimedia.org`—, que piden a todo cliente identificarse y limitan mucho antes a los genericos. Sin el valor el `User-Agent` sigue nombrando al proyecto y su repositorio; las demas fuentes reciben el de siempre, sin contacto. Cada instalacion es un cliente distinto para Wikimedia, por eso el contacto es de quien la opera y no viene en el codigo.
+
 `--forwarded-allow-ips` nunca debe configurarse con `*` si Uvicorn acepta conexiones que no provienen exclusivamente del proxy. Con Nginx local alcanza `127.0.0.1`.
 
 ## systemd

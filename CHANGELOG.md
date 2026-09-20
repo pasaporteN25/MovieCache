@@ -145,6 +145,13 @@ el trabajo visual de Inicio sigue en curso.
 
 ### Cambiado
 
+- Wikipedia, Wikidata y las portadas de Wikimedia reciben ahora un `User-Agent` que dice
+  quién pide —`MovieInbox/<versión>` y la URL del proyecto— en lugar del genérico, porque
+  Wikimedia se lo pide a todo cliente y limita mucho antes a los que no lo traen. Medido a una
+  búsqueda cada 12 segundos: con el genérico, 5 de 14 búsquedas salían limitadas; con el
+  nuevo, 0 de 9. Quien opera la instancia puede sumar un contacto (un email o una URL) con
+  `--operator-contact` o `MOVIE_INBOX_OPERATOR_CONTACT` en `.env`; es opcional y sólo viaja a
+  Wikimedia. Las demás fuentes reciben lo de siempre.
 - Elegir un VHS programa la lista con el conjunto editorial de ese estante, actualiza
   consola y cartelera de consulta, y ofrece «Volver a programación» sin alterar el
   carrusel diario. Teclado, foco, anuncios de selección y listas largas conservan el

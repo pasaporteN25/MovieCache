@@ -19,6 +19,7 @@ from movie_inbox.domain.pairing import (
     certificate_pin_from_pem,
     normalize_certificate_pin,
 )
+from movie_inbox.external.common import validated_operator_contact
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.web.app import create_app
@@ -153,6 +154,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--operator-contact",
+        default=os.environ.get("MOVIE_INBOX_OPERATOR_CONTACT", ""),
+        help=(
+            "An email address or URL where Wikimedia can reach whoever runs this "
+            "instance. Sent in the User-Agent of requests to Wikipedia and Wikidata, "
+            "which ask every client for one. Optional."
+        ),
+    )
+    parser.add_argument(
         "--session-days",
         type=int,
         default=DEFAULT_SESSION_TTL_SECONDS // (24 * 60 * 60),
@@ -240,6 +250,10 @@ def main(argv: list[str] | None = None) -> int:
     if not 1 <= args.session_days <= 365:
         parser.error("--session-days must be between 1 and 365")
     try:
+        operator_contact = validated_operator_contact(args.operator_contact)
+    except ValueError as error:
+        parser.error(f"--operator-contact: {error}")
+    try:
         external_credentials = ExternalSourceCredentials(
             tmdb_read_access_token=external_api_token(
                 args.tmdb_read_access_token_file,
@@ -299,6 +313,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.imdb_dataset_index
         else "",
         external_credentials=external_credentials,
+        operator_contact=operator_contact,
     )
     identity_repository = SqliteIdentityRepository(instance_db)
     identity_repository.initialize()

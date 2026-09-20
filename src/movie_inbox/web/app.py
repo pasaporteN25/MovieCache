@@ -46,6 +46,7 @@ from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.public_ratings import PublicRating
+from movie_inbox.external.common import configure_operator_contact
 from movie_inbox.external.imdb import imdb_id_from_text
 from movie_inbox.external.imdb_dataset_source import ImdbDatasetSource
 from movie_inbox.external.tmdb import TmdbAdapter
@@ -146,6 +147,7 @@ STATIC_CACHE_CONTROL = "public, max-age=0, must-revalidate"
 def create_app(config: ViewerConfig) -> FastAPI:
     if not config.instance_db:
         raise RuntimeError("ViewerConfig.instance_db is required")
+    configure_operator_contact(config.operator_contact)
     configure_external_catalog(
         config.external_credentials.tmdb_read_access_token,
         config.anime_offline_index,

@@ -403,14 +403,24 @@ vez de vivir dentro de una épica cerrada. Ninguno de los dos bloquea nada.
   declara nombre del artículo, la misma superficie que el alias confirmado por Wikidata de
   [Q3]. El gate de auto-match sigue en precisión 1.000 y cero falsos positivos. **Modelo
   sugerido**: Medio.
-- [ ] **[B2.4] Identificarse ante Wikimedia y no esconder el 429 parcial.** *Decide el owner.*
-  El `User-Agent` de `external/common.py::fetch_text` es `MovieInbox/0.2 (+local personal
-  catalog)`, sin forma de contacto; la política de Wikimedia pide uno descriptivo con dónde
-  encontrarlos, y el A/B de arriba sugiere que eso es lo que cuesta el 429. Alcance: (a) un
-  `User-Agent` con la URL del proyecto o un contacto que ponga el owner —lo comparten todas las
-  fuentes que pasan por `fetch_text`, así que conviene decidir si es uno para todas o por
-  host—; (b) que un 429 dentro del reintento por alias o de un idioma cuente para el cooldown
-  de la fuente y no se cachee como respuesta completa. **Modelo sugerido**: Medio.
+- [ ] **[B2.4] Identificarse ante Wikimedia y no esconder el 429 parcial.** *Decidido por el
+  owner el 2026-09-20: entra en la 0.9.0, con un `User-Agent` que trae el nombre, la versión
+  y la URL del repositorio, más un contacto opcional que pone quien corre cada instancia, y
+  sólo para los hosts de Wikimedia.* El `User-Agent` de `fetch_text` era `MovieInbox/0.2
+  (+local personal catalog)`, sin forma de contacto, y Wikimedia pide uno descriptivo; el A/B
+  de [B2.2] sugería que eso es lo que costaba el 429.
+  - [x] **[B2.4a] El `User-Agent`.** 2026-09-20. `external/common.py::user_agent_for` devuelve
+    `MovieInbox/<versión> (+<repo>[; <contacto>])` para `wikipedia.org`, `wikidata.org` y
+    `wikimedia.org` (con la comparación sobre las etiquetas del host, no sobre el texto:
+    `notwikipedia.org` y `wikipedia.org.evil.example` no cuentan) y deja el de siempre a
+    todo lo demás. Lo usan `fetch_text` y el proxy de portadas (`upload.wikimedia.org`). El
+    contacto es de quien opera cada instancia —cada instalación es un cliente distinto para
+    Wikimedia— y llega por `--operator-contact` o `MOVIE_INBOX_OPERATOR_CONTACT` (en Docker,
+    `.env`); se rechaza en vez de limpiarse si no es ASCII imprimible sin paréntesis, porque
+    va en una cabecera. **Modelo sugerido**: Chico.
+  - [ ] **[B2.4b] Un 429 parcial cuenta.** Que un 429 dentro del reintento por alias o de un
+    idioma cuente para el cooldown de la fuente y no se cachee como respuesta completa.
+    **Modelo sugerido**: Medio.
 - **Modelo sugerido**: Chico. Son dos puntas acotadas, no un frente.
 
 ### Frente: Fuentes externas y especializacion de anime

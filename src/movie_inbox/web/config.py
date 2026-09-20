@@ -59,6 +59,8 @@ class ViewerConfig:
     library_scheduler_poll_seconds: float = 15.0
     anime_offline_index: str = ""
     imdb_dataset_index: str = ""
+    # [B2.4]: how Wikimedia can reach whoever runs this instance. Optional.
+    operator_contact: str = ""
     external_credentials: ExternalSourceCredentials = field(
         default_factory=ExternalSourceCredentials,
         repr=False,
