@@ -1,4 +1,43 @@
 /* Shared collection hand-off formerly imported indirectly through home.css. */
+.drawer-access { display: grid; align-content: center; gap: 10px; padding: 10px; border-block: 1px solid var(--line); }
+.detail-access-signal { align-items: center; color: var(--muted); display: flex; gap: 9px; font-size: var(--text-meta); font-weight: 700; }
+.detail-access-signal.is-available { color: var(--teal); }
+.detail-access-signal small { color: var(--muted); display: block; font-size: var(--text-label); font-weight: 400; margin-top: 2px; }
+.detail-availability-icon { flex: 0 0 23px; height: 23px; width: 23px; }
+.detail-context { display: grid; gap: 24px; padding-block: 12px; min-width: 0; }
+.detail-context h3 { font-size: var(--text-small); margin: 0; }
+.detail-context .record-heading { align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.detail-context-note, .detail-context-empty { color: var(--muted); font-size: var(--text-meta); line-height: 1.5; }
+.detail-context-empty { margin: 8px 0; }
+.detail-public-section, .detail-streaming-section { border-top: 1px solid var(--line); padding-top: 18px; min-width: 0; }
+.detail-public-scores { display: flex; flex-wrap: wrap; gap: 16px 32px; margin: 0 0 12px; }
+.detail-public-scores dt { color: var(--ink); font-size: var(--text-meta); font-weight: 700; }
+.detail-public-scores dd { color: var(--muted); margin: 3px 0 0; }
+.detail-public-scores strong { color: var(--ink); font-size: 24px; font-variant-numeric: tabular-nums; }
+.detail-public-scores .is-low-vote strong { color: var(--muted); }
+.detail-public-scores .detail-votes { font-size: var(--text-meta); }
+.detail-attribution { color: var(--muted); font-size: var(--text-label); line-height: 1.5; margin: 8px 0 0; max-width: 75ch; overflow-wrap: anywhere; }
+.detail-offer-group { align-items: baseline; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; padding-block: 8px; }
+.detail-offer-group h4 { color: var(--muted); font-size: var(--text-meta); font-weight: 400; margin: 0; }
+.detail-offer-group ul { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; margin: 0; padding: 0; }
+.detail-offer-group li { color: var(--ink); font-size: var(--text-small); overflow-wrap: anywhere; }
+.detail-streaming-link { display: inline-block; font-size: var(--text-meta); padding-block: 12px; }
+.detail-region-label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--text-meta); }
+.detail-region-label select { min-height: 44px; width: auto; max-width: 220px; }
+.detail-context-retry { min-height: 44px; width: auto; }
+.personal-conflict { border: 1px solid var(--gold); grid-column: 1 / -1; padding: 14px; }
+.personal-conflict h4 { color: var(--gold); margin: 0 0 8px; }
+.personal-conflict p, .personal-conflict dl { font-size: var(--text-meta); line-height: 1.5; }
+.personal-conflict dt { color: var(--muted); margin-top: 8px; }
+.personal-conflict dd { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
+.personal-conflict-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.personal-conflict-actions button { width: auto; min-height: 44px; }
+@media (max-width: 640px) {
+  .detail-offer-group { grid-template-columns: 1fr; gap: 6px; }
+  .detail-context .record-heading { display: flex; }
+  .detail-region-label { flex-wrap: wrap; }
+  .detail-region-label select { max-width: 100%; }
+}
 .home-collection-origin { border-block: 1px solid var(--line); display: grid; gap: 5px; padding: 13px 0; }
 .home-collection-origin span { color: var(--violet); font-weight: 800; }
 .home-collection-origin p { color: var(--muted); margin: 0; }
@@ -279,7 +318,7 @@
       .drawer-hero {
         display: grid;
         gap: 18px;
-        grid-template-columns: 148px minmax(0, 1fr);
+        grid-template-columns: 176px minmax(0, 1fr);
       }
       .drawer-poster {
         background: #090b1b;
@@ -290,7 +329,7 @@
         object-fit: cover;
         width: 148px;
       }
-      .drawer-poster-frame { height: 222px; position: relative; width: 148px; }
+      .drawer-poster-frame { height: 222px; margin: 14px 14px 38px; position: relative; width: 148px; }
       .drawer-poster-frame .drawer-poster { inset: 0; position: absolute; }
       .drawer-poster-frame img.drawer-poster {
         opacity: 0;
@@ -743,7 +782,7 @@
       }
 
 @media (max-width: 640px) {
-        .drawer-hero { grid-template-columns: 92px 1fr; }
+        .drawer-hero { grid-template-columns: 120px minmax(0, 1fr); }
 
         .drawer-poster, .drawer-poster-frame { height: 138px; width: 92px; }
 

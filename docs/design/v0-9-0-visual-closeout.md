@@ -6,6 +6,12 @@ release del plan `home-v0-9-0-u5-u8-plan.md`, no sus decisiones de diseño futur
 
 ## Alcance congelado
 
+**Ampliación del owner, 2026-09-19:** sin apuro por cerrar, se incorpora la ficha
+con puntajes públicos, streaming e indicadores compactos; conserva el dossier y
+prioriza obra/registro personal. Incluye X8.4 para guardar sin pisar cambios de otro
+dispositivo. Brief `../briefs/detail-public-context-v1.md`. Este ajuste sustituye
+la restricción de retoques de este corte sólo para ese frente; no reabre U8/U9/MW1.
+
 Home U4/U5 y cartelera derecha U6 ya integradas, más U7.5a con imágenes actuales.
 No agregar VHS al azar/animación, nuevas APIs de imágenes, sonido ni auditoría
 móvil integral. Conservar el botón Al azar actual. Móvil sólo smoke de reflow.

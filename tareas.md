@@ -530,10 +530,10 @@ web.
   - [x] **[X8.3] Traspaso a la ficha y changelog.** 2026-09-19. Lo que tiene que hacer la
     ficha queda escrito en `Traspasos`, con las reglas que no se pueden romper; el cambio de
     `/api/personal` tiene su entrada en el changelog.
-  - [ ] **[X8.4] La ficha manda sólo lo que la persona tocó, con un `base`.** Del frente
-    visual: `persistPersonalForm` en `js/core/detail.js`. **Es lo que cierra X8**; hasta
-    entonces el servidor está listo y la ficha sigue mandando el formulario entero. Ver el
-    traspaso. **Modelo sugerido**: Medio.
+  - [x] **[X8.4] La ficha manda sólo lo que la persona tocó, con un `base`.** Del frente
+    visual: `persistPersonalForm` en `js/core/detail.js`. **Cierra X8** con guardado
+    parcial y reconciliación explícita. Validación completada 2026-09-20; ver Ficha
+    en `Hecho`. Cambios locales sin commit. **Modelo sugerido**: Medio.
 
 #### [M1] Definir verticales de juegos y musica
 - **Alcance**: investigar modelos, fuentes, disponibilidad y UX separados; no agregar
@@ -552,19 +552,6 @@ tablero, que es el que el frente visual lee: es la causa más probable de que no
 Cuándo y en qué orden se toman lo deciden el frente visual y el owner; lo que sigue es qué
 consumir y qué reglas no se pueden romper.
 
-- [ ] **Disponibilidad en streaming en la ficha** (el [S4] del análisis; no confundir con
-  [S1]/[S2] de la purga del historial, que comparten número). Consume `GET
-  /api/streaming/availability` y `GET`/`POST /api/streaming/preferences`. Tres reglas: una
-  obra ausente del mapa es "no lo consultamos", nunca "no está disponible"; sólo
-  `available_on` es "Disponible en X", y `acquire_on` —alquiler o compra— necesita otro
-  verbo; y la atribución a JustWatch, que viene en la respuesta, es obligatoria donde se
-  muestre, porque sus términos incluyen revocar el acceso a toda la API. La ficha no lleva
-  fecha; `checked_at` se informa en `Administrar`. Traspaso completo en el análisis, §7.
-- [ ] **Puntajes públicos en la ficha, junto al propio** (la mitad de presentación de
-  [F6.2]). Consume `GET /api/ratings`: IMDb y TMDb juntos, ordenados por cantidad de votos
-  y no por fuente. Lleva las atribuciones que vienen en la respuesta, y un puntaje marcado
-  `is_meaningful: false` —menos de 50 votos— tiene que verse distinto. Nunca se presenta
-  como valoración propia.
 - [ ] **La pantalla que genera el QR de apareamiento** (de [A2.1]). `POST
   /api/device-pairing` devuelve el QR como `data:` URI junto con su contenido, que
   conviene ofrecer también como texto para aparear a mano. **No va en `Administrar`**:
@@ -588,26 +575,6 @@ consumir y qué reglas no se pueden romper.
   pide confirmación con el nombre del teléfono; y la lista vacía es un estado normal, no un
   error. `expires_at` es el vencimiento **si no se sincroniza**: se corre 30 días con cada
   sincronización, así que no es una fecha para mostrar como "vence el ...".
-- [ ] **La ficha debe mandar sólo lo que la persona tocó** (de [X8.4], lo que cierra [X8]).
-  `persistPersonalForm` (`js/core/detail.js`, lo llaman el guardado de la ficha y el de
-  "guardar antes de salir") manda hoy `watched_at`, `rating` y `review` siempre, con lo que
-  tenían al abrirse: guardar la review vuelve el puntaje a lo que tenía la ficha, aunque un
-  teléfono lo haya cambiado mientras tanto. El servidor ya acepta otra cosa
-  (`POST /api/personal`, [X8.2]) y tres cosas tienen que cambiar en la ficha:
-  1. **Mandar sólo los campos que cambiaron** respecto de `form.dataset.initial`. Un campo
-     ausente no se toca; uno presente se escribe aunque esté vacío (`""` y `0` borran). Un
-     POST sin ningún campo da 400, así que sin cambios no se manda nada.
-  2. **Mandar un `base`**: `{watched_at, rating, review}` con lo que tenía cada campo cuando
-     se abrió la ficha. Los valores de la fila cargada sirven tal cual: el servidor les da la
-     misma forma a los dos lados, y `0` y `""` valen "sin poner". Mandar sólo el campo propio
-     **no alcanza**: no evita pisar ese mismo campo si otro dispositivo lo cambió.
-  3. **Ante `409 {"ok": false, "reason": "personal_conflict"}` no se escribió nada, y no se
-     puede perder lo que la persona tipeó.** Recargar la obra, decir qué cambió y dejarla
-     decidir —por ejemplo, dejar su texto en el campo y avisar—. Reenviar sin `base` para
-     "que pase" es exactamente el pisado que esto evita.
-  Criterio de cierre: guardar un campo desde la ficha no pisa un cambio que llegó por otro
-  lado después de abrirla, ni entre dos pestañas del navegador. Con una salvedad para el
-  navegador: el `409` sólo existe si la ficha manda el `base`.
 - **Bandeja en el teléfono** (de [MB2]): traspaso consolidado en **[MW1.4]**, al
   final de la cola a pedido del owner. La auditoría del 2026-09-07 es antecedente,
   no diagnóstico vigente; volver a medir antes de corregir.
@@ -731,6 +698,52 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
 
 ## Hecho
+
+### Frente: Ficha — contexto público y guardado seguro
+
+**Implementado 2026-09-19, validado localmente 2026-09-20; sin commit todavía.** El owner
+eligió conservar el dossier, priorizar obra/registro y sumar iconos compactos de
+biblioteca/streaming en color o gris, con etiquetas para estados desconocidos.
+Puntajes y streaming ya se muestran, con país, reintento y atribuciones. Las APIs
+aceptan `item_id` opcional para gastar el presupuesto de refresco en la obra abierta,
+filtrada dentro del catálogo propio. X8.4 conserva texto ante conflicto y exige una
+reconciliación explícita. La carcasa VHS deja de invadir los controles.
+Brief: `docs/briefs/detail-public-context-v1.md`. Evidencia y validación:
+`docs/design/detail-context-evidence/README.md`. El gate general V9 sigue abierto.
+
+- [x] **Disponibilidad en streaming en la ficha** (el [S4] del análisis; no confundir con
+  [S1]/[S2] de la purga del historial, que comparten número). Consume `GET
+  /api/streaming/availability` y `GET`/`POST /api/streaming/preferences`. Tres reglas: una
+  obra ausente del mapa es "no lo consultamos", nunca "no está disponible"; sólo
+  `available_on` es "Disponible en X", y `acquire_on` —alquiler o compra— necesita otro
+  verbo; y la atribución a JustWatch, que viene en la respuesta, es obligatoria donde se
+  muestre, porque sus términos incluyen revocar el acceso a toda la API. La ficha no lleva
+  fecha; `checked_at` se informa en `Administrar`. Traspaso completo en el análisis, §7.
+- [x] **Puntajes públicos en la ficha, junto al propio** (la mitad de presentación de
+  [F6.2]). Consume `GET /api/ratings`: IMDb y TMDb juntos, ordenados por cantidad de votos
+  y no por fuente. Lleva las atribuciones que vienen en la respuesta, y un puntaje marcado
+  `is_meaningful: false` —menos de 50 votos— tiene que verse distinto. Nunca se presenta
+  como valoración propia.
+
+- [x] **La ficha debe mandar sólo lo que la persona tocó** (de [X8.4], lo que cierra [X8]).
+  `persistPersonalForm` (`js/core/detail.js`, lo llaman el guardado de la ficha y el de
+  "guardar antes de salir") antes mandaba `watched_at`, `rating` y `review` siempre,
+  con lo que tenían al abrirse: podía sobrescribir un cambio de otro dispositivo.
+  El servidor (`POST /api/personal`, [X8.2]) y la ficha cumplen estas tres reglas:
+  1. **Mandar sólo los campos que cambiaron** respecto de `form.dataset.initial`. Un campo
+     ausente no se toca; uno presente se escribe aunque esté vacío (`""` y `0` borran). Un
+     POST sin ningún campo da 400, así que sin cambios no se manda nada.
+  2. **Mandar un `base`**: `{watched_at, rating, review}` con lo que tenía cada campo cuando
+     se abrió la ficha. Los valores de la fila cargada sirven tal cual: el servidor les da la
+     misma forma a los dos lados, y `0` y `""` valen "sin poner". Mandar sólo el campo propio
+     **no alcanza**: no evita pisar ese mismo campo si otro dispositivo lo cambió.
+  3. **Ante `409 {"ok": false, "reason": "personal_conflict"}` no se escribió nada, y no se
+     puede perder lo que la persona tipeó.** Recargar la obra, decir qué cambió y dejarla
+     decidir —por ejemplo, dejar su texto en el campo y avisar—. Reenviar sin `base` para
+     "que pase" es exactamente el pisado que esto evita.
+  Criterio de cierre: guardar un campo desde la ficha no pisa un cambio que llegó por otro
+  lado después de abrirla, ni entre dos pestañas del navegador. Con una salvedad para el
+  navegador: el `409` sólo existe si la ficha manda el `base`.
 
 - [x] **[U4.4] Materialidad de estante.** 2026-09-13. Placas sobre travesaño,
   contacto corto, VHS a 2 px del suelo sin levantarse en hover/selección, luz y

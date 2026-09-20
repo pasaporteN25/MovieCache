@@ -42,12 +42,20 @@ el trabajo visual de Inicio sigue en curso.
   atribución a JustWatch que exigen sus términos. Cada consulta se guarda como una
   observación fechada: se refresca a los 30 días y deja de servirse a los 180. Tener el
   archivo y estar en una plataforma siguen siendo cosas distintas, y "no lo consultamos"
-  nunca se presenta como "no está disponible". La ficha todavía no lo muestra.
+  nunca se presenta como "no está disponible". La ficha lo muestra agrupado por
+  suscripción, gratis, anuncios, alquiler y compra, con país y atribución. El país
+  se puede cambiar si la política de la instancia lo permite.
 - Los puntajes públicos de IMDb y de TMDb se sirven al lado del puntaje propio, nunca en
   su lugar: ningún camino lleva un puntaje público al puntaje personal. Los de IMDb
   salen del índice local; los de TMDb se guardan con fecha, igual que la disponibilidad.
-  Un puntaje con menos de 50 votos llega marcado como poco representativo. La ficha
-  todavía no los muestra.
+  Un puntaje con menos de 50 votos se distingue como poco representativo. La ficha
+  muestra fuente, escala y votos, ordenados por cantidad de votos, con atribuciones.
+- La ficha conserva su dossier y suma iconos compactos de biblioteca y streaming:
+  color para disponibilidad confirmada, gris para ausencia o información pendiente,
+  siempre con texto que distingue los estados. La carcasa VHS reserva su espacio
+  sin superponerse al estado personal. Puntajes y streaming cargan independientemente
+  y ofrecen reintento; la consulta opcional `item_id` en ambas APIs limita el refresco
+  a la obra del catálogo propio que está abierta, aun fuera del primer lote.
 - Con el índice local de IMDb configurado, la instancia lo usa como primera fuente para
   siete campos —título, título original, títulos alternativos, tipo de obra, año,
   duración y géneros—, como ya indicaba la política de autoridad; los títulos
@@ -176,9 +184,11 @@ el trabajo visual de Inicio sigue en curso.
   escribe sólo el puntaje, la fecha o la review que recibe, en vez de tomar los que faltaban
   como vacíos. Acepta además un `base` —lo que tenía cada campo cuando se abrió la ficha— y,
   si ya no coincide, responde 409 `personal_conflict` sin escribir. Un pedido sin ningún
-  campo es un 400. **La ficha todavía manda los tres campos y no manda `base`**, así que el
-  caso de un teléfono que sube un puntaje mientras la ficha está abierta no queda cerrado
-  hasta que la ficha lo use; ver `tareas.md`, [X8.4].
+  campo es un 400. La ficha manda sólo los campos modificados y su `base`; sin cambios
+  no hace un POST vacío. Si hay conflicto conserva el texto y muestra la versión actual
+  para elegir entre conservar la edición o usar lo recibido. Conservar requiere guardar
+  explícitamente otra vez. La privacidad se guarda sólo cuando cambió y su fallo no
+  repite el guardado personal ya realizado; cierra [X8.4].
 
 ### Corregido
 

@@ -12,6 +12,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -146,6 +147,40 @@ class PublicRatingsApiTests(unittest.TestCase):
         # Public scores are not public access: the route carries the same
         # `require_token` guard as the rest of `/api/`.
         self.assertEqual(self.client.get("/api/ratings").status_code, 403)
+
+    def test_dossier_queries_only_its_own_work_beyond_the_refresh_batch(self) -> None:
+        rows = [
+            normalize_item(
+                {
+                    "id": f"work-{index}",
+                    "title": f"Work {index}",
+                    "kind": "pelicula",
+                    "tmdb_url": f"https://www.themoviedb.org/movie/{index + 1}",
+                }
+            )
+            for index in range(20)
+        ]
+        JsonCatalogRepository(self.catalog_path, normalize_item).write(rows)
+        calls = []
+
+        def loader(media_type, tmdb_id):
+            calls.append((media_type, tmdb_id))
+            return {"average": 8, "votes": 100}
+
+        self._install(tmdb_loader=loader)
+        headers = {"X-Movie-Inbox-Token": "test-token"}
+        response = self.client.get("/api/ratings?item_id=work-19", headers=headers)
+        self.assertEqual(list(response.json()["ratings"]), ["work-19"])
+        self.assertEqual(len(calls), 1)
+        service = self.app.state.streaming_service
+        with patch.object(service, "availability_for", return_value={}) as resolve:
+            self.client.get("/api/streaming/availability?item_id=work-19", headers=headers)
+            self.assertEqual([row["id"] for row in resolve.call_args.args[1]], ["work-19"])
+            self.client.get("/api/streaming/availability?item_id=other-account", headers=headers)
+            self.assertEqual(resolve.call_args.args[1], [])
+        response = self.client.get("/api/ratings?item_id=other-account", headers=headers)
+        self.assertEqual(response.json()["ratings"], {})
+        self.assertEqual(len(calls), 1)
 
 
 if __name__ == "__main__":

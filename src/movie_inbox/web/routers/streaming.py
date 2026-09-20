@@ -131,7 +131,7 @@ def refresh_providers(
 
 
 @router.get("/api/streaming/availability", dependencies=[Depends(require_token)])
-def streaming_availability(request: Request) -> JSONResponse:
+def streaming_availability(request: Request, item_id: str | None = None) -> JSONResponse:
     """Platform availability for the caller's own catalogue.
 
     Read-only by construction: it loads the viewer's items to learn their
@@ -143,7 +143,10 @@ def streaming_availability(request: Request) -> JSONResponse:
     service = request.app.state.streaming_service
     try:
         catalog = SessionCatalog.from_identity(request.app.state.viewer_config, identity)
-        resolved = service.availability_for(identity, load_items(catalog.config.patterns))
+        items = load_items(catalog.config.patterns)
+        if item_id is not None:
+            items = [item for item in items if item.get("id") == item_id]
+        resolved = service.availability_for(identity, items)
     except CatalogRepositoryError:
         return error_response("catalog_unavailable", 503)
     except StreamingRepositoryError:

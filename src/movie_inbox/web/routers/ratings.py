@@ -25,7 +25,7 @@ router = APIRouter()
 
 
 @router.get("/api/ratings", dependencies=[Depends(require_token)])
-def public_ratings(request: Request) -> JSONResponse:
+def public_ratings(request: Request, item_id: str | None = None) -> JSONResponse:
     identity = require_ready_identity(request)
     service = request.app.state.public_ratings_service
     if not service.sources_configured:
@@ -38,6 +38,10 @@ def public_ratings(request: Request) -> JSONResponse:
     except CatalogRepositoryError:
         return error_response("catalog_unavailable", 503)
 
+    # A dossier must spend its refresh budget on the selected work, including
+    # one beyond the first batch. Filter only inside the authenticated catalogue.
+    if item_id is not None:
+        items = [item for item in items if item.get("id") == item_id]
     found = service.ratings_for(items)
     ratings = {item_id: [rating.to_dict() for rating in rows] for item_id, rows in found.items()}
     # Both notices are required by their sources' terms wherever the data is

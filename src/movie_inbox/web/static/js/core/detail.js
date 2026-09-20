@@ -1,5 +1,6 @@
 import { cachedImageSrc, card, posterVariant } from "./card.js";
 import { renderBackCover } from "./back-cover.js";
+import { availabilityIcon, mountDetailContext, streamingSignal } from "./detail-context.js";
 import { load, loadCatalog } from "./catalog-data.js";
 import { fields } from "./fields.js";
 import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localFilesText, meta, normalizeRating, titleSubtitle } from "./format.js";
@@ -142,7 +143,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
               <span class="drawer-kicker">Edición</span>
               <h3>Mi registro</h3>
             </div>
-            <span class="status-line" data-personal-status></span>
+            <span class="status-line" data-personal-status role="status"></span>
           </div>
           <div class="personal-grid">
             <label>
@@ -454,11 +455,12 @@ import { editorialPersonalIds } from "../surfaces/home.js";
             <button class="drawer-state ${watched ? "active" : ""}" type="button" data-click="toggle-watched" data-id="${escapeAttr(item.id)}" data-status="${escapeAttr(item.status || "to_watch")}" aria-pressed="${watched}">
               <span>Estado</span><strong>${watched ? "Vista" : "Pendiente"}</strong><small>${item.watched_at ? escapeHtml(item.watched_at) : "Sin fecha"}</small>
             </button>
-            <div class="drawer-state ${availability.effective ? "active" : ""}">
-              <span>Disponibilidad</span><strong>${availability.effective ? "Disponible" : "No disponible"}</strong><small>${escapeHtml(availability.origin)}</small>
+            <div class="drawer-access" aria-label="Acceso a la obra">
+              <span class="detail-access-signal${availability.effective ? " is-available" : ""}" title="${escapeAttr(availability.origin)}">${availabilityIcon("library")}<span>Biblioteca<small>${availability.effective ? "Disponible" : "No disponible"}</small></span></span>
+              <span data-detail-streaming-signal>${streamingSignal(null, "loading")}</span>
             </div>
             <button class="drawer-state rating-state ${rating ? "active" : ""}" type="button" data-click="edit-personal" data-id="${escapeAttr(item.id)}">
-              <span>Puntuación</span><strong>${rating ? `${rating}/10` : "Sin puntuar"}</strong><small>Editar registro</small>
+              <span>Mi puntaje</span><strong>${rating ? `${rating}/10` : "Sin puntuar"}</strong><small>Editar registro</small>
             </button>
           </section>
           <section class="drawer-synopsis">
@@ -468,6 +470,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           <section class="drawer-section drawer-personal-section">
             ${personalRecordPanel(item)}
           </section>
+          <div class="detail-context" data-detail-context></div>
           <details class="drawer-accordion">
             <summary><span>Ficha técnica</span><small>Dirección, reparto y títulos</small></summary>
             <div class="drawer-accordion-body">${factsPanel(item) || `<span class="status-line">Sin ficha enriquecida.</span>`}</div>
@@ -490,6 +493,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           </details>
         `;
         primeDetailForms();
+        mountDetailContext(fields.detailBody.querySelector("[data-detail-context]"), item.id, fields.detailBody.querySelector("[data-detail-streaming-signal]"));
         syncDetailFeedback();
       }
 
@@ -772,25 +776,48 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const ratingPrivacy = form.querySelector("[data-personal-rating-privacy]")?.value || "inherit";
         const reviewPrivacy = form.querySelector("[data-personal-review-privacy]")?.value || "inherit";
         const status = form.querySelector("[data-personal-status]");
+        if (form.querySelector("[data-personal-conflict]")) {
+          if (status) status.textContent = "Revisá el cambio recibido antes de guardar.";
+          return false;
+        }
+        const initial = Object.fromEntries(JSON.parse(form.dataset.initial || "[]"));
+        const base = { watched_at: initial.watched_at || "", rating: normalizeRating(initial.rating), review: initial.review || "" };
+        const current = { watched_at: watchedAt, rating, review };
+        const changed = Object.fromEntries(Object.entries(current).filter(([key, value]) => value !== base[key]));
+        const controls = [...form.querySelectorAll("input, select, textarea, button")].map(control => [control, control.disabled]);
+        controls.forEach(([control]) => { control.disabled = true; });
         if (status) status.textContent = "Guardando…";
         try {
-          const response = await apiFetch("/api/personal", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id, watched_at: watchedAt, rating, review, source_file: item?._source_file || "" })
-          });
-          const payload = await response.json();
-          if (!payload.ok) throw new Error(payload.reason || "No se pudo guardar");
-          const privacyResponse = await apiFetch(`/api/privacy/items/${encodeURIComponent(id)}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ rating: ratingPrivacy, review: reviewPrivacy })
-          });
-          const privacyPayload = await privacyResponse.json();
-          if (!privacyResponse.ok || !privacyPayload.ok) {
-            throw new Error(privacyPayload.reason || "No se pudo guardar la privacidad");
+          if (Object.keys(changed).length) {
+            const response = await apiFetch("/api/personal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, ...changed, base, source_file: item?._source_file || "" })
+            });
+            const payload = await response.json();
+            if (response.status === 409 && payload.reason === "personal_conflict") {
+              await showPersonalConflict(form, id, base, changed);
+              return false;
+            }
+            if (!response.ok || !payload.ok) throw new Error(payload.reason || "No se pudo guardar");
+            // A privacy failure must not retry an already saved personal change
+            // against its old base. Keep the two successful baselines independent.
+            Object.assign(item, current);
+            Object.assign(initial, current);
+            form.dataset.initial = JSON.stringify(Object.entries(initial));
           }
-          item._privacy = privacyPayload.privacy || { rating: ratingPrivacy, review: reviewPrivacy };
+          if (ratingPrivacy !== (initial.rating_privacy || "inherit") || reviewPrivacy !== (initial.review_privacy || "inherit")) {
+            const privacyResponse = await apiFetch(`/api/privacy/items/${encodeURIComponent(id)}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ rating: ratingPrivacy, review: reviewPrivacy })
+            });
+            const privacyPayload = await privacyResponse.json();
+            if (!privacyResponse.ok || !privacyPayload.ok) {
+              throw new Error(privacyPayload.reason || "No se pudo guardar la privacidad");
+            }
+            item._privacy = privacyPayload.privacy || { rating: ratingPrivacy, review: reviewPrivacy };
+          }
           if (status) status.textContent = "Guardado";
           form.dataset.initial = serializeDetailForm(form);
           return true;
@@ -799,7 +826,50 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           if (status) status.textContent = "No se pudo guardar. Revisá los datos e intentá otra vez.";
           setDetailFeedback("Error al guardar el registro", "error", 0);
           return false;
+        } finally {
+          controls.forEach(([control, disabled]) => { control.disabled = disabled; });
         }
+      }
+
+      async function showPersonalConflict(form, id, base, changed) {
+        const response = await apiFetch("/api/items");
+        const payload = await response.json();
+        if (!response.ok) throw new Error("No se pudo recuperar la versión actual");
+        const fresh = payload.items?.find(entry => entry.id === id);
+        if (!fresh) throw new Error("La obra ya no está en el catálogo");
+        if (!form.isConnected) return;
+        const values = { watched_at: fresh.watched_at || "", rating: normalizeRating(fresh.rating), review: fresh.review || "" };
+        const labels = { watched_at: "Fecha vista", rating: "Puntaje", review: "Review" };
+        const rows = Object.keys(values).filter(key => values[key] !== base[key]);
+        const box = document.createElement("div");
+        box.className = "personal-conflict";
+        box.dataset.personalConflict = "true";
+        box.tabIndex = -1;
+        box.setAttribute("role", "alert");
+        box.innerHTML = `<h4>Tu registro cambió en otra pestaña o dispositivo</h4>
+          <p>No guardamos estos cambios. Tu edición sigue en el formulario. Revisá la versión actual antes de continuar.</p>
+          <dl>${rows.map(key => `<dt>${labels[key]} · versión actual</dt><dd>${escapeHtml(String(values[key] || "Sin completar"))}</dd>`).join("")}</dl>
+          <div class="personal-conflict-actions"><button type="button" data-keep-edit>Conservar mi edición</button><button type="button" class="quiet-action" data-use-current>Usar versión actual</button></div>`;
+        form.querySelector(".personal-grid").prepend(box);
+        const reconcile = keep => {
+          const initial = Object.fromEntries(JSON.parse(form.dataset.initial));
+          for (const [key, value] of Object.entries(values)) {
+            const control = form.querySelector(`[name="${key}"]`);
+            if (!keep || !Object.hasOwn(changed, key)) control.value = String(value);
+            initial[key] = String(value);
+          }
+          Object.assign(items.find(entry => entry.id === id) || {}, fresh);
+          form.dataset.initial = JSON.stringify(Object.entries(initial));
+          box.remove();
+          handleDetailFormMutation({ target: form });
+          const status = form.querySelector("[data-personal-status]");
+          if (status) status.textContent = keep ? "Revisá tu edición y presioná Guardar cambios para aplicarla sobre esta versión." : "Versión actual cargada.";
+          form.querySelector("[data-personal-review]")?.focus();
+        };
+        box.querySelector("[data-keep-edit]").addEventListener("click", () => reconcile(true));
+        box.querySelector("[data-use-current]").addEventListener("click", () => reconcile(false));
+        if (fields.unsavedDetailDialog.open) keepEditingDetail();
+        requestAnimationFrame(() => box.focus());
       }
 
       export async function saveMetadata(event, id) {
