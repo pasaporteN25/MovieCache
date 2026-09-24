@@ -152,16 +152,17 @@ usuarios al frontend.
 Gate de salida: 554 pruebas unitarias (4 omitidas), 20 pruebas de navegador, Ruff,
 formato, mypy estricto, compileall y `git diff --check` en verde.
 
-### v0.9.0: API de dispositivo, datos en vivo y afinación de Inicio — abierta
+### v0.9.0: API de dispositivo, datos en vivo y afinación de Inicio — publicado 2026-09-24
 
-Abierta el 2026-09-13 en la rama `release/0.9.0`; se cierra al fusionar su PR contra
-`master`, y hasta entonces se le suman cambios. Trae la API de dispositivo `/api/v1/`
-—sesiones por dispositivo, apareamiento por QR, alta sin conexión y lo que un teléfono
-necesita para repartir charadas—, disponibilidad en streaming y puntajes públicos, mazos de
-charadas deterministas, el índice local de IMDb como primera fuente, arreglos de búsqueda y
-de rendimiento del catálogo, y el trabajo visual de Inicio desde la 0.8.0. No está pulida:
-varias de esas capacidades todavía no tienen pantalla. Lo que falta para cerrarla está en
-[V9] de `tareas.md`.
+Trae la API de dispositivo `/api/v1/` —sesiones por dispositivo, apareamiento por QR, alta
+sin conexión y lo que un teléfono necesita para repartir charadas—, disponibilidad en
+streaming y puntajes públicos, mazos de charadas deterministas, el índice local de IMDb
+como primera fuente, arreglos de búsqueda y de rendimiento del catálogo, y el trabajo
+visual de Inicio desde la 0.8.0.
+
+Gate de salida: suite local (1105 pruebas) y CI del commit de cierre en verde — Linux,
+Windows, wheel limpio, Chromium, Docker Compose con estado persistente, Ruff/mypy y el
+gate de calidad de búsqueda. Detalle del cierre en [V9] de `tareas.md`.
 
 Corte visual actualizado por el owner el 2026-09-14: cerrar la Home U4/U5,
 cartelera U6 y U7.5a ya integradas. **U8 pasa completa a otra release**, sin número

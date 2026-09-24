@@ -45,15 +45,15 @@ nada y no es un servidor de medios.** No compite con Plex, Jellyfin ni con Radar
 
 ## Estado del proyecto
 
-La versión estable es **v0.8.0**. Es una aplicación web multiusuario para una instancia
+La versión estable es **v0.9.0**. Es una aplicación web multiusuario para una instancia
 personal o familiar: cada cuenta tiene su catálogo, mientras que el inventario físico y las
 bibliotecas administradas pertenecen al servidor.
 
 El historial completo de versiones está en [CHANGELOG.md](CHANGELOG.md) y no se repite acá.
 
-### Lo que hay en `master` y todavía no salió en una versión
+### Novedades de la 0.9.0
 
-Está en el árbol, con pruebas, pero sin publicar:
+Se sumó en esta versión:
 
 - **Disponibilidad en plataformas de streaming.** Back office de regiones y plataformas,
   con snapshot fechado por obra y mercado. `en_plataforma` se deriva al leer y es

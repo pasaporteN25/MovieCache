@@ -4,10 +4,7 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
-Va a ser la **0.9.0**. La versión está abierta en la rama `release/0.9.0` y se cierra al
-fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios. Todavía no está
-pulida: varias capacidades nuevas del servidor no tienen pantalla —cada entrada lo dice— y
-el trabajo visual de Inicio sigue en curso.
+## [0.9.0] - 2026-09-24
 
 ### Antes de actualizar
 

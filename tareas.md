@@ -671,7 +671,7 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 | Changelog: "Antes de actualizar" | Frente lógico | **Hecho** (2026-09-13) |
 | Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup | Owner, o el frente lógico con su autorización | Pendiente |
 | El gate de `docs/release-checklist.md`, con el CI del PR en verde | Todos | Pendiente |
-| Último commit: versión `0.9.0`, changelog, `README.md`, `CLAUDE.md` y roadmap | Frente lógico | Pendiente |
+| Último commit: versión `0.9.0`, changelog, `README.md`, `CLAUDE.md` y roadmap | Frente lógico | **Hecho** (2026-09-24). Gate automático confirmado verde sobre `fee5845` antes del commit: `scripts\check.ps1` completo (Ruff, mypy estricto, compileall, 1105 tests) y los 7 checks de CI del PR #1 (Linux, Windows, wheel, Chromium, Docker Compose, ruff/mypy, search quality gate). Falta la aceptación manual del owner (`docs/release-checklist.md` §2-7) antes de fusionar y taggear |
 | Fusionar con merge commit y etiquetar `v0.9.0` | Owner | Pendiente |
 
 - **Modelo sugerido**: Grande para coordinar el cierre; cada fila, por separado, es chica.
