@@ -713,6 +713,123 @@
         ],
         "createdAt": "2026-09-15T00:09:51.986Z",
         "reason": "Agent, following the owner's 2026-09-14 request to stop recurring hook findings on these files: size from the accepted U2-P/U4 Home work, off the DESIGN.md type ramp; documenting it stays with the visual front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#666b8e",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:29.678Z",
+        "reason": "Pre-existing literal in the dossier drawer (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 0, 0, 0.46)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:29.772Z",
+        "reason": "Pre-existing literal in the dossier drawer (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(0, 0, 0, 0.68)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:29.870Z",
+        "reason": "Pre-existing literal in the dossier drawer (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(111, 234, 255, 0.42)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:29.965Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(2, 6, 14, 0.48)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.054Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(111, 234, 255, 0.22)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.146Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(111, 234, 255, 0.15)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.236Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#160c1c",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.329Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(231, 189, 106, 0.64)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.420Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(231, 189, 106, 0.42)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.511Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#c8d7da",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.604Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#e9e4d6",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.699Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "48px",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-25T02:30:30.797Z",
+        "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front: fluid endpoint of the back-cover title clamp"
       }
     ]
   }
