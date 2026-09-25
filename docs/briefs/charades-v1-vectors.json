@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "description": "Test vectors for a port of the charades generator ([G2], docs/briefs/charades-v1.md). Two players share a deck only if their generators agree byte for byte. Every output here was computed by the server's own functions, and tests/test_charades_vectors.py recomputes them, so a server change that would change installed phones' decks fails.",
+  "generator": {
+    "fnv1a_32": {
+      "offset_basis": 2166136261,
+      "prime": 16777619,
+      "input": "the UTF-8 bytes of the text"
+    },
+    "lcg": {
+      "multiplier": 1664525,
+      "increment": 1013904223,
+      "modulus": 4294967296
+    },
+    "separator": "U+001F",
+    "fingerprint": "Drop empty keys and duplicates, sort by Unicode code point (not by UTF-16 code unit), join with the separator, FNV-1a; the first 6 characters of the 8-digit uppercase hexadecimal digest.",
+    "seed": "Each option as text (integers in decimal), then the fingerprint, joined with the separator; FNV-1a of that.",
+    "deck": "Sort the works by key (code point order). state = seed. For index from the last position down to 1: state = (multiplier * state + increment) mod modulus; swap the work at index with the one at state mod (index + 1). When size > 0, keep the first size works.",
+    "server_deck_options": "The server seeds a deck with the options [difficulty, size], size 0 meaning the whole category."
+  },
+  "fnv1a": [
+    {
+      "input": "",
+      "output": 2166136261
+    },
+    {
+      "input": "a",
+      "output": 3826002220
+    },
+    {
+      "input": "facil",
+      "output": 4231513356
+    },
+    {
+      "input": "Película",
+      "output": 1344261109
+    },
+    {
+      "input": "千と千尋の神隠し",
+      "output": 3126887813
+    },
+    {
+      "input": "tmdb:1\u001ftmdb:2",
+      "output": 3704338663
+    }
+  ],
+  "fingerprints": [
+    {
+      "keys": [
+        "tmdb:2",
+        "tmdb:1",
+        "tmdb:1",
+        ""
+      ],
+      "output": "DCCBB8"
+    },
+    {
+      "keys": [],
+      "output": "811C9D"
+    },
+    {
+      "keys": [
+        "tmdb:949",
+        "imdb:tt0113277",
+        "wikidata:Q1136",
+        "title:el viaje de chihiro|2001",
+        "title:千と千尋の神隠し|2001"
+      ],
+      "output": "347064"
+    },
+    {
+      "keys": [
+        "title:𝔸|2000",
+        "title:ｚ|2000",
+        "title:a|2000"
+      ],
+      "output": "6BB11D"
+    }
+  ],
+  "seeds": [
+    {
+      "options": [
+        "facil",
+        0
+      ],
+      "fingerprint": "9337B4",
+      "output": 124918552
+    },
+    {
+      "options": [
+        "medio_alto",
+        10
+      ],
+      "fingerprint": "9337B4",
+      "output": 2230750547
+    },
+    {
+      "options": [
+        "dificil",
+        0
+      ],
+      "fingerprint": "347064",
+      "output": 4053237725
+    }
+  ],
+  "decks": [
+    {
+      "keys": [
+        "tmdb:0",
+        "tmdb:1",
+        "tmdb:2",
+        "tmdb:3",
+        "tmdb:4",
+        "tmdb:5",
+        "tmdb:6",
+        "tmdb:7",
+        "tmdb:8",
+        "tmdb:9",
+        "tmdb:10",
+        "tmdb:11",
+        "tmdb:12",
+        "tmdb:13",
+        "tmdb:14",
+        "tmdb:15",
+        "tmdb:16",
+        "tmdb:17",
+        "tmdb:18",
+        "tmdb:19",
+        "tmdb:20",
+        "tmdb:21",
+        "tmdb:22",
+        "tmdb:23",
+        "tmdb:24",
+        "tmdb:25",
+        "tmdb:26",
+        "tmdb:27",
+        "tmdb:28",
+        "tmdb:29",
+        "tmdb:30",
+        "tmdb:31",
+        "tmdb:32",
+        "tmdb:33",
+        "tmdb:34",
+        "tmdb:35",
+        "tmdb:36",
+        "tmdb:37",
+        "tmdb:38",
+        "tmdb:39"
+      ],
+      "seed": 124918552,
+      "size": 0,
+      "output": [
+        "tmdb:34",
+        "tmdb:27",
+        "tmdb:0",
+        "tmdb:19",
+        "tmdb:10",
+        "tmdb:8",
+        "tmdb:23",
+        "tmdb:2",
+        "tmdb:30",
+        "tmdb:3",
+        "tmdb:28",
+        "tmdb:39",
+        "tmdb:24",
+        "tmdb:25",
+        "tmdb:32",
+        "tmdb:6",
+        "tmdb:38",
+        "tmdb:29",
+        "tmdb:1",
+        "tmdb:26",
+        "tmdb:16",
+        "tmdb:13",
+        "tmdb:7",
+        "tmdb:33",
+        "tmdb:20",
+        "tmdb:22",
+        "tmdb:14",
+        "tmdb:5",
+        "tmdb:12",
+        "tmdb:11",
+        "tmdb:4",
+        "tmdb:9",
+        "tmdb:21",
+        "tmdb:35",
+        "tmdb:18",
+        "tmdb:15",
+        "tmdb:31",
+        "tmdb:17",
+        "tmdb:36",
+        "tmdb:37"
+      ]
+    },
+    {
+      "keys": [
+        "tmdb:39",
+        "tmdb:38",
+        "tmdb:37",
+        "tmdb:36",
+        "tmdb:35",
+        "tmdb:34",
+        "tmdb:33",
+        "tmdb:32",
+        "tmdb:31",
+        "tmdb:30",
+        "tmdb:29",
+        "tmdb:28",
+        "tmdb:27",
+        "tmdb:26",
+        "tmdb:25",
+        "tmdb:24",
+        "tmdb:23",
+        "tmdb:22",
+        "tmdb:21",
+        "tmdb:20",
+        "tmdb:19",
+        "tmdb:18",
+        "tmdb:17",
+        "tmdb:16",
+        "tmdb:15",
+        "tmdb:14",
+        "tmdb:13",
+        "tmdb:12",
+        "tmdb:11",
+        "tmdb:10",
+        "tmdb:9",
+        "tmdb:8",
+        "tmdb:7",
+        "tmdb:6",
+        "tmdb:5",
+        "tmdb:4",
+        "tmdb:3",
+        "tmdb:2",
+        "tmdb:1",
+        "tmdb:0"
+      ],
+      "seed": 2230750547,
+      "size": 10,
+      "output": [
+        "tmdb:1",
+        "tmdb:7",
+        "tmdb:22",
+        "tmdb:13",
+        "tmdb:19",
+        "tmdb:25",
+        "tmdb:28",
+        "tmdb:14",
+        "tmdb:15",
+        "tmdb:26"
+      ]
+    },
+    {
+      "keys": [
+        "title:𝔸|2000",
+        "title:ｚ|2000",
+        "title:a|2000"
+      ],
+      "seed": 124918552,
+      "size": 0,
+      "output": [
+        "title:ｚ|2000",
+        "title:a|2000",
+        "title:𝔸|2000"
+      ]
+    },
+    {
+      "keys": [
+        "tmdb:1"
+      ],
+      "seed": 124918552,
+      "size": 0,
+      "output": [
+        "tmdb:1"
+      ]
+    },
+    {
+      "keys": [],
+      "seed": 124918552,
+      "size": 0,
+      "output": []
+    }
+  ]
+}

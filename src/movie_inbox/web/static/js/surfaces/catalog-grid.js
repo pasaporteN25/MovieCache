@@ -6,7 +6,7 @@ import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, hasExt
 import { apiFetch } from "../core/http.js";
 import { goToCollection, routeValuesForView, syncRoute } from "../core/router.js";
 import { CATALOG_PAGE_SIZE, currentView, items, selectedExistingIdForSearch } from "../core/state.js";
-import { activeQuery, clearManualSearch, externalHealth, externalSourceSearchStates, externalSourcesAttempted, externalSourcesLastUsed, manualResults, matchesNormalizedSearchText, selectedManualIndex, setSearchState } from "./catalog-search.js";
+import { activeQuery, clearManualSearch, externalHealth, externalSourceSearchStates, externalSourcesAttempted, externalSourcesLastUsed, manualResults, matchesNormalizedSearchText, selectedManualCandidateRef, selectedManualCandidateSource, selectedManualIndex, setSearchState } from "./catalog-search.js";
 import { renderEditorialHome } from "./home.js";
 
       export let catalogSearchIndex = new WeakMap();
@@ -86,25 +86,39 @@ import { renderEditorialHome } from "./home.js";
       }
 
       export function collectionRouteValues() {
+        const shelfMode = ["browse", "search"].includes(collectionSearchMode);
         const values = {
           q: activeQuery,
-          year_from: collectionYearRange.from,
-          year_to: collectionYearRange.to,
-          sort: fields.sort.value && fields.sort.value !== "original" ? fields.sort.value : "",
-          duplicates: duplicatesOnly ? "1" : "",
+          year_from: shelfMode ? collectionYearRange.from : "",
+          year_to: shelfMode ? collectionYearRange.to : "",
+          sort: shelfMode && fields.sort.value !== "original" ? fields.sort.value : "",
+          duplicates: shelfMode && duplicatesOnly ? "1" : "",
           external: activeQuery && fields.externalSource.checked ? "1" : "",
           director: activeQuery && fields.searchByDirector.checked ? "1" : "",
           mode: collectionSearchMode !== "browse" ? collectionSearchMode : "",
-          link_id: collectionSearchMode === "link" ? selectedExistingIdForSearch || "" : ""
+          link_id: collectionSearchMode === "link" ? selectedExistingIdForSearch || "" : "",
+          candidate_source: collectionSearchMode === "compare" ? selectedManualCandidateSource : "",
+          candidate_ref: collectionSearchMode === "compare" ? selectedManualCandidateRef : ""
         };
         for (const key of COLLECTION_MULTI_FILTER_KEYS) {
-          values[key] = [...collectionFilters[key]].sort((left, right) => left.localeCompare(right, "es"));
+          values[key] = shelfMode
+            ? [...collectionFilters[key]].sort((left, right) => left.localeCompare(right, "es"))
+            : [];
         }
         return values;
       }
 
-      export function syncCollectionRoute(method = "replace") {
-        syncRoute(routeValuesForView("catalog"), method);
+      export function syncCollectionRoute(method = "replace", state = {}) {
+        const activeElement = document.activeElement;
+        syncRoute(routeValuesForView("catalog"), method, {
+          collection: {
+            ...(history.state?.collection || {}),
+            scrollY: window.scrollY,
+            visibleCount: catalogVisibleCount,
+            focusId: activeElement?.id || "",
+            ...state
+          }
+        });
       }
 
       export function applyCollectionRoute(params) {
@@ -317,14 +331,100 @@ import { renderEditorialHome } from "./home.js";
       }
 
       export function setCollectionSearchMode(mode = "browse") {
-        collectionSearchMode = ["browse", "compare", "link"].includes(mode) ? mode : "browse";
-        const comparisonMode = collectionSearchMode !== "browse";
+        collectionSearchMode = ["browse", "search", "add", "compare", "link"].includes(mode)
+          ? mode
+          : "browse";
+        const comparisonMode = ["compare", "link"].includes(collectionSearchMode);
+        if (["add", "link"].includes(collectionSearchMode)) fields.externalSource.checked = true;
         fields.collectionView.classList.toggle("is-compare-mode", comparisonMode);
+        fields.collectionView.classList.toggle("is-search-mode", collectionSearchMode === "search");
+        fields.collectionView.classList.toggle("is-add-mode", collectionSearchMode === "add");
         fields.collectionView.dataset.searchMode = collectionSearchMode;
         fields.backToCollection.hidden = !comparisonMode;
+        fields.collectionAnchor.hidden = !comparisonMode;
+        fields.collectionModeTabs.querySelectorAll("[data-mode]").forEach((button) => {
+          const selected = button.dataset.mode === collectionSearchMode;
+          button.setAttribute("aria-pressed", String(selected));
+          button.classList.toggle("active", selected);
+        });
+        const copy = collectionModeCopy(collectionSearchMode);
+        fields.collectionModeKicker.textContent = copy.kicker;
+        fields.catalogSection.querySelector("#catalogTitle").textContent = copy.title;
+        fields.collectionModeDescription.textContent = copy.description;
+        fields.collectionQueryLabel.textContent = copy.queryLabel;
+        fields.query.placeholder = copy.placeholder;
+        if (!fields.searchButton.disabled) fields.searchButton.textContent = copy.action;
         if (!comparisonMode && !activeQuery) {
           fields.catalogMergeKicker.textContent = "Comparación";
           fields.catalogMergeTitle.textContent = "Entrada de la colección";
+        }
+      }
+
+      export function collectionModeCopy(mode = collectionSearchMode) {
+        const copies = {
+          browse: {
+            kicker: "Archivo nocturno",
+            title: "Colección",
+            description: "Recorré tu archivo personal y afiná la estantería.",
+            queryLabel: "Buscar en tu colección",
+            placeholder: "Título, persona o dato…",
+            action: "Buscar"
+          },
+          search: {
+            kicker: "Localizar en el archivo",
+            title: "Colección",
+            description: "Encontrá una obra propia y, si hace falta, ampliá la búsqueda.",
+            queryLabel: "Buscar en tu colección",
+            placeholder: "Título, persona o dato…",
+            action: "Buscar"
+          },
+          add: {
+            kicker: "Nueva entrada",
+            title: "Colección",
+            description: "Buscá una obra afuera antes de sumarla a tu catálogo.",
+            queryLabel: "Buscar una obra para agregar",
+            placeholder: "Obra para agregar…",
+            action: "Buscar afuera"
+          },
+          compare: {
+            kicker: "Resolver identidad",
+            title: "Comparar",
+            description: "Conservá la referencia externa y buscá su entrada local.",
+            queryLabel: "Buscar coincidencia en tu colección",
+            placeholder: "Título de la coincidencia local…",
+            action: "Comparar"
+          },
+          link: {
+            kicker: "Resolver referencia",
+            title: "Vincular",
+            description: "Conservá la obra local y buscá su referencia externa.",
+            queryLabel: "Buscar referencia externa",
+            placeholder: "Título de la referencia externa…",
+            action: "Buscar afuera"
+          }
+        };
+        return copies[mode] || copies.browse;
+      }
+
+      export function changeCollectionMode(mode, options = {}) {
+        const requested = ["browse", "search", "add"].includes(mode) ? mode : "browse";
+        const updateHistory = options.updateHistory !== false;
+        const focus = options.focus !== false;
+        clearManualSearch({
+          focus: false,
+          updateHistory: false,
+          resetExternal: requested !== "search",
+          forceModeChange: true
+        });
+        setCollectionSearchMode(requested);
+        if (requested === "add") fields.externalSource.checked = true;
+        setSearchState("idle");
+        render();
+        renderDatabaseMenu();
+        if (updateHistory) syncCollectionRoute("push");
+        if (focus && requested !== "browse") requestAnimationFrame(() => fields.query.focus());
+        if (focus && requested === "browse") {
+          requestAnimationFrame(() => fields.catalogSection.querySelector("#catalogTitle")?.focus());
         }
       }
 
@@ -708,9 +808,25 @@ import { renderEditorialHome } from "./home.js";
         fields.sourceFiles.textContent = sourceFiles.length;
         fields.catalogSummary.textContent = catalogSummaryText(filtered);
         fields.empty.style.display = filtered.length ? "none" : "block";
-        fields.empty.textContent = activeQuery
-          ? `No encontramos obras para “${activeQuery}” con los filtros actuales.`
-          : "No hay obras que coincidan con los filtros actuales.";
+        if (activeQuery) {
+          fields.empty.innerHTML = `<strong>No aparece “${escapeHtml(activeQuery)}” en esta estantería.</strong>
+            <span>Probá quitando filtros o ampliá la búsqueda a fuentes externas.</span>
+            <div class="collection-empty-actions">
+              <button type="button" data-click="clear-filter" data-filter="query">Limpiar búsqueda</button>
+              <button type="button" class="quiet-action" data-click="collection-mode" data-mode="add">Buscar para agregar</button>
+            </div>`;
+        } else if (!catalogMetrics.total) {
+          fields.empty.innerHTML = `<strong>Tu videoteca todavía está vacía.</strong>
+            <span>Agregá una obra o prepará una importación desde la Bandeja.</span>
+            <div class="collection-empty-actions">
+              <button type="button" data-click="collection-mode" data-mode="add">Agregar una obra</button>
+              <button type="button" class="quiet-action" data-click="menu-inbox">Abrir Bandeja</button>
+            </div>`;
+        } else {
+          fields.empty.innerHTML = `<strong>Ninguna caja coincide con estos filtros.</strong>
+            <span>La colección sigue intacta; sólo estás viendo una selección vacía.</span>
+            <button type="button" data-click="clear-all-collection-filters">Limpiar filtros</button>`;
+        }
         const gridKey = `${catalogRevision}:${currentView === "catalog" ? "catalog" : "background"}:${shown.map((item) => item.id).join("|")}`;
         if (gridKey !== lastCatalogGridKey) {
           fields.grid.innerHTML = shown

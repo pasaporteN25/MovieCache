@@ -9,12 +9,13 @@ from difflib import SequenceMatcher
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from movie_inbox.domain.catalog import canonical_url, external_source_name
+from movie_inbox.domain.catalog import FUNCTION_WORDS, canonical_url, external_source_name
 from movie_inbox.domain.normalization import normalize_search_text
 from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
 
 _MIN_SUBSTRING_LENGTH = 3
 _MIN_FUZZY_QUERY_LENGTH = 5
+
 # external/registry.py's live external search still filters on this directly
 # (it never receives a SearchStrategy) -- kept as a module constant, derived
 # from the same baseline external_result_score() defaults to, so there is one
@@ -125,17 +126,57 @@ def text_match_score(value: str, query: str, query_terms: tuple[str, ...] | list
     if len(query) >= _MIN_SUBSTRING_LENGTH:
         if value.startswith(query):
             return 88.0
-        if query in value:
+        # Anchored at the start of a word, for the same reason _term_matches is:
+        # what this rule is for is finding a word inside a phrase -- "Fly" in
+        # "The Fly", an external id inside a URL -- not a fragment inside a
+        # word. Unanchored it scored "Man" 82 against "Spiderman" and "Age" 82
+        # against "Carnage", and searching the catalogue for "Fly" put "M.
+        # Butterfly" above both films actually called "The Fly".
+        #
+        # Typing the beginning of a word is still a match: the prefix test above
+        # covers "Moon" finding "Moonlight", and " fly" covers "Fly" finding
+        # "The Flying Dutchman". What is gone is arriving at the middle of a
+        # word from nowhere.
+        if f" {query}" in value:
             return 82.0
     value_terms = value.split()
-    covered = sum(1 for term in query_terms if _term_matches(term, value_terms))
-    coverage = covered / max(1, len(query_terms))
+    covered_terms = [term for term in query_terms if _term_matches(term, value_terms)]
+    coverage = len(covered_terms) / max(1, len(query_terms))
     if coverage == 1:
         return 70.0 + (12.0 * min(1.0, len(query) / max(1, len(value))))
+    if covered_terms and all(term in FUNCTION_WORDS for term in covered_terms):
+        # The only words these two titles have in common are articles, which is
+        # not evidence of anything. Scored on what is left instead, so a near
+        # miss still surfaces and an unrelated film does not.
+        return _content_word_score(query, value)
     if len(query) < _MIN_FUZZY_QUERY_LENGTH:
         return coverage * 62.0
-    ratio = SequenceMatcher(None, query, value).ratio()
-    return max(coverage * 62.0, ratio * 58.0)
+    # Nothing whole matched, so all that is left is character similarity -- but
+    # over the words that carry meaning, not over the raw strings. Comparing
+    # the raw strings scored "The Fly" against "M. Butterfly" at 32.2, above
+    # the 29.0 it gave "The Flies", on the strength of letters shared between
+    # "the" and "butterfly".
+    return max(coverage * 62.0, _content_word_score(query, value))
+
+
+def _content_word_score(query: str, value: str) -> float:
+    """Character similarity with the articles taken out of both sides.
+
+    Two branches reach it and for the same reason: what is left of a title once
+    the articles are gone is what the person was actually looking for. It is
+    the answer when articles were the only words in common, and the fallback
+    when no whole word matched at all.
+
+    A title that is nothing but an article is a real thing -- Bunuel's "El" --
+    so when either side has no content left, the original comparison stands
+    rather than being replaced by an invented one.
+    """
+
+    query_content = " ".join(term for term in query.split() if term not in FUNCTION_WORDS)
+    value_content = " ".join(term for term in value.split() if term not in FUNCTION_WORDS)
+    if not query_content or not value_content:
+        return SequenceMatcher(None, query, value).ratio() * 58.0
+    return SequenceMatcher(None, query_content, value_content).ratio() * 58.0
 
 
 def external_result_score(
@@ -247,9 +288,33 @@ def _title_from_url(value: str, source: str) -> str:
 
 
 def _term_matches(term: str, values: list[str]) -> bool:
+    """Whether one query term is present among a title's terms.
+
+    The equality test is not redundant with the substring tests below it: those
+    are gated on three characters, so without it a two-letter term never
+    matched even an identical one. "Ed" found nothing at all in a catalogue
+    holding "Ed Wood", and "Up" could not see "Up in the Air".
+
+    Equality does not count for an article, though. Term coverage of 1 takes a
+    fast path well above the admission floor, so letting "la" match "la" would
+    make a two-letter query pull in every title that merely starts with it --
+    the same noise `title_similarity` was just cleared of, arriving by another
+    door.
+
+    The substring tests are anchored at the start of a word. A short word
+    buried inside a longer one is a coincidence of spelling, not a shared word:
+    "Fly" is not "Butterfly", which the golden corpus now states outright --
+    without the anchor, searching the catalogue for "The Fly" ranked "M.
+    Butterfly" (32.2) above "The Flies" (29.0). The anchored form keeps what
+    the test was for, which is compounds and plurals reaching their root, and
+    terms of five characters or more still have the fuzzy test underneath, so
+    "terminator" still finds "exterminator".
+    """
+
     return any(
-        (len(term) >= _MIN_SUBSTRING_LENGTH and term in value)
-        or (len(value) >= _MIN_SUBSTRING_LENGTH and value in term)
+        (term == value and term not in FUNCTION_WORDS)
+        or (len(term) >= _MIN_SUBSTRING_LENGTH and value.startswith(term))
+        or (len(value) >= _MIN_SUBSTRING_LENGTH and term.startswith(value))
         or (len(term) >= 5 and SequenceMatcher(None, term, value).ratio() >= 0.82)
         for value in values
     )

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.models import CatalogItem
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 
 
@@ -176,6 +177,308 @@ class AppendItemStrongMatchTests(unittest.TestCase):
             self.assertEqual(reason, "possible_duplicate")
             self.assertEqual(extra["candidates"][0]["id"], "heat-tmdb")
             self.assertEqual(len(repository.read()), 1)
+
+
+class PatchPersonalPreconditionTests(unittest.TestCase):
+    """[X2]: an optional `base` on patch_personal guards against a lost update.
+
+    Reproduces the case ADR-0005's sync matrix ([A5.1] case 8, confirmed
+    2026-09-15 against a real instance by the client harness [A5.3]): a phone
+    uploads what it saw when it last downloaded, without looking at the
+    server again first, silently overwriting a change made elsewhere in the
+    meantime. With `base` declared, that upload is refused instead.
+    """
+
+    def service(self, catalog_path: Path) -> tuple[CatalogService, JsonCatalogRepository]:
+        repository = JsonCatalogRepository(catalog_path, normalize_item)
+        repository.write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
+        )
+        return CatalogService(repository), repository
+
+    def _get(self, repository: JsonCatalogRepository, item_id: str = "heat") -> CatalogItem:
+        item = repository.get(item_id)
+        assert item is not None
+        return item
+
+    def test_without_a_base_the_last_write_still_wins_as_before(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            updated, reason = service.patch_personal("heat", {"rating": 8})
+
+            self.assertTrue(updated)
+            self.assertEqual(reason, "updated")
+            self.assertEqual(self._get(repository).rating, 8)
+
+    def test_a_base_matching_the_stored_value_applies_normally(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            updated, reason = service.patch_personal(
+                "heat", {"rating": 8, "base": {"status": "to_watch", "rating": None}}
+            )
+
+            self.assertTrue(updated)
+            self.assertEqual(reason, "updated")
+            self.assertEqual(self._get(repository).rating, 8)
+
+    def test_the_lost_update_a_phone_reproduced_is_refused_instead_of_applied(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            service, repository = self.service(catalog_path)
+
+            # The web (or another phone) rates it while this phone is offline.
+            first = service.patch_personal("heat", {"rating": 9})
+            self.assertEqual(first, (True, "updated"))
+
+            # This phone uploads a review, believing rating is still unset --
+            # its own base is what it downloaded before going offline.
+            second = service.patch_personal(
+                "heat", {"review": "Buenisima.", "base": {"rating": None}}
+            )
+
+            self.assertEqual(second, (False, "conflict"))
+            after = self._get(repository)
+            self.assertEqual(after.rating, 9, "the web's rating must survive")
+            self.assertEqual(after.review, "", "the phone's review must not apply either")
+
+    def test_a_base_field_that_is_not_being_changed_still_guards_the_patch(self) -> None:
+        # A conflict is about anything the caller declared it still trusts,
+        # not only the fields this particular call is writing.
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            service, repository = self.service(catalog_path)
+            service.patch_personal("heat", {"status": "watched", "watched_at": "2026-09-14"})
+
+            updated, reason = service.patch_personal(
+                "heat", {"rating": 7, "base": {"status": "to_watch"}}
+            )
+
+            self.assertEqual((updated, reason), (False, "conflict"))
+            self.assertEqual(self._get(repository).rating, 0)
+
+    def test_an_unrecognized_base_field_is_refused_up_front(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, _ = self.service(Path(temporary) / "catalog.json")
+
+            with self.assertRaises(ValueError):
+                service.patch_personal("heat", {"rating": 7, "base": {"tmdb_id": "949"}})
+
+    def test_a_base_that_is_not_an_object_is_refused_up_front(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, _ = self.service(Path(temporary) / "catalog.json")
+
+            with self.assertRaises(ValueError):
+                service.patch_personal("heat", {"rating": 7, "base": "rating:0"})
+
+
+class PersonalChangedAtStampingTests(unittest.TestCase):
+    """[X3.2]: patch_personal and update_personal mark the fields they touch.
+
+    Three marks, not four: watched_at shares the status mark, because
+    patch_personal already changes them together from one decision.
+    """
+
+    def service(self, catalog_path: Path) -> tuple[CatalogService, JsonCatalogRepository]:
+        repository = JsonCatalogRepository(catalog_path, normalize_item)
+        repository.write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
+        )
+        return CatalogService(repository), repository
+
+    def _get(self, repository: JsonCatalogRepository, item_id: str = "heat") -> CatalogItem:
+        item = repository.get(item_id)
+        assert item is not None
+        return item
+
+    def test_patch_personal_marks_only_the_fields_it_touches(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.patch_personal("heat", {"rating": 8})
+
+            marks = self._get(repository).personal_changed_at
+            self.assertEqual(set(marks), {"rating"})
+
+    def test_a_watched_at_only_patch_marks_status_not_rating_or_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.patch_personal("heat", {"watched_at": "2026-09-17"})
+
+            self.assertEqual(set(self._get(repository).personal_changed_at), {"status"})
+
+    def test_touching_two_fields_at_once_marks_both(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.patch_personal("heat", {"status": "watched", "review": "Buenisima."})
+
+            self.assertEqual(set(self._get(repository).personal_changed_at), {"status", "review"})
+
+    def test_an_untouched_field_s_mark_survives_a_later_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"rating": 8})
+            first_marks = dict(self._get(repository).personal_changed_at)
+
+            service.patch_personal("heat", {"review": "Buenisima."})
+
+            marks = self._get(repository).personal_changed_at
+            self.assertEqual(marks["rating"], first_marks["rating"])
+            self.assertIn("review", marks)
+
+    def test_a_refused_conflicting_patch_marks_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"rating": 9})
+
+            updated, reason = service.patch_personal(
+                "heat", {"review": "Buenisima.", "base": {"rating": None}}
+            )
+
+            self.assertEqual((updated, reason), (False, "conflict"))
+            self.assertEqual(set(self._get(repository).personal_changed_at), {"rating"})
+
+    def test_update_personal_marks_all_three_since_it_overwrites_all_three(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.update_personal("heat", "2026-09-17", 8, "Buenisima.")
+
+            self.assertEqual(
+                set(self._get(repository).personal_changed_at), {"status", "rating", "review"}
+            )
+
+
+class UpdatePersonalFieldsTests(unittest.TestCase):
+    """[X8]: a form save touches only the fields it sent, and can be guarded.
+
+    The case [A5.1] 14 describes: the ficha opens, a phone uploads a rating while
+    it is still open, and saving the review put the rating back to what the form
+    had -- undoing the phone's change without a word.
+    """
+
+    def service(self, catalog_path: Path) -> tuple[CatalogService, JsonCatalogRepository]:
+        repository = JsonCatalogRepository(catalog_path, normalize_item)
+        repository.write(
+            [normalize_item({"id": "heat", "title": "Heat", "year": "1995", "kind": "pelicula"})]
+        )
+        return CatalogService(repository), repository
+
+    def _get(self, repository: JsonCatalogRepository, item_id: str = "heat") -> CatalogItem:
+        item = repository.get(item_id)
+        assert item is not None
+        return item
+
+    def test_a_field_the_form_did_not_send_is_left_alone(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            # The phone rates it while the ficha, opened before that, is on screen.
+            service.patch_personal("heat", {"rating": 9})
+
+            service.update_personal_fields("heat", {"review": "Buenisima."})
+
+            saved = self._get(repository)
+            self.assertEqual(saved.rating, 9, "the phone's rating must survive")
+            self.assertEqual(saved.review, "Buenisima.")
+
+    def test_only_the_fields_sent_get_a_change_mark(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"rating": 9})
+            rating_mark = self._get(repository).personal_changed_at["rating"]
+
+            service.update_personal_fields("heat", {"review": "Buenisima."})
+
+            marks = self._get(repository).personal_changed_at
+            self.assertEqual(marks["rating"], rating_mark)
+            self.assertIn("review", marks)
+            self.assertNotIn("status", marks)
+
+    def test_a_watched_at_alone_marks_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            service.update_personal_fields("heat", {"watched_at": "2026-09-17"})
+
+            self.assertEqual(set(self._get(repository).personal_changed_at), {"status"})
+
+    def test_a_stale_base_on_the_field_being_saved_is_refused(self) -> None:
+        # Sending only your own field does not stop you overwriting that very
+        # field: the phone changed the review too.
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"review": "Desde el telefono."})
+
+            result = service.update_personal_fields(
+                "heat", {"review": "Desde la ficha."}, base={"review": ""}
+            )
+
+            self.assertEqual(result, (False, "conflict"))
+            saved = self._get(repository)
+            self.assertEqual(saved.review, "Desde el telefono.")
+            self.assertEqual(set(saved.personal_changed_at), {"review"})
+
+    def test_a_base_on_a_field_not_being_saved_still_guards(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"rating": 9})
+
+            result = service.update_personal_fields(
+                "heat", {"review": "Buenisima."}, base={"rating": 0}
+            )
+
+            self.assertEqual(result, (False, "conflict"))
+            self.assertEqual(self._get(repository).review, "")
+
+    def test_a_base_read_off_a_web_row_matches_an_unset_field(self) -> None:
+        # A web row holds 0 and "" where the device API says null: neither may
+        # raise a conflict on a field nobody changed.
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+
+            result = service.update_personal_fields(
+                "heat",
+                {"review": "Buenisima."},
+                base={"watched_at": "", "rating": 0, "review": ""},
+            )
+
+            self.assertEqual(result, (True, "updated"))
+            self.assertEqual(self._get(repository).review, "Buenisima.")
+
+    def test_nothing_or_something_unknown_is_refused_up_front(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            service, _ = self.service(Path(temporary) / "catalog.json")
+
+            for bad in ({}, {"status": "watched"}, {"review": "x", "tmdb_id": "949"}):
+                with self.subTest(values=sorted(bad)):
+                    with self.assertRaises(ValueError):
+                        service.update_personal_fields("heat", bad)
+            with self.assertRaises(ValueError):
+                service.update_personal_fields("heat", {"review": "x"}, base={"tmdb_id": "1"})
+
+    def test_the_whole_form_save_is_still_unconditional(self) -> None:
+        # update_personal is the deliberate "overwrite all three" save; it is the
+        # partial one that exists so a form no longer has to use it.
+        with tempfile.TemporaryDirectory() as temporary:
+            service, repository = self.service(Path(temporary) / "catalog.json")
+            service.patch_personal("heat", {"rating": 9})
+
+            service.update_personal("heat", "", 0, "Buenisima.")
+
+            self.assertEqual(self._get(repository).rating, 0)
+
+    def test_a_device_base_in_the_web_shape_still_applies(self) -> None:
+        # The [X2] guard now shapes both sides the same way, so a base that says 0
+        # for an unset rating no longer conflicts with it.
+        with tempfile.TemporaryDirectory() as temporary:
+            service, _ = self.service(Path(temporary) / "catalog.json")
+
+            result = service.patch_personal("heat", {"review": "x", "base": {"rating": 0}})
+
+            self.assertEqual(result, (True, "updated"))
 
 
 if __name__ == "__main__":

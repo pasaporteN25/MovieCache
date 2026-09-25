@@ -1,7 +1,8 @@
 # CLAUDE.md
 
 Movie Inbox: gestor self-hosted de catálogo audiovisual. Python + FastAPI + SQLite,
-frontend vanilla sin build step. Estable v0.6.0.
+frontend vanilla sin build step. Estable v0.9.0; no hay versión nueva abierta todavía,
+ver "Versiones".
 
 Antes de trabajar, leé los contratos vigentes: `PRODUCT.md`, `DESIGN.md`,
 `docs/roadmap.md`, `CHANGELOG.md` (`[Sin publicar]`), `tests/test_layering.py`.
@@ -62,6 +63,33 @@ y los shims de import (`catalog_*.py`) ya no viven en `scripts/`: se movieron a
 `codigoLegacy/` (fuera de Git, ver `.gitignore`) porque nadie los ejecuta dentro del
 contenedor Docker — ahí el camino es `movie-inbox <subcomando>`. La lógica nueva va
 siempre al paquete.
+
+## Reparto de trabajo entre agentes (desde 2026-09-07)
+
+El trabajo corre en paralelo, dividido por especialidad:
+
+- **Claude** — infraestructura, backend, modelo de datos, capas, contratos con fuentes
+  externas, migraciones y pruebas. Frentes propios: activación real de TMDb,
+  disponibilidad en streaming, charadas y dirección móvil
+  (`docs/analisis/streaming-charadas-movil-2026-09-07.md`).
+- **Codex** — dirección visual y frontend de presentación: [U2-P] y sus derivados.
+
+El cliente Android es otro repositorio, `../movieIndexAndroid`, con su propio tablero
+(decisión del owner del 2026-08-17). Acá sólo vive lo que ese cliente consume: la API
+`/api/v1/`, su contrato OpenAPI y los vectores de prueba que el cliente porta.
+
+`tareas.md` es compartido: cada frente agrega su sección y no reescribe las ajenas. Antes
+de commitear, comprobar que el árbol no arrastra trabajo sin commitear del otro frente en
+los mismos archivos.
+
+## Versiones
+
+La 0.9.0 es la versión estable, cerrada fusionando `release/0.9.0` contra `master` con
+merge commit. Ninguna versión nueva está abierta todavía: cuando arranque el próximo
+incremento se abre una rama `release/X.Y.Z` con las mismas reglas — se trabaja y se
+commitea ahí, todo lo que se commitea en ese checkout entra en la versión, y `master` no
+recibe commits directos salvo esa fusión, con merge commit, porque los documentos citan
+hashes de la rama. El gate y los pasos de cierre están en `docs/release-checklist.md`.
 
 ## Archivos personales — no tocar, no leer como fixture
 

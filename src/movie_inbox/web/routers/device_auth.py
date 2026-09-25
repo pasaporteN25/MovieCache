@@ -13,6 +13,7 @@ from movie_inbox.application.auth_service import (
     PasswordChangeRequiredError,
 )
 from movie_inbox.application.identity_repository import IdentityRepositoryError
+from movie_inbox.application.pairing_service import PairingRejected
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.web.dependencies import device_json, require_device_identity
 from movie_inbox.web.responses import DeviceApiRequestError, identity_payload
@@ -44,6 +45,47 @@ def login_device(request: Request, body: dict[str, Any] = Depends(device_json)) 
     except AuthenticationError as error:
         limiter.record_failure(limiter_key)
         raise DeviceApiRequestError("invalid_credentials", 401) from error
+    except ValueError as error:
+        raise DeviceApiRequestError("invalid_request", 400) from error
+    except IdentityRepositoryError as error:
+        raise DeviceApiRequestError("identity_store_unavailable", 503) from error
+    limiter.clear(limiter_key)
+    return JSONResponse(_session_payload(session), status_code=201)
+
+
+@router.post("/api/v1/pair")
+def pair_device(request: Request, body: dict[str, Any] = Depends(device_json)) -> JSONResponse:
+    """Trade a one-time pairing ticket for a device session.
+
+    The front door for the Android client (ADR-0005, as amended): an account is
+    created on the web, its owner mints a QR, and this is what the phone calls
+    after scanning it. No password crosses the wire, and the ticket dies on use.
+
+    Rate limited like login, by client address alone -- there is no username to
+    key on, and that is the point: a caller here has not claimed an identity yet.
+    """
+
+    client_host = request.client.host if request.client else "unknown"
+    limiter = request.app.state.device_login_limiter
+    limiter_key = f"pair:{client_host}"
+    retry_after = limiter.retry_after(limiter_key)
+    if retry_after:
+        raise DeviceApiRequestError(
+            "too_many_attempts",
+            429,
+            headers={"Retry-After": str(retry_after)},
+        )
+    try:
+        session = request.app.state.pairing_service.redeem(
+            str(body.get("pairing_token") or ""),
+            str(body.get("device_name") or ""),
+        )
+    except PairingRejected as error:
+        limiter.record_failure(limiter_key)
+        # One answer for every reason: expired, already used, never existed, or
+        # minted for an account that has since been archived. Telling them apart
+        # would say whether a ticket ever existed, and for whom.
+        raise DeviceApiRequestError("pairing_rejected", 401) from error
     except ValueError as error:
         raise DeviceApiRequestError("invalid_request", 400) from error
     except IdentityRepositoryError as error:

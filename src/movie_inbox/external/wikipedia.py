@@ -26,7 +26,12 @@ from movie_inbox.external.common import (
     object_list,
     result_index,
 )
-from movie_inbox.external.query_variants import VARIANT_RETRY_TIMEOUT_SECONDS, alias_variants
+from movie_inbox.external.query_variants import (
+    VARIANT_RETRY_TIMEOUT_SECONDS,
+    alias_variants,
+    needs_alias_retry,
+    with_alias_identity,
+)
 from movie_inbox.external.wikidata import (
     fetch_wikidata_article_url,
     fetch_wikidata_metadata,
@@ -37,6 +42,9 @@ from movie_inbox.external.wikidata import (
 class WikipediaAdapter:
     name = "wikipedia"
     label = "Wikipedia"
+    # Where a 429 counts against this source, even when the adapter carries on
+    # past it ([B2.4b]): its own two editions, and the Wikidata alias lookup.
+    rate_limit_hosts = ("wikipedia.org", "wikidata.org")
 
     def search(self, query: str) -> list[dict[str, Any]]:
         intent = parse_search_query(query)
@@ -75,7 +83,7 @@ class WikipediaAdapter:
         if not completed and errors:
             raise errors[0]
         results = dedupe_results(interleave_batches([batches[language] for language in languages]))
-        if results or intent.source:
+        if intent.source or not needs_alias_retry(intent, results):
             return results
         # [Q3] tareas.md: en/es cover a lot, but not every work's Wikipedia
         # article uses one of those two titles. A Wikidata-confirmed alias
@@ -84,11 +92,17 @@ class WikipediaAdapter:
         # direct check, not a second fuzzy pass.
         for variant in alias_variants(self.name, search_title):
             try:
-                direct = self._resolve_title(variant, "en", timeout=VARIANT_RETRY_TIMEOUT_SECONDS)
+                direct = self._resolve_title(
+                    variant.title, "en", timeout=VARIANT_RETRY_TIMEOUT_SECONDS
+                )
             except Exception:
                 continue
-            if direct:
-                return dedupe_results(direct)
+            # Same reason as FilmAffinity's retry: an article found under
+            # an alias has to arrive carrying the alias, or it is scored
+            # against a query it no longer resembles.
+            annotated = dedupe_results(with_alias_identity(direct, variant))
+            if annotated and not needs_alias_retry(intent, annotated):
+                return annotated
         return results
 
     def _search_language(self, query: str, language: str) -> list[dict[str, Any]]:
@@ -97,7 +111,11 @@ class WikipediaAdapter:
             f"https://{language}.wikipedia.org/w/api.php"
             f"?action=query&generator=search&gsrsearch={quote(query + ' ' + film_word)}"
             "&gsrlimit=8&gsrnamespace=0&gsrenablerewrites=1"
-            "&prop=extracts%7Cpageimages%7Cpageprops&exintro=1&explaintext=1&pithumbsize=480"
+            # inprop=url so the search answers with the article's own address.
+            # Without it the URL had to be built from the title, and a built one
+            # spells "(1986 film)" differently than Wikipedia does.
+            "&prop=extracts%7Cpageimages%7Cpageprops%7Cinfo&inprop=url"
+            "&exintro=1&explaintext=1&pithumbsize=480"
             "&format=json&formatversion=2"
         )
         search_error: Exception | None = None
@@ -132,7 +150,58 @@ class WikipediaAdapter:
             "&pithumbsize=480&inprop=url&format=json&formatversion=2"
             f"&titles={quote(query)}"
         )
-        return wikipedia_results_from_query(fetch_json(url, timeout=timeout), language)
+        raw = fetch_json(url, timeout=timeout)
+        return _with_redirect_titles(wikipedia_results_from_query(raw, language), raw)
+
+
+def _with_redirect_titles(
+    results: list[dict[str, Any]], raw: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Keep the title a person asked for when Wikipedia redirected it to an article.
+
+    [B2.3]: "Sen to Chihiro no kamikakushi" resolves, on English Wikipedia, to
+    "Spirited Away" -- Wikipedia itself saying the first is a name of the second.
+    That fact came back in the response's `redirects` and was dropped, so the row
+    was scored against a query it shares no words with (16.6, under the 28.0
+    floor) and thrown away. The registry then answered with nothing, though the
+    source had found the work.
+
+    The asked title goes to `alternative_titles`, where the scorer already reads
+    aliases -- the same place a Wikidata-confirmed alias is put ([Q3]). Only the
+    exact-title lookup passes through here, so a work reached by the search
+    endpoint is scored exactly as before.
+    """
+
+    redirects = {
+        str(row.get("from") or ""): str(row.get("to") or "")
+        for row in object_list(object_dict(raw.get("query")).get("redirects"))
+        if isinstance(row, dict)
+    }
+    if not redirects:
+        return results
+    annotated: list[dict[str, Any]] = []
+    for row in results:
+        title = str(row.get("title") or "")
+        aliases = [asked for asked in redirects if _redirect_target(asked, redirects) == title]
+        titles = list(row.get("alternative_titles") or [])
+        for asked in aliases:
+            if asked and search_key(asked) != search_key(title) and asked not in titles:
+                titles.append(asked)
+        annotated.append({**row, "alternative_titles": titles} if titles else row)
+    return annotated
+
+
+def _redirect_target(title: str, redirects: dict[str, str]) -> str:
+    """Where a title ends up after following a redirect chain (bounded)."""
+
+    seen = {title}
+    current = title
+    while current in redirects:
+        current = redirects[current]
+        if current in seen:
+            break
+        seen.add(current)
+    return current if current != title else ""
 
 
 def wikipedia_results_from_query(

@@ -1,0 +1,52 @@
+/* U4.2a composite kit v1. The three source PNGs are RGB, NOT alpha exports.
+   Keep this file beside the measured sources. Do not use the bezel/plaque raw.
+   Source geometry is fixed; layout/content stays ordinary, unmasked HTML. */
+.u4-plane {
+  background: #091a22 url('surface-petroleum-v2.png') repeat 0 0 / var(--u4-texture-size, 768px) var(--u4-texture-size, 768px);
+}
+.u4-aperture {
+  position: relative;
+  isolation: isolate;
+  padding: 24px;
+}
+.u4-aperture::before {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border: 40px solid transparent;
+  border-image: url('aperture-bezel-v1.png') 125 / 40px / 0 stretch;
+  clip-path: inset(28px round 3px);
+  pointer-events: none;
+  z-index: -1;
+}
+.u4-aperture::after {
+  content: '';
+  position: absolute;
+  inset: 24px;
+  background: var(--u4-well, #020d13);
+  box-shadow: inset 0 10px 22px #000c;
+  pointer-events: none;
+  z-index: -1;
+}
+.u4-plate {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  width: 360px;
+  max-width: 100%;
+  aspect-ratio: 6.12;
+  padding: 7px 26px;
+  color: #f0d6a1;
+  text-align: center;
+}
+.u4-plate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('category-plaque-blank-v1.png') center / 103.6% 214% no-repeat;
+  clip-path: inset(0 round 3px);
+  pointer-events: none;
+  z-index: -1;
+}

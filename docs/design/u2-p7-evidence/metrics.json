@@ -1,0 +1,47 @@
+[
+  {
+    "viewport": 1280,
+    "parentId": "homeFurniture",
+    "parentSection": "",
+    "displayHeight": 134.390625,
+    "factsFontSize": 11,
+    "factsWhiteSpace": "nowrap",
+    "pageOverflow": 0
+  },
+  {
+    "viewport": 1440,
+    "parentId": "homeFurniture",
+    "parentSection": "",
+    "displayHeight": 134.390625,
+    "factsFontSize": 11,
+    "factsWhiteSpace": "nowrap",
+    "pageOverflow": 0
+  },
+  {
+    "viewport": 1920,
+    "parentId": "homeFurniture",
+    "parentSection": "",
+    "displayHeight": 134.390625,
+    "factsFontSize": 11,
+    "factsWhiteSpace": "nowrap",
+    "pageOverflow": 0
+  },
+  {
+    "viewport": 390,
+    "parentId": "",
+    "parentSection": "p6-bay-0",
+    "displayHeight": 567.203125,
+    "factsFontSize": 12,
+    "factsWhiteSpace": "normal",
+    "pageOverflow": 0
+  },
+  {
+    "viewport": 320,
+    "parentId": "",
+    "parentSection": "p6-bay-0",
+    "displayHeight": 530.328125,
+    "factsFontSize": 12,
+    "factsWhiteSpace": "normal",
+    "pageOverflow": 0
+  }
+]

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "description": "Test vectors for a client port of title normalization ([X1.2], docs/analisis/lo-que-viene-del-servidor-2026-09-13.md of the movieIndexAndroid repository). A device offers to merge an offline addition with an existing catalog work by comparing normalized titles; it has to fold and compare them exactly like the server, or a duplicate it should have flagged slips through, or a distinct work gets folded into one it is not. tests/test_title_normalization_vectors.py recomputes every value here from the server's own functions, so a server change that would change what a phone flags as a possible duplicate fails this suite.",
+  "generator": {
+    "normalize_search_text": "html.unescape, then Unicode NFKC, then casefold. Per character: NFD-decompose and keep only the base letter when its Unicode name contains LATIN (folding accents on Latin script only -- other scripts, e.g. Japanese, keep their original character unchanged and uncased). Any character that is not alphanumeric becomes a space; runs of whitespace collapse to one, and the result is trimmed.",
+    "title_match_key": "Strip every ( ... ) parenthetical group first, then run normalize_search_text, then drop any token, other than the first, that is exactly four digits shaped 19xx or 20xx -- a leading year can be the title itself ('1917'), a trailing one is usually filename noise ('Heat 1995' -> 'heat').",
+    "title_similarity": "Split both normalized keys on whitespace into term sets. Subtract the shared FUNCTION_WORDS set (English/Spanish/French/Italian/German/Portuguese articles and determiners, listed in full in movie_inbox.domain.catalog.FUNCTION_WORDS) from each side. If either side has no content words left after that (e.g. a title that is only an article, like Bunuel's 'El'), compare the original, unfiltered term sets instead. Otherwise the score is the size of the intersection of content words divided by the size of the larger content-word set."
+  },
+  "normalize_search_text": [
+    {"input": "", "output": ""},
+    {
+      "input": "The Fly (1986 film)",
+      "output": "the fly 1986 film",
+      "note": "normalize_search_text does not strip parentheses on its own -- that is title_match_key's job."
+    },
+    {
+      "input": "Adiós tío Tom",
+      "output": "adios tio tom",
+      "note": "Latin diacritics fold away."
+    },
+    {
+      "input": "千と千尋の神隠し",
+      "output": "千と千尋の神隠し",
+      "note": "Non-Latin scripts pass through unchanged rather than collapsing to an empty key."
+    },
+    {
+      "input": "Q&amp;A",
+      "output": "q a",
+      "note": "html.unescape runs first (&amp; -> &), then & is not alphanumeric and becomes a space."
+    },
+    {
+      "input": "ﬁlm",
+      "output": "film",
+      "note": "NFKC expands the 'fi' ligature (U+FB01) before folding, so it matches a plain 'film'."
+    },
+    {"input": "M", "output": "m"}
+  ],
+  "title_match_key": [
+    {"input": "1917", "output": "1917", "note": "A leading year-shaped token can be the title itself."},
+    {"input": "1984", "output": "1984"},
+    {"input": "2001: A Space Odyssey", "output": "2001 a space odyssey"},
+    {
+      "input": "1917 2019",
+      "output": "1917",
+      "note": "The first token survives even though it is year-shaped; the second, a trailing release year, is dropped."
+    },
+    {
+      "input": "Heat 1995",
+      "output": "heat",
+      "note": "A non-first year-shaped token is treated as filename noise, not part of the title."
+    },
+    {
+      "input": "The Fly (1986 film)",
+      "output": "the fly",
+      "note": "The parenthetical is stripped before normalization, so its digits never reach the year check."
+    },
+    {"input": "M", "output": "m"}
+  ],
+  "title_similarity": [
+    {
+      "left": "the fly",
+      "right": "the gift",
+      "output": 0.0,
+      "note": "Sharing only the article 'the' is not a match."
+    },
+    {
+      "left": "the fly",
+      "right": "the flies",
+      "output": 0.0,
+      "note": "Distinct content tokens ('fly' vs 'flies') score zero even though the strings look alike."
+    },
+    {
+      "left": "el",
+      "right": "el",
+      "output": 1.0,
+      "note": "A title that is only an article (Bunuel's 'El') falls back to comparing the unfiltered term sets."
+    },
+    {"left": "heat", "right": "heat", "output": 1.0},
+    {
+      "left": "los siete samurais",
+      "right": "los olvidados",
+      "output": 0.0,
+      "note": "Sharing only the article 'los' is not a match."
+    }
+  ]
+}

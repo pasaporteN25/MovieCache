@@ -15,6 +15,7 @@ from movie_inbox.application.curation_workflow import CatalogPointer, CurationCo
 from movie_inbox.application.identity_repository import IdentityRepositoryError
 from movie_inbox.application.library_repository import LibraryRepositoryError
 from movie_inbox.application.repository import CatalogRepositoryError
+from movie_inbox.domain.removals import RemovedWork
 from movie_inbox.infrastructure.export import catalog_csv_text
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION, catalog_document
@@ -32,7 +33,7 @@ from movie_inbox.web.catalog_api import (
     update_item_catalog_status,
     update_item_kind,
     update_item_metadata,
-    update_item_personal,
+    update_item_personal_fields,
     update_item_status,
     write_path_for,
 )
@@ -49,6 +50,7 @@ from movie_inbox.web.dependencies import (
     session_catalog_rows,
 )
 from movie_inbox.web.image_proxy import cached_image
+from movie_inbox.web.removals import record_removed_works
 from movie_inbox.web.responses import (
     application_error_response,
     error_response,
@@ -273,7 +275,7 @@ def add(
 def delete(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
     try:
         catalog = session_catalog(request)
-        deleted, reason = delete_item_anywhere(
+        deleted, reason, removed = delete_item_anywhere(
             catalog.config,
             source_file=catalog.source_path(str(body.get("source_file") or "")),
             item_id=str(body.get("id") or ""),
@@ -283,6 +285,15 @@ def delete(request: Request, body: dict[str, Any] = Depends(authorized_json)) ->
             local_name=str(body.get("local_name") or ""),
             confirmed=bool(body.get("confirmed")),
         )
+        if removed is not None:
+            # [X5.3]: a paired phone that still holds this work is told a
+            # person deleted it, rather than finding a 404 it cannot explain.
+            record_removed_works(
+                request,
+                require_ready_identity(request),
+                catalog,
+                [RemovedWork(str(removed[0]), removed[1])],
+            )
         return operation_response(deleted, reason)
     except (ValueError, CatalogRepositoryError) as error:
         return application_error_response(error)
@@ -342,18 +353,27 @@ def catalog(request: Request, body: dict[str, Any] = Depends(authorized_json)) -
 
 @router.post("/api/personal")
 def personal(request: Request, body: dict[str, Any] = Depends(authorized_json)) -> JSONResponse:
+    # [X8]: only the fields present in the body are written. A form used to send
+    # all three with whatever they held when it opened, and a missing one meant
+    # "empty", so saving the review put back a rating another device had changed.
+    # A body that sends all three still behaves as it always did.
+    #
+    # `base` is the values the form read when it opened; if any no longer matches
+    # what is stored, nothing is written and the answer is a 409.
+    values = {field: body[field] for field in ("watched_at", "rating", "review") if field in body}
     try:
         catalog = session_catalog(request)
-        updated, reason = update_item_personal(
+        updated, reason = update_item_personal_fields(
             write_path_for(
                 catalog.config,
                 catalog.source_path(str(body.get("source_file") or "")),
             ),
-            item_id=str(body.get("id") or ""),
-            watched_at=str(body.get("watched_at") or ""),
-            rating=body.get("rating"),
-            review=str(body.get("review") or ""),
+            str(body.get("id") or ""),
+            values,
+            body.get("base"),
         )
+        if reason == "conflict":
+            return error_response("personal_conflict", 409)
         return operation_response(updated, reason)
     except (ValueError, CatalogRepositoryError) as error:
         return application_error_response(error)

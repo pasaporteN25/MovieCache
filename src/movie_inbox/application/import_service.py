@@ -7,7 +7,7 @@ import re
 import time
 import unicodedata
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
@@ -15,15 +15,39 @@ from typing import Any
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
 from movie_inbox.application.import_repository import ImportDraftRepository
-from movie_inbox.domain.catalog import catalog_membership, normalize_item
+from movie_inbox.domain.catalog import CatalogComparisonIndex, catalog_membership, normalize_item
 from movie_inbox.domain.collections import (
     CollectionItem,
     CuratedCollection,
     normalize_collection_item,
 )
-from movie_inbox.domain.imports import ImportDraft, ImportDraftItem, ParsedImport
+from movie_inbox.domain.imports import (
+    DEVICE_ORIGIN,
+    NEVER_EXPIRES,
+    DeviceReceipt,
+    ImportDraft,
+    ImportDraftItem,
+    ParsedImport,
+    ParsedImportItem,
+)
+from movie_inbox.domain.titles import clean_whitespace
 
 IMPORT_DRAFT_TTL_SECONDS = 48 * 60 * 60
+
+# Everything a phone adds while offline lands in one draft per account rather
+# than one draft per work. Two reasons: it matches how it reads -- "things I
+# added from my phone" is one pending pile, not twenty -- and one work per draft
+# would hit MAX_IMPORT_DRAFTS_PER_USER after twenty bus rides.
+DEVICE_DRAFT_NAME = "Agregado desde el telefono"
+MAX_DEVICE_ITEMS_PER_REQUEST = 100
+# One draft cannot grow without limit either, or a phone that loops on a failing
+# sync would fill the instance. Well above any realistic offline backlog.
+MAX_DEVICE_DRAFT_ITEMS = 2_000
+# [X6]: how long a resolved receipt is remembered. A pending one is never
+# forgotten -- its work is still waiting in a draft. After this, a retry of the
+# same client id would be taken for a new work; a phone that was offline for a
+# year has bigger problems than that.
+DEVICE_RECEIPT_RETENTION_SECONDS = 365 * 24 * 60 * 60
 IMPORT_APPLY_STALE_SECONDS = 5 * 60
 MAX_IMPORT_SELECTION = 10_000
 MAX_IMPORT_DRAFTS_PER_USER = 20
@@ -53,6 +77,10 @@ class ImportPermissionError(ValueError):
 
 class ImportDraftLimit(ValueError):
     """Raised when a user must remove a draft before creating another."""
+
+
+class DeviceDraftFull(ValueError):
+    """Raised when the device draft cannot hold more pending works."""
 
 
 class ImportService:
@@ -107,6 +135,229 @@ class ImportService:
         self.repository.create(draft)
         return self._payload(draft, include_items=True, now=now)
 
+    def append_device_items(
+        self,
+        user_id: str,
+        entries: Sequence[Mapping[str, Any]],
+        catalog_items: list[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Add works a phone recorded with no connection to that account's pending pile.
+
+        This is the server half of [A2.3], and the distinction it rests on is
+        the one the Android client's brief v3 makes explicit: editing a work
+        that exists on both sides has a shared base and merges, while **adding**
+        one has no base at all. That is not a merge, it is an import -- so it
+        goes down the path imports already take, and lands in review rather than
+        in the catalogue.
+
+        The phone never decides identity. Each entry is classified against the
+        catalogue by the same rules a file import uses: an obvious match reads
+        `present`, an uncertain one `review`, and only a clear miss reads `new`.
+        Nothing is written to the catalogue here.
+
+        Idempotent by the client's own id. A sync that succeeds on the server and
+        fails on the way back will be retried, and a retry must not duplicate
+        the film -- so an entry whose id is already in the draft is reported
+        back, not added again.
+
+        Enrichment is deliberately **not** done here. It is a network call, and
+        making a phone wait on it -- or fail because a third party is down --
+        would defeat the point of an offline addition. The draft carries what
+        the person typed; the existing enrichment path fills the rest in when
+        someone reviews it.
+        """
+
+        if len(entries) > MAX_DEVICE_ITEMS_PER_REQUEST:
+            raise ValueError(
+                f"At most {MAX_DEVICE_ITEMS_PER_REQUEST} works can be sent in one request"
+            )
+        now = self._now()
+        self.repository.purge_expired(now)
+        self.repository.purge_receipts(now - DEVICE_RECEIPT_RETENTION_SECONDS)
+        draft = self._device_draft(user_id)
+        known = {entry.id for entry in draft.items} if draft is not None else set()
+        position = max((entry.position for entry in draft.items), default=-1) if draft else -1
+
+        client_ids = [str(raw.get("id") or "").strip()[:64] for raw in entries]
+        if not all(client_ids):
+            raise ValueError("Every work needs a client id, so a retry cannot duplicate it")
+        # [X6]: a work the server already has an answer for is a duplicate whether or
+        # not its draft still exists. It used to be judged only against the draft
+        # still `ready`, so a retry after the draft was applied or deleted in the
+        # browser added the same works again.
+        answered = self.repository.receipts_for(user_id, client_ids)
+
+        parsed_items: list[ParsedImportItem] = []
+        duplicates: list[str] = []
+        for raw, entry_id in zip(entries, client_ids, strict=True):
+            if (
+                entry_id in known
+                or entry_id in answered
+                or entry_id in {row.id for row in parsed_items}
+            ):
+                duplicates.append(entry_id)
+                continue
+            position += 1
+            parsed_items.append(self._device_entry(entry_id, position, raw))
+
+        if draft is not None and len(draft.items) + len(parsed_items) > MAX_DEVICE_DRAFT_ITEMS:
+            raise DeviceDraftFull(
+                f"The device draft already holds {len(draft.items)} works; "
+                "review it before adding more"
+            )
+
+        added: tuple[ImportDraftItem, ...] = ()
+        if parsed_items:
+            parsed = ParsedImport(DEVICE_DRAFT_NAME, "json", tuple(parsed_items))
+            # Classified against the catalogue plus what the draft already holds,
+            # so a work added twice on two different days is caught as well.
+            seen = list(catalog_items) + [
+                entry.item for entry in (draft.items if draft else ()) if entry.item
+            ]
+            added = self._classify(parsed, seen)
+            draft = self._store_device_items(user_id, draft, added, now)
+
+        if draft is not None:
+            self.repository.save_receipts(
+                user_id, self._new_receipts(draft.id, added, duplicates, known, answered), now
+            )
+
+        return {
+            "draft_id": draft.id if draft is not None else "",
+            "accepted": [
+                {"id": entry.id, "state": entry.state, "reason": entry.reason} for entry in added
+            ],
+            "duplicates": duplicates,
+            "counts": draft.counts() if draft is not None else {},
+        }
+
+    def device_receipts(self, user_id: str, client_ids: Sequence[str]) -> dict[str, DeviceReceipt]:
+        """What the server can say about each work a phone asks after.
+
+        An id missing from the answer is one the server has no record of: never
+        received, or forgotten after the retention. The caller reports it as
+        unknown, and the phone sends it again.
+
+        A work that is in the pending pile with no receipt yet -- stored before
+        receipts existed, or before its receipt was written -- is `pending` all
+        the same, so nothing needs backfilling for that to be true.
+        """
+
+        if len(client_ids) > MAX_DEVICE_ITEMS_PER_REQUEST:
+            raise ValueError(f"At most {MAX_DEVICE_ITEMS_PER_REQUEST} ids can be asked at once")
+        wanted = [str(value or "").strip()[:64] for value in client_ids]
+        if not wanted or not all(wanted):
+            raise ValueError("Every id asked for must be a client id")
+        found = self.repository.receipts_for(user_id, wanted)
+        missing = [client_id for client_id in dict.fromkeys(wanted) if client_id not in found]
+        draft = self._device_draft(user_id) if missing else None
+        if draft is not None:
+            waiting = {entry.id: entry for entry in draft.items}
+            for client_id in missing:
+                entry = waiting.get(client_id)
+                if entry is None:
+                    continue
+                invalid = entry.state == "invalid"
+                found[client_id] = DeviceReceipt(
+                    client_id,
+                    "discarded" if invalid else "pending",
+                    "invalid" if invalid else "",
+                    draft_id=draft.id,
+                )
+        return found
+
+    @staticmethod
+    def _new_receipts(
+        draft_id: str,
+        added: Sequence[ImportDraftItem],
+        duplicates: Sequence[str],
+        known: set[str],
+        answered: Mapping[str, DeviceReceipt],
+    ) -> list[DeviceReceipt]:
+        """The receipts a request leaves behind, written after its works are stored.
+
+        Written after, not before: a receipt without its work would tell a retry
+        the work was safe when it was not. The reverse is harmless -- a work
+        without a receipt is still in the draft, so a retry finds it there and
+        the duplicate branch backfills the receipt it is missing.
+        """
+
+        receipts = {
+            entry.id: DeviceReceipt(
+                entry.id,
+                "discarded" if entry.state == "invalid" else "pending",
+                "invalid" if entry.state == "invalid" else "",
+                draft_id=draft_id,
+            )
+            for entry in added
+        }
+        for entry_id in duplicates:
+            if entry_id in known and entry_id not in answered and entry_id not in receipts:
+                receipts[entry_id] = DeviceReceipt(entry_id, "pending", draft_id=draft_id)
+        return list(receipts.values())
+
+    def _device_draft(self, user_id: str) -> ImportDraft | None:
+        for summary in self.repository.list_for_user(user_id):
+            if summary.origin == DEVICE_ORIGIN and summary.status == "ready":
+                return self.repository.get_for_user(user_id, summary.id)
+        return None
+
+    def _device_entry(
+        self,
+        entry_id: str,
+        position: int,
+        raw: Mapping[str, Any],
+    ) -> ParsedImportItem:
+        title = clean_whitespace(str(raw.get("title") or ""))[:400]
+        if not title:
+            return ParsedImportItem(entry_id, position, "(sin titulo)", None, "missing_title")
+        year = str(raw.get("year") or "").strip()[:8]
+        label = f"{title} ({year})" if year else title
+        item = normalize_item(
+            {
+                "title": title,
+                "year": year,
+                "kind": str(raw.get("kind") or "pelicula"),
+                "notes": clean_whitespace(str(raw.get("notes") or ""))[:2000],
+            }
+        ).to_dict()
+        return ParsedImportItem(entry_id, position, label, item)
+
+    def _store_device_items(
+        self,
+        user_id: str,
+        draft: ImportDraft | None,
+        added: tuple[ImportDraftItem, ...],
+        now: int,
+    ) -> ImportDraft:
+        if draft is None:
+            if self.repository.count_for_user(user_id) >= self.max_drafts:
+                raise ImportDraftLimit(
+                    f"Import draft limit reached ({self.max_drafts}); "
+                    "delete a draft before adding from a phone"
+                )
+            created = ImportDraft(
+                id=self.id_factory(),
+                user_id=user_id,
+                source_name=DEVICE_DRAFT_NAME,
+                source_format="json",
+                source_hash=hashlib.sha256(f"device:{user_id}".encode()).hexdigest(),
+                status="ready",
+                created_at=now,
+                updated_at=now,
+                expires_at=NEVER_EXPIRES,
+                origin=DEVICE_ORIGIN,
+                items=added,
+            )
+            self.repository.create(created)
+            return created
+        if not self.repository.append_items(user_id, draft.id, added, now):
+            # Someone is applying the draft in the browser right now, or it was
+            # just deleted. Saying so beats writing into a draft about to
+            # disappear: the phone keeps the works and offers them again.
+            raise ImportDraftBusy("The device draft is being applied; try again")
+        return replace(draft, updated_at=now, items=draft.items + added)
+
     def list_drafts(self, user_id: str) -> list[dict[str, Any]]:
         now = self._now()
         self.repository.purge_expired(now)
@@ -134,7 +385,12 @@ class ImportService:
             raise ImportDraftNotFound("Import draft was not found")
         if draft.status == "applying":
             raise ImportDraftBusy("Import draft is being applied")
-        return self.repository.delete(user_id, draft_id)
+        deleted = self.repository.delete(user_id, draft_id)
+        if deleted and draft.origin == DEVICE_ORIGIN:
+            # [X6]: what was still waiting in it is gone, and the phone has to be
+            # able to find that out.
+            self.repository.discard_pending_receipts(user_id, draft_id, "deleted", self._now())
+        return deleted
 
     def apply_draft(
         self,
@@ -212,6 +468,10 @@ class ImportService:
                 claimed.expires_at,
                 result,
             )
+            if claimed.origin == DEVICE_ORIGIN:
+                self._resolve_device_receipts(
+                    user_id, refreshed, result, {entry.id for entry in selected}, now
+                )
             return result
         except Exception:
             try:
@@ -219,6 +479,56 @@ class ImportService:
             except Exception:
                 pass
             raise
+
+    def _resolve_device_receipts(
+        self,
+        user_id: str,
+        draft: ImportDraft,
+        result: Mapping[str, Any],
+        selected_ids: set[str],
+        now: int,
+    ) -> None:
+        """Tell every phone work in an applied draft what became of it.
+
+        Runs after the draft is completed, never before: a receipt that says
+        `applied` for a work that was not is worse than one that says nothing.
+
+        A draft is applied once, as a whole, and is not reopened, so whatever
+        was not written is over: a work nobody selected, or one that stayed in
+        review, is `discarded` rather than left `pending` forever. `applied`
+        covers both a work that was added and one that turned out to be in the
+        catalog already -- either way the phone has a work to link to.
+        """
+
+        rows = {str(row.get("draft_item_id") or ""): row for row in result.get("results") or []}
+        receipts: list[DeviceReceipt] = []
+        for entry in draft.items:
+            if entry.state == "invalid":
+                continue  # discarded when it arrived
+            if result.get("destination") == "collection":
+                # It went into a private collection, which is not the catalogue a
+                # phone downloads, so there is no work for it to link to.
+                reason = "collection" if entry.id in selected_ids else "not_applied"
+                receipts.append(DeviceReceipt(entry.id, "discarded", reason, "", draft.id))
+                continue
+            row = rows.get(entry.id)
+            outcome = str(row.get("outcome") or "") if row else ""
+            if outcome == "added":
+                item_id = str((row or {}).get("item_id") or "")
+                receipts.append(DeviceReceipt(entry.id, "applied", "added", item_id, draft.id))
+            elif outcome == "present":
+                # The catalogue's own id for the work that was already there; the
+                # result row only carries the draft item's id.
+                existing = next(
+                    (str(candidate.get("id") or "") for candidate in entry.candidates), ""
+                )
+                item_id = existing or str((row or {}).get("item_id") or "")
+                receipts.append(
+                    DeviceReceipt(entry.id, "applied", "already_in_catalog", item_id, draft.id)
+                )
+            else:
+                receipts.append(DeviceReceipt(entry.id, "discarded", "not_applied", "", draft.id))
+        self.repository.save_receipts(user_id, receipts, now)
 
     def _apply_to_catalog(
         self,
@@ -324,7 +634,11 @@ class ImportService:
         parsed: ParsedImport,
         catalog_items: list[Mapping[str, Any]],
     ) -> tuple[ImportDraftItem, ...]:
-        source_items: list[Mapping[str, Any]] = []
+        # Both comparisons below run once per parsed row against the same two
+        # lists, so both lists are prepared once. The source one grows as rows
+        # are accepted, which is what add() is for.
+        source_items = CatalogComparisonIndex()
+        prepared_catalog = CatalogComparisonIndex(catalog_items)
         classified: list[ImportDraftItem] = []
         for parsed_entry in parsed.items:
             if parsed_entry.item is None:
@@ -356,8 +670,8 @@ class ImportService:
                     )
                 )
                 continue
-            source_items.append(parsed_entry.item)
-            membership = catalog_membership(parsed_entry.item, catalog_items)
+            source_items.add(parsed_entry.item)
+            membership = catalog_membership(parsed_entry.item, prepared_catalog)
             state = "new" if membership["state"] == "missing" else membership["state"]
             classified.append(
                 ImportDraftItem(
@@ -379,11 +693,12 @@ class ImportService:
         catalog_items: list[Mapping[str, Any]],
     ) -> ImportDraft:
         refreshed: list[ImportDraftItem] = []
+        prepared = CatalogComparisonIndex(catalog_items)
         for entry in draft.items:
             if entry.state == "invalid" or not entry.collection_eligible:
                 refreshed.append(entry)
                 continue
-            membership = catalog_membership(entry.item or {}, catalog_items)
+            membership = catalog_membership(entry.item or {}, prepared)
             state = "new" if membership["state"] == "missing" else membership["state"]
             refreshed.append(
                 replace(
@@ -476,10 +791,13 @@ class ImportService:
                 "fingerprint": draft.source_hash[:12],
             },
             "status": draft.status,
+            "origin": draft.origin,
             "created_at": _iso_time(draft.created_at),
             "updated_at": _iso_time(draft.updated_at),
-            "expires_at": _iso_time(draft.expires_at),
-            "remaining_seconds": max(0, draft.expires_at - now),
+            # A device draft has no expiry to report, and inventing one would
+            # put a countdown on a surface that must not show one.
+            "expires_at": "" if draft.never_expires else _iso_time(draft.expires_at),
+            "remaining_seconds": None if draft.never_expires else max(0, draft.expires_at - now),
             "counts": draft.counts(),
             "result": draft.result,
         }

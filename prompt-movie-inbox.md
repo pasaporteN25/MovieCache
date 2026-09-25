@@ -1233,7 +1233,7 @@ oportunista en LAN/VPN cuando el server esté alcanzable, no solo lectura remota
 mientras el server esté arriba. Eso justifica un repo aparte (`movie-inbox-android` o
 como se termine llamando), con su propio toolchain Kotlin/Gradle, para no mezclarlo
 con este repo Python. El plan inicial de esa idea quedó capturado en
-`movie-inbox-android-plan.md` (raíz de este repo) para retomar en otra sesión o con
+`movie-inbox-android-plan.md` (desde el 2026-09-13, en el repo `movieIndexAndroid`) para retomar en otra sesión o con
 otro agente — es una foto de dónde quedó la conversación, no un plan ejecutable
 todavía. Lo que sí sigue siendo trabajo de *este* repo: la Fase 5 (v0.4.0) de abajo, y
 eventualmente una capa `/api/v1/` con auth por usuario/dispositivo cuando se retome

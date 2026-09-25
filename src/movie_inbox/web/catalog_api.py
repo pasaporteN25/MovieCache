@@ -260,7 +260,14 @@ def delete_item_anywhere(
     year: str,
     local_name: str,
     confirmed: bool,
-) -> tuple[bool, str]:
+) -> tuple[bool, str, tuple[Path, str] | None]:
+    """Delete an item from whichever source holds it.
+
+    The third value is the file it was in and the id it had, when something was
+    deleted -- [X5.3]: the request may name it by url or title, and the record
+    a paired phone is told from needs the id.
+    """
+
     paths = [write_path_for(config, source_file)]
     for file in resolved_files(config.patterns):
         path = Path(file)
@@ -268,23 +275,13 @@ def delete_item_anywhere(
             paths.append(path)
     last_reason = "not_found"
     for path in paths:
-        deleted, reason = delete_item(path, item_id, item_url, title, year, local_name, confirmed)
+        deleted, reason, removed_id = catalog_service(path).remove_item(
+            item_id, item_url, title, year, local_name, confirmed
+        )
         if deleted:
-            return True, reason
+            return True, reason, (path, removed_id)
         last_reason = reason
-    return False, last_reason
-
-
-def delete_item(
-    path: Path,
-    item_id: str,
-    item_url: str,
-    title: str,
-    year: str,
-    local_name: str,
-    confirmed: bool,
-) -> tuple[bool, str]:
-    return catalog_service(path).delete_item(item_id, item_url, title, year, local_name, confirmed)
+    return False, last_reason, None
 
 
 def update_item_status(
@@ -301,10 +298,13 @@ def update_item_catalog_status(path: Path, item_id: str, en_catalogo: Any) -> tu
     return catalog_service(path).update_catalog_status(item_id, en_catalogo)
 
 
-def update_item_personal(
-    path: Path, item_id: str, watched_at: str, rating: Any, review: str
+def update_item_personal_fields(
+    path: Path,
+    item_id: str,
+    values: dict[str, Any],
+    base: Any = None,
 ) -> tuple[bool, str]:
-    return catalog_service(path).update_personal(item_id, watched_at, rating, review)
+    return catalog_service(path).update_personal_fields(item_id, values, base)
 
 
 def patch_item_personal(
@@ -313,6 +313,14 @@ def patch_item_personal(
     values: dict[str, Any],
 ) -> tuple[bool, str]:
     return catalog_service(path).patch_personal(item_id, values)
+
+
+def remove_item_unless_edited(
+    path: Path,
+    item_id: str,
+    base: dict[str, Any] | None,
+) -> tuple[bool, str]:
+    return catalog_service(path).remove_item_unless_edited(item_id, base)
 
 
 def update_link_curation(path: Path, item_id: str, status: str) -> tuple[bool, str]:

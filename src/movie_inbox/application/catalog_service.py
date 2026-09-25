@@ -28,6 +28,7 @@ from movie_inbox.domain.catalog import (
 from movie_inbox.domain.curation import (
     apply_duplicate_curation_decision,
     apply_link_curation_decision,
+    curation_timestamp,
 )
 from movie_inbox.domain.matching import decide_match
 from movie_inbox.domain.metadata import (
@@ -71,6 +72,68 @@ LIST_METADATA_FIELDS = {
     "writers",
     "cast",
 }
+
+
+class PersonalPreconditionFailed(Exception):
+    """[X2]: a `patch_personal` base value no longer matches the stored item.
+
+    Raised from inside the mutation callback, so the repository's own
+    transaction never commits the change -- there is nothing to roll back.
+    """
+
+    def __init__(self, fields: Sequence[str]) -> None:
+        super().__init__(f"Personal state changed since base was read: {', '.join(fields)}")
+        self.fields = tuple(fields)
+
+
+def _wire_personal_value(field: str, value: Any) -> Any:
+    """Shape a stored personal field the way the API already reports it.
+
+    `PersonalState`/`PersonalPatch` never send an unset field as `""` or `0`;
+    they send `null` (status excepted, which defaults to `to_watch`). A `base`
+    value from the client is always one the client itself read off the wire,
+    so the comparison has to use the same shape or every precondition would
+    fail on a field nobody actually changed.
+    """
+
+    if field == "status":
+        return str(value or "") or "to_watch"
+    if field == "rating":
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if 1 <= parsed <= 10 else None
+    text = str(value or "").strip()
+    return text or None
+
+
+PERSONAL_BASE_FIELDS = frozenset({"status", "watched_at", "rating", "review"})
+
+
+def _validated_personal_base(raw: Any) -> dict[str, Any]:
+    """[X2]/[X8]: the field values a caller last read, or nothing to check."""
+
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping) or set(raw) - PERSONAL_BASE_FIELDS:
+        raise ValueError("Invalid base")
+    return dict(raw)
+
+
+def _stale_personal_fields(item: Mapping[str, Any], base: Mapping[str, Any]) -> list[str]:
+    """Which of the caller's base values no longer match what is stored.
+
+    Both sides go through the same shaping, so a base echoed from the device API
+    (`null` for unset) and one read off a web row (`0`, `""`) mean the same thing
+    and neither raises a conflict on a field nobody changed.
+    """
+
+    return [
+        field
+        for field, expected in base.items()
+        if _wire_personal_value(field, item.get(field)) != _wire_personal_value(field, expected)
+    ]
 
 
 class CatalogService:
@@ -332,19 +395,73 @@ class CatalogService:
         local_name: str,
         confirmed: bool,
     ) -> tuple[bool, str]:
+        deleted, reason, _ = self.remove_item(item_id, item_url, title, year, local_name, confirmed)
+        return deleted, reason
+
+    def remove_item(
+        self,
+        item_id: str,
+        item_url: str,
+        title: str,
+        year: str,
+        local_name: str,
+        confirmed: bool,
+    ) -> tuple[bool, str, str]:
+        """Delete an item, and say which one it was.
+
+        [X5.3]: an item can be named by its url or its title rather than its
+        id, so the caller cannot know the id of what went -- and a paired
+        phone can only be told about a removal by that id.
+        """
+
         if not confirmed:
             raise ValueError("Deletion requires confirmation")
         if not any([item_id, item_url, title, local_name]):
             raise ValueError("Missing item reference")
 
         if item_id and self.repository.delete_by_id(item_id):
-            return True, "deleted"
+            return True, "deleted", item_id
+
+        def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str, str]]:
+            for index, item in enumerate(items):
+                if same_catalog_item(item, item_id, item_url, title, year, local_name):
+                    removed_id = str(item.get("id") or "")
+                    del items[index]
+                    return True, (True, "deleted", removed_id)
+            return False, (False, "not_found", "")
+
+        return self.repository.mutate(mutation)
+
+    def remove_item_unless_edited(
+        self, item_id: str, base: Mapping[str, Any] | None
+    ) -> tuple[bool, str]:
+        """Delete an item, unless its personal state changed since `base` was read.
+
+        [X5.6]: a phone that deletes a work sends the personal state it last saw.
+        If the server holds something else now -- somebody rated it, or wrote a
+        review, since that phone last synced -- the deletion is refused as a
+        `"conflict"` and nothing is written: the person decides, because deleting
+        would throw away an edit they may not know about. Compared exactly as the
+        personal patch's `base` is ([X2]).
+
+        `base=None` deletes unconditionally, which is what a person who was told
+        about the conflict and chose to delete anyway asks for. The check and the
+        deletion happen in one repository transaction, so an edit cannot slip in
+        between them.
+        """
+
+        if not item_id:
+            raise ValueError("Missing item id")
+        guard = _validated_personal_base(base)
 
         def mutation(items: list[CatalogItem]) -> tuple[bool, tuple[bool, str]]:
             for index, item in enumerate(items):
-                if same_catalog_item(item, item_id, item_url, title, year, local_name):
-                    del items[index]
-                    return True, (True, "deleted")
+                if str(item.get("id") or "") != item_id:
+                    continue
+                if _stale_personal_fields(item, guard):
+                    return False, (False, "conflict")
+                del items[index]
+                return True, (True, "deleted")
             return False, (False, "not_found")
 
         return self.repository.mutate(mutation)
@@ -387,23 +504,79 @@ class CatalogService:
     def update_personal(
         self, item_id: str, watched_at: str, rating: Any, review: str
     ) -> tuple[bool, str]:
+        """Save all three form fields, unconditionally -- the whole-form save."""
+
+        return self.update_personal_fields(
+            item_id, {"watched_at": watched_at, "rating": rating, "review": review}
+        )
+
+    def update_personal_fields(
+        self,
+        item_id: str,
+        values: Mapping[str, Any],
+        base: Mapping[str, Any] | None = None,
+    ) -> tuple[bool, str]:
+        """Save only the personal fields a form actually sent.
+
+        [X8]: a form used to send `watched_at`, `rating` and `review` together
+        with whatever they held when it opened, so saving one of them put the
+        other two back to their old values -- undoing, without a word, a rating a
+        phone had uploaded in the meantime. A field absent from `values` is left
+        exactly as it is, and only the fields present get their change mark.
+
+        `base` is the same guard `patch_personal` takes ([X2]): the values the
+        form read when it opened. If any no longer matches, nothing is written
+        and the answer is `(False, "conflict")`, because a save that only touched
+        its own field can still overwrite that very field.
+
+        Unlike `patch_personal`, this keeps the web form's leniency (a blank date
+        clears it, a rating is clamped, no length limit on the review) so the
+        browser sees no new refusals.
+        """
+
         if not item_id:
             raise ValueError("Missing item id")
+        if not values or set(values) - {"watched_at", "rating", "review"}:
+            raise ValueError("Invalid personal fields")
+        guard = _validated_personal_base(base)
+        now = curation_timestamp()
 
         def update(item: dict[str, Any]) -> None:
-            item["watched_at"] = normalize_date(watched_at)
-            item["rating"] = normalize_rating(rating)
-            item["review"] = review.strip()
+            stale = _stale_personal_fields(item, guard)
+            if stale:
+                raise PersonalPreconditionFailed(stale)
+            if "watched_at" in values:
+                item["watched_at"] = normalize_date(str(values["watched_at"] or ""))
+            if "rating" in values:
+                item["rating"] = normalize_rating(values["rating"])
+            if "review" in values:
+                item["review"] = str(values["review"] or "").strip()
+            # [X3]: watched_at shares the status mark.
+            marks = {"status" if field == "watched_at" else field for field in values}
+            item["personal_changed_at"] = {
+                **item.get("personal_changed_at", {}),
+                **dict.fromkeys(marks, now),
+            }
 
-        return self._update_item(item_id, update)
+        try:
+            return self._update_item(item_id, update)
+        except PersonalPreconditionFailed:
+            return False, "conflict"
 
     def patch_personal(self, item_id: str, values: Mapping[str, Any]) -> tuple[bool, str]:
-        """Apply a partial personal-state edit without accepting metadata fields."""
+        """Apply a partial personal-state edit without accepting metadata fields.
+
+        [X2]: `values` may carry an optional `base` mapping -- the field
+        values the caller last read from the server. Present and no longer
+        current, the whole patch is refused as a conflict instead of applied,
+        so a change from elsewhere in the meantime is never silently lost.
+        Omitted, behaviour is exactly as before: last write wins.
+        """
         if not item_id:
             raise ValueError("Missing item id")
-        allowed = {"status", "watched_at", "rating", "review"}
-        requested = set(values)
-        if not requested or requested - allowed:
+        base = _validated_personal_base(values.get("base"))
+        requested = set(values) - {"base"}
+        if not requested or requested - PERSONAL_BASE_FIELDS:
             raise ValueError("Invalid personal fields")
         status = ""
         if "status" in values:
@@ -440,8 +613,12 @@ class CatalogService:
             review = str(raw_review or "").strip()
             if len(review) > 10_000:
                 raise ValueError("Review is too long")
+        now = curation_timestamp()
 
         def update(item: dict[str, Any]) -> None:
+            stale = _stale_personal_fields(item, base)
+            if stale:
+                raise PersonalPreconditionFailed(stale)
             if status:
                 item["status"] = status
                 if status == "to_watch":
@@ -454,8 +631,27 @@ class CatalogService:
                 item["rating"] = rating or 0
             if "review" in values:
                 item["review"] = review or ""
+            # [X3]: watched_at shares the status mark -- patch_personal already
+            # changes them together from one decision.
+            changed = {
+                field
+                for field, present in (
+                    ("status", status or "watched_at" in values),
+                    ("rating", "rating" in values),
+                    ("review", "review" in values),
+                )
+                if present
+            }
+            if changed:
+                item["personal_changed_at"] = {
+                    **item.get("personal_changed_at", {}),
+                    **dict.fromkeys(changed, now),
+                }
 
-        return self._update_item(item_id, update)
+        try:
+            return self._update_item(item_id, update)
+        except PersonalPreconditionFailed:
+            return False, "conflict"
 
     def update_link_curation(self, item_id: str, status: str) -> tuple[bool, str]:
         if not item_id:

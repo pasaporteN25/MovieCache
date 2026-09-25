@@ -1,0 +1,80 @@
+/* U4.2c — approved composite material, scoped exclusively to visible Home.
+   RGB sources require these measured windows. No standalone alpha PNG claim.
+   Front paint is drawn ONCE on body; modules add only the inward aperture. */
+body:has(#homeView:not([hidden])) {
+  container-type: inline-size;
+  background: #091a22 url("../img/home-surface-petroleum-v2.png") repeat 0 0 / 768px 768px;
+  background-blend-mode: normal;
+}
+body:has(#homeView:not([hidden]))::before { display: none; }
+body:has(#homeView:not([hidden])) main {
+  width: calc(100% - clamp(32px,4vw,112px));
+  max-width: 2240px;
+  min-height: 100vh;
+  padding: 16px 0 24px;
+}
+#homeView .spotlight-layout,
+#homeView .spotlight-empty,
+#homeView .home-empty-state {
+  position: relative;
+  isolation: isolate;
+  padding: 24px;
+}
+#homeView .spotlight-layout::before,
+#homeView .spotlight-empty::before,
+#homeView .home-empty-state::before {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  width: auto;
+  height: auto;
+  background: none;
+  border: 40px solid transparent;
+  border-image: url("../img/home-aperture-bezel-v1.png") 125 / 40px / 0 stretch;
+  clip-path: inset(28px round 3px);
+  pointer-events: none;
+  z-index: -1;
+}
+#homeView .spotlight-layout::after,
+#homeView .spotlight-empty::after,
+#homeView .home-empty-state::after {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  background: #020d13;
+  box-shadow: inset 0 10px 22px #000c;
+  pointer-events: none;
+  z-index: -1;
+}
+#homeView .home-shelf-bay-plaque {
+  isolation: isolate;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  color: #f0d6a1;
+  text-align: center;
+  box-shadow: 0 3px 3px #000b;
+}
+#homeView .home-shelf-bay-plaque::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #04141b1a, #0003),
+    url("../img/home-category-plaque-inset-v1.png") center / 103.6% 214% no-repeat;
+  clip-path: inset(0 round 3px);
+  pointer-events: none;
+  z-index: -1;
+}
+@media(max-width:860px) {
+  body:has(#homeView:not([hidden])) main { width: auto; padding: 12px 12px 32px; }
+  #homeView { overflow: clip; }
+}
+@media(forced-colors:active) {
+  #homeView .spotlight-layout::before,
+  #homeView .spotlight-empty::before,
+  #homeView .home-empty-state::before { border-image: none; border: 1px solid CanvasText; inset: 12px; clip-path: none; }
+  #homeView .spotlight-layout::after,
+  #homeView .spotlight-empty::after,
+  #homeView .home-empty-state::after { background: Canvas; }
+  #homeView .playlist-entry.is-selected { outline: 2px solid Highlight; outline-offset: -2px; }
+}

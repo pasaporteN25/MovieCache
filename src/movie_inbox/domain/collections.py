@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.normalization import normalize_search_text
 from movie_inbox.domain.privacy import SHARED_CATALOG_FIELDS
 
 COLLECTION_VISIBILITIES = {"private", "published"}
@@ -90,6 +91,48 @@ def collection_item_from_availability_record(
         {**identity, "id": work_key, "file_count": int(record.get("file_count") or 0)}
     )
     return CollectionItem(id=work_key, position=position, item=item)
+
+
+# The order the viewer's own catalogue grid already uses, so a collection does
+# not read differently from the shelf beside it: the title actually displayed,
+# preferring the Spanish one when there is one.
+COLLECTION_DISPLAY_TITLE_FIELDS = ("spanish_title", "title", "original_title", "english_title")
+
+
+def collection_items_in_reading_order(
+    items: Iterable[CollectionItem],
+) -> tuple[CollectionItem, ...]:
+    """Number a machine-built collection the way a person reads a shelf.
+
+    Only for collections nobody arranged. A curated collection's order *is* the
+    curator's statement and is never touched; a [P2] collection derived from a
+    scanned library has no such statement, and until now inherited the order
+    `availability_records()` happened to return -- which is by `work_key`, an
+    internal dedup id. A library published like that reads as Casablanca, Alien,
+    Blade Runner, Dune: sorted by TMDb id as text, so 78 lands between 348 and
+    841, and a film with no TMDb id at all sits after every film that has one.
+
+    Worse than arbitrary, it moves. A work's key changes from `work:<hash>` to
+    `tmdb:movie:<id>` the moment enrichment finds it, so a title jumps position
+    in a collection other people are already reading.
+    """
+
+    ordered = sorted(items, key=_reading_order_key)
+    return tuple(replace(entry, position=position) for position, entry in enumerate(ordered))
+
+
+def _reading_order_key(entry: CollectionItem) -> tuple[str, str, str]:
+    title = next(
+        (
+            str(entry.item.get(field) or "").strip()
+            for field in COLLECTION_DISPLAY_TITLE_FIELDS
+            if str(entry.item.get(field) or "").strip()
+        ),
+        "",
+    )
+    # The id is the last resort so two identical titles never swap places
+    # between one sync and the next.
+    return normalize_search_text(title), str(entry.item.get("year") or ""), entry.id
 
 
 def normalize_club_collection_title(value: Any) -> str:

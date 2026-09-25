@@ -5,10 +5,12 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
 from movie_inbox.application.auth_service import (
     AuthenticationError,
     AuthService,
+    DeviceSession,
     PasswordHasher,
     PasswordPolicyError,
     session_token_hash,
@@ -23,6 +25,7 @@ from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 from movie_inbox.infrastructure.identity_repository import (
     INSTANCE_SCHEMA_V1,
+    INSTANCE_SCHEMA_VERSION,
     SqliteIdentityRepository,
 )
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
@@ -123,6 +126,9 @@ class IdentityTests(unittest.TestCase):
                 clock=lambda: now[0],
                 device_access_ttl_seconds=60,
                 device_refresh_ttl_seconds=300,
+                # This test is about rotation and revocation, not the retry
+                # window [X4.1] adds -- see DeviceRefreshRetryTests.
+                device_refresh_grace_seconds=0,
             )
             service.bootstrap_owner(
                 "owner",
@@ -150,6 +156,7 @@ class IdentityTests(unittest.TestCase):
             self.assertNotEqual(rotated.access_token, session.access_token)
             self.assertNotEqual(rotated.refresh_token, session.refresh_token)
             self.assertIsNone(service.authenticate_device(session.access_token))
+            now[0] = 1_011.0
             self.assertIsNone(service.refresh_device_session(session.refresh_token))
             self.assertIsNotNone(service.authenticate_device(rotated.access_token))
 
@@ -291,8 +298,13 @@ class IdentityTests(unittest.TestCase):
                         "SELECT name FROM sqlite_master WHERE type = 'table'"
                     )
                 }
-            self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+            # Every migration runs, in order, with no gaps. Derived from the
+            # constant so adding one does not need this list edited by hand.
+            self.assertEqual(versions, list(range(1, INSTANCE_SCHEMA_VERSION + 1)))
             self.assertIn("user_privacy_preferences", tables)
+            self.assertIn("streaming_regions", tables)
+            self.assertIn("streaming_providers", tables)
+            self.assertIn("member_streaming_preferences", tables)
             self.assertIn("item_privacy_overrides", tables)
             self.assertIn("archived_members", tables)
             self.assertIn("curated_collections", tables)
@@ -340,6 +352,7 @@ class IdentityTests(unittest.TestCase):
                     CREATE TABLE library_scan_runs (id TEXT PRIMARY KEY);
                     CREATE TABLE media_libraries (id TEXT PRIMARY KEY);
                     CREATE TABLE curated_collections (id TEXT PRIMARY KEY);
+                    CREATE TABLE import_drafts (id TEXT PRIMARY KEY);
                     """
                 )
                 connection.executemany(
@@ -363,7 +376,7 @@ class IdentityTests(unittest.TestCase):
                     "FROM scanner_history"
                 ).fetchone()
 
-            self.assertEqual(version, 12)
+            self.assertEqual(version, INSTANCE_SCHEMA_VERSION)
             self.assertTrue(
                 {"catalog_before_json", "catalog_after_json", "catalog_path"} <= columns
             )
@@ -463,6 +476,328 @@ class IdentityTests(unittest.TestCase):
             with self.assertRaises(IdentityNotFound):
                 members.archive_member(owner, member.user.id, confirmed_username="maria")
             self.assertIsNotNone(repository.account(member.user.id))
+
+
+class DeviceRefreshRetryTests(unittest.TestCase):
+    """[X4.1]: a refresh whose response was lost can be retried.
+
+    The phone sent its refresh token, the server rotated, and the response never
+    arrived: the phone still holds only the token it just spent. Without a retry
+    window that phone is locked out until someone scans a QR again.
+    """
+
+    GRACE = 120
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        catalog_path = root / "catalog.json"
+        JsonCatalogRepository(catalog_path, normalize_item).write([])
+        self.database = root / "instance.db"
+        self.now = [1_000.0]
+        self.service = AuthService(
+            SqliteIdentityRepository(self.database),
+            clock=lambda: self.now[0],
+            device_access_ttl_seconds=60,
+            device_refresh_ttl_seconds=10_000,
+            device_refresh_grace_seconds=self.GRACE,
+        )
+        self.service.bootstrap_owner(
+            "owner",
+            "a-long-local-password",
+            catalog_name="Mi catalogo",
+            source_paths=[str(catalog_path)],
+            write_path=str(catalog_path),
+        )
+        self.first = self.service.login_device("owner", "a-long-local-password", "Pixel")
+
+    def test_only_hashes_of_the_previous_token_are_stored(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+
+        with closing(sqlite3.connect(self.database)) as connection:
+            previous, valid_until = connection.execute(
+                "SELECT previous_refresh_token_hash, previous_refresh_valid_until"
+                " FROM device_sessions"
+            ).fetchone()
+
+        self.assertEqual(previous, session_token_hash(self.first.refresh_token))
+        self.assertNotEqual(previous, self.first.refresh_token)
+        self.assertEqual(valid_until, int(self.now[0]) + self.GRACE)
+
+    def test_the_token_a_lost_response_left_behind_still_refreshes(self) -> None:
+        # The server rotated, the phone never saw the answer.
+        self.assertIsNotNone(self.service.refresh_device_session(self.first.refresh_token))
+        self.now[0] += 10
+
+        retried = self.service.refresh_device_session(self.first.refresh_token)
+
+        assert retried is not None
+        self.assertIsNotNone(self.service.authenticate_device(retried.access_token))
+        self.assertIsNotNone(self.service.refresh_device_session(retried.refresh_token))
+
+    def test_a_retry_replaces_the_pair_the_phone_never_received(self) -> None:
+        lost = self.service.refresh_device_session(self.first.refresh_token)
+        assert lost is not None
+
+        retried = self.service.refresh_device_session(self.first.refresh_token)
+
+        assert retried is not None
+        self.assertIsNone(self.service.authenticate_device(lost.access_token))
+        self.assertIsNotNone(self.service.authenticate_device(retried.access_token))
+
+    def test_the_window_closes(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+
+        self.now[0] += self.GRACE + 1
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_a_retry_does_not_extend_the_window(self) -> None:
+        # Otherwise anyone holding an old token could keep it alive by using it.
+        self.service.refresh_device_session(self.first.refresh_token)
+        self.now[0] += self.GRACE - 10
+        self.assertIsNotNone(self.service.refresh_device_session(self.first.refresh_token))
+
+        self.now[0] += 20
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_a_token_two_rotations_back_is_unknown(self) -> None:
+        second = self.service.refresh_device_session(self.first.refresh_token)
+        assert second is not None
+        self.service.refresh_device_session(second.refresh_token)
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_a_retry_does_not_outlive_the_session(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+        retried = self.service.refresh_device_session(self.first.refresh_token)
+        assert retried is not None
+        self.service.logout_device(retried.access_token)
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+    def test_changing_the_password_still_ends_every_device_session(self) -> None:
+        self.service.refresh_device_session(self.first.refresh_token)
+        _, identity = self.service.login("owner", "a-long-local-password")
+        self.service.change_password(identity, "a-long-local-password", "a-different-password!")
+
+        self.assertIsNone(self.service.refresh_device_session(self.first.refresh_token))
+
+
+class DeviceSessionListTests(unittest.TestCase):
+    """[X4.2]: an account sees its paired phones, by a stable id and no credential."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        catalog_path = root / "catalog.json"
+        JsonCatalogRepository(catalog_path, normalize_item).write([])
+        self.database = root / "instance.db"
+        self.now = [1_000.0]
+        self.repository = SqliteIdentityRepository(self.database)
+        self.service = AuthService(
+            self.repository,
+            clock=lambda: self.now[0],
+            device_access_ttl_seconds=60,
+            device_refresh_ttl_seconds=500,
+        )
+        self.owner, _ = self.service.bootstrap_owner(
+            "owner",
+            "a-long-local-password",
+            catalog_name="Mi catalogo",
+            source_paths=[str(catalog_path)],
+            write_path=str(catalog_path),
+        )
+        _, self.identity = self.service.login("owner", "a-long-local-password")
+        self.members = MemberService(
+            self.repository, SqlitePersonalCatalogProvisioner(root / "member-catalogs")
+        )
+
+    def _pair(self, name: str) -> DeviceSession:
+        return self.service.login_device("owner", "a-long-local-password", name)
+
+    def test_it_lists_the_account_s_phones_most_recently_used_first(self) -> None:
+        self._pair("Pixel")
+        self.now[0] += 5
+        tablet = self._pair("Tablet")
+        self.now[0] += 5
+        self.service.authenticate_device(tablet.access_token)
+
+        names = [row.device_name for row in self.service.list_device_sessions(self.identity)]
+
+        self.assertEqual(names, ["Tablet", "Pixel"])
+
+    def test_the_id_survives_a_refresh(self) -> None:
+        session = self._pair("Pixel")
+        (before,) = self.service.list_device_sessions(self.identity)
+
+        self.now[0] += 10
+        self.service.refresh_device_session(session.refresh_token)
+
+        (after,) = self.service.list_device_sessions(self.identity)
+        self.assertEqual(after.id, before.id)
+
+    def test_last_seen_follows_authenticated_use(self) -> None:
+        session = self._pair("Pixel")
+        self.now[0] += 30
+
+        self.service.authenticate_device(session.access_token)
+
+        (row,) = self.service.list_device_sessions(self.identity)
+        self.assertEqual(row.created_at, 1_000)
+        self.assertEqual(row.last_seen_at, 1_030)
+
+    def test_a_row_carries_no_credential(self) -> None:
+        session = self._pair("Pixel")
+        (row,) = self.service.list_device_sessions(self.identity)
+
+        self.assertEqual(
+            set(vars(row)), {"id", "device_name", "created_at", "last_seen_at", "expires_at"}
+        )
+        rendered = repr(row)
+        for secret in (
+            session.access_token,
+            session.refresh_token,
+            session_token_hash(session.access_token),
+            session_token_hash(session.refresh_token),
+        ):
+            self.assertNotIn(secret, rendered)
+
+    def test_another_account_s_phones_are_not_listed(self) -> None:
+        self._pair("Pixel")
+        member = self.members.create_member(self.owner, "maria").member
+        self.repository.save_device_session(
+            "member-access-hash",
+            "member-refresh-hash",
+            member.user.id,
+            "Telefono de Maria",
+            1_000,
+            1_060,
+            1_500,
+        )
+
+        names = [row.device_name for row in self.service.list_device_sessions(self.identity)]
+
+        self.assertEqual(names, ["Pixel"])
+
+    def test_an_expired_session_is_not_listed(self) -> None:
+        self._pair("Pixel")
+
+        self.now[0] += 501
+
+        self.assertEqual(self.service.list_device_sessions(self.identity), [])
+
+    def _id_of(self, name: str) -> str:
+        return next(
+            row.id
+            for row in self.service.list_device_sessions(self.identity)
+            if row.device_name == name
+        )
+
+    def test_a_revoked_phone_is_out_on_its_next_call(self) -> None:
+        session = self._pair("Pixel")
+
+        self.assertTrue(self.service.revoke_device_session(self.identity, self._id_of("Pixel")))
+
+        self.assertIsNone(self.service.authenticate_device(session.access_token))
+        self.assertIsNone(self.service.refresh_device_session(session.refresh_token))
+
+    def test_revoking_also_closes_the_retry_window(self) -> None:
+        # [X4.1] keeps the replaced refresh token usable for a while; a phone
+        # someone just cut off must not get back in through it.
+        session = self._pair("Pixel")
+        rotated = self.service.refresh_device_session(session.refresh_token)
+        assert rotated is not None
+
+        self.service.revoke_device_session(self.identity, self._id_of("Pixel"))
+
+        self.assertIsNone(self.service.refresh_device_session(session.refresh_token))
+        self.assertIsNone(self.service.refresh_device_session(rotated.refresh_token))
+
+    def test_revoking_one_phone_leaves_the_others(self) -> None:
+        self._pair("Pixel")
+        tablet = self._pair("Tablet")
+
+        self.service.revoke_device_session(self.identity, self._id_of("Pixel"))
+
+        self.assertIsNotNone(self.service.authenticate_device(tablet.access_token))
+        self.assertEqual(
+            [row.device_name for row in self.service.list_device_sessions(self.identity)],
+            ["Tablet"],
+        )
+
+    def test_an_account_cannot_revoke_another_account_s_phone(self) -> None:
+        member = self.members.create_member(self.owner, "maria").member
+        self.repository.save_device_session(
+            "member-access-hash",
+            "member-refresh-hash",
+            member.user.id,
+            "Telefono de Maria",
+            1_000,
+            1_060,
+            1_500,
+        )
+        (theirs,) = self.repository.list_device_sessions(member.user.id, 1_000)
+
+        revoked = self.service.revoke_device_session(self.identity, theirs.id)
+
+        self.assertFalse(revoked)
+        self.assertEqual(len(self.repository.list_device_sessions(member.user.id, 1_000)), 1)
+
+    def test_an_unknown_or_malformed_id_revokes_nothing(self) -> None:
+        self._pair("Pixel")
+
+        for bad in ("", "no-such-phone", "x" * 65, "%' OR '1'='1"):
+            with self.subTest(session_id=bad[:12]):
+                self.assertFalse(self.service.revoke_device_session(self.identity, bad))
+        self.assertEqual(len(self.service.list_device_sessions(self.identity)), 1)
+
+    def test_revoking_twice_is_not_an_error(self) -> None:
+        self._pair("Pixel")
+        session_id = self._id_of("Pixel")
+
+        self.assertTrue(self.service.revoke_device_session(self.identity, session_id))
+        self.assertFalse(self.service.revoke_device_session(self.identity, session_id))
+
+    def test_the_migration_gives_existing_sessions_distinct_ids(self) -> None:
+        # A real instance at v20, built by the real migrations rather than by
+        # undoing the latest one, so this keeps meaning the same thing whichever
+        # version happens to be last.
+        root = Path(self.temporary.name)
+        catalog_path = root / "catalog.json"
+        old_database = root / "old-instance.db"
+        with patch("movie_inbox.infrastructure.identity_repository.INSTANCE_SCHEMA_VERSION", 20):
+            old_repository = SqliteIdentityRepository(old_database)
+            owner, _ = AuthService(old_repository).bootstrap_owner(
+                "owner",
+                "a-long-local-password",
+                catalog_name="Mi catalogo",
+                source_paths=[str(catalog_path)],
+                write_path=str(catalog_path),
+            )
+        with closing(sqlite3.connect(old_database)) as connection:
+            for index, name in enumerate(("Pixel", "Tablet")):
+                connection.execute(
+                    """INSERT INTO device_sessions(
+                        access_token_hash, refresh_token_hash, user_id, device_name,
+                        created_at, access_expires_at, refresh_expires_at, last_seen_at
+                    ) VALUES (?, ?, ?, ?, 1000, 1060, 1500, 1000)""",
+                    (f"access-{index}", f"refresh-{index}", owner.id, name),
+                )
+            connection.commit()
+            self.assertNotIn(
+                "session_id",
+                {row[1] for row in connection.execute("PRAGMA table_info(device_sessions)")},
+            )
+
+        rows = SqliteIdentityRepository(old_database).list_device_sessions(owner.id, 1_000)
+
+        ids = {row.id for row in rows}
+        self.assertEqual(len(ids), 2)
+        self.assertNotIn("", ids)
 
 
 if __name__ == "__main__":

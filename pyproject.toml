@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "movie-inbox"
-version = "0.8.0"
+version = "0.9.0"
 description = "Personal movie catalog, scanner and local web viewer."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,6 +12,9 @@ license = {file = "LICENSE"}
 authors = [{name = "Lucas"}]
 dependencies = [
     "fastapi>=0.115,<1",
+    # Pure Python, no transitive dependencies. Renders the pairing QR server
+    # side so a bearer ticket never needs a client-side encoder or a GET URL.
+    "segno>=1.6,<2",
     "uvicorn>=0.30,<1",
 ]
 
@@ -37,6 +40,9 @@ where = ["src"]
     "static/js/surfaces/*.js",
     "static/img/*.png",
     "static/img/*.svg",
+    "static/fonts/*.woff2",
+    "static/fonts/*-OFL.txt",
+    "static/fonts/README.md",
 ]
 "movie_inbox.search_lab" = ["corpus/*.json"]
 

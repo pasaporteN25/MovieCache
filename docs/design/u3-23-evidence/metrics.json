@@ -1,0 +1,92 @@
+[
+  {
+    "mode": "browse",
+    "viewport": 1440,
+    "pageOverflow": 0,
+    "headerHeight": 144.390625,
+    "consoleHeight": 95,
+    "gridTop": 347.390625,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "search",
+    "viewport": 1440,
+    "pageOverflow": 0,
+    "headerHeight": 144.390625,
+    "consoleHeight": 193,
+    "gridTop": 445.390625,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "add",
+    "viewport": 1440,
+    "pageOverflow": 0,
+    "headerHeight": 144.390625,
+    "consoleHeight": 72,
+    "gridTop": 0,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "browse",
+    "viewport": 390,
+    "pageOverflow": 0,
+    "headerHeight": 193.09375,
+    "consoleHeight": 230,
+    "gridTop": 630.59375,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "search",
+    "viewport": 390,
+    "pageOverflow": 0,
+    "headerHeight": 193.09375,
+    "consoleHeight": 393,
+    "gridTop": 793.59375,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "add",
+    "viewport": 390,
+    "pageOverflow": 0,
+    "headerHeight": 193.09375,
+    "consoleHeight": 72,
+    "gridTop": 0,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "browse",
+    "viewport": 320,
+    "pageOverflow": 0,
+    "headerHeight": 193.09375,
+    "consoleHeight": 245,
+    "gridTop": 637.59375,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "search",
+    "viewport": 320,
+    "pageOverflow": 0,
+    "headerHeight": 209.890625,
+    "consoleHeight": 408,
+    "gridTop": 817.390625,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  },
+  {
+    "mode": "add",
+    "viewport": 320,
+    "pageOverflow": 0,
+    "headerHeight": 209.890625,
+    "consoleHeight": 72,
+    "gridTop": 0,
+    "taskTabsVisible": 3,
+    "quickGroupsVisible": 3
+  }
+]

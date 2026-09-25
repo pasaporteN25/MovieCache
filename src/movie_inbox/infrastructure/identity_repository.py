@@ -23,13 +23,14 @@ from movie_inbox.domain.identity import (
     ArchivedMember,
     AuthenticatedIdentity,
     CatalogSource,
+    DeviceSessionRecord,
     PersonalCatalog,
     UserAccount,
     username_key,
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 12
+INSTANCE_SCHEMA_VERSION = 23
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -365,6 +366,157 @@ CREATE INDEX ix_device_sessions_refresh_expiry
 ON device_sessions(refresh_token_hash, refresh_expires_at);
 """
 
+INSTANCE_SCHEMA_V13 = """
+CREATE TABLE streaming_regions (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE streaming_providers (
+    region_code TEXT NOT NULL REFERENCES streaming_regions(code) ON DELETE CASCADE,
+    provider_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    display_priority INTEGER NOT NULL DEFAULT 0,
+    logo_path TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (region_code, provider_id)
+);
+CREATE INDEX ix_streaming_providers_region
+ON streaming_providers(region_code, display_priority);
+
+CREATE TABLE streaming_region_policy (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    default_region TEXT NOT NULL DEFAULT '',
+    members_may_choose INTEGER NOT NULL DEFAULT 0 CHECK (members_may_choose IN (0, 1)),
+    updated_at TEXT NOT NULL
+);
+INSERT INTO streaming_region_policy(id, default_region, members_may_choose, updated_at)
+VALUES (1, '', 0, '');
+
+CREATE TABLE member_streaming_preferences (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    region TEXT NOT NULL DEFAULT '',
+    ignored_providers_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+);
+"""
+
+INSTANCE_SCHEMA_V14 = """
+CREATE TABLE streaming_availability (
+    work_key TEXT NOT NULL,
+    region_code TEXT NOT NULL REFERENCES streaming_regions(code) ON DELETE CASCADE,
+    checked_at TEXT NOT NULL,
+    link TEXT NOT NULL DEFAULT '',
+    offers_json TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (work_key, region_code)
+);
+CREATE INDEX ix_streaming_availability_checked
+ON streaming_availability(checked_at);
+"""
+
+INSTANCE_SCHEMA_V15 = """
+CREATE TABLE charades_difficulty (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    work_key TEXT NOT NULL,
+    difficulty TEXT NOT NULL CHECK (
+        difficulty IN ('facil', 'medio', 'medio_alto', 'dificil')
+    ),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, work_key)
+);
+CREATE INDEX ix_charades_difficulty_user ON charades_difficulty(user_id, difficulty);
+"""
+
+INSTANCE_SCHEMA_V16 = """
+CREATE TABLE instance_secrets (
+    name TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+"""
+
+INSTANCE_SCHEMA_V17 = """
+CREATE TABLE public_rating_snapshots (
+    work_key TEXT NOT NULL,
+    source TEXT NOT NULL,
+    checked_at TEXT NOT NULL,
+    average REAL NOT NULL,
+    votes INTEGER NOT NULL,
+    PRIMARY KEY (work_key, source)
+);
+CREATE INDEX ix_public_rating_snapshots_checked
+ON public_rating_snapshots(source, checked_at);
+"""
+
+INSTANCE_SCHEMA_V18 = """
+CREATE TABLE device_pairing_tickets (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    redeemed_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX ix_device_pairing_tickets_expiry ON device_pairing_tickets(expires_at);
+"""
+
+INSTANCE_SCHEMA_V19 = """
+ALTER TABLE import_drafts ADD COLUMN origin TEXT NOT NULL DEFAULT 'web';
+"""
+
+INSTANCE_SCHEMA_V20 = """
+ALTER TABLE device_sessions ADD COLUMN previous_refresh_token_hash TEXT;
+ALTER TABLE device_sessions ADD COLUMN previous_refresh_valid_until INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX ix_device_sessions_previous_refresh
+ON device_sessions(previous_refresh_token_hash);
+"""
+
+# The access token hash is the table's key and changes on every renovation, so
+# it cannot name a phone from the web. This label is random and never changes.
+INSTANCE_SCHEMA_V21 = """
+ALTER TABLE device_sessions ADD COLUMN session_id TEXT NOT NULL DEFAULT '';
+UPDATE device_sessions SET session_id = lower(hex(randomblob(16)));
+CREATE UNIQUE INDEX ix_device_sessions_session_id ON device_sessions(session_id);
+"""
+
+# [X6]: what a phone is told about each work it sent while offline, by the id it
+# generated. Its own table because it has to outlive the draft the work was
+# parked in: that draft is applied or deleted in the browser, and the phone asks
+# afterwards. `item_id` is the catalog item the work became, when it did.
+INSTANCE_SCHEMA_V22 = """
+CREATE TABLE device_receipts (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    client_id TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('pending', 'applied', 'discarded')),
+    reason TEXT NOT NULL DEFAULT '',
+    item_id TEXT NOT NULL DEFAULT '',
+    draft_id TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, client_id)
+);
+CREATE INDEX ix_device_receipts_draft ON device_receipts(user_id, draft_id);
+CREATE INDEX ix_device_receipts_retention ON device_receipts(state, updated_at);
+"""
+
+# [X5]: which works a person removed from a catalogue -- by deleting them or by
+# merging them into another -- so a paired phone that still holds one can be told
+# what became of it. Both ids are the opaque ones a phone knows, not the
+# catalogue's own, and this lives here rather than beside the catalogue because
+# it is sync state, not part of a work: the portable formats do not carry it.
+INSTANCE_SCHEMA_V23 = """
+CREATE TABLE device_removals (
+    catalog_id TEXT NOT NULL REFERENCES catalogs(id) ON DELETE CASCADE,
+    device_id TEXT NOT NULL,
+    reason TEXT NOT NULL CHECK (reason IN ('deleted', 'merged')),
+    merged_into TEXT NOT NULL DEFAULT '',
+    removed_at INTEGER NOT NULL,
+    PRIMARY KEY (catalog_id, device_id)
+);
+CREATE INDEX ix_device_removals_retention ON device_removals(removed_at);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -377,6 +529,17 @@ INSTANCE_MIGRATIONS = {
     10: ("shared library availability collections", INSTANCE_SCHEMA_V10),
     11: ("revocable public availability presentations", INSTANCE_SCHEMA_V11),
     12: ("revocable opaque device sessions", INSTANCE_SCHEMA_V12),
+    13: ("streaming regions, platforms and member choices", INSTANCE_SCHEMA_V13),
+    14: ("dated streaming availability snapshots", INSTANCE_SCHEMA_V14),
+    15: ("human charades difficulty decisions", INSTANCE_SCHEMA_V15),
+    16: ("persistent instance secrets for durable device keys", INSTANCE_SCHEMA_V16),
+    17: ("dated public score snapshots", INSTANCE_SCHEMA_V17),
+    18: ("single-use device pairing tickets", INSTANCE_SCHEMA_V18),
+    19: ("import drafts remember whether a phone or a browser made them", INSTANCE_SCHEMA_V19),
+    20: ("device refresh tokens tolerate one retry after a lost response", INSTANCE_SCHEMA_V20),
+    21: ("device sessions carry a stable id a browser can name them by", INSTANCE_SCHEMA_V21),
+    22: ("receipts for works a phone added while offline", INSTANCE_SCHEMA_V22),
+    23: ("the record of works removed from a catalogue", INSTANCE_SCHEMA_V23),
 }
 
 
@@ -572,9 +735,15 @@ class SqliteIdentityRepository:
                         (int(active), _utc_now(), user_id),
                     )
                     if not active:
+                        # Every credential goes, pairing tickets included: kept, one
+                        # would open a device session if the account came back
+                        # within its five minutes.
                         connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
                         connection.execute(
                             "DELETE FROM device_sessions WHERE user_id = ?", (user_id,)
+                        )
+                        connection.execute(
+                            "DELETE FROM device_pairing_tickets WHERE user_id = ?", (user_id,)
                         )
                     updated = connection.execute(
                         "SELECT * FROM users WHERE id = ?", (user_id,)
@@ -823,8 +992,14 @@ class SqliteIdentityRepository:
                     if cursor.rowcount != 1:
                         connection.rollback()
                         raise IdentityNotFound("Account was not found")
+                    # Changing a password revokes every credential: web and device
+                    # sessions, and pairing tickets not yet redeemed, which would
+                    # otherwise still open a device session after the change.
                     connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
                     connection.execute("DELETE FROM device_sessions WHERE user_id = ?", (user_id,))
+                    connection.execute(
+                        "DELETE FROM device_pairing_tickets WHERE user_id = ?", (user_id,)
+                    )
                     updated = connection.execute(
                         "SELECT * FROM users WHERE id = ?", (user_id,)
                     ).fetchone()
@@ -1083,6 +1258,9 @@ class SqliteIdentityRepository:
                     device_cursor = connection.execute(
                         "DELETE FROM device_sessions WHERE user_id = ?", (user_id,)
                     )
+                    connection.execute(
+                        "DELETE FROM device_pairing_tickets WHERE user_id = ?", (user_id,)
+                    )
                     connection.commit()
                     return max(0, web_cursor.rowcount) + max(0, device_cursor.rowcount)
             except sqlite3.Error as error:
@@ -1110,8 +1288,9 @@ class SqliteIdentityRepository:
                     connection.execute(
                         """INSERT INTO device_sessions(
                             access_token_hash, refresh_token_hash, user_id, device_name,
-                            created_at, access_expires_at, refresh_expires_at, last_seen_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            created_at, access_expires_at, refresh_expires_at, last_seen_at,
+                            session_id
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             access_token_hash,
                             refresh_token_hash,
@@ -1121,6 +1300,7 @@ class SqliteIdentityRepository:
                             access_expires_at,
                             refresh_expires_at,
                             created_at,
+                            uuid.uuid4().hex,
                         ),
                     )
                     connection.commit()
@@ -1172,6 +1352,7 @@ class SqliteIdentityRepository:
         now: int,
         access_expires_at: int,
         refresh_expires_at: int,
+        previous_valid_until: int,
     ) -> AuthenticatedIdentity | None:
         with self._thread_lock:
             try:
@@ -1179,7 +1360,7 @@ class SqliteIdentityRepository:
                     self._initialize(connection)
                     connection.execute("BEGIN IMMEDIATE")
                     row = connection.execute(
-                        """SELECT users.*, device_sessions.device_name
+                        """SELECT users.*
                         FROM device_sessions
                         JOIN users ON users.id = device_sessions.user_id
                         WHERE device_sessions.refresh_token_hash = ?
@@ -1187,6 +1368,23 @@ class SqliteIdentityRepository:
                             AND users.active = 1""",
                         (refresh_token_hash, now),
                     ).fetchone()
+                    retry = False
+                    if row is None:
+                        # [X4.1]: the token a phone just replaced is still honoured
+                        # for a short window, so a response lost in a dropout does not
+                        # strand it. Only the token replaced by the latest rotation
+                        # is kept: anything older is simply unknown.
+                        row = connection.execute(
+                            """SELECT users.*
+                            FROM device_sessions
+                            JOIN users ON users.id = device_sessions.user_id
+                            WHERE device_sessions.previous_refresh_token_hash = ?
+                                AND device_sessions.previous_refresh_valid_until >= ?
+                                AND device_sessions.refresh_expires_at > ?
+                                AND users.active = 1""",
+                            (refresh_token_hash, now, now),
+                        ).fetchone()
+                        retry = row is not None
                     if row is None:
                         connection.execute(
                             "DELETE FROM device_sessions WHERE refresh_expires_at <= ?", (now,)
@@ -1198,21 +1396,47 @@ class SqliteIdentityRepository:
                     if catalog is None:
                         connection.rollback()
                         return None
-                    cursor = connection.execute(
-                        """UPDATE device_sessions
-                        SET access_token_hash = ?, refresh_token_hash = ?, access_expires_at = ?,
-                            refresh_expires_at = ?, last_seen_at = ?
-                        WHERE refresh_token_hash = ? AND refresh_expires_at > ?""",
-                        (
-                            access_token_hash,
-                            next_refresh_token_hash,
-                            access_expires_at,
-                            refresh_expires_at,
-                            now,
-                            refresh_token_hash,
-                            now,
-                        ),
-                    )
+                    if retry:
+                        # The window stays anchored to the rotation that opened it: a
+                        # retry must not extend it, or whoever holds an old token
+                        # could keep it open indefinitely.
+                        cursor = connection.execute(
+                            """UPDATE device_sessions
+                            SET access_token_hash = ?, refresh_token_hash = ?,
+                                access_expires_at = ?, refresh_expires_at = ?, last_seen_at = ?
+                            WHERE previous_refresh_token_hash = ?
+                                AND previous_refresh_valid_until >= ?
+                                AND refresh_expires_at > ?""",
+                            (
+                                access_token_hash,
+                                next_refresh_token_hash,
+                                access_expires_at,
+                                refresh_expires_at,
+                                now,
+                                refresh_token_hash,
+                                now,
+                                now,
+                            ),
+                        )
+                    else:
+                        cursor = connection.execute(
+                            """UPDATE device_sessions
+                            SET access_token_hash = ?, refresh_token_hash = ?,
+                                access_expires_at = ?, refresh_expires_at = ?, last_seen_at = ?,
+                                previous_refresh_token_hash = ?, previous_refresh_valid_until = ?
+                            WHERE refresh_token_hash = ? AND refresh_expires_at > ?""",
+                            (
+                                access_token_hash,
+                                next_refresh_token_hash,
+                                access_expires_at,
+                                refresh_expires_at,
+                                now,
+                                refresh_token_hash,
+                                previous_valid_until,
+                                refresh_token_hash,
+                                now,
+                            ),
+                        )
                     if cursor.rowcount != 1:
                         connection.rollback()
                         return None
@@ -1236,6 +1460,52 @@ class SqliteIdentityRepository:
             except sqlite3.Error as error:
                 raise IdentityRepositoryError(
                     f"Cannot update device session in: {self.path}"
+                ) from error
+
+    def list_device_sessions(self, user_id: str, now: int) -> list[DeviceSessionRecord]:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    rows = connection.execute(
+                        """SELECT session_id, device_name, created_at, last_seen_at,
+                            refresh_expires_at
+                        FROM device_sessions
+                        WHERE user_id = ? AND refresh_expires_at > ?
+                        ORDER BY last_seen_at DESC, created_at DESC, session_id""",
+                        (user_id, now),
+                    ).fetchall()
+                    return [
+                        DeviceSessionRecord(
+                            id=str(row["session_id"]),
+                            device_name=str(row["device_name"]),
+                            created_at=int(row["created_at"]),
+                            last_seen_at=int(row["last_seen_at"]),
+                            expires_at=int(row["refresh_expires_at"]),
+                        )
+                        for row in rows
+                    ]
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot list device sessions from: {self.path}"
+                ) from error
+
+    def delete_device_session_by_id(self, user_id: str, session_id: str) -> bool:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    # Scoped to the account: an id from another account matches
+                    # nothing, exactly as an id that does not exist.
+                    cursor = connection.execute(
+                        "DELETE FROM device_sessions WHERE user_id = ? AND session_id = ?",
+                        (user_id, session_id),
+                    )
+                    connection.commit()
+                    return bool(cursor.rowcount == 1)
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot revoke device session in: {self.path}"
                 ) from error
 
     def delete_device_session(self, access_token_hash: str) -> None:
@@ -1372,6 +1642,125 @@ class SqliteIdentityRepository:
         for column, declaration in additions.items():
             if column not in columns:
                 connection.execute(f"ALTER TABLE scanner_history ADD COLUMN {column} {declaration}")
+
+    def save_pairing_ticket(
+        self,
+        token_hash: str,
+        user_id: str,
+        created_at: int,
+        expires_at: int,
+    ) -> None:
+        """Store only the hash, exactly like a session token.
+
+        The plaintext ticket exists once, travels through the QR and is never
+        written down. A stolen database therefore yields no way in.
+        """
+
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    connection.execute(
+                        """INSERT INTO device_pairing_tickets(
+                            token_hash, user_id, created_at, expires_at, redeemed_at
+                        ) VALUES (?, ?, ?, ?, 0)""",
+                        (token_hash, user_id, int(created_at), int(expires_at)),
+                    )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot store a pairing ticket in: {self.path}"
+                ) from error
+
+    def redeem_pairing_ticket(self, token_hash: str, now: int) -> str:
+        """Consume a ticket and return whose account it opens, or "" if it does not.
+
+        The check and the consumption are **one** statement on purpose. Two
+        phones scanning the same QR at the same moment is not exotic, and a
+        read-then-write would let both through: `redeemed_at = 0` in the WHERE
+        clause is what makes "single use" true rather than merely intended.
+        """
+
+        moment = int(now)
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    cursor = connection.execute(
+                        """UPDATE device_pairing_tickets SET redeemed_at = ?
+                        WHERE token_hash = ? AND redeemed_at = 0 AND expires_at > ?""",
+                        (moment, token_hash, moment),
+                    )
+                    if not cursor.rowcount:
+                        connection.rollback()
+                        return ""
+                    row = connection.execute(
+                        "SELECT user_id FROM device_pairing_tickets WHERE token_hash = ?",
+                        (token_hash,),
+                    ).fetchone()
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot redeem a pairing ticket in: {self.path}"
+                ) from error
+        return str(row["user_id"]) if row is not None else ""
+
+    def purge_pairing_tickets(self, before: int) -> int:
+        """Sweep tickets nobody can use any more, redeemed or simply expired."""
+
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    self._initialize(connection)
+                    connection.execute("BEGIN IMMEDIATE")
+                    cursor = connection.execute(
+                        "DELETE FROM device_pairing_tickets WHERE expires_at <= ?", (int(before),)
+                    )
+                    removed = int(cursor.rowcount or 0)
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise IdentityRepositoryError(
+                    f"Cannot purge pairing tickets in: {self.path}"
+                ) from error
+        return removed
+
+    def instance_secret(self, name: str) -> str:
+        """A stable per-instance secret, created once and kept.
+
+        The device sync key is derived from this rather than from
+        `api_token`: rotating that token is a normal operation, and it must not
+        re-key every work in a paired client's local replica.
+        """
+
+        with self._thread_lock, closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT value FROM instance_secrets WHERE name = ?", (name,)
+            ).fetchone()
+            if row is not None:
+                return str(row["value"])
+            value = uuid.uuid4().hex + uuid.uuid4().hex
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.execute(
+                    "INSERT INTO instance_secrets(name, value, created_at) VALUES (?, ?, ?)",
+                    (name, value, _utc_now()),
+                )
+                connection.commit()
+            except sqlite3.IntegrityError:
+                # Another worker created it first; theirs wins.
+                connection.rollback()
+                existing = connection.execute(
+                    "SELECT value FROM instance_secrets WHERE name = ?", (name,)
+                ).fetchone()
+                return str(existing["value"]) if existing else value
+            except sqlite3.Error as error:
+                connection.rollback()
+                raise IdentityRepositoryError(
+                    f"Cannot create instance secret in: {self.path}"
+                ) from error
+        return value
 
     @staticmethod
     def _catalog(connection: sqlite3.Connection, user_id: str) -> PersonalCatalog | None:

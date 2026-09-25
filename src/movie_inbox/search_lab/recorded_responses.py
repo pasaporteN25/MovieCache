@@ -30,8 +30,17 @@ from movie_inbox.external import common as external_common
 from movie_inbox.external import filmaffinity as external_filmaffinity
 
 
-class UnrecordedRequestError(RuntimeError):
-    """A replay session saw a URL with no recorded response."""
+class UnrecordedRequestError(BaseException):
+    """A replay session saw a URL with no recorded response.
+
+    Deliberately not an Exception. The adapters catch Exception around their own
+    fetches -- that is how a source failing is turned into an empty shelf -- and
+    a missing fixture caught by one of those looks exactly like a source that
+    answered nothing. It cost a corpus case: the Wikipedia case kept passing
+    after its recorded search URL went stale, through a path it was not written
+    to exercise. A hole in the fixture table has to reach _evaluate_trial, which
+    catches this by name.
+    """
 
     def __init__(self, url: str) -> None:
         super().__init__(f"No recorded response for URL: {url}")

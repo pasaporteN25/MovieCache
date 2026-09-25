@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-10",
+  "scope": "Isolated U4.2b specimen, not production regression or owner visual acceptance",
+  "viewports": [
+    {"width":1280,"height":720,"clientWidth":1265,"scrollWidth":1265,"shelfRight":1265,"fontsLoaded":true},
+    {"width":1440,"height":900,"clientWidth":1425,"scrollWidth":1425,"shelfRight":1425,"fontsLoaded":true},
+    {"width":1920,"height":1080,"clientWidth":1905,"scrollWidth":1905,"shelfRight":1905,"fontsLoaded":true},
+    {"width":390,"height":844,"clientWidth":375,"scrollWidth":375,"shelfRight":363,"fontsLoaded":true}
+  ],
+  "interactions": {
+    "playlist_does_not_change_poster_or_lower_selection": "pass",
+    "spine_does_not_change_playlist_selection": "pass",
+    "spine_arrow_right_moves_selection_and_retains_solid_focus_ring": "pass",
+    "category_activation_updates_source_and_preserves_marquee": "pass",
+    "yesterday_changes_marquee_label_and_pressed_state": "pass",
+    "lateral_scroll_reaches_max_and_updates_both_disabled_states": "pass",
+    "sparse_category_has_two_spines_360px_plaque_and_no_page_overflow": "pass",
+    "missing_images_retain_fallback_six_rows_and_eighteen_spines": "pass",
+    "empty_fixture_exposes_existing_recovery_controls": "pass"
+  },
+  "consoleErrorsAfterFinalChecks": [],
+  "http": {"public_routes":200,"external_image_key":404,"api_home":404,"git_config":404,"post":405,"material_kit_route":200},
+  "syntax": ["junction.js: pass","fixture.js: pass","serve-preview.mjs: pass","U4.2a serve-preview.mjs: pass"],
+  "independentReview": {
+    "fixes": ["left shelf return joined to lips","poster and playlist share the lower support"],
+    "final": "Both corrections passed; no additional fixes for these two joins"
+  },
+  "limitations": ["No production Home changes in this iteration","No backend regression suite run","RGB source PNGs require the composite CSS kit","U4.2b awaits owner acceptance","U4.3-U4.6 remain pending"]
+}

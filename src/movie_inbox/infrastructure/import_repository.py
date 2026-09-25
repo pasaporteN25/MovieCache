@@ -5,12 +5,18 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from collections.abc import Sequence
 from contextlib import closing
 from pathlib import Path
 from typing import Any
 
 from movie_inbox.application.import_repository import ImportRepositoryError
-from movie_inbox.domain.imports import ImportDraft, ImportDraftItem
+from movie_inbox.domain.imports import (
+    NEVER_EXPIRES,
+    DeviceReceipt,
+    ImportDraft,
+    ImportDraftItem,
+)
 
 STALE_APPLY_GRACE_SECONDS = 15 * 60
 
@@ -36,8 +42,9 @@ class SqliteImportDraftRepository:
                     connection.execute(
                         """INSERT INTO import_drafts(
                             id, user_id, source_name, source_format, source_hash, status,
-                            created_at, updated_at, expires_at, applied_at, result_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            created_at, updated_at, expires_at, applied_at, result_json,
+                            origin
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             draft.id,
                             draft.user_id,
@@ -50,6 +57,7 @@ class SqliteImportDraftRepository:
                             draft.expires_at,
                             draft.applied_at,
                             _json_dump(draft.result),
+                            draft.origin,
                         ),
                     )
                     for entry in draft.items:
@@ -135,7 +143,12 @@ class SqliteImportDraftRepository:
                     if row is None:
                         connection.rollback()
                         return None
-                    if str(row["status"]) == "applied" or int(row["expires_at"]) <= now:
+                    # `expires_at = 0` is "never" (a phone draft), not a deadline in
+                    # 1970: purge_expired already knows that, and the claim has to
+                    # as well or a phone draft can never be applied.
+                    expires_at = int(row["expires_at"])
+                    lapsed = expires_at != NEVER_EXPIRES and expires_at <= now
+                    if str(row["status"]) == "applied" or lapsed:
                         connection.rollback()
                         return self._draft(connection, row)
                     can_claim = str(row["status"]) in {"ready", "failed"} or (
@@ -215,13 +228,76 @@ class SqliteImportDraftRepository:
                     f"Cannot delete import draft from: {self.path}"
                 ) from error
 
+    def append_items(
+        self,
+        user_id: str,
+        draft_id: str,
+        items: Sequence[ImportDraftItem],
+        now: int,
+    ) -> bool:
+        if not items:
+            return True
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    row = connection.execute(
+                        "SELECT status FROM import_drafts WHERE id = ? AND user_id = ?",
+                        (draft_id, user_id),
+                    ).fetchone()
+                    if row is None or str(row["status"]) != "ready":
+                        # Gone, or being applied right now. The caller reports
+                        # the works as not accepted so the phone keeps them and
+                        # tries again, rather than losing them quietly.
+                        connection.rollback()
+                        return False
+                    for entry in items:
+                        connection.execute(
+                            """INSERT INTO import_draft_items(
+                                draft_id, item_id, position, state, reason, label,
+                                item_json, candidates_json, collection_eligible
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                draft_id,
+                                entry.id,
+                                entry.position,
+                                entry.state,
+                                entry.reason,
+                                entry.label,
+                                _json_dump(entry.item or {}),
+                                _json_dump(list(entry.candidates)),
+                                int(entry.collection_eligible),
+                            ),
+                        )
+                    connection.execute(
+                        "UPDATE import_drafts SET updated_at = ? WHERE id = ?",
+                        (now, draft_id),
+                    )
+                    connection.commit()
+                    return True
+            except sqlite3.IntegrityError as error:
+                # The unique key is (draft_id, item_id): a retry that raced past
+                # the caller's own check lands here, and the safe answer is the
+                # same as any other "not stored now".
+                raise ImportRepositoryError(
+                    f"Cannot append import draft items in: {self.path}"
+                ) from error
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot append import draft items in: {self.path}"
+                ) from error
+
     def purge_expired(self, now: int) -> int:
         with self._thread_lock:
             try:
                 with closing(self._connect()) as connection:
                     cursor = connection.execute(
+                        # `expires_at > 0` is what keeps a device draft alive. A
+                        # work added on a phone with no connection may wait days
+                        # for a network, and sweeping it away would be the exact
+                        # loss ADR-0005 set out to prevent.
                         """DELETE FROM import_drafts
-                        WHERE expires_at <= ?
+                        WHERE expires_at > 0 AND expires_at <= ?
                           AND (status != 'applying' OR updated_at <= ?)""",
                         (now, now - STALE_APPLY_GRACE_SECONDS),
                     )
@@ -230,6 +306,106 @@ class SqliteImportDraftRepository:
             except sqlite3.Error as error:
                 raise ImportRepositoryError(
                     f"Cannot purge import drafts from: {self.path}"
+                ) from error
+
+    def receipts_for(self, user_id: str, client_ids: Sequence[str]) -> dict[str, DeviceReceipt]:
+        wanted = list(dict.fromkeys(client_ids))
+        if not wanted:
+            return {}
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    found: dict[str, DeviceReceipt] = {}
+                    # Chunked: SQLite bounds the number of bound parameters.
+                    for start in range(0, len(wanted), 200):
+                        chunk = wanted[start : start + 200]
+                        marks = ", ".join("?" for _ in chunk)
+                        rows = connection.execute(
+                            "SELECT client_id, state, reason, item_id, draft_id, updated_at "
+                            f"FROM device_receipts WHERE user_id = ? AND client_id IN ({marks})",
+                            (user_id, *chunk),
+                        ).fetchall()
+                        for row in rows:
+                            found[str(row["client_id"])] = DeviceReceipt(
+                                client_id=str(row["client_id"]),
+                                state=str(row["state"]),
+                                reason=str(row["reason"]),
+                                item_id=str(row["item_id"]),
+                                draft_id=str(row["draft_id"]),
+                                updated_at=int(row["updated_at"]),
+                            )
+                    return found
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot read device receipts from: {self.path}"
+                ) from error
+
+    def save_receipts(self, user_id: str, receipts: Sequence[DeviceReceipt], now: int) -> None:
+        if not receipts:
+            return
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    for receipt in receipts:
+                        connection.execute(
+                            """INSERT INTO device_receipts(
+                                user_id, client_id, state, reason, item_id, draft_id,
+                                created_at, updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(user_id, client_id) DO UPDATE SET
+                                state = excluded.state,
+                                reason = excluded.reason,
+                                item_id = excluded.item_id,
+                                draft_id = excluded.draft_id,
+                                updated_at = excluded.updated_at""",
+                            (
+                                user_id,
+                                receipt.client_id,
+                                receipt.state,
+                                receipt.reason,
+                                receipt.item_id,
+                                receipt.draft_id,
+                                now,
+                                now,
+                            ),
+                        )
+                    connection.commit()
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot save device receipts in: {self.path}"
+                ) from error
+
+    def discard_pending_receipts(self, user_id: str, draft_id: str, reason: str, now: int) -> int:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    cursor = connection.execute(
+                        """UPDATE device_receipts
+                        SET state = 'discarded', reason = ?, item_id = '', updated_at = ?
+                        WHERE user_id = ? AND draft_id = ? AND state = 'pending'""",
+                        (reason, now, user_id, draft_id),
+                    )
+                    connection.commit()
+                    return max(0, cursor.rowcount)
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot discard device receipts in: {self.path}"
+                ) from error
+
+    def purge_receipts(self, resolved_before: int) -> int:
+        with self._thread_lock:
+            try:
+                with closing(self._connect()) as connection:
+                    cursor = connection.execute(
+                        "DELETE FROM device_receipts WHERE state != 'pending' AND updated_at < ?",
+                        (resolved_before,),
+                    )
+                    connection.commit()
+                    return max(0, cursor.rowcount)
+            except sqlite3.Error as error:
+                raise ImportRepositoryError(
+                    f"Cannot purge device receipts from: {self.path}"
                 ) from error
 
     def _connect(self) -> sqlite3.Connection:
@@ -286,6 +462,7 @@ class SqliteImportDraftRepository:
                 "collection_eligible": int(counts["collection_eligible_count"] or 0),
             }
         return ImportDraft(
+            origin=str(row["origin"]),
             id=str(row["id"]),
             user_id=str(row["user_id"]),
             source_name=str(row["source_name"]),

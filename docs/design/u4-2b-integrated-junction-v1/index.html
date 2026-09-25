@@ -1,0 +1,37 @@
+<!doctype html>
+<!--
+THESIS: Un frente pintado continuo, con cartelera y archivo hundidos en él; no una carcasa sobre un fondo.
+OWN-WORLD: Pintura petróleo v2 aprobada, desgaste latón, huecos oscuros, Oswald/Barlow/Plex locales.
+STORY: Leer la jornada, seleccionar una obra y recorrer categorías sin confundir selección, portada y disponibilidad.
+FIRST VIEWPORT: A 1440 px, cartelera superior de unos 410 px con póster a la izquierda; travesaño material y estante alto debajo. Ver más sigue junto a la ficha.
+FORM: Encuentro empotrado fijado por el owner, sin sorteo nuevo. Kit compuesto CSS + fuentes RGB. Prueba aislada con renderer real y fixture explícita; no sustituye Home ni cierra U4.3–5.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="movie-inbox-token" content="isolated-specimen-no-api">
+  <title>U4.2b · Encuentro empotrado · Movie Inbox</title>
+  <link rel="stylesheet" href="/static/css/home-type.css">
+  <link rel="stylesheet" href="/static/css/home-spines.css">
+  <link rel="stylesheet" href="/kit/material-components.css">
+  <link rel="stylesheet" href="/junction.css">
+  <script type="module" src="/junction.js"></script>
+</head>
+<body class="u4-plane">
+  <header class="lab-bar">
+    <div><strong>MOVIE INBOX</strong><span>U4.2b · Prueba de encuentro</span></div>
+    <label>Contenido de prueba <select id="fixtureMode"><option value="populated">Archivo poblado</option><option value="sparse">Una categoría · títulos largos</option><option value="missing">Sin imágenes</option><option value="empty">Archivo vacío</option></select></label>
+  </header>
+  <p class="lab-disclosure">Datos de demostración, no tu catálogo. Selección, flechas y Hoy/Ayer funcionan localmente; ficha y edición sólo muestran un aviso.</p>
+  <main id="mount" aria-label="Muestra de integración de Home"><p role="status">Cargando componentes de Home…</p></main>
+  <footer class="lab-footer">
+    <p id="labFeedback" role="status">Material aprobado. Esta prueba evalúa los encuentros; todavía no cambia la Home.</p>
+    <details><summary>Alcance y fuentes de la prueba</summary>
+      <p>Se carga el HTML y el renderer actual de Home, con un ensamblaje material aislado. No se conecta a APIs ni bases personales. La terminación de cartelera y consola sigue en U4.3–U4.5.</p>
+      <p>Portada de Metropolis: Boris Bilinsky, 1927, <a href="https://commons.wikimedia.org/wiki/File:Boris_Bilinski_-_Filmplakat_f%C3%BCr_Metropolis.jpg">Wikimedia Commons</a>. Las demás fichas y todos los estados personales son sintéticos. Sinopsis, duración y créditos no disponibles se dejan vacíos.</p>
+      <p>Kit compuesto: los PNG de canto y placa son RGB. Sus recortes están encapsulados en CSS; no son exports transparentes ni fondos completos para copiar directamente.</p>
+    </details>
+  </footer>
+</body>
+</html>

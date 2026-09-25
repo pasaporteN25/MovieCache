@@ -11,6 +11,7 @@ _CONTENT_TYPES_BY_SUFFIX = {
     ".js": "text/javascript; charset=utf-8",
     ".png": "image/png",
     ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
 }
 
 # index.html is assembled from fragments, one per surface, in document order.

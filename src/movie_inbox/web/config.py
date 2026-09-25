@@ -45,6 +45,11 @@ class ViewerConfig:
     host: str = "127.0.0.1"
     public_origin: str = ""
     public_presentation_origin: str = ""
+    # SHA-256 SPKI pin of the instance's TLS certificate, base64. Only needed
+    # when the certificate is self-signed: a phone cannot trust one no public
+    # CA vouches for, and the QR is the out-of-band channel that lets it.
+    # The server terminates TLS behind a proxy, so it cannot learn this itself.
+    device_pairing_certificate_pin: str = ""
     forwarded_allow_ips: str = "127.0.0.1"
     image_cache_total_bytes: int = DEFAULT_IMAGE_CACHE_TOTAL_BYTES
     image_cache_warm: bool = True
@@ -53,6 +58,9 @@ class ViewerConfig:
     library_allowed_roots: tuple[str, ...] = ()
     library_scheduler_poll_seconds: float = 15.0
     anime_offline_index: str = ""
+    imdb_dataset_index: str = ""
+    # [B2.4]: how Wikimedia can reach whoever runs this instance. Optional.
+    operator_contact: str = ""
     external_credentials: ExternalSourceCredentials = field(
         default_factory=ExternalSourceCredentials,
         repr=False,

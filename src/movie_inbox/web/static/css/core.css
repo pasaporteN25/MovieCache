@@ -97,6 +97,29 @@
       }
       .nav-count-scanner { background: var(--gold); }
       .header-utilities { align-items: stretch; display: flex; gap: 8px; justify-self: end; }
+      .header-utility-action {
+        align-items: center;
+        background: rgba(8, 10, 24, 0.74);
+        border: 1px solid rgba(120, 92, 255, 0.46);
+        color: var(--muted);
+        display: grid;
+        gap: 1px;
+        justify-items: start;
+        line-height: 1.05;
+        min-height: var(--touch-target);
+        padding-inline: 12px;
+        width: auto;
+      }
+      .header-utility-action:hover,
+      .header-utility-action:focus-visible { color: var(--teal); }
+      .header-utility-action > span { font-size: var(--text-meta); }
+      .header-utility-action > small {
+        color: var(--text-secondary);
+        font-family: var(--font-label);
+        font-size: var(--text-label);
+        font-weight: 800;
+        text-transform: uppercase;
+      }
       .header-command {
         align-items: center;
         background: rgba(255, 190, 85, 0.09);
@@ -367,7 +390,11 @@
 
         .header-utilities { gap: 6px; }
 
-        .nav-action, .header-command, .system-menu > summary { min-height: 44px; }
+        .nav-action, .header-command, .header-utility-action, .system-menu > summary { min-height: 44px; }
+
+        .header-utility-action { padding-inline: 8px; }
+
+        .header-utility-action > small { display: none; }
 
 input,
         select,
@@ -392,6 +419,8 @@ input,
 
         .header-command > small,
         #currentUserLabel { display: none; }
+
+        .header-utility-action { padding-inline: 6px; }
 }
 
 @media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
@@ -484,5 +513,345 @@ input,
         .system-menu-panel {
           max-width: calc(100vw - 28px);
           min-width: min(240px, calc(100vw - 28px));
+        }
+}
+
+/* U2-R.1 desktop shell: the header reads as one physical sign above the
+   live surface. These rules are deliberately desktop-only; the compact/mobile
+   shell above remains the incumbent touch layout. */
+@media (min-width: 861px) {
+        body:has(#homeView:not([hidden])) {
+          background:
+            linear-gradient(180deg, rgba(5, 7, 15, 0.42), rgba(5, 7, 15, 0.88)),
+            linear-gradient(90deg, rgba(8, 20, 34, 0.52), rgba(8, 9, 21, 0.72) 42%, rgba(31, 7, 29, 0.48)),
+            url("../img/night-videotheque-wall-v1.png") center top / cover fixed,
+            var(--surface-app);
+          background-blend-mode: normal, color, normal, normal;
+        }
+
+        body:has(#homeView:not([hidden]))::before {
+          background:
+            linear-gradient(90deg, transparent 0 3px, rgba(15, 18, 21, .95) 3px 7px, rgba(109, 79, 43, .72) 7px 9px, rgba(9, 11, 15, .98) 9px 15px, transparent 15px) 18px 0 / 18px 100% no-repeat,
+            linear-gradient(90deg, transparent 0 3px, rgba(15, 18, 21, .95) 3px 7px, rgba(109, 79, 43, .72) 7px 9px, rgba(9, 11, 15, .98) 9px 15px, transparent 15px) calc(100% - 18px) 0 / 18px 100% no-repeat,
+            repeating-linear-gradient(0deg, transparent 0 3px, rgba(68, 214, 224, .025) 3px 4px);
+          display: block;
+          mask-image: linear-gradient(#000, #000);
+          opacity: .82;
+          z-index: 0;
+        }
+
+        body:has(#homeView:not([hidden])) main {
+          max-width: 1672px;
+          min-height: 100vh;
+          padding: 16px 24px 22px;
+        }
+
+        .app-header {
+          align-items: center;
+          background: linear-gradient(90deg, rgba(4, 6, 13, 0.82), rgba(8, 10, 20, 0.46) 58%, rgba(4, 6, 13, 0.78));
+          border: 0;
+          border-bottom: 2px solid var(--red);
+          border-top: 1px solid rgba(var(--gold-rgb), 0.42);
+          box-shadow: 0 9px 24px rgba(0, 0, 0, 0.42);
+          column-gap: 0;
+          row-gap: 18px;
+          grid-template-columns: minmax(280px, 1fr) auto auto;
+          margin-bottom: 10px;
+          min-height: 64px;
+          padding: 7px 14px 7px 12px;
+          position: relative;
+          top: auto;
+        }
+
+        .app-header::after {
+          background: linear-gradient(90deg, transparent, rgba(var(--teal-rgb), 0.34) 18%, rgba(var(--red-rgb), 0.5) 68%, transparent);
+          bottom: -2px;
+          content: "";
+          height: 1px;
+          left: 0;
+          pointer-events: none;
+          position: absolute;
+          right: 0;
+        }
+
+        .brand-lockup {
+          align-items: center;
+          display: grid;
+          grid-template-columns: 24px minmax(0, auto) auto minmax(20px, 1fr);
+          column-gap: 12px;
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .brand-lockup::before,
+        .brand-lockup::after {
+          background: var(--red);
+          box-shadow: 0 0 8px rgba(var(--red-rgb), 0.62);
+          content: "";
+          display: block;
+          height: 2px;
+          min-width: 0;
+        }
+
+        .brand-lockup::before {
+          box-shadow: 0 -6px 0 rgba(var(--red-rgb), 0.72), 0 6px 0 rgba(var(--red-rgb), 0.72), 0 0 8px rgba(var(--red-rgb), 0.58);
+          width: 24px;
+        }
+
+        .brand-lockup::after {
+          background: linear-gradient(90deg, rgba(var(--red-rgb), 0.74), rgba(var(--teal-rgb), 0.34), transparent);
+          box-shadow: none;
+          width: 100%;
+        }
+
+        .brand-kicker {
+          display: none;
+        }
+
+        .brand-home {
+          display: block;
+          max-width: min(51vw, 850px);
+          min-width: 0;
+          text-decoration: none;
+        }
+
+        .brand-home:hover { text-decoration: none; }
+
+        h1 {
+          background: none;
+          color: #ffd8ed;
+          font-size: clamp(30px, 3.15vw, 46px);
+          line-height: 0.9;
+          overflow: hidden;
+          overflow-wrap: normal;
+          text-overflow: ellipsis;
+          text-shadow: 0 0 1px #fff, 0 0 8px rgba(var(--red-rgb), 0.78), 0 0 20px rgba(var(--red-rgb), 0.34);
+          white-space: nowrap;
+        }
+
+        .stats {
+          border-left: 1px solid rgba(var(--teal-rgb), 0.42);
+          color: #91d5d9;
+          font-family: var(--font-label);
+          font-size: var(--text-meta);
+          letter-spacing: 0.055em;
+          line-height: 1;
+          margin: 0;
+          max-width: none;
+          padding-left: 12px;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+
+        .primary-nav {
+          align-items: stretch;
+          background: transparent;
+          border: 0;
+          gap: 0;
+          justify-self: end;
+          padding: 0;
+          margin-right: -1px;
+        }
+
+        .primary-nav .nav-action {
+          border: 1px solid rgba(var(--gold-rgb), 0.66);
+          color: var(--text-primary);
+          font-family: var(--font-display);
+          font-size: 16px;
+          font-style: italic;
+          letter-spacing: 0.08em;
+          min-height: 42px;
+          padding: 7px 20px;
+          text-transform: uppercase;
+        }
+
+        .primary-nav #homeButton,
+        .primary-nav #inboxButton,
+        .primary-nav #clubButton,
+        .header-utilities > #headerSearchButton,
+        .header-utilities > #headerAddButton,
+        .header-utilities > #randomButton { display: none; }
+
+        .primary-nav .nav-action:hover,
+        .primary-nav .nav-action:focus-visible,
+        .primary-nav .nav-action.active {
+          background: rgba(var(--gold-rgb), 0.12);
+          border-color: var(--gold);
+          color: var(--gold);
+        }
+
+        .header-utilities {
+          align-items: stretch;
+          gap: 0;
+          justify-self: end;
+        }
+
+        .system-menu > summary {
+          background: rgba(7, 9, 18, 0.62);
+          border: 1px solid rgba(var(--gold-rgb), 0.66);
+          color: var(--text-primary);
+          font-family: var(--font-display);
+          font-size: 16px;
+          font-style: italic;
+          letter-spacing: 0.08em;
+          min-height: 42px;
+          padding: 7px 20px;
+          text-transform: uppercase;
+        }
+
+        .primary-nav #catalogButton,
+        .system-menu > summary { border-radius: 0; }
+
+        .primary-nav #catalogButton { border-right-color: rgba(var(--gold-rgb), 0.34); }
+
+        .system-menu > summary::after { color: var(--gold); }
+        .system-menu > summary .account-mark { display: none; }
+        .system-menu > summary #currentUserLabel { display: none; }
+        .menu-summary-label { display: inline; }
+
+        .system-menu-panel {
+          background: rgba(10, 12, 25, 0.98);
+          border-color: rgba(var(--gold-rgb), 0.62);
+          min-width: 284px;
+          padding: 10px;
+        }
+
+        .menu-route-group {
+          border-bottom: 1px solid var(--line);
+          display: grid;
+          gap: 6px;
+          padding-bottom: 10px;
+        }
+
+        .menu-route-action {
+          min-height: 38px;
+          width: 100%;
+        }
+
+        .menu-route-group .nav-action {
+          background: rgba(var(--teal-rgb), 0.08);
+          border-color: rgba(var(--teal-rgb), 0.34);
+          color: var(--ink);
+          text-align: left;
+        }
+
+        .menu-route-group .header-command {
+          background: rgba(var(--gold-rgb), 0.11);
+          color: var(--gold);
+        }
+
+        .menu-route-group .header-utility-action {
+          background: rgba(var(--violet-rgb), 0.11);
+          color: var(--ink);
+          display: grid;
+          text-align: left;
+        }
+
+        .menu-route-group .header-utility-action > small,
+        .menu-route-group .header-command > small { color: var(--muted); }
+
+        .menu-desktop-action { display: block; }
+}
+
+@media (max-width: 860px) {
+        .menu-desktop-action { display: none !important; }
+        .menu-summary-label { display: none; }
+}
+
+@media (min-width: 861px) and (max-width: 1100px) {
+        .app-header { padding-left: 8px; padding-right: 8px; }
+
+        .brand-lockup {
+          column-gap: 8px;
+          grid-template-columns: 18px minmax(0, auto) auto minmax(8px, 1fr);
+        }
+
+        .brand-lockup::before { width: 18px; }
+
+        .brand-home { max-width: 38vw; }
+
+        h1 { font-size: clamp(27px, 3vw, 34px); }
+
+        .stats {
+          font-size: var(--text-meta);
+          padding-left: 8px;
+        }
+
+        .primary-nav .nav-action,
+        .system-menu > summary {
+          font-size: 14px;
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+}
+
+@media (min-width: 861px) and (max-height: 1100px) {
+        body:has(#homeView:not([hidden])) main {
+          padding-bottom: 8px;
+          padding-top: 8px;
+        }
+        body:has(#homeView:not([hidden])) .app-header {
+          margin-bottom: 6px;
+          min-height: 60px;
+          padding-bottom: 6px;
+          padding-top: 6px;
+        }
+        body:has(#homeView:not([hidden])) h1 {
+          font-size: clamp(32px, 2.5vw, 38px);
+        }
+}
+
+@media (min-width: 861px) and (max-height: 800px) {
+        body:has(#homeView:not([hidden])) main { padding-bottom: 8px; padding-top: 8px; }
+        body:has(#homeView:not([hidden])) .app-header {
+          min-height: 60px;
+          padding-bottom: 6px;
+          padding-top: 6px;
+        }
+        body:has(#homeView:not([hidden])) h1 { font-size: clamp(32px, 2.5vw, 38px); }
+}
+
+/* U2-R.6 mobile recovery: the compact shell keeps the operational commands,
+   but gives the instance name a complete row instead of squeezing it beside
+   four controls. */
+@media (max-width: 860px) {
+        .app-header {
+          align-items: stretch;
+          gap: 10px;
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .brand-lockup {
+          grid-column: 1;
+          grid-row: 1;
+          width: 100%;
+        }
+
+        .brand-home { min-width: 0; }
+
+        h1 {
+          font-size: clamp(24px, 7.2vw, 28px);
+          line-height: 1;
+          overflow-wrap: normal;
+          text-wrap: balance;
+          word-break: normal;
+        }
+
+        .header-utilities {
+          display: grid;
+          grid-column: 1;
+          grid-row: 2;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          justify-self: stretch;
+          width: 100%;
+        }
+
+        .header-utilities > *,
+        .header-utilities .header-command,
+        .header-utilities .header-utility-action,
+        .header-utilities .system-menu > summary {
+          justify-content: center;
+          min-width: 0;
+          width: 100%;
         }
 }

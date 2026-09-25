@@ -9,6 +9,7 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
+from movie_inbox.external.common import user_agent_for
 from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.security import open_public_url, validate_http_url
 
@@ -119,7 +120,9 @@ def download_image(
     response = open_public_url(
         image_url,
         headers={
-            "User-Agent": "MovieInboxViewer/0.2 (+local personal catalog)",
+            "User-Agent": user_agent_for(
+                image_url, default="MovieInboxViewer/0.2 (+local personal catalog)"
+            ),
             "Accept": "image/avif,image/webp,image/png,image/jpeg,image/gif",
         },
         timeout=10,

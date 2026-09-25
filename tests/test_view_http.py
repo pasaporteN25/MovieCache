@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from movie_inbox.application.auth_service import AuthService
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.privacy import PrivacyPreferences
+from movie_inbox.external.registry import default_source_adapters
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.json_repository import JsonCatalogRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
@@ -149,6 +150,33 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(refresh_after_logout.status_code, 401, refresh_after_logout.content)
         self.assertEqual(web_session.status_code, 200, web_session.content)
 
+    def test_a_lost_refresh_response_can_be_retried_with_the_same_token(self) -> None:
+        # [X4.1]: the phone sent its refresh token, the server rotated, the
+        # answer never arrived. The phone only has the token it just spent.
+        headers = {"Content-Type": "application/json"}
+        created = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {"username": "lucas", "password": self.owner_password, "device_name": "Pixel"}
+            ),
+            headers=headers,
+        )
+        spent = created.json()["refresh_token"]
+        lost = self.client.post(
+            "/api/v1/auth/refresh", content=json.dumps({"refresh_token": spent}), headers=headers
+        )
+        self.assertEqual(lost.status_code, 200, lost.content)
+
+        retried = self.client.post(
+            "/api/v1/auth/refresh", content=json.dumps({"refresh_token": spent}), headers=headers
+        )
+
+        self.assertEqual(retried.status_code, 200, retried.content)
+        me = self.client.get(
+            "/api/v1/me", headers={"Authorization": f"Bearer {retried.json()['access_token']}"}
+        )
+        self.assertEqual(me.status_code, 200, me.content)
+
     def test_device_login_uses_the_shared_credential_rate_limit(self) -> None:
         body = json.dumps(
             {
@@ -270,8 +298,10 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(search.status_code, 200, search.content)
         self.assertEqual([item["title"] for item in search.json()["items"]], ["Heat"])
         self.assertEqual(patched.status_code, 200, patched.content)
+        patched_personal = dict(patched.json()["personal"])
+        changed_at = patched_personal.pop("changed_at")
         self.assertEqual(
-            patched.json()["personal"],
+            patched_personal,
             {
                 "status": "watched",
                 "watched_at": "2026-09-02",
@@ -279,6 +309,8 @@ class ViewerHttpTests(unittest.TestCase):
                 "review": "Una noche intensa.",
             },
         )
+        # [X3.3]: one call touching all three groups marks all three.
+        self.assertEqual(set(changed_at), {"status", "rating", "review"})
         self.assertEqual(cleared.status_code, 200, cleared.content)
         self.assertIsNone(cleared.json()["personal"]["rating"])
         self.assertIsNone(cleared.json()["personal"]["review"])
@@ -1583,7 +1615,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b".dvd-case", css)
         self.assertIn(b".dvd-front-statuses", css)
         self.assertIn(b".home-shelf-rail", css)
-        self.assertIn(b".vhs-cassette", css)
+        self.assertIn(b".vhs-spine", css)
+        self.assertIn(b".vhs-case", css)
+        self.assertIn(b".home-shelf-categories", css)
         self.assertIn(b".spotlight-selector", css)
         self.assertIn(b".collection-filter-toolbar", css)
         self.assertIn(b".filter-segments", css)
@@ -1625,7 +1659,8 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b"@media (hover: none) and (pointer: coarse)", css)
         self.assertIn(b":has(.dvd-open-surface:focus-visible)", css)
         self.assertIn(b".drawer-accordion", css)
-        self.assertIn(b".spotlight-stage", css)
+        # U4.6b: css/home.css, which held .spotlight-stage, is no longer imported.
+        self.assertIn(b"#homeView .spotlight-layout", css)
         self.assertIn(b".detail-drawer[open]", css)
         self.assertIn(b".personal-record-read", css)
         self.assertIn(b".drawer-navigation", css)
@@ -1663,6 +1698,25 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn(b"<svg", body)
 
+    def test_every_registrable_external_source_has_a_frontend_label(self) -> None:
+        # [F5.4]: TMDb reached production without an entry in SOURCE_LABELS, so every
+        # real result rendered as "Sin fuente". Cosmetic in the result card, but
+        # duplicateSignalsCollide() compares labels rather than raw sources, so two
+        # items from different unlabelled sources also collapsed into one signal and
+        # the [V5-4] disambiguation fallback lost a real distinguishing fact. Only a
+        # live run with a valid token could surface it, so pin it structurally here.
+        status, body = self.request("GET", "/static/js/core/format.js")
+        self.assertEqual(status, 200)
+        block = re.search(r"const SOURCE_LABELS = \{(.*?)\n\s*\};", body.decode("utf-8"), re.DOTALL)
+        self.assertIsNotNone(block)
+        assert block is not None
+        labelled = set(re.findall(r"(\w+)\s*:", block.group(1)))
+        registrable = {
+            adapter.name for adapter in default_source_adapters("token-that-registers-tmdb")
+        }
+        self.assertIn("tmdb", registrable)
+        self.assertEqual(sorted(registrable - labelled), [])
+
     def test_vhs_frame_is_a_packaged_local_png_asset(self) -> None:
         status, body = self.request("GET", "/static/img/vhs-cassette-frame-v1.png")
         self.assertEqual(status, 200)
@@ -1672,7 +1726,7 @@ class ViewerHttpTests(unittest.TestCase):
     def test_static_assets_are_cached_with_etag_revalidation(self) -> None:
         first = self.client.get("/static/js/core/bootstrap.js")
         self.assertEqual(first.status_code, 200)
-        self.assertEqual(first.headers["cache-control"], "public, max-age=3600, must-revalidate")
+        self.assertEqual(first.headers["cache-control"], "public, max-age=0, must-revalidate")
         etag = first.headers["etag"]
         self.assertTrue(etag)
 
@@ -1680,9 +1734,7 @@ class ViewerHttpTests(unittest.TestCase):
             "/static/js/core/bootstrap.js", headers={"If-None-Match": etag}
         )
         self.assertEqual(revalidated.status_code, 304)
-        self.assertEqual(
-            revalidated.headers["cache-control"], "public, max-age=3600, must-revalidate"
-        )
+        self.assertEqual(revalidated.headers["cache-control"], "public, max-age=0, must-revalidate")
         self.assertFalse(revalidated.content)
 
         # API responses stay uncached: they carry per-session catalog data.
@@ -3214,6 +3266,96 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(public_route.status_code, 404)
         self.assertEqual(login.status_code, 403)
         self.assertEqual(login.json()["reason"], "invalid_origin")
+
+    # [X8]: the ficha saves through /api/personal, and used to undo a phone's edit.
+
+    def _phone(self) -> tuple[dict[str, str], str]:
+        login = self.client.post(
+            "/api/v1/auth/login",
+            content=json.dumps(
+                {"username": "lucas", "password": self.owner_password, "device_name": "Pixel"}
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+        item = self.client.get("/api/v1/catalog/items", headers=headers).json()["items"][0]
+        return headers, str(item["id"])
+
+    def _phone_patch(self, headers: dict[str, str], item_id: str, body: dict[str, object]):
+        return self.client.patch(
+            f"/api/v1/catalog/items/{item_id}/personal",
+            content=json.dumps(body),
+            headers={**headers, "Content-Type": "application/json"},
+        )
+
+    def _phone_view(self, headers: dict[str, str], item_id: str) -> dict[str, object]:
+        response = self.client.get(f"/api/v1/catalog/items/{item_id}", headers=headers)
+        personal: dict[str, object] = response.json()["personal"]
+        return personal
+
+    def _save_from_ficha(self, body: dict[str, object]):
+        return self.client.post(
+            "/api/personal", content=json.dumps({"id": "heat", **body}), headers=self.post_headers()
+        )
+
+    def test_saving_one_field_from_the_ficha_does_not_undo_a_phone_s_rating(self) -> None:
+        headers, item_id = self._phone()
+        # The ficha is open. A phone uploads a rating. The ficha then saves only
+        # the review, because that is the only thing the person touched.
+        self._phone_patch(headers, item_id, {"rating": 9})
+
+        saved = self._save_from_ficha({"review": "Una noche intensa."})
+
+        self.assertEqual(saved.status_code, 200, saved.content)
+        personal = self._phone_view(headers, item_id)
+        self.assertEqual(personal["rating"], 9, "the phone's rating must survive")
+        self.assertEqual(personal["review"], "Una noche intensa.")
+
+    def test_a_form_that_still_sends_all_three_behaves_as_it_always_did(self) -> None:
+        headers, item_id = self._phone()
+        self._phone_patch(headers, item_id, {"rating": 9})
+
+        saved = self._save_from_ficha({"watched_at": "", "rating": 0, "review": "Sola."})
+
+        self.assertEqual(saved.status_code, 200, saved.content)
+        personal = self._phone_view(headers, item_id)
+        self.assertIsNone(personal["rating"])
+        self.assertEqual(personal["review"], "Sola.")
+
+    def test_a_stale_base_is_a_409_and_writes_nothing(self) -> None:
+        headers, item_id = self._phone()
+        self._phone_patch(headers, item_id, {"review": "Desde el telefono."})
+
+        saved = self._save_from_ficha({"review": "Desde la ficha.", "base": {"review": ""}})
+
+        self.assertEqual(saved.status_code, 409, saved.content)
+        self.assertEqual(saved.json(), {"ok": False, "reason": "personal_conflict"})
+        self.assertEqual(self._phone_view(headers, item_id)["review"], "Desde el telefono.")
+
+    def test_a_base_read_off_the_row_the_page_loaded_applies(self) -> None:
+        headers, item_id = self._phone()
+
+        saved = self._save_from_ficha(
+            {"review": "Buenisima.", "base": {"watched_at": "", "rating": 0, "review": ""}}
+        )
+
+        self.assertEqual(saved.status_code, 200, saved.content)
+        self.assertEqual(self._phone_view(headers, item_id)["review"], "Buenisima.")
+
+    def test_saving_no_fields_is_refused_instead_of_clearing_them(self) -> None:
+        headers, item_id = self._phone()
+        self._phone_patch(headers, item_id, {"rating": 9, "review": "Guardada."})
+
+        saved = self._save_from_ficha({})
+
+        self.assertEqual(saved.status_code, 400, saved.content)
+        personal = self._phone_view(headers, item_id)
+        self.assertEqual((personal["rating"], personal["review"]), (9, "Guardada."))
+
+    def test_a_malformed_base_is_a_400(self) -> None:
+        saved = self._save_from_ficha({"review": "x", "base": "rating:0"})
+
+        self.assertEqual(saved.status_code, 400, saved.content)
 
     def test_json_body_limit_is_enforced(self) -> None:
         body = json.dumps({"id": "heat", "review": "x" * MAX_JSON_BODY_BYTES})

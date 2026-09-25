@@ -1,66 +1,122 @@
 # Movie Inbox
 
-Gestor self-hosted para organizar obras, disponibilidad fisica y memoria personal a partir de listas, fuentes externas y bibliotecas locales.
+**Un catálogo audiovisual self-hosted: qué obras te importan, cuáles tenés, cuáles viste
+y qué opinás de ellas.** Corre en tu servidor, con tus datos, sin cuenta en ningún lado.
+
+Empieza donde empiezan casi todos: una lista de títulos en un `.txt`. Movie Inbox la
+importa, la enriquece contra fuentes públicas, encuentra los archivos que ya tenés en el
+disco y los empareja con las obras — dejando para revisión humana todo lo que no puede
+afirmar con certeza.
+
+## Qué resuelve
+
+- **Una lista suelta se vuelve un catálogo.** Importa TXT, CSV o JSON y completa títulos
+  en varios idiomas, año, duración, géneros, dirección y reparto desde Wikipedia,
+  Wikidata, IMDb, FilmAffinity, TMDb y MyAnimeList.
+- **Sabés qué tenés.** El Scanner recorre las bibliotecas montadas y dice qué obra tiene
+  archivo y cuál no, sin que edites nada a mano.
+- **Y qué viste.** Estado, fecha, puntaje y review son tuyos y viven aparte de todo lo
+  demás.
+- **Sin falsos positivos silenciosos.** Cuando una coincidencia es dudosa va a una cola de
+  revisión en vez de decidirse sola. Es un gate real, medido en CI desde v0.3.0.
+- **Compartir sin filtrar.** `Club` muestra identidad compartida a otros miembros y nunca
+  rutas, archivos, notas ni estado operativo.
+
+## Qué no es
+
+Vale la pena decirlo para no perder el tiempo de nadie: **no descarga nada, no reproduce
+nada y no es un servidor de medios.** No compite con Plex, Jellyfin ni con Radarr o Sonarr
+— de hecho, si tenés archivos, se apoya en que ya estén en el disco. Es la capa de
+*decidir qué ver y recordar qué viste*, no la de conseguirlo ni la de reproducirlo.
+
+## Índice
+
+- [Estado del proyecto](#estado-del-proyecto)
+- [Cómo está organizado](#cómo-está-organizado)
+- [Puesta en marcha](#puesta-en-marcha) · [Primer acceso](#primer-acceso) ·
+  [Miembros](#miembros-y-catalogos-personales) · [Club y privacidad](#club-y-privacidad)
+- [Persistencia y backups](#persistencia-y-backups)
+- [Escanear una carpeta local](#escanear-una-carpeta-local-de-peliculas)
+- [Interfaz web](#interfaz-web) · [Importaciones desde la Bandeja](#importaciones-desde-la-bandeja)
+- [Esquema versionado y migración](#esquema-versionado-y-migracion)
+- [Seguridad del visor web](#seguridad-del-visor-web) · [Pruebas](#pruebas) ·
+  [Despliegue](#despliegue-en-servidor)
+- [Estado de compatibilidad](#estado-de-compatibilidad)
 
 ## Estado del proyecto
 
-La version estable actual es **v0.8.0**. Movie Inbox es una aplicacion web multiusuario para una instancia personal o familiar: cada cuenta tiene su propio catalogo, mientras que el inventario fisico y las bibliotecas administradas pertenecen al servidor. Importa listas, consulta fuentes externas, detecta duplicados y permite administrar disponibilidad, estado de visualizacion, puntajes y reviews.
+La versión estable es **v0.9.0**. Es una aplicación web multiusuario para una instancia
+personal o familiar: cada cuenta tiene su catálogo, mientras que el inventario físico y las
+bibliotecas administradas pertenecen al servidor.
 
-v0.3.0 cerro el gate de calidad de busqueda (cero falsos positivos conocidos en
-auto-match y merge, con `movie-inbox search-lab run --enforce` como gate real en CI).
-v0.4.0 unifico el lenguaje visual y la arquitectura de `Inicio`, `Coleccion`, `Bandeja`,
-`Club` y `Administrar`: una franja de alcance persistente distingue `Archivo fisico`,
-`Identidad compartida` y `Ficha en tu catalogo` en cada decision; disponibilidad se
-presenta siempre como `Disponible` (o no) con su procedencia real, nunca como el flag
-manual crudo; y la cola de revision se organiza por causa y confianza en vez de una
-lista plana.
+El historial completo de versiones está en [CHANGELOG.md](CHANGELOG.md) y no se repite acá.
 
-v0.5.0 completa ese cierre: Scanner incorpora actividad y deshacer, Curaduria suma
-busqueda y navegacion por teclado, los duplicados quedan diferenciados aun en empates
-extremos y la busqueda externa reconoce titulos multilingues verificados contra el
-mismo identificador de IMDb. El acceso conserva el carnet de videoclub con una
-secuencia de credenciales mas clara y adaptable.
+### Novedades de la 0.9.0
 
-v0.8.0 rediseña Inicio como un selector editorial navegable y estanterías horizontales
-con un kit visual de VHS accesible, sin cambiar contratos ni datos. v0.7.0 suma una cartelera publica opt-in, aislada del catalogo y de las sesiones, mas
-una receta reproducible de HTTPS/Nginx con hosts privado y publico separados. Tambien
-define y prueba, sin habilitar red, el formato de intercambio manual entre homeservers.
-Detalle completo de las versiones en [CHANGELOG.md](CHANGELOG.md).
+Se sumó en esta versión:
 
-El paquete instalable y la interfaz web son el camino recomendado. Los lanzadores de
-compatibilidad con v0.1 (`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`,
-`enrich_catalog.py`, `match_external_links.py`, `migrate_catalog.py`) no viven en este
-repositorio: quedan en `codigoLegacy/`, fuera de Git, para quien todavia los necesite
-localmente — ver [Estado de compatibilidad](#estado-de-compatibilidad) al final de este
-documento.
+- **Disponibilidad en plataformas de streaming.** Back office de regiones y plataformas,
+  con snapshot fechado por obra y mercado. `en_plataforma` se deriva al leer y es
+  independiente de `en_catalogo`: estar en Netflix y tener el archivo son dos hechos
+  distintos. Fuente y condiciones en
+  [ADR-0004](docs/adr/0004-streaming-availability-source.md).
+- **Puntajes públicos de IMDb y TMDb**, servidos juntos al lado del puntaje propio, nunca
+  mezclados con él. Los de IMDb salen del índice local; los de TMDb, de un snapshot
+  fechado.
+- **Charadas**, un juego construido sobre el catálogo que ya existe, con mazo determinista
+  y portable para que dos teléfonos sin conexión entre sí generen el mismo.
+  Contrato en [`docs/briefs/charades-v1.md`](docs/briefs/charades-v1.md).
+- **API de dispositivo v1** con sesiones opacas revocables y una clave de sincronización
+  que sobrevive a rotar el token y a mover el catálogo.
+- **Índice local de IMDb** conectado como autoridad de metadatos, reducido de ~8 GB a
+  ~1,1 GB.
 
-En una instalacion nueva, SQLite es la fuente de verdad recomendada. JSON conserva un contrato versionado como formato de importacion, exportacion y auditoria, pero una exportacion individual no reemplaza el backup completo de la instancia. Catalogos, cuentas, reportes, caches y backups se mantienen fuera de Git. Las capacidades de cada version estan resumidas en [CHANGELOG.md](CHANGELOG.md).
+### Dirección próxima
 
-El gate reproducible de pruebas y aceptacion en un servidor real esta documentado en [docs/release-checklist.md](docs/release-checklist.md).
+El foco declarado el 2026-09-07 es **la calidad y la presentación de la búsqueda y las
+colecciones**. Las integraciones con Radarr, Sonarr y Letterboxd quedaron **evaluadas y
+postergadas**: ver [ADR-0006](docs/adr/0006-radarr-como-fuente-de-inventario.md),
+[ADR-0007](docs/adr/0007-sonarr-como-fuente-de-inventario.md) y
+[ADR-0008](docs/adr/0008-letterboxd-historial-personal.md). El cliente Android se
+reespecificó como aplicación autónoma en
+[ADR-0005](docs/adr/0005-mobile-direction.md) y es un proyecto aparte, con su propio
+repositorio (`movieIndexAndroid`); este repositorio le da la API de dispositivo.
 
-El codigo principal vive en el paquete instalable `src/movie_inbox`.
+## Cómo está organizado
 
-Nucleo actual:
+El código vive en el paquete instalable `src/movie_inbox`, en capas con una regla que se
+verifica por AST en `tests/test_layering.py`: **`domain/` y `application/` no importan
+`infrastructure`, `external`, `web` ni `cli`.**
 
-- `scripts/docker-backup.sh`: detiene brevemente Compose, crea un backup verificado y comprueba el reinicio.
-- `src/movie_inbox/domain/`: modelos, normalizacion, matching y reglas de merge.
-- `src/movie_inbox/application/`: casos de uso compartidos por el visor, importadores y scanner.
-- `src/movie_inbox/infrastructure/`: esquemas, repositorios JSON/SQLite y exportacion.
-- `src/movie_inbox/external/`: clientes separados para Wikipedia, Wikidata, IMDb, FilmAffinity y Jikan.
-- `src/movie_inbox/web/`: aplicacion FastAPI, servidor Uvicorn, proxy seguro de imagenes y assets estaticos.
-- `catalog.schema.json`: contrato JSON versionado del catalogo.
-- `PRODUCT.md` y `DESIGN.md`: contratos de producto, terminologia y lenguaje visual del visor.
+| Capa | Qué hay | Qué no puede haber |
+| --- | --- | --- |
+| `domain/` | modelos, normalización, matching, reglas de merge | I/O, HTTP, SQLite, FastAPI |
+| `application/` | casos de uso, servicios, repositorios abstractos | persistencia concreta |
+| `infrastructure/` | esquemas, repositorios JSON/SQLite, exportación, scanner | reglas de negocio |
+| `external/` | clientes de Wikipedia, Wikidata, IMDb, FilmAffinity, TMDb, Jikan | — |
+| `web/` | FastAPI, Uvicorn, proxy de imágenes, assets, seguridad HTTP | — |
+| `cli/` | subcomandos de `movie-inbox` | los comandos batch no importan `web` |
 
-Herramientas conservadas por compatibilidad, todavia en el repositorio:
+Contratos que no son documentación decorativa:
 
-- `scripts/scan_video_catalog.sh`: genera un JSON puntual desde archivos de video.
-- `scripts/build_viewer.py`: visor HTML estatico para exportaciones.
-- `chrome-extension/`: capturador experimental con exportacion CSV/JSON, sin sincronizacion directa con la instancia.
+- [`PRODUCT.md`](PRODUCT.md) — terminología. `en_catalogo` (tener el archivo) es
+  independiente de `to_watch`/`watched`, y nunca se presentan como intercambiables.
+- [`DESIGN.md`](DESIGN.md) — lenguaje visual.
+- [`catalog.schema.json`](catalog.schema.json) — contrato JSON versionado. **SQLite es la
+  fuente de verdad**; JSON es importación, exportación y backup, y una exportación
+  individual no reemplaza el backup completo de la instancia.
+- [`docs/adr/`](docs/adr) — decisiones con su evidencia y sus condiciones.
+- [`docs/briefs/`](docs/briefs) — contratos de entrega. [`docs/analisis/`](docs/analisis) —
+  evaluaciones medidas. [`docs/design/`](docs/design) — auditorías visuales.
+- [`docs/release-checklist.md`](docs/release-checklist.md) — el gate reproducible de
+  pruebas y aceptación en un servidor real.
 
-Los lanzadores de v0.1 que solo llamaban al mismo comando del paquete
-(`txt_to_catalog.py`, `scan_library.py`, `view_catalog.py`, mas los shims de import
-`catalog_*.py`) se movieron a `codigoLegacy/` — ver
-[Estado de compatibilidad](#estado-de-compatibilidad).
+Herramientas que siguen en el repositorio por compatibilidad, fuera del camino principal:
+`scripts/scan_video_catalog.sh`, `scripts/build_viewer.py` y `chrome-extension/`. Los
+lanzadores de v0.1 y los shims `catalog_*.py` se movieron a `codigoLegacy/`, fuera de Git —
+ver [Estado de compatibilidad](#estado-de-compatibilidad).
+
+Catálogos, cuentas, reportes, cachés y backups se mantienen fuera de Git.
 
 ## Puesta en marcha
 
@@ -87,6 +143,7 @@ movie-inbox match catalog.json --json catalog-con-links.json
 movie-inbox db import catalog.json --db data/movie-inbox.db
 movie-inbox db export data/movie-inbox.db --json backups/catalog.json
 movie-inbox cache info --dir .catalog-cache/images
+movie-inbox images coverage catalog.json --instance-db .movie-inbox/instance.db
 movie-inbox backup create data --output-dir backups --retention-days 14
 movie-inbox backup verify backups/movie-inbox-instance-20260811-033000Z.tar.gz
 movie-inbox search-lab run --json reports/search-baseline.json --html reports/search-baseline.html
@@ -793,4 +850,8 @@ borraron— a `codigoLegacy/` en el checkout local, ignorado por Git
 (`.gitignore`); quien todavia los necesite los sigue teniendo a mano, pero no forman
 parte de lo que se clona, se publica en un release ni se ejecuta en CI o Docker.
 
-Temporadas y episodios, sincronizacion directa de la extension y una app Kotlin siguen siendo lineas futuras.
+Temporadas y episodios, y la sincronizacion directa de la extension, siguen siendo
+lineas futuras. La app Kotlin ya no lo es: tiene direccion decidida en
+[ADR-0005](docs/adr/0005-mobile-direction.md) y vive en su propio repositorio,
+`movieIndexAndroid`, que consume la API de dispositivo de este
+([`docs/openapi/device-api-v1.openapi.json`](docs/openapi/device-api-v1.openapi.json)).

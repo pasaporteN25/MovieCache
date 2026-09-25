@@ -10,6 +10,47 @@ IMPORT_FORMATS = {"txt", "csv", "json"}
 IMPORT_DRAFT_STATUSES = {"ready", "applying", "applied", "failed"}
 IMPORT_ITEM_STATES = {"new", "present", "review", "invalid"}
 
+# Where a draft came from. A file someone uploaded through the browser is
+# `web`; works added on a phone with no connection are `device`.
+WEB_ORIGIN = "web"
+DEVICE_ORIGIN = "device"
+IMPORT_DRAFT_ORIGINS = {WEB_ORIGIN, DEVICE_ORIGIN}
+
+# `expires_at = 0` means the draft never expires, and only a device draft is
+# allowed to use it. ADR-0005 decided why: a draft written offline may wait days
+# for a network, so expiring it would be exactly the loss the decision existed to
+# prevent. An upload sitting in a browser has no such excuse and keeps its 48
+# hours.
+NEVER_EXPIRES = 0
+
+# [X6]: what the server tells a phone about a work it sent while offline. It has
+# to outlive the draft the work was parked in, because that draft is applied or
+# deleted in the browser, and the phone asks afterwards.
+DEVICE_RECEIPT_STATES = {"pending", "applied", "discarded"}
+
+
+@dataclass(frozen=True)
+class DeviceReceipt:
+    """One offline addition, by the id the phone generated for it.
+
+    `item_id` is the catalog item the work ended up as, and is only set when
+    `state` is `applied`; it is the catalogue's own id, and translating it into
+    the opaque id a device sees is the web layer's job.
+    """
+
+    client_id: str
+    state: str
+    reason: str = ""
+    item_id: str = ""
+    draft_id: str = ""
+    updated_at: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.client_id:
+            raise ValueError("A receipt requires the client's id")
+        if self.state not in DEVICE_RECEIPT_STATES:
+            raise ValueError(f"Invalid receipt state: {self.state}")
+
 
 @dataclass(frozen=True)
 class ParsedImportItem:
@@ -66,6 +107,7 @@ class ImportDraft:
     result: dict[str, Any] = field(default_factory=dict)
     items: tuple[ImportDraftItem, ...] = field(default_factory=tuple)
     count_snapshot: dict[str, int] = field(default_factory=dict)
+    origin: str = WEB_ORIGIN
 
     def __post_init__(self) -> None:
         if not self.id or not self.user_id or not self.source_hash:
@@ -74,11 +116,22 @@ class ImportDraft:
             raise ValueError(f"Invalid import format: {self.source_format}")
         if self.status not in IMPORT_DRAFT_STATUSES:
             raise ValueError(f"Invalid import draft status: {self.status}")
-        if self.expires_at <= self.created_at:
+        if self.origin not in IMPORT_DRAFT_ORIGINS:
+            raise ValueError(f"Invalid import draft origin: {self.origin}")
+        if self.never_expires and self.origin != DEVICE_ORIGIN:
+            # Kept narrow deliberately: without this, a web upload could be made
+            # immortal by passing a zero, and the 48-hour bound that keeps
+            # untrusted uploads from accumulating would quietly stop applying.
+            raise ValueError("Only a device draft may be kept without an expiry")
+        if not self.never_expires and self.expires_at <= self.created_at:
             raise ValueError("An import draft must expire after it is created")
 
+    @property
+    def never_expires(self) -> bool:
+        return self.expires_at == NEVER_EXPIRES
+
     def expired(self, now: int) -> bool:
-        return self.expires_at <= now
+        return not self.never_expires and self.expires_at <= now
 
     def counts(self) -> dict[str, int]:
         if self.count_snapshot:

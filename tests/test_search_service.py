@@ -313,5 +313,58 @@ class SearchRankingPrecisionTests(unittest.TestCase):
         self.assertEqual([row["id"] for row in results], ["287"])
 
 
+class SingleCharacterQueryTests(unittest.TestCase):
+    """[B1]: "M", "Z" and "9" are films, and none of them could be searched for.
+
+    search_catalog_items refused any query whose title key was shorter than two
+    characters, so a one-letter title was unreachable by its own title -- adding
+    the year did not help either, since only the title key was measured.
+
+    Letting one character through is safe because the scorer already refuses to
+    over-reach on it: no substring or fuzzy test is open under three characters,
+    so a one-letter term only matches a standalone one-letter term.
+    """
+
+    def setUp(self) -> None:
+        self.items: list[dict[str, object]] = [
+            {"id": "m-1931", "title": "M", "year": "1931", "kind": "pelicula"},
+            {"id": "m-butterfly", "title": "M. Butterfly", "year": "1993", "kind": "pelicula"},
+            {"id": "moonlight", "title": "Moonlight", "year": "2016", "kind": "pelicula"},
+            {"id": "different-film", "title": "A Different Film", "year": "2018"},
+        ]
+
+    def test_a_one_letter_title_is_found_by_its_own_title(self) -> None:
+        results = search_catalog_items(self.items, "M")
+        self.assertEqual([row["id"] for row in results], ["m-1931", "m-butterfly"])
+
+    def test_it_does_not_become_a_prefix_search(self) -> None:
+        # "Moonlight" merely starts with the letter, which is not a match.
+        self.assertNotIn("moonlight", [row["id"] for row in search_catalog_items(self.items, "M")])
+
+    def test_a_year_still_narrows_it(self) -> None:
+        results = search_catalog_items(self.items, "M 1931")
+        self.assertEqual([row["id"] for row in results], ["m-1931"])
+
+    def test_a_one_letter_article_is_not_a_wildcard(self) -> None:
+        # The opening is for titles, not for turning every article into a way
+        # of listing the catalogue.
+        self.assertEqual(search_catalog_items(self.items, "A"), [])
+
+    def test_an_empty_query_still_returns_nothing(self) -> None:
+        for query in ("", "   ", "-", "!"):
+            with self.subTest(query=query):
+                self.assertEqual(search_catalog_items(self.items, query), [])
+
+    def test_identity_evidence_did_not_change(self) -> None:
+        # The guard that makes this safe: acceptance comes from decide_match,
+        # which rank_catalog_candidates runs over every item regardless of what
+        # the search gate returns. This passed before the gate was lowered too.
+        ranked = rank_catalog_candidates(
+            self.items, {"title": "M", "year": "1931", "kind": "pelicula"}
+        )
+        accepted = [row["id"] for row in ranked if row["_search"]["accepted"]]
+        self.assertEqual(accepted, ["m-1931"])
+
+
 if __name__ == "__main__":
     unittest.main()

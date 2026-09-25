@@ -1,8 +1,34 @@
       <section id="collectionView" class="app-view collection-view" hidden>
+        <header id="catalogSection" class="collection-task-header" aria-labelledby="catalogTitle">
+          <div class="collection-task-heading">
+            <span id="collectionModeKicker" class="eyebrow">Archivo nocturno</span>
+            <h2 id="catalogTitle" class="view-focus-target" tabindex="-1">Colección</h2>
+            <p id="collectionModeDescription">Recorré tu archivo personal y afiná la estantería.</p>
+          </div>
+          <nav id="collectionModeTabs" class="collection-mode-tabs" aria-label="Tarea en Colección">
+            <button type="button" data-click="collection-mode" data-mode="browse" aria-pressed="true">
+              <span>Explorar</span><small>Tu archivo</small>
+            </button>
+            <button type="button" data-click="collection-mode" data-mode="search" aria-pressed="false">
+              <span>Buscar</span><small>Encontrar una obra</small>
+            </button>
+            <button type="button" data-click="collection-mode" data-mode="add" aria-pressed="false">
+              <span>Agregar</span><small>Sumar al catálogo</small>
+            </button>
+          </nav>
+          <p id="catalogSummary" class="collection-result-summary">Disponibilidad, estado y puntuación visibles en cada caja.</p>
+        </header>
+
+        <section id="collectionAnchor" class="collection-anchor" aria-live="polite" hidden>
+          <span id="collectionAnchorLabel">Obra de referencia</span>
+          <strong id="collectionAnchorTitle"></strong>
+          <p id="collectionAnchorMeta"></p>
+        </section>
+
         <section class="search-console" aria-label="Buscar y filtrar la colección">
           <div class="search-main">
             <label class="search-field">
-              <span class="sr-only">Buscar películas</span>
+              <span id="collectionQueryLabel" class="sr-only">Buscar en tu colección</span>
               <input id="query" type="search" placeholder="Buscar una película..." autocomplete="off">
             </label>
             <button id="searchButton" class="search-action" type="button">Buscar</button>
@@ -157,16 +183,9 @@
           </div>
         </section>
 
-        <section id="catalogSection" class="catalog-heading" aria-labelledby="catalogTitle">
-          <div>
-            <span class="eyebrow">Archivo nocturno</span>
-            <h2 id="catalogTitle" class="view-focus-target" tabindex="-1">La colección</h2>
-          </div>
-          <p id="catalogSummary">Disponibilidad, estado y puntuación visibles en cada caja.</p>
-        </section>
-
         <section class="grid" id="grid"></section>
         <button id="catalogLoadMore" class="catalog-more" type="button" hidden>Cargar más</button>
-        <p class="empty" id="empty">No hay obras que coincidan con la búsqueda y los filtros actuales.</p>
+        <section class="empty collection-empty" id="empty" aria-live="polite">
+          No hay obras que coincidan con la búsqueda y los filtros actuales.
+        </section>
       </section>
-

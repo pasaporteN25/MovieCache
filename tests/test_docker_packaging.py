@@ -51,6 +51,9 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("127.0.0.1}", compose)
         self.assertIn("--public-presentation-origin", compose)
         self.assertIn("MOVIE_INBOX_PUBLIC_PRESENTATION_ORIGIN", compose)
+        # [B2.4]: how Wikimedia can reach whoever runs the instance -- optional.
+        self.assertIn("--operator-contact", compose)
+        self.assertIn("MOVIE_INBOX_OPERATOR_CONTACT:-}", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_MODE:-after-access", compose)
         self.assertIn("MOVIE_INBOX_IMAGE_WARM_INTERVAL_SECONDS:-3", compose)
         self.assertIn("movie-inbox-backup:", compose)
@@ -77,6 +80,7 @@ class DockerPackagingTests(unittest.TestCase):
         self.assertIn("MOVIE_INBOX_BACKUP_PATH=./backups", environment)
         self.assertIn("MOVIE_INBOX_BACKUP_RETENTION_DAYS=14", environment)
         self.assertIn("MOVIE_INBOX_PUBLIC_PRESENTATION_ORIGIN=", environment)
+        self.assertIn("MOVIE_INBOX_OPERATOR_CONTACT=", environment)
         self.assertNotIn("MOVIE_INBOX_OWNER_PASSWORD=", environment)
 
     def test_nginx_templates_keep_private_and_capability_routes_separate(self) -> None:

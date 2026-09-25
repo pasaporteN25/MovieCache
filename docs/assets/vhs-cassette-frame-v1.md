@@ -3,7 +3,7 @@
 | Campo | Valor |
 | --- | --- |
 | Archivo | `src/movie_inbox/web/static/img/vhs-cassette-frame-v1.png` |
-| Uso | Marco decorativo para `.vhs-cassette`; no contiene texto ni datos de catálogo. |
+| Uso | Marco decorativo para `.home-shelf-preview-frame` (previsualización de estantería, U2.2); no contiene texto ni datos de catálogo. |
 | Formato | PNG RGBA, 1,672 × 941 px, con transparencia. |
 | Integridad SHA-256 | `f443c8d47a248d441f208a9b0142908d4cf32072a8697d59562cfad956d0d7c9` |
 | Origen | Generado el 2026-09-02 con la herramienta integrada de generación de imágenes de OpenAI, sin imagen de entrada ni material de terceros aportado. Conserva metadatos C2PA de procedencia. |

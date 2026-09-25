@@ -252,6 +252,48 @@ def work_identity_key(item: Mapping[str, Any]) -> str:
     return f"work:{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:24]}" if titles else ""
 
 
+def merged_availability_records(
+    records: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """One row per work per library, however many identities its files carry.
+
+    A matched file keeps the identity it was matched with until its fingerprint
+    changes. So a library holding two copies of the same film -- one scanned
+    before its catalogue entry was enriched, one after -- reports the same
+    `work_key` under two different identity blobs, and every reader downstream
+    is wrong about it: the shared collection keys its items by `work_key` and
+    the insert fails on the duplicate, and availability counts the two copies
+    as separate works.
+
+    The surviving identity is the most complete one, ties broken by its own
+    contents so the published order does not flicker between scans. Enrichment
+    only ever adds fields, so "most complete" is "most recent" in practice --
+    and unlike a timestamp it still decides when a single scan run stamped
+    every file with the same one.
+    """
+
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    for record in records:
+        row = dict(record)
+        key = (str(row.get("library_id") or ""), str(row.get("work_key") or ""))
+        current = merged.get(key)
+        if current is None:
+            merged[key] = row
+            continue
+        current["file_count"] = int(current.get("file_count") or 0) + int(
+            row.get("file_count") or 0
+        )
+        if _identity_completeness(row) > _identity_completeness(current):
+            current["identity"] = row.get("identity") or {}
+    return list(merged.values())
+
+
+def _identity_completeness(record: Mapping[str, Any]) -> tuple[int, str]:
+    identity = record.get("identity") or {}
+    filled = sum(1 for value in identity.values() if value not in ("", None, [], {}))
+    return filled, "|".join(f"{key}={value}" for key, value in sorted(identity.items()))
+
+
 def identity_matches_item(identity: Mapping[str, Any], item: Mapping[str, Any]) -> bool:
     left_tmdb_id = normalize_external_positive_id(identity.get("tmdb_id"))
     right_tmdb_id = normalize_external_positive_id(item.get("tmdb_id"))

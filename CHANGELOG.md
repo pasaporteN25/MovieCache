@@ -2,6 +2,266 @@
 
 Los cambios relevantes del proyecto se documentan en este archivo.
 
+## [Sin publicar]
+
+## [0.9.0] - 2026-09-24
+
+### Antes de actualizar
+
+- **Hacé un backup: las bases no vuelven atrás.** La 0.9.0 migra `instance.db` del esquema
+  v11 al v23 y la base del catálogo (`movie-inbox.db`) del v5 al v6 apenas las abre, y
+  guarda un catálogo JSON en el formato v10 —antes v9— en cuanto lo escribe. La 0.8.0 se
+  niega a abrir cualquiera de las tres ("newer than supported"): volver a la 0.8.0 exige
+  restaurar el backup (`movie-inbox backup` o, en Docker, `bash scripts/docker-backup.sh`).
+  Un catálogo JSON suelto no lo cubre `movie-inbox backup`: copialo antes.
+- **Si usás el índice local de IMDb, regeneralo** con `movie-inbox imdb-dataset sync`. Su
+  formato cambió, y hasta regenerarlo la instancia enriquece como si no lo tuviera y no
+  muestra puntajes de IMDb.
+- `pip install` y la imagen de Docker instalan solos `segno`, la dependencia nueva.
+- No se retira nada: subcomandos, opciones de la CLI, rutas web, variables de entorno y
+  campos del JSON portable y de la base del catálogo siguen como en la 0.8.0. Lo único que
+  cambia en ellos es que suman un campo, `personal_changed_at` (ver más abajo), y por eso
+  suben de versión.
+
+### Agregado
+
+- Inicio ahora se presenta como una videoteca empotrada: una cartelera diaria a la
+  izquierda, otra de consulta a la derecha y una consola única. La obra consultada se
+  conserva separada de la rotación Hoy/Ayer y sus acciones respetan si pertenece al
+  catálogo personal o a una colección seguida del Club.
+- La estantería usa lomos VHS más legibles, placas de categoría activables y material
+  compartido de petróleo/latón. Las imágenes de la consola reservan su espacio, admiten
+  cero, una o dos imágenes y dejan abrir la ficha aunque una carga falle.
+
+- La instancia puede decir dónde se ve en streaming cada obra del catálogo propio. El
+  owner elige en Administrar qué mercados se consultan, cuál es el predeterminado y si
+  los miembros pueden elegir el suyo; las plataformas se traen de TMDb, con la
+  atribución a JustWatch que exigen sus términos. Cada consulta se guarda como una
+  observación fechada: se refresca a los 30 días y deja de servirse a los 180. Tener el
+  archivo y estar en una plataforma siguen siendo cosas distintas, y "no lo consultamos"
+  nunca se presenta como "no está disponible". La ficha lo muestra agrupado por
+  suscripción, gratis, anuncios, alquiler y compra, con país y atribución. El país
+  se puede cambiar si la política de la instancia lo permite.
+- Los puntajes públicos de IMDb y de TMDb se sirven al lado del puntaje propio, nunca en
+  su lugar: ningún camino lleva un puntaje público al puntaje personal. Los de IMDb
+  salen del índice local; los de TMDb se guardan con fecha, igual que la disponibilidad.
+  Un puntaje con menos de 50 votos se distingue como poco representativo. La ficha
+  muestra fuente, escala y votos, ordenados por cantidad de votos, con atribuciones.
+- La ficha conserva su dossier y suma iconos compactos de biblioteca y streaming:
+  color para disponibilidad confirmada, gris para ausencia o información pendiente,
+  siempre con texto que distingue los estados. La carcasa VHS reserva su espacio
+  sin superponerse al estado personal. Puntajes y streaming cargan independientemente
+  y ofrecen reintento; la consulta opcional `item_id` en ambas APIs limita el refresco
+  a la obra del catálogo propio que está abierta, aun fuera del primer lote.
+- Con el índice local de IMDb configurado, la instancia lo usa como primera fuente para
+  siete campos —título, título original, títulos alternativos, tipo de obra, año,
+  duración y géneros—, como ya indicaba la política de autoridad; los títulos
+  alternativos se suman a los que ya había en vez de reemplazarlos. Se consulta sólo por
+  identificador de IMDb, nunca por título, y una instalación sin índice enriquece igual
+  que antes.
+- Mazos de charadas deterministas sobre el catálogo propio y las colecciones seguidas:
+  las mismas opciones sobre las mismas obras dan el mismo mazo, con un código corto para
+  que dos jugadores comprueben que tienen el mismo. La dificultad se sugiere sólo en los
+  extremos; el resto lo decide una persona, y esa decisión sobrevive a cualquier
+  recálculo. Todavía no tiene pantalla.
+- Una API versionada para clientes de dispositivo, bajo `/api/v1/`, con su contrato
+  publicado en `docs/openapi/device-api-v1.openapi.json`. Cubre lo que necesita un
+  teléfono: iniciar, renovar y cerrar su sesión, listar, buscar y leer el catálogo
+  propio, y editar estado, fecha de visionado, puntaje y review. Las sesiones son por
+  dispositivo: el acceso vence a los 15 minutos y la renovación a los 30 días, viajan
+  sólo en el encabezado `Authorization` —nunca en una cookie ni en la URL—, se guardan
+  como hashes y se invalidan al cambiar la contraseña o al desactivar o archivar la
+  cuenta; el inicio de sesión tiene límite de intentos. Cada obra se identifica con un
+  id opaco que no revela rutas ni archivos, y que no cambia al rotar el token de la API
+  ni al mover el archivo del catálogo. Scanner, administración y Curaduría quedan
+  afuera. Todavía no hay aplicación que la use.
+- Un dispositivo se puede aparear con una cuenta mediante un ticket de un solo uso, sin
+  que viaje una contraseña: una sesión web lo emite para su propia cuenta y el servidor
+  lo dibuja como QR. El ticket vence a los cinco minutos, y cambiar la contraseña o
+  desactivar la cuenta lo anula junto con las sesiones. `serve` puede servir HTTPS por su
+  cuenta con un certificado propio (`--ssl-certfile`, `--ssl-keyfile`) y calcula la
+  huella que el QR le lleva al teléfono; `movie-inbox pairing-pin` la imprime para cuando
+  HTTPS lo termina un proxy. Todavía no hay pantalla que muestre el QR ni aplicación que
+  lo escanee.
+- La API de dispositivo también recibe el alta sin conexión —lo que un teléfono agrega
+  sin red entra en un borrador que no vence y pasa por la revisión de siempre— y sirve
+  las colecciones seguidas, la disponibilidad en streaming, los puntajes públicos y lo
+  que un teléfono necesita para repartir sin conexión el mismo mazo de charadas que el
+  servidor. La disponibilidad y los puntajes de TMDb llegan con la fecha en que el
+  teléfono tiene que dejar de mostrarlos.
+- Cada obra recuerda cuándo cambió por última vez su estado (`status`, junto con la fecha
+  de visionado), su puntaje y su review, y la API de dispositivo lo informa en
+  `personal.changed_at`. Sólo informa: no decide qué lado de un conflicto gana, porque el
+  reloj de un teléfono puede estar mal. Un campo que nunca se editó no figura, y las obras
+  que ya existían empiezan sin marcas: se llenan a medida que se editan. Es un campo nuevo
+  del JSON portable (`personal_changed_at`, esquema v10) y de la base del catálogo (v6), y
+  sobrevive a `movie-inbox db export` e `import`.
+- `PATCH /api/v1/catalog/items/{id}/personal` acepta un `base` opcional: el valor que el
+  cliente tenía de cada campo cuando lo bajó. Si el servidor ya no vale eso, responde `409
+  personal_conflict` y no escribe nada, en vez de pisar en silencio un cambio que hizo la
+  web u otro teléfono. Sin `base`, sigue como antes: gana el último. Antes de esto, un
+  teléfono que subía lo que vio al bajar perdía sin aviso lo que otro dispositivo había
+  cambiado en el medio.
+- Un teléfono cuya respuesta de renovación se perdió en un corte puede reintentar con el
+  token que le queda: el anterior sigue valiendo 120 segundos después de reemplazado, y
+  cada reintento devuelve un par nuevo. La ventana no se extiende con los reintentos y sólo
+  vale el token inmediatamente anterior. El vencimiento sigue contándose desde la última
+  sincronización.
+- Cada cuenta ve los teléfonos que apareó —nombre, cuándo se creó la sesión y cuándo se
+  usó por última vez— y puede desconectar cualquiera: `GET /api/device-sessions` y
+  `DELETE /api/device-sessions/{id}`, para cualquier cuenta y sólo sobre las propias. El
+  teléfono desconectado queda afuera en su próxima llamada y tiene que volver a aparearse.
+  La respuesta no trae nada que sirva para autenticar. Todavía no hay pantalla que lo
+  muestre.
+- Un teléfono puede preguntar qué pasó con las obras que mandó sin conexión:
+  `POST /api/v1/catalog/drafts/receipts` responde, por cada id que generó, si sigue esperando
+  revisión, si se aplicó —y entonces trae el id de la obra en que se convirtió, para que
+  enlace su copia local con la del servidor en vez de tener las dos—, si se descartó y por
+  qué, o si el servidor no tiene registro y hay que reenviarla. Un reintento que llega
+  después de que el borrador se aplicó o se borró en la web ya no agrega las obras otra vez:
+  antes sólo se miraba el borrador mientras seguía esperando. Una obra dudosa nunca se enlaza
+  a una candidata del catálogo, y un borrador aplicado no se reabre, así que lo que quedó sin
+  aplicar se informa como descartado. Los recibos ya resueltos se olvidan al año; los
+  pendientes no.
+- **Las bajas viajan a los teléfonos** (decisión del owner del 2026-09-14, que revierte "la
+  sincronización nunca borra" de ADR-0005). Borrar una obra en la web, o unirla con otra en
+  Curaduría, deja un registro con el id que el teléfono conocía; unir dice además con qué obra
+  se unió, para que un cambio pendiente del teléfono la siga. Deshacer la unión borra el
+  registro. `POST /api/v1/catalog/items/status` responde por hasta 100 obras: `present`,
+  `removed` (con el motivo, la obra que quedó y cuándo) o `unknown`. `unknown` **no** es una baja:
+  una obra que falta en una descarga, o que desapareció sin pasar por la aplicación, nunca se
+  anuncia como borrada; sólo lo es lo que una persona hizo. Los registros se olvidan al año.
+- **Un teléfono puede borrar una obra:** `POST /api/v1/catalog/items/{itemId}/removal`, con el
+  estado personal que vio. Si alguien puntuó o reseñó la obra en el servidor desde la última
+  sincronización de ese teléfono no se borra sola —responde `409 removal_conflict`— y decide la
+  persona, que puede insistir con `force`. La comprobación y el borrado son una sola operación,
+  y un reintento después de un éxito responde 200 en vez de fallar. Los demás teléfonos de la
+  cuenta se enteran.
+- Vectores de prueba para el cliente Android, calculados por el propio servidor y
+  verificados en cada corrida de pruebas: la huella del certificado con los payloads del QR
+  (`docs/briefs/pairing-certificate-v1-vectors.json`) y la normalización de títulos
+  (`docs/briefs/title-normalization-v1-vectors.json`).
+- `movie-inbox images coverage` cuenta, por causa, por qué las obras no llenan las dos
+  ventanas de imágenes de la consola: campo vacío, dirección que el proxy rechazaría o
+  imagen todavía sin caché, y cuántas imágenes distintas tiene cada obra —dos tamaños de
+  la misma imagen cuentan como una—. Lo separa por tipo, por origen —catálogo o Club— y
+  por identidad. No descarga nada ni consulta proveedores, y sólo imprime totales: no
+  nombra títulos, direcciones ni rutas.
+
+### Cambiado
+
+- Wikipedia, Wikidata y las portadas de Wikimedia reciben ahora un `User-Agent` que dice
+  quién pide —`MovieInbox/<versión>` y la URL del proyecto— en lugar del genérico, porque
+  Wikimedia se lo pide a todo cliente y limita mucho antes a los que no lo traen. Medido a una
+  búsqueda cada 12 segundos: con el genérico, 5 de 14 búsquedas salían limitadas; con el
+  nuevo, 0 de 9. Quien opera la instancia puede sumar un contacto (un email o una URL) con
+  `--operator-contact` o `MOVIE_INBOX_OPERATOR_CONTACT` en `.env`; es opcional y sólo viaja a
+  Wikimedia. Las demás fuentes reciben lo de siempre.
+- Elegir un VHS programa la lista con el conjunto editorial de ese estante, actualiza
+  consola y cartelera de consulta, y ofrece «Volver a programación» sin alterar el
+  carrusel diario. Teclado, foco, anuncios de selección y listas largas conservan el
+  contexto al cambiar fuente, día, tamaño o disponibilidad.
+
+- La búsqueda del catálogo dejó de leer una coincidencia de letras como si fuera una
+  palabra compartida. Un artículo en común ya no acerca dos títulos, una palabra corta
+  metida adentro de otra más larga ya no cuenta, y la comparación de respaldo mide las
+  palabras con contenido en vez de las cadenas crudas: buscar "The Fly" ya no trae
+  "M. Butterfly" por encima de "The Flies".
+- Un término corto encuentra el título al que pertenece. "Ed" llega a "Ed Wood", y un
+  título de una sola letra como "M" se puede buscar por su propio título, con o sin año;
+  antes la consulta se descartaba entera. Nada de esto habilita un auto-match nuevo: la
+  aceptación se sigue decidiendo con la misma evidencia de identidad de siempre.
+- El índice local de IMDb ocupa unas siete veces menos: guarda sólo los tipos de obra y
+  las regiones que el catálogo usa. Un índice construido antes se detecta como viejo y
+  pide volver a sincronizarse.
+- La instalación suma una dependencia, `segno`, que dibuja en el servidor el QR de
+  apareamiento. Es Python puro y no trae dependencias propias.
+
+- Guardar desde la ficha ya no borra los campos que no se mandaron: `POST /api/personal`
+  escribe sólo el puntaje, la fecha o la review que recibe, en vez de tomar los que faltaban
+  como vacíos. Acepta además un `base` —lo que tenía cada campo cuando se abrió la ficha— y,
+  si ya no coincide, responde 409 `personal_conflict` sin escribir. Un pedido sin ningún
+  campo es un 400. La ficha manda sólo los campos modificados y su `base`; sin cambios
+  no hace un POST vacío. Si hay conflicto conserva el texto y muestra la versión actual
+  para elegir entre conservar la edición o usar lo recibido. Conservar requiere guardar
+  explícitamente otra vez. La privacidad se guarda sólo cuando cambió y su fallo no
+  repite el guardado personal ya realizado; cierra [X8.4].
+
+### Corregido
+
+- Abrir una colección, refrescar una importación y armar la pantalla de inicio dejan de
+  ponerse lentos a medida que crece el catálogo. Las tres comparaban cada ficha contra
+  el catálogo entero y volvían a normalizarlo de cero en cada comparación: con 5000
+  fichas y una colección de 200, eso eran 25 de los 28 segundos que tardaba la página.
+  Ahora el catálogo se prepara una vez por pantalla.
+- Compartir la disponibilidad de una biblioteca dejaba de funcionar en silencio si la
+  biblioteca tenía dos copias de la misma película y una se había escaneado antes de que
+  su ficha se enriqueciera: la obra se reportaba dos veces, la colección no se llegaba a
+  crear y la única señal era que el interruptor volvía sin publicar nada. Ahora las
+  copias se cuentan juntas, como siempre debieron.
+- Cuando Wikipedia o Wikidata limitaban sólo una parte de una búsqueda —un idioma, o el
+  reintento por alias—, la app lo tomaba por un éxito: no esperaba, la búsqueda siguiente
+  chocaba contra el mismo límite y la respuesta incompleta quedaba guardada 15 minutos como
+  si fuera completa. Ahora un 429 en cualquier pedido cuenta: se muestran las filas que sí
+  llegaron, la fuente descansa lo que el sitio pidió y esa respuesta no se guarda.
+- Buscar una obra por su título original —por ejemplo `Sen to Chihiro no kamikakushi`—
+  podía no devolver nada desde Wikipedia aunque Wikipedia la conociera: esa página redirige
+  el título a "Spirited Away", el buscador la encontraba y la ficha se descartaba porque no
+  se parecía a lo que se había escrito. Ahora el título que se pidió cuenta como un nombre
+  del artículo al que Wikipedia lo redirige. Como el reintento por alias ya no hace falta
+  en esos casos, la búsqueda ahorra de 4 a 6 pedidos a Wikipedia y a Wikidata.
+- Un mismo artículo de Wikipedia dejó de aparecer dos veces en su estante. Wikipedia se
+  alcanza por dos caminos —su buscador y una resolución por título exacto— y las dos
+  filas traían el mismo artículo con direcciones que sólo se diferenciaban en cómo
+  estaban escapados los paréntesis de "The Fly (1986 film)". Como casi toda ficha de
+  cine está desambiguada así, pasaba seguido, y justo cuando la consulta estaba en otro
+  idioma que el artículo.
+- Cuando una fuente externa contesta pero nada de lo que trae sirve, Movie Inbox vuelve
+  a intentar con un título alternativo confirmado, igual que hacía cuando la respuesta
+  venía vacía. Antes bastaba con que la fuente devolviera cualquier cosa para que no se
+  reintentara: buscar "Der Untergang" en FilmAffinity traía cinco películas y ninguna
+  era la buscada, y el reintento que la encuentra no llegaba a correr.
+- FilmAffinity vuelve a encontrar una película buscada por su título original. Cuando la
+  búsqueda resuelve a una sola película el sitio no devuelve un listado sino la ficha, y
+  Movie Inbox la leía como si fuera un listado: devolvía los enlaces de navegación de la
+  propia página ("Ficha", "Imágenes") como si fueran películas, y la que se estaba
+  buscando quedaba afuera. Buscar "Sen to Chihiro no kamikakushi" devolvía ocho filas y
+  ninguna era El viaje de Chihiro, que estaba arriba de todo en la respuesta.
+- Buscar una película por su título original en otro idioma vuelve a encontrarla en
+  Wikipedia y en FilmAffinity. El reintento con un alias confirmado por Wikidata ya
+  existía, pero la fila que encontraba llegaba sin rastro de la consulta que la había
+  encontrado, así que el puntaje la descartaba salvo que el título de mercado se
+  pareciera al original. "Der Untergang" contra "El hundimiento" daba 13.9 sobre un piso
+  de 28; ahora la fila viaja con el título original que la encontró.
+- La colección que publica una biblioteca ya no sale ordenada por un identificador
+  interno. Se lee alfabéticamente por el título que se muestra, igual que la grilla del
+  catálogo, y una película ya no cambia de lugar en una colección que otros están
+  mirando sólo porque el enriquecimiento le encontró un id.
+- La descarga de los datasets de IMDb vuelve a verificar el certificado en modo
+  estricto. La excepción que se había agregado culpaba a la cadena de Amazon por lo que
+  en realidad hacía un antivirus que intercepta HTTPS; sin él, la cadena verifica sin
+  relajar nada.
+- Los resultados de TMDb dejan de mostrarse como "Sin fuente". La etiqueta faltaba en el
+  frontend desde que la fuente existe, y además de verse mal le quitaba un dato real a
+  la desambiguación de duplicados, que compara etiquetas.
+- Traer los datos de una obra desde una dirección de FilmAffinity deja de fallar cuando
+  el sitio responde vacío. Python 3.11.16 y 3.14.7 cambiaron por dentro el lector de HTML
+  de la biblioteca estándar, que empezó a guardar su estado con un nombre que el lector de
+  fichas de FilmAffinity ya usaba para el suyo: con una respuesta vacía, el pedido
+  terminaba en un error en vez de volver sin datos. Pasa desde esas versiones de Python, y
+  la imagen de Docker toma la última 3.11 cada vez que se reconstruye.
+- Bajar el catálogo a un teléfono por páginas ya no se corta cuando el servidor se reinicia
+  a mitad: el cursor se firmaba con el token de la API, que `serve` regenera al azar en
+  cada arranque, y la página siguiente respondía 400. Ahora se firma con el secreto
+  durable de la instancia, el mismo que fija los ids de las obras.
+- Esa misma descarga por páginas ya no se saltea una obra ni repite otra cuando el
+  catálogo cambia mientras se baja: paginaba por posición, así que una obra agregada o
+  quitada corría todas las siguientes. Ahora retoma después de una clave estable —título,
+  año e id—. La búsqueda sigue paginando por posición, porque su orden es por relevancia.
+- El contrato de la API de dispositivo declara los rechazos que el servidor ya daba y no
+  avisaba: 409 (`draft_busy`, `device_draft_full`, `draft_limit_reached`) al enviar altas
+  sin conexión, y 400 al pedir una página con un cursor inválido.
+
 ## [0.8.0] - 2026-09-02
 
 ### Agregado

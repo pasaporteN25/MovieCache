@@ -18,9 +18,19 @@
     "/api/v1/auth/refresh": {
       "post": {
         "operationId": "refreshDeviceSession",
+        "description": "Trade a refresh token for a new session; the refresh token is replaced every time. A refresh token stays acceptable for a short window after the rotation that replaced it, so a phone whose response was lost in a dropout can simply try again with the token it still holds: each retry answers with a fresh pair, and the pair it never received is discarded. The window is anchored to the first rotation, not to the retry, and only the most recently replaced token is kept.",
         "security": [],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RefreshRequest"}}}},
         "responses": {"200": {"description": "Rotated device session", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceSession"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/pair": {
+      "post": {
+        "operationId": "redeemPairingTicket",
+        "description": "Trade a one-time pairing ticket, read from a QR the account owner minted in the browser, for a device session. No password crosses the wire and the ticket dies on first use. Every refusal answers pairing_rejected without distinguishing expired, already used, never existed, or minted for an account that has since changed.",
+        "security": [],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PairingRequest"}}}},
+        "responses": {"201": {"description": "Device session", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeviceSession"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "429": {"$ref": "#/components/responses/RateLimited"}}
       }
     },
     "/api/v1/auth/session": {
@@ -33,7 +43,15 @@
       "get": {
         "operationId": "listCatalogItems",
         "parameters": [{"$ref": "#/components/parameters/CatalogCursor"}, {"$ref": "#/components/parameters/PageSize"}],
-        "responses": {"200": {"description": "Personal catalog page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemPage"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+        "responses": {"200": {"description": "Personal catalog page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemPage"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/catalog/items/status": {
+      "post": {
+        "operationId": "getItemStatuses",
+        "description": "What became of works the device holds, by the ids it holds them under. present: still in the catalogue. removed: it left the catalogue because a person deleted it (reason deleted) or merged it into another work (reason merged, and merged_into is the work that took its place, so a change the device has not sent yet can follow it there; a chain of merges is followed to its end). unknown: the server has no record of that id -- it was never here, or the record was forgotten -- and that is NOT a removal: a device must never delete a work because it is absent from a download or because it is unknown, only because it is removed. A removal is remembered for a year. A POST only because the ids travel in a body; it changes nothing.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemStatusQuery"}}}},
+        "responses": {"200": {"description": "One answer per id asked, unknown included", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemStatusResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "503": {"$ref": "#/components/responses/Unavailable"}}
       }
     },
     "/api/v1/catalog/items/{itemId}": {
@@ -48,7 +66,65 @@
         "operationId": "patchPersonalItemState",
         "parameters": [{"$ref": "#/components/parameters/ItemId"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalPatch"}}}},
-        "responses": {"200": {"description": "Updated item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogItem"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}}
+        "responses": {"200": {"description": "Updated item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CatalogItem"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "409": {"$ref": "#/components/responses/PersonalConflict"}}
+      }
+    },
+    "/api/v1/catalog/drafts": {
+      "post": {
+        "operationId": "addOfflineDrafts",
+        "description": "Submit works recorded on the device while it had no connection. Nothing reaches the catalogue: each work is classified against it and parked in the account's pending pile for review, because an addition made offline has no shared base to merge against. Safe to retry -- works are keyed by the id the client generated, and a repeat is reported under duplicates instead of being stored twice. Responds 200, not 201: it appends to a pile that usually already exists.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftRequest"}}}},
+        "responses": {"200": {"description": "What the server did with each work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OfflineDraftResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "409": {"$ref": "#/components/responses/DraftConflict"}}
+      }
+    },
+    "/api/v1/catalog/drafts/receipts": {
+      "post": {
+        "operationId": "getOfflineDraftReceipts",
+        "description": "What became of works the device sent while it had no connection, by the id it generated for each. pending: still waiting for a person to review it. applied: it became a work in the catalogue, and item_id is that work's opaque id -- the same one the catalogue endpoints use, so the device can link its local copy to the server's and stop holding it as its own; this also covers a work that turned out to be in the catalogue already. discarded: it will not become one, and reason says why (invalid: it had no title; not_applied: the draft was applied without it, or it stayed in review, and an applied draft is not reopened; collection: it went into a private collection, which is not the catalogue a device downloads; deleted: the draft was deleted while it waited). unknown: the server has no record of that id -- it never arrived, or the record was forgotten -- so the device should send it again. A POST only because the ids travel in a body; it changes nothing. A resolved answer is kept for a year, a pending one for as long as it waits.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReceiptQuery"}}}},
+        "responses": {"200": {"description": "One receipt per id asked, unknown included", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReceiptResult"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/availability": {
+      "get": {
+        "operationId": "getAvailability",
+        "description": "Where the account's works can be watched, keyed by the same opaque id the catalogue endpoints use. A work that is absent was not checked -- that is not the same as not being available anywhere, and a client must not render it as such. Every row carries expires_at: the moment the client must stop showing it, because the upstream terms cap how long anything obtained from them may be kept. Naming JustWatch wherever this is shown is a condition of the source and is returned with the data.",
+        "responses": {"200": {"description": "Availability by work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AvailabilityResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "503": {"$ref": "#/components/responses/Unavailable"}}
+      }
+    },
+    "/api/v1/ratings": {
+      "get": {
+        "operationId": "getPublicRatings",
+        "description": "Public scores for the account's works, keyed by the same opaque id the catalogue endpoints use. Several sources at once rather than one chosen for the reader, ordered most-supported first. These are other people's opinions and are shown beside the viewer's own rating, never merged into it. A TMDb row carries checked_at and expires_at because it ages under that source's terms; an IMDb row carries neither, since it comes from a local index with no such clause. A work with no score is absent rather than present with an empty list.",
+        "responses": {"200": {"description": "Scores by work", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RatingsResult"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/collections": {
+      "get": {
+        "operationId": "listFollowedCollections",
+        "description": "Collections this account follows. Only followed ones: a device replica holds what its owner reads, not a directory of the instance. Items are fetched separately so a long collection cannot make this response unbounded.",
+        "responses": {"200": {"description": "Followed collections", "content": {"application/json": {"schema": {"type": "object", "properties": {"collections": {"type": "array", "items": {"$ref": "#/components/schemas/CollectionSummary"}}}}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/collections/{collectionId}/items": {
+      "get": {
+        "operationId": "listCollectionItems",
+        "description": "Works in one followed collection, paged. A collection item carries no personal state: following a collection does not copy its works into your catalogue, so there is no status, rating or review to report. Answers 404 once the account stops following it.",
+        "parameters": [
+          {"name": "collectionId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "cursor", "in": "query", "required": false, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}}
+        ],
+        "responses": {"200": {"description": "A page of works", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CollectionItemPage"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/v1/catalog/items/{itemId}/removal": {
+      "post": {
+        "operationId": "removeCatalogItem",
+        "description": "Remove a work because the person deleted it on the device. The device sends base: the personal state it last saw. If the server holds something different now -- somebody rated it, or wrote a review, since this device last synced -- nothing is deleted and the answer is 409 removal_conflict: a person decides, and deletes anyway by asking again with force: true. Without force, base has to name all four fields; a partial one proves nothing about what the device saw. Only personal state is compared, not the rest of the record. Safe to retry: a work that is already removed answers 200 with how it left, so a request that succeeded and whose response was lost cannot then fail. The removal is remembered, so other devices of the account are told about it by /api/v1/catalog/items/status.",
+        "parameters": [{"$ref": "#/components/parameters/ItemId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RemovalRequest"}}}},
+        "responses": {"200": {"description": "The work is removed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemStatus"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "409": {"$ref": "#/components/responses/RemovalConflict"}}
       }
     },
     "/api/v1/search": {
@@ -56,6 +132,13 @@
         "operationId": "searchPersonalCatalog",
         "parameters": [{"name": "q", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 200}}, {"$ref": "#/components/parameters/CatalogCursor"}, {"$ref": "#/components/parameters/PageSize"}],
         "responses": {"200": {"description": "Personal catalog search page", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ItemPage"}}}}, "400": {"$ref": "#/components/responses/InvalidRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}}
+      }
+    },
+    "/api/v1/charades": {
+      "get": {
+        "operationId": "getCharadesSnapshot",
+        "description": "Everything a device needs to deal charades decks offline: every eligible work of the account -- its personal catalogue plus the collections it follows, each work once -- with the key the deck is ordered and fingerprinted by, the title acted out, the difficulty the server resolved and the category rules. A device holding this and running the documented generator deals exactly the deck the server would; docs/briefs/charades-v1-vectors.json pins that generator. Unpaged on purpose: the fingerprint covers every eligible work, so part of the list would deal a different deck. Keys are the server's own rather than opaque ids, because any stand-in would change the order; they are built from TMDb, IMDb or Wikidata identifiers or a normalised title and year, never from a path, a file or an internal id. Read-only: difficulty is decided on the server and travels resolved.",
+        "responses": {"200": {"description": "Charades snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CharadesSnapshot"}}}}, "401": {"$ref": "#/components/responses/Unauthorized"}, "503": {"$ref": "#/components/responses/Unavailable"}}
       }
     }
   },
@@ -70,18 +153,46 @@
       "Unauthorized": {"description": "Missing, invalid, expired or revoked device session", "headers": {"WWW-Authenticate": {"schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "RateLimited": {"description": "Login rate limit", "headers": {"Retry-After": {"schema": {"type": "integer", "minimum": 1}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "InvalidRequest": {"description": "Invalid request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "DraftConflict": {"description": "The pile of pending offline works cannot take this submission right now: draft_busy (the pile the account already has is being applied in the browser), device_draft_full (that pile cannot hold more pending works) or draft_limit_reached (an existing pile has to be removed before another can be created).", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "RemovalConflict": {"description": "removal_conflict: the work's personal state no longer matches the base in the request. Nothing was deleted; re-read the item and let the person choose between keeping it and deleting anyway (force: true).", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "PersonalConflict": {"description": "personal_conflict: at least one field named in the request's base no longer matches what is stored. Nothing was written; re-read the item and merge before retrying.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+      "Unavailable": {"description": "A dependency this reads from is not answering", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
       "NotFound": {"description": "No accessible item", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
     },
     "schemas": {
       "LoginRequest": {"type": "object", "additionalProperties": false, "required": ["username", "password", "device_name"], "properties": {"username": {"type": "string", "minLength": 3, "maxLength": 64}, "password": {"type": "string", "minLength": 1, "maxLength": 1024, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
+      "RatingsResult": {"type": "object", "required": ["ratings", "attribution"], "properties": {"ratings": {"type": "object", "additionalProperties": {"type": "array", "items": {"$ref": "#/components/schemas/PublicRating"}}, "description": "Keyed by device work id. An absent key means no score at all."}, "attribution": {"type": "object", "properties": {"imdb": {"type": "string"}, "tmdb": {"type": "string"}}, "description": "Only sources this instance has configured. Show what is present."}}},
+      "PublicRating": {"type": "object", "properties": {"source": {"type": "string", "enum": ["imdb", "tmdb"]}, "average": {"type": "number"}, "votes": {"type": "integer"}, "scale": {"type": "number"}, "is_meaningful": {"type": "boolean", "description": "False under 50 votes: a number without an opinion behind it."}, "checked_at": {"type": "string", "description": "TMDb only."}, "expires_at": {"type": "string", "description": "TMDb only. Stop showing this row after this moment."}}},
+      "AvailabilityResult": {"type": "object", "required": ["availability", "attribution"], "properties": {"availability": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/WorkAvailability"}, "description": "Keyed by device work id. An absent key means not checked."}, "attribution": {"type": "object", "required": ["justwatch"], "properties": {"justwatch": {"type": "string", "description": "Must be shown wherever this data is."}}}}},
+      "WorkAvailability": {"type": "object", "properties": {"en_plataforma": {"type": "boolean", "description": "True only for offers watchable with a subscription, free or ad-supported."}, "available_on": {"type": "array", "items": {"$ref": "#/components/schemas/PlatformOffer"}}, "acquire_on": {"type": "array", "items": {"$ref": "#/components/schemas/PlatformOffer"}, "description": "Rent or buy. Not the same as being available."}, "region_code": {"type": "string"}, "checked_at": {"type": "string"}, "expires_at": {"type": "string", "description": "Stop showing this row after this moment."}, "link": {"type": "string"}}},
+      "PlatformOffer": {"type": "object", "properties": {"provider_id": {"type": "string"}, "provider_name": {"type": "string"}, "kind": {"type": "string", "enum": ["flatrate", "free", "ads", "rent", "buy"]}}},
+      "CollectionSummary": {"type": "object", "properties": {"id": {"type": "string", "description": "Opaque and stable; reveals no internal id."}, "title": {"type": "string"}, "description": {"type": "string"}, "updated_at": {"type": "string"}, "count": {"type": "integer"}}},
+      "CollectionItemPage": {"type": "object", "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/CollectionWork"}}, "next_cursor": {"type": ["string", "null"]}}},
+      "CollectionWork": {"type": "object", "properties": {"id": {"type": "string"}, "position": {"type": "integer"}, "title": {"type": "string"}, "original_title": {"type": ["string", "null"]}, "year": {"type": ["string", "null"]}, "kind": {"type": "string"}, "description": {"type": ["string", "null"]}, "image_url": {"type": ["string", "null"]}, "genres": {"type": "array", "items": {"type": "string"}}, "runtime_minutes": {"type": ["integer", "null"]}}},
+      "OfflineDraftRequest": {"type": "object", "additionalProperties": false, "required": ["items"], "properties": {"items": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/components/schemas/OfflineDraftItem"}}}},
+      "OfflineDraftItem": {"type": "object", "additionalProperties": false, "required": ["id", "title"], "properties": {"id": {"type": "string", "minLength": 1, "maxLength": 64, "description": "Client-generated and stable, so a retry cannot duplicate the work."}, "title": {"type": "string", "minLength": 1, "maxLength": 400}, "year": {"type": "string", "maxLength": 8}, "kind": {"type": "string", "maxLength": 40}, "notes": {"type": "string", "maxLength": 2000}}},
+      "RemovalRequest": {"type": "object", "additionalProperties": false, "description": "[X5.6] Either base -- the personal state the device last saw -- or force. With base, a work whose state differs is not removed. With force true the check is skipped, and base is ignored.", "properties": {"base": {"$ref": "#/components/schemas/RemovalBase"}, "force": {"type": "boolean", "default": false}}},
+      "RemovalBase": {"type": "object", "additionalProperties": false, "required": ["status", "watched_at", "rating", "review"], "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}}},
+      "ItemStatusQuery": {"type": "object", "additionalProperties": false, "required": ["ids"], "properties": {"ids": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"type": "string", "minLength": 1, "maxLength": 64}, "description": "Work ids as the catalogue endpoints returned them."}}},
+      "ItemStatusResult": {"type": "object", "additionalProperties": false, "required": ["items"], "properties": {"items": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/ItemStatus"}, "description": "Keyed by the id asked about. Every id asked for is present."}}},
+      "ItemStatus": {"type": "object", "additionalProperties": false, "required": ["state", "reason", "merged_into", "removed_at"], "properties": {"state": {"type": "string", "enum": ["present", "removed", "unknown"]}, "reason": {"type": ["string", "null"], "enum": ["deleted", "merged", null], "description": "How it was removed. Null unless removed."}, "merged_into": {"type": ["string", "null"], "description": "The opaque id of the work a merge left in its place, the last one the server knows of: it can itself have been removed since, and then asking about it says so. Null unless reason is merged."}, "removed_at": {"type": ["string", "null"], "description": "ISO 8601. When the server recorded the removal. Null unless removed."}}},
+      "ReceiptQuery": {"type": "object", "additionalProperties": false, "required": ["ids"], "properties": {"ids": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"type": "string", "minLength": 1, "maxLength": 64}, "description": "The ids the device generated for the works it sent."}}},
+      "ReceiptResult": {"type": "object", "additionalProperties": false, "required": ["receipts"], "properties": {"receipts": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/Receipt"}, "description": "Keyed by the id the device generated. Every id asked for is present."}}},
+      "Receipt": {"type": "object", "additionalProperties": false, "required": ["state", "reason", "item_id"], "properties": {"state": {"type": "string", "enum": ["pending", "applied", "discarded", "unknown"]}, "reason": {"type": ["string", "null"], "description": "Why a work was discarded, or how an applied one came to be (added, already_in_catalog). Null otherwise."}, "item_id": {"type": ["string", "null"], "description": "The opaque id of the work it became. Only when applied, and null if that work has since been removed."}}},
+      "OfflineDraftResult": {"type": "object", "properties": {"draft_id": {"type": "string"}, "accepted": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "string"}, "state": {"type": "string", "enum": ["new", "present", "review", "invalid"]}, "reason": {"type": "string"}}}}, "duplicates": {"type": "array", "items": {"type": "string"}, "description": "Ids the server already has -- still waiting in the pile, or already resolved and out of it. The client can stop resending them, and ask for their receipts."}, "counts": {"type": "object", "additionalProperties": {"type": "integer"}}}},
+      "PairingRequest": {"type": "object", "additionalProperties": false, "required": ["pairing_token", "device_name"], "properties": {"pairing_token": {"type": "string", "minLength": 32, "maxLength": 512, "writeOnly": true}, "device_name": {"type": "string", "minLength": 1, "maxLength": 80}}},
       "RefreshRequest": {"type": "object", "additionalProperties": false, "required": ["refresh_token"], "properties": {"refresh_token": {"type": "string", "minLength": 32, "maxLength": 512, "writeOnly": true}}},
       "DeviceSession": {"type": "object", "additionalProperties": false, "required": ["access_token", "refresh_token", "token_type", "access_expires_at", "refresh_expires_at", "identity"], "properties": {"access_token": {"type": "string", "minLength": 32, "writeOnly": true}, "refresh_token": {"type": "string", "minLength": 32, "writeOnly": true}, "token_type": {"const": "Bearer"}, "access_expires_at": {"type": "string", "format": "date-time"}, "refresh_expires_at": {"type": "string", "format": "date-time"}, "identity": {"$ref": "#/components/schemas/Identity"}}},
       "Identity": {"type": "object", "additionalProperties": false, "required": ["user", "catalog"], "properties": {"user": {"type": "object", "additionalProperties": false, "required": ["id", "username", "role"], "properties": {"id": {"type": "string"}, "username": {"type": "string"}, "role": {"enum": ["owner", "member"]}}}, "catalog": {"type": "object", "additionalProperties": false, "required": ["id", "name"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}}},
       "ItemPage": {"type": "object", "additionalProperties": false, "required": ["items", "next_cursor"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogItem"}}, "next_cursor": {"type": ["string", "null"]}}},
       "CatalogItem": {"type": "object", "additionalProperties": false, "required": ["id", "title", "kind", "personal", "availability"], "properties": {"id": {"type": "string"}, "title": {"type": "string"}, "original_title": {"type": ["string", "null"]}, "year": {"type": ["string", "null"]}, "kind": {"type": "string"}, "description": {"type": ["string", "null"]}, "image_url": {"type": ["string", "null"], "format": "uri"}, "genres": {"type": "array", "items": {"type": "string"}}, "runtime_minutes": {"type": ["integer", "null"], "minimum": 0}, "personal": {"$ref": "#/components/schemas/PersonalState"}, "availability": {"$ref": "#/components/schemas/Availability"}}},
-      "PersonalState": {"type": "object", "additionalProperties": false, "required": ["status", "watched_at", "rating", "review"], "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}}},
-      "PersonalPatch": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}}},
+      "PersonalState": {"type": "object", "additionalProperties": false, "required": ["status", "watched_at", "rating", "review", "changed_at"], "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}, "changed_at": {"$ref": "#/components/schemas/PersonalChangedAt"}}},
+      "PersonalChangedAt": {"type": "object", "additionalProperties": false, "description": "[X3] When each field was last changed, ISO 8601. status covers watched_at too, since they always change together. A field absent here was never personally edited.", "properties": {"status": {"type": "string"}, "rating": {"type": "string"}, "review": {"type": "string"}}},
+      "PersonalPatch": {"type": "object", "additionalProperties": false, "minProperties": 1, "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}, "base": {"$ref": "#/components/schemas/PersonalPatchBase"}}},
+      "PersonalPatchBase": {"type": "object", "additionalProperties": false, "description": "[X2] Optional. The value of each named field as last read from the server. A field present here and no longer current at write time turns the whole patch into a 409 personal_conflict instead of applying -- so a change made elsewhere in between is never silently overwritten. A field this omits is not checked; omitting the whole object keeps the previous last-write-wins behaviour.", "properties": {"status": {"type": "string"}, "watched_at": {"type": ["string", "null"], "format": "date"}, "rating": {"type": ["integer", "null"], "minimum": 0, "maximum": 10}, "review": {"type": ["string", "null"], "maxLength": 10000}}},
       "Availability": {"type": "object", "additionalProperties": false, "required": ["state", "count"], "properties": {"state": {"type": "string"}, "count": {"type": "integer", "minimum": 0}}},
+      "CharadesSnapshot": {"type": "object", "required": ["works", "fingerprint", "eligible", "unclassified", "counts", "playable_difficulties", "minimums", "timer_options", "ready"], "properties": {"works": {"type": "array", "items": {"$ref": "#/components/schemas/CharadeWork"}, "description": "Every eligible work, classified or not, sorted by key."}, "fingerprint": {"type": "string", "minLength": 6, "maxLength": 6, "description": "Short code two players compare before a game. Recompute it from the keys: a mismatch means the device holds a different set."}, "eligible": {"type": "integer", "minimum": 0}, "unclassified": {"type": "integer", "minimum": 0, "description": "Works nobody classified. They cannot be played, but they count toward the fingerprint."}, "counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}, "description": "Works per difficulty."}, "playable_difficulties": {"type": "array", "items": {"type": "string", "enum": ["facil", "medio", "medio_alto", "dificil"]}}, "minimums": {"type": "object", "required": ["eligible", "per_difficulty"], "properties": {"eligible": {"type": "integer"}, "per_difficulty": {"type": "integer"}}}, "timer_options": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "integer", "minimum": 1}}, "description": "Seconds offered per difficulty."}, "ready": {"type": "boolean"}}},
+      "CharadeWork": {"type": "object", "additionalProperties": false, "required": ["key", "title", "year", "difficulty", "source"], "properties": {"key": {"type": "string", "description": "The work identity the deck is ordered and fingerprinted by. Use it verbatim."}, "title": {"type": "string", "description": "The one title acted out, the same for every player."}, "year": {"type": "string", "description": "Four digits, or empty when unknown."}, "difficulty": {"type": "string", "enum": ["", "facil", "medio", "medio_alto", "dificil"], "description": "Empty when nobody classified the work and public votes are not decisive."}, "source": {"type": "string", "enum": ["catalog", "collection"]}}},
       "Error": {"type": "object", "additionalProperties": false, "required": ["error"], "properties": {"error": {"type": "object", "additionalProperties": false, "required": ["code"], "properties": {"code": {"type": "string"}}}}}
     }
   },

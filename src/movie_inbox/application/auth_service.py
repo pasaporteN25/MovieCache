@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from movie_inbox.application.identity_repository import IdentityRepository
 from movie_inbox.domain.identity import (
     AuthenticatedIdentity,
+    DeviceSessionRecord,
     PersonalCatalog,
     UserAccount,
     normalize_username,
@@ -24,6 +25,10 @@ SESSION_TOKEN_BYTES = 48
 DEFAULT_SESSION_TTL_SECONDS = 14 * 24 * 60 * 60
 DEFAULT_DEVICE_ACCESS_TTL_SECONDS = 15 * 60
 DEFAULT_DEVICE_REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60
+# [X4.1]: how long a refresh token stays valid after the rotation that replaced
+# it. Long enough to outlast a real dropout, short enough that a stale token is
+# not a standing credential.
+DEFAULT_DEVICE_REFRESH_GRACE_SECONDS = 120
 SCRYPT_N = 2**14
 SCRYPT_R = 8
 SCRYPT_P = 1
@@ -106,6 +111,7 @@ class AuthService:
         session_ttl_seconds: int = DEFAULT_SESSION_TTL_SECONDS,
         device_access_ttl_seconds: int = DEFAULT_DEVICE_ACCESS_TTL_SECONDS,
         device_refresh_ttl_seconds: int = DEFAULT_DEVICE_REFRESH_TTL_SECONDS,
+        device_refresh_grace_seconds: int = DEFAULT_DEVICE_REFRESH_GRACE_SECONDS,
         clock: Callable[[], float] = time.time,
         hasher: PasswordHasher | None = None,
     ) -> None:
@@ -116,6 +122,7 @@ class AuthService:
             self.device_access_ttl_seconds + 60,
             int(device_refresh_ttl_seconds),
         )
+        self.device_refresh_grace_seconds = max(0, int(device_refresh_grace_seconds))
         self.clock = clock
         self.hasher = hasher or PasswordHasher()
         self._dummy_hash = self.hasher.hash("movie-inbox-dummy-password")
@@ -149,6 +156,31 @@ class AuthService:
             raise PasswordChangeRequiredError("password_change_required")
         return self._create_device_session(user, catalog, validate_device_name(device_name))
 
+    def create_paired_device_session(self, user_id: str, device_name: str) -> DeviceSession:
+        """Open a device session for an account whose authorization was already proven.
+
+        There are no credentials in this call because there is no password to
+        check: the caller must have redeemed a single-use pairing ticket that a
+        browser session minted for this same account. `PairingService.redeem` is
+        the only sanctioned caller, and it consumes the ticket **before** asking
+        for this.
+
+        The same three refusals login applies still apply here, because a ticket
+        minted minutes ago says nothing about the account's state now: an
+        account that was archived, deactivated, left without a catalogue or told
+        to change its password cannot get a session.
+        """
+
+        user = self.repository.account(user_id)
+        if user is None or not user.active:
+            raise ValueError("pairing_account_unavailable")
+        if user.must_change_password:
+            raise ValueError("pairing_password_change_required")
+        catalog = self.repository.default_catalog_for(user.id)
+        if catalog is None:
+            raise ValueError("pairing_account_unavailable")
+        return self._create_device_session(user, catalog, validate_device_name(device_name))
+
     def refresh_device_session(self, refresh_token: str) -> DeviceSession | None:
         if not refresh_token or len(refresh_token) > 512:
             return None
@@ -164,6 +196,7 @@ class AuthService:
             now,
             access_expires_at,
             refresh_expires_at,
+            now + self.device_refresh_grace_seconds,
         )
         if identity is None or identity.user.must_change_password:
             return None
@@ -188,6 +221,24 @@ class AuthService:
     def logout_device(self, access_token: str) -> None:
         if access_token and len(access_token) <= 512:
             self.repository.delete_device_session(session_token_hash(access_token))
+
+    def list_device_sessions(self, identity: AuthenticatedIdentity) -> list[DeviceSessionRecord]:
+        """The phones paired to this account -- only this account's, never a token."""
+
+        return self.repository.list_device_sessions(identity.user.id, int(self.clock()))
+
+    def revoke_device_session(self, identity: AuthenticatedIdentity, session_id: str) -> bool:
+        """Cut one of this account's phones off; it is out on its next call.
+
+        Deleting the row ends the access token and the refresh token alike, and
+        the previous refresh token [X4.1] keeps for retries: they live in it.
+        A phone that is not this account's, or does not exist, answers False --
+        the same way, so the answer says nothing about other accounts.
+        """
+
+        if not session_id or len(session_id) > 64:
+            return False
+        return self.repository.delete_device_session_by_id(identity.user.id, session_id)
 
     def _authenticated_user(
         self, username: str, password: str

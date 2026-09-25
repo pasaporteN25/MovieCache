@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -20,6 +20,7 @@ from movie_inbox.application.auth_service import (
     AuthService,
     PasswordPolicyError,
 )
+from movie_inbox.application.charades_service import CharadesService
 from movie_inbox.application.collection_service import CollectionService
 from movie_inbox.application.external_retirement import (
     RetirementCatalog,
@@ -35,11 +36,21 @@ from movie_inbox.application.library_service import (
     ManagedLibraryService,
 )
 from movie_inbox.application.member_service import MemberService
+from movie_inbox.application.pairing_service import PairingService
 from movie_inbox.application.privacy_service import PrivacyService
 from movie_inbox.application.public_presentation_service import PublicPresentationService
+from movie_inbox.application.public_ratings_service import PublicRatingsService
+from movie_inbox.application.removal_service import RemovalService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
+from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
+from movie_inbox.domain.public_ratings import PublicRating
+from movie_inbox.external.common import configure_operator_contact
+from movie_inbox.external.imdb import imdb_id_from_text
+from movie_inbox.external.imdb_dataset_source import ImdbDatasetSource
+from movie_inbox.external.tmdb import TmdbAdapter
+from movie_inbox.infrastructure.charades_repository import SqliteCharadesRepository
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.curation_history import (
     JsonCurationHistoryRepository,
@@ -56,11 +67,16 @@ from movie_inbox.infrastructure.personal_catalogs import SqlitePersonalCatalogPr
 from movie_inbox.infrastructure.public_presentation_repository import (
     SqlitePublicPresentationRepository,
 )
+from movie_inbox.infrastructure.public_ratings_repository import (
+    SqlitePublicRatingsRepository,
+)
+from movie_inbox.infrastructure.removal_repository import SqliteRemovalRepository
 from movie_inbox.infrastructure.scanner_history import SqliteScannerHistoryRepository
 from movie_inbox.infrastructure.starter_collections import (
     AKIRA_KUROSAWA_SEED_KEY,
     akira_kurosawa_collection,
 )
+from movie_inbox.infrastructure.streaming_repository import SqliteStreamingRepository
 from movie_inbox.web.assets import (
     render_html,
     render_login_html,
@@ -72,6 +88,7 @@ from movie_inbox.web.config import ViewerConfig
 from movie_inbox.web.dependencies import (
     AUTH_SESSION_COOKIE,
     HISTORY_SESSION_COOKIE,
+    SessionCatalog,
     authenticated_json,
     blocked_until_password_change,
     login_json,
@@ -91,16 +108,21 @@ from movie_inbox.web.responses import (
 from movie_inbox.web.routers import (
     admin,
     catalog,
+    charades,
     club,
     curation,
     device_auth,
     device_catalog,
+    device_charades,
     home,
     imports,
     integrations,
+    pairing,
     public_presentations,
+    ratings,
     scanner,
     search,
+    streaming,
 )
 from movie_inbox.web.security import LoginAttemptLimiter, PublicReadLimiter, viewer_allowed_hosts
 
@@ -117,16 +139,19 @@ SECURITY_HEADERS = {
 
 # Static JS/CSS carry no user data and are identical for every request, unlike the
 # no-store default the security middleware applies elsewhere for privacy. Filenames
-# aren't content-hashed, so this revalidates via ETag rather than going immutable.
-STATIC_CACHE_CONTROL = "public, max-age=3600, must-revalidate"
+# aren't content-hashed, so every navigation revalidates via ETag; a positive freshness
+# window can otherwise leave an old interface visible after deployment.
+STATIC_CACHE_CONTROL = "public, max-age=0, must-revalidate"
 
 
 def create_app(config: ViewerConfig) -> FastAPI:
     if not config.instance_db:
         raise RuntimeError("ViewerConfig.instance_db is required")
+    configure_operator_contact(config.operator_contact)
     configure_external_catalog(
         config.external_credentials.tmdb_read_access_token,
         config.anime_offline_index,
+        config.imdb_dataset_index,
     )
     instance_db = Path(config.instance_db)
     identity_repository = SqliteIdentityRepository(instance_db)
@@ -173,10 +198,49 @@ def create_app(config: ViewerConfig) -> FastAPI:
                 )
         return catalogs
 
+    # The loaders are only wired when a credential is present, so an instance
+    # without TMDb keeps a usable back office that simply cannot refresh from
+    # upstream, instead of failing at call time.
+    streaming_token = config.external_credentials.tmdb_read_access_token
+    streaming_adapter = TmdbAdapter(streaming_token) if streaming_token else None
+    streaming_service = StreamingService(
+        SqliteStreamingRepository(instance_db),
+        region_loader=streaming_adapter.watch_regions if streaming_adapter else None,
+        provider_loader=streaming_adapter.watch_providers if streaming_adapter else None,
+        availability_loader=streaming_adapter.watch_availability if streaming_adapter else None,
+    )
+
+    dataset_source = (
+        ImdbDatasetSource(Path(config.imdb_dataset_index)) if config.imdb_dataset_index else None
+    )
+
+    def imdb_rating(imdb_id: str) -> PublicRating | None:
+        return dataset_source.rating_for(imdb_id) if dataset_source is not None else None
+
+    def imdb_id_of(row: dict[str, Any]) -> str:
+        return imdb_id_from_text(str(row.get("imdb_url") or ""))
+
+    public_ratings_service = PublicRatingsService(
+        SqlitePublicRatingsRepository(instance_db),
+        imdb_lookup=imdb_rating if dataset_source is not None else None,
+        imdb_id_reader=imdb_id_of,
+        tmdb_loader=streaming_adapter.public_rating if streaming_adapter else None,
+    )
+
+    def purge_tmdb_derived_data() -> int:
+        # Availability and public scores are both TMDb data, so retiring TMDb
+        # has to drop both or the purge would be incomplete. The IMDb index is
+        # deliberately untouched: it is not TMDb's data to reclaim.
+        return (
+            streaming_service.purge_all_availability()
+            + public_ratings_service.purge_all_tmdb_ratings()
+        )
+
     tmdb_retirement_service = TmdbRetirementService(
         lambda path: catalog_service(path).repository,
         JsonCurationHistoryRepository(retirement_history_path(instance_db)),
         retirement_catalogs,
+        purge_tmdb_derived_data,
     )
 
     def catalog_universe() -> list[dict[str, Any]]:
@@ -273,6 +337,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.home_snapshot_repository = home_snapshot_repository
     app.state.import_repository = import_repository
     app.state.import_service = import_service
+    app.state.removal_service = RemovalService(SqliteRemovalRepository(instance_db))
     app.state.library_repository = library_repository
     app.state.library_service = library_service
     app.state.availability_service = availability_service
@@ -280,6 +345,40 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.library_scheduler = library_scheduler
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
+    app.state.streaming_service = streaming_service
+    app.state.public_ratings_service = public_ratings_service
+    app.state.pairing_service = PairingService(
+        identity_repository,
+        auth_service,
+        origin=config.public_origin,
+        certificate_pin=config.device_pairing_certificate_pin,
+    )
+
+    def charades_catalog(identity: AuthenticatedIdentity) -> list[dict[str, Any]]:
+        catalog = SessionCatalog.from_identity(config, identity)
+        return load_items(catalog.config.patterns)
+
+    def charades_collections(identity: AuthenticatedIdentity) -> list[dict[str, Any]]:
+        # Following a collection does not copy its works, so they are read from
+        # the collection store rather than found in the personal catalogue.
+        rows: list[dict[str, Any]] = []
+        for collection in collection_service.followed_collections(identity.user.id):
+            rows.extend(dict(entry.item) for entry in collection.items)
+        return rows
+
+    def charades_votes(row: Mapping[str, Any]) -> int | None:
+        if dataset_source is None:
+            return None
+        found = dataset_source.rating_for(imdb_id_from_text(str(row.get("imdb_url") or "")))
+        return found.votes if found is not None else None
+
+    app.state.charades_service = CharadesService(
+        SqliteCharadesRepository(instance_db),
+        catalog_loader=charades_catalog,
+        collection_loader=charades_collections,
+        vote_lookup=charades_votes,
+    )
+    app.state.imdb_dataset_source = dataset_source
     app.state.device_login_limiter = login_limiter
     app.add_middleware(
         TrustedHostMiddleware,
@@ -467,9 +566,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(club.router)
     app.include_router(admin.router)
     app.include_router(integrations.router)
+    app.include_router(streaming.router)
+    app.include_router(ratings.router)
+    app.include_router(charades.router)
     app.include_router(search.router)
+    app.include_router(pairing.router)
     app.include_router(device_auth.router)
     app.include_router(device_catalog.router)
+    app.include_router(device_charades.router)
     app.include_router(public_presentations.router)
     # FastAPI >=0.139's include_router is lazy: app.routes holds _IncludedRouter
     # wrappers instead of the included APIRoute objects. Flatten once so app.routes

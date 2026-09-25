@@ -8,6 +8,7 @@ from typing import Protocol
 from movie_inbox.domain.identity import (
     ArchivedMember,
     AuthenticatedIdentity,
+    DeviceSessionRecord,
     PersonalCatalog,
     UserAccount,
 )
@@ -162,11 +163,50 @@ class IdentityRepository(Protocol):
         now: int,
         access_expires_at: int,
         refresh_expires_at: int,
-    ) -> AuthenticatedIdentity | None: ...
+        previous_valid_until: int,
+    ) -> AuthenticatedIdentity | None:
+        """Swap a device session's tokens for new ones.
+
+        The refresh token being replaced stays acceptable until
+        `previous_valid_until`, so a caller whose response was lost can retry.
+        """
+        ...
 
     def touch_device_session(self, access_token_hash: str, seen_at: int) -> None: ...
 
+    def list_device_sessions(self, user_id: str, now: int) -> list[DeviceSessionRecord]:
+        """The account's unexpired device sessions, most recently used first."""
+        ...
+
+    def delete_device_session_by_id(self, user_id: str, session_id: str) -> bool:
+        """Revoke one of `user_id`'s phones; False if it is not theirs or not there."""
+        ...
+
     def delete_device_session(self, access_token_hash: str) -> None: ...
+
+    def save_pairing_ticket(
+        self,
+        token_hash: str,
+        user_id: str,
+        created_at: int,
+        expires_at: int,
+    ) -> None: ...
+
+    def redeem_pairing_ticket(self, token_hash: str, now: int) -> str:
+        """Consume a ticket atomically; returns the user id, or "" when unusable."""
+        ...
+
+    def purge_pairing_tickets(self, before: int) -> int: ...
+
+    def instance_secret(self, name: str) -> str:
+        """Get-or-create a persistent per-instance secret ([A1.4]).
+
+        Declared here because more than one service depends on it now: the
+        device sync key derives item ids from it, and pairing derives the public
+        instance id. Reaching it through the concrete class kept it out of type
+        checking, which is exactly how a contract quietly stops being one.
+        """
+        ...
 
     def owner(self) -> UserAccount | None: ...
 

@@ -152,10 +152,28 @@ usuarios al frontend.
 Gate de salida: 554 pruebas unitarias (4 omitidas), 20 pruebas de navegador, Ruff,
 formato, mypy estricto, compileall y `git diff --check` en verde.
 
+### v0.9.0: API de dispositivo, datos en vivo y afinación de Inicio — publicado 2026-09-24
+
+Trae la API de dispositivo `/api/v1/` —sesiones por dispositivo, apareamiento por QR, alta
+sin conexión y lo que un teléfono necesita para repartir charadas—, disponibilidad en
+streaming y puntajes públicos, mazos de charadas deterministas, el índice local de IMDb
+como primera fuente, arreglos de búsqueda y de rendimiento del catálogo, y el trabajo
+visual de Inicio desde la 0.8.0.
+
+Gate de salida: suite local (1105 pruebas) y CI del commit de cierre en verde — Linux,
+Windows, wheel limpio, Chromium, Docker Compose con estado persistente, Ruff/mypy y el
+gate de calidad de búsqueda. Detalle del cierre en [V9] de `tareas.md`.
+
+Corte visual actualizado por el owner el 2026-09-14: cerrar la Home U4/U5,
+cartelera U6 y U7.5a ya integradas. **U8 pasa completa a otra release**, sin número
+asignado; el botón Al azar existente se conserva. No sumar nuevos rediseños.
+Orden y criterios en `design/v0-9-0-visual-closeout.md`; el plan U5/U8 anterior
+queda como antecedente. Retoques no bloqueantes irán a un fix posterior; no se
+posterga el gate de release. U7.5b, U9 y mobile web también quedan fuera.
+
 ### Próximos incrementos propuestos
 
-- **v0.9.0** comienza con [A1], una API versionada y sesiones revocables por
-  dispositivo para habilitar un cliente Android sin reutilizar cookies del navegador.
+- Se proponen al cerrar la 0.9.0.
 
 ## Implementado en el incremento de descubrimiento y scanner
 
@@ -285,13 +303,57 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
 
 ### 4. Clientes e integraciones
 
-1. [A1] API versionada y sesiones revocables para dispositivos.
-2. [A2] Cliente Android basico, candidato a un hito posterior una vez cerrado [A1].
-3. [I1] Evaluar Radarr, Sonarr y Letterboxd sobre contratos ya estables.
+1. **Cerrado 2026-09-07.** [A1] API versionada y sesiones revocables para dispositivos.
+2. [A2] Cliente Android autonomo, con almacen propio y sincronizacion que inicia una
+   persona (ADR-0005). **Desde el 2026-09-13 es un repositorio aparte,
+   `movieIndexAndroid`**, con su propia hoja de ruta; aca queda la API que consume.
+   **Requisito para publicar su v0.1.0: [X11]**, un id por fuente en lugar de su posicion
+   (decidido el 2026-09-20), porque despues de publicar cambiar como se derivan los ids de
+   las obras obliga a re-descargar y deja huerfanos los cambios pendientes.
+3. **Cerrado 2026-09-07.** [I1] Evaluar Radarr, Sonarr y Letterboxd: evaluacion hecha y
+   construccion postergada por decision del owner (ADR-0006, ADR-0007 y ADR-0008).
 4. [M1] Investigar juegos y musica como verticales propias, nunca como simples valores
    nuevos de `kind`.
 
-### Decisiones que pueden interrumpir la cola cuando el owner las resuelva
+### Evolución visual de Home — plan 2026-09-12
+
+El owner aceptó la base continua y consola única U4.2d.3. U4.3 integró B el
+2026-09-13 tras la elección U6.1; U4.4 ya está implementada y U4.6a verificada.
+Permanece U4.6b (regresión histórica de navegador)
+como pulido y gate; las nuevas ideas se registran como épicas de producto distintas.
+El desglose, dependencias y criterios ejecutables están en `tareas.md`; el análisis
+de interacción, espacio y fuentes está en `docs/design/home-evolution-backlog-2026-09-12.md`.
+
+1. **[U5] Lista Winamp del conjunto elegido.** Un VHS seleccionado cambia la fuente
+   de lista a su estante y sincroniza consulta/fila. **Revisa expresamente la decisión
+   U2-R/U4.2d.2** que reservaba ese cambio a activar la categoría. La programación
+   Hoy/Ayer y el autoplay siguen independientes; hay retorno diario visible.
+   U5.4–5 verificadas localmente el 2026-09-14: teclado/origen, respuestas tardías,
+   listas 0/1/6/20/100 y pruebas del gesto actualizado. Evidencia en
+   `design/u5-integration-gate.md`; U5.3.4 aceptada manualmente por el owner el
+   2026-09-14, con capturas en `design/u5-u6-owner-acceptance/`.
+2. **[U6] Segunda cartelera.** Derecha: obra consultada; izquierda: Hoy/Ayer.
+   B elegida e integrada con U4.3; compatibilidad U5 verificada y U6.5 aceptada
+   manualmente el 2026-09-14. No hay
+   segundo carrusel autónomo ni vuelve la consola inferior.
+3. **[U7] Imágenes de consola.** Investigar y completar sus dos espacios con assets
+   de la identidad correcta, adquisición/cobertura, cache, atribución y corrección
+   manual; contrato portable si se amplía a varias imágenes por obra.
+4. **[U8] VHS al azar.** Módulo especial al final del archivo, una etiqueta animada
+   y un resultado compartido con consulta/derecha. El lomo apagado y «?» tenue
+   corresponden a resultado no disponible, no al switch de sortear todo el catálogo.
+5. **[U9] Sonido opcional.** Posterior a la interacción estable; apagado fácil desde
+   el menú, gesto intencional y respeto de políticas de audio del navegador.
+6. **[MW1] Mobile web.** **Último en el backlog, prioridad baja.** Auditoría de
+   navegador de celular y arreglos acotados después de la evolución de Home. Incluye
+   el traspaso de Bandeja/MB2 sin duplicarlo; el cliente Android/Kotlin va por delante.
+
+Estas épicas no están cerradas ni comprometidas a una release. U6 tiene base integrada
+y U7.5 estados visuales con los campos existentes; adquisición/procedencia y U5–U9
+conservan los pendientes descritos en el tablero.
+Las decisiones de prototipo se presentan dentro de cada tarea de descubrimiento.
+
+### Decisiones históricas resueltas
 
 - **Resuelta 2026-08-26.** [S1]/[S2]: Lucas eligio purgar. El catalogo personal
   anidado quedo inalcanzable en rama y tags de `origin/master` (128 commits y 5 tags

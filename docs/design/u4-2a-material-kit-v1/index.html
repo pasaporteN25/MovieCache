@@ -1,0 +1,66 @@
+<!doctype html>
+<!--
+THESIS: Un único frente pintado contiene aberturas; no una carcasa sobre otro fondo.
+OWN-WORLD: Pintura petróleo desgastada, latón fino, negro interior y texto cyan/crema.
+STORY: Revisar material, profundidad y placas antes de integrar componentes de Home.
+FIRST VIEWPORT: Muestra de hueco y placa sobre un campo continuo, con controles de escala.
+FORM: Laboratorio de materiales U4.2a, dirección empotrada elegida por el owner; sin sorteo.
+-->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Movie Inbox — Muestra material U4.2a</title>
+  <link rel="stylesheet" href="material-components.css">
+  <link rel="stylesheet" href="material-lab.css">
+  <script src="material-lab.js" defer></script>
+</head>
+<body>
+  <header class="lab-header">
+    <span>Movie Inbox / Taller visual</span>
+    <a href="#reference">Referencia del owner</a>
+  </header>
+  <main>
+    <div class="intro">
+      <div>
+        <p class="status">U4.2a · Acabado aprobado el 10/09/2026</p>
+        <p class="source-state">Kit compuesto CSS + assets RGB. Los PNG de borde y placa no son exports transparentes.</p>
+        <h1>Un material. Distintos huecos.</h1>
+        <p>El fondo continúa entre las piezas. El canto aporta la profundidad hacia adentro.</p>
+      </div>
+      <form class="tools" aria-label="Calibración de la muestra" onsubmit="return false">
+        <label for="scale">Escala de textura
+          <select id="scale"><option value="512">512 px</option><option value="768" selected>768 px</option><option value="1024">1024 px</option></select>
+        </label>
+        <label class="toggle"><input type="checkbox" id="seams"> Mostrar juntas de repetición</label>
+      </form>
+    </div>
+
+    <section class="specimen" aria-label="Muestra de integración material">
+      <div class="specimen-sign">
+        <span class="section-name">VIDEOTECA</span>
+        <span class="plate u4-plate">DISPONIBLE ESTA NOCHE</span>
+      </div>
+      <div class="opening u4-aperture" id="opening">
+        <div class="well">
+          <div class="display-heading"><span>ARCHIVO / PELÍCULAS / MEMORIA</span><small>MUESTRA MATERIAL</small></div>
+          <div class="well-content">
+            <div><h2>El borde pertenece al hueco.</h2><p>Este texto es HTML. La pintura de alrededor pertenece al fondo común, incluso junto a la esquina y debajo de la placa.</p></div>
+            <dl><div><dt>CANTO</dt><dd>Latón gastado</dd></div><div><dt>INTERIOR</dt><dd>Azul negro</dd></div><div><dt>FRENTE</dt><dd>Pintura continua</dd></div></dl>
+          </div>
+        </div>
+      </div>
+      <div class="specimen-foot"><span>REBOBINAR · EXPLORAR · CONSERVAR</span><span>Texto vivo · Assets separados · Sin framework</span></div>
+    </section>
+
+    <section class="asset-strip" aria-label="Piezas del kit">
+      <div class="material-note"><h2>Superficie</h2><p>La textura que ves detrás ocupa toda la página. El selector cambia su escala, no la forma de las piezas.</p><a href="surface-petroleum-v2.png">Abrir textura original</a></div>
+      <div><h2>Esquina y canto</h2><div class="corner-window" role="img" aria-label="Esquina del bisel, aislada mediante recorte CSS"><div class="corner-bezel" aria-hidden="true"></div></div><a href="aperture-bezel-v1.png">Abrir fuente RGB del bisel</a></div>
+      <div><h2>Placa sin texto horneado</h2><span class="plate u4-plate second-plate">TU ARCHIVO PIDE MEMORIA</span><p>Oswald 400 sobre el asset vacío.</p><a href="category-plaque-blank-v1.png">Abrir placa original</a></div>
+    </section>
+    <details id="reference"><summary>Comparar con la referencia elegida</summary><img src="reference.png" alt="Referencia del owner: videoteca empotrada en un frente continuo azul negro desgastado"></details>
+    <p class="asset-warning">Estado de las piezas: el generador no entregó alpha real en el borde ni la placa. Esta muestra los aísla con CSS. Los PNG originales contienen un damero y no son recortes transparentes de producción.</p>
+    <p class="scope-note">Laboratorio aislado. No es la Home ni demuestra U4.2b: faltan los encuentros con el póster, la playlist y el estante reales. La continuidad derecha se valida en esa integración.</p>
+  </main>
+</body>
+</html>

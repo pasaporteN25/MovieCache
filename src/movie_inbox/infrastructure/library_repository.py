@@ -23,6 +23,7 @@ from movie_inbox.domain.libraries import (
     LibraryFile,
     LibraryScanRun,
     ManagedLibrary,
+    merged_availability_records,
     work_identity_key,
 )
 
@@ -613,7 +614,11 @@ class SqliteLibraryRepository:
                         GROUP BY f.work_key, f.identity_json, f.library_id, l.name
                         ORDER BY l.name COLLATE NOCASE, f.work_key"""
                     ).fetchall()
-                    return [
+                    # Grouped by identity as well as work_key, because identity
+                    # is stored per file -- so the same work can arrive under
+                    # two blobs. merged_availability_records() puts it back
+                    # together; every reader downstream expects one row per work.
+                    return merged_availability_records(
                         {
                             "work_key": str(row["work_key"]),
                             "identity": _json_object(row["identity_json"]),
@@ -622,7 +627,7 @@ class SqliteLibraryRepository:
                             "file_count": int(row["file_count"]),
                         }
                         for row in rows
-                    ]
+                    )
             except sqlite3.Error as error:
                 raise LibraryRepositoryError(
                     f"Cannot read shared availability from: {self.path}"

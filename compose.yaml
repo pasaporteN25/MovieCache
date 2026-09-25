@@ -38,6 +38,8 @@ services:
       - ${MOVIE_INBOX_FORWARDED_ALLOW_IPS:-127.0.0.1}
       - --session-days
       - ${MOVIE_INBOX_SESSION_DAYS:-30}
+      - --operator-contact
+      - ${MOVIE_INBOX_OPERATOR_CONTACT:-}
       - --library-root
       - /media/library
       - --no-open

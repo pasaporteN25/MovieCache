@@ -41,6 +41,21 @@ class UserAccount:
 
 
 @dataclass(frozen=True)
+class DeviceSessionRecord:
+    """A paired phone as its account sees it.
+
+    `id` is a random label that names the phone and does nothing else: it is not
+    derived from, and cannot be used as, any credential. Times are Unix seconds.
+    """
+
+    id: str
+    device_name: str
+    created_at: int
+    last_seen_at: int
+    expires_at: int
+
+
+@dataclass(frozen=True)
 class CatalogSource:
     path: str
     writable: bool = False
