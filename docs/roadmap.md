@@ -171,9 +171,17 @@ Orden y criterios en `design/v0-9-0-visual-closeout.md`; el plan U5/U8 anterior
 queda como antecedente. Retoques no bloqueantes irán a un fix posterior; no se
 posterga el gate de release. U7.5b, U9 y mobile web también quedan fuera.
 
+### v0.10.0 — abierta
+
+Abierta el 2026-09-24 en la rama `release/0.10.0`; se cierra al fusionar su PR contra
+`master`, y hasta entonces se le suman cambios. Alcance todavía no fijado: queda del
+backlog de `tareas.md` — entre lo accionable, [U7] (imágenes de consola), [U8] (VHS al
+azar, postergada de la 0.9.0), [X11] (id durable por fuente, requisito para publicar
+`movieIndexAndroid` v0.1.0) y los traspasos de backend sin pantalla todavía.
+
 ### Próximos incrementos propuestos
 
-- Se proponen al cerrar la 0.9.0.
+- Se proponen al cerrar la 0.10.0.
 
 ## Implementado en el incremento de descubrimiento y scanner
 

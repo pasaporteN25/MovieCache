@@ -24,8 +24,8 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U4] | Integrar materialmente la Home como una única consola | U4.1 visual antes de código |
-| 2 | [U5] → [U6] → [U7] → [U8] | Lista del conjunto, cartelera consultada, imágenes y VHS al azar | B integrada con U4.3/U6.1; quedan U5, compatibilidad U6 e imágenes U7 |
+| — | [U4] | **Cerrada 2026-09-24.** Home integrada como una única consola, gate visual y de regresión en verde | — |
+| 2 | [U7] → [U8] | Imágenes de consola y VHS al azar | [U5]/[U6] cerradas; U8 postergada fuera de 0.9.0 por el owner |
 | — | [B1] | **Cerrada 2026-09-11.** Alcance cubierto, medido y con gates en CI | criterio de cierre acordado con el owner |
 | 3 | [A2] | **Se mudó a `../movieIndexAndroid`** (2026-09-13) | tablero propio de ese repositorio |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
@@ -75,7 +75,7 @@ es el nuevo pulido visual de Home [U4], abierto después de la aceptación de [U
 
 ### Frente: Inicio videoclub (integración material U4)
 
-#### [U4] Integrar Home como una única consola de archivo audiovisual
+#### [U4] Integrar Home como una única consola de archivo audiovisual — **cerrada 2026-09-24**
 
 **Abierta y aprobada 2026-09-09.** El mueble, la cartelera y sus controles conservan su
 función y contenido, pero deben dejar de verse como capas HTML apoyadas sobre imágenes.
@@ -138,19 +138,21 @@ internas y luz contenida, con un campo nocturno abstracto que prolonga el objeto
     evidencia en `docs/design/u4-4-visual-gate/`, cierre técnico en `Hecho`.
   - **[U4.5] Cerrada por absorción en d.3/U4.3.** Sin panel inferior separado;
     registro en `Hecho` junto con la integración de B.
-  - [ ] **[U4.6] Gate visual y responsive acotado.** Comparar los tres anchos desktop,
+  - [x] **[U4.6] Gate visual y responsive acotado.** Comparar los tres anchos desktop,
     verificar foco y contraste, y hacer sólo un smoke móvil de reflow y overflow.
     Actualizar/correr las aserciones geométricas de navegador que aún describen U2
     y la carcasa rechazada; U4.2c tiene QA conectado y 20 tests de servicio/packaging.
     - [x] **[U4.6a] Gate visual conectado.** 2026-09-13: 1280/1440/1920, smoke
       390/320, foco separado de selección, contraste de pantalla, 0/1/2 imágenes,
       error, vacío, título largo y origen Club. Evidencia `u4-4-visual-gate/`.
-    - [ ] **[U4.6b] Regresión histórica de navegador.** Se migraron geometrías de
-      cartelera, placas, mueble y consola a B y a `home_visual_metrics.js`; la sonda
-      se ejecutó en navegador conectado. Falta migrar los tests de interacción que
-      aún usan `.home-shelf-preview`/señal eliminada y ejecutar el runner completo.
-      Preservar escenarios móvil, fuentes, fechas y foco; no saltarlos ni adaptar
-      expectativas para aprobar silenciosamente. Es trabajo de tests, no rediseño.
+    - [x] **[U4.6b] Regresión histórica de navegador.** **Cerrada** (commits
+      `f66beab` "test: migrate the browser suite to the single Home console" y
+      `214a753` "test: measure Home's height once drawn, against the accepted U4
+      contract"). Los tests de interacción que usaban `.home-shelf-preview`/señal
+      eliminada ya se migraron a la consola única; `tests/browser/test_ui_browser.py`
+      ahora afirma que esos selectores dan `count() == 0`. Suite completa verificada
+      en verde el 2026-09-24 (`scripts\check.ps1`, 1105 pruebas). **Cierra [U4.6] y con
+      él todo [U4].**
 
 ### Frente: Home — lista del conjunto seleccionado
 

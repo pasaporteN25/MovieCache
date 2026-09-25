@@ -4,6 +4,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+Va a ser la **0.10.0**. La versión está abierta en la rama `release/0.10.0` y se cierra al
+fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
+
 ## [0.9.0] - 2026-09-24
 
 ### Antes de actualizar
