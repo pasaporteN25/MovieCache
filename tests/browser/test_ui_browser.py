@@ -310,18 +310,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         preview = page.locator('.spotlight-preview[data-selection-source="shelf:available"]')
         preview.wait_for()
         self.assertEqual(preview.get_attribute("data-selected-entry-key"), "available-long-title")
-        page.wait_for_function(
-            "[...document.querySelectorAll('.spotlight-preview .home-furniture-frame img')]"
-            ".every(image => image.hidden === true)"
-        )
-        poster = preview.locator(".home-furniture-frame img").nth(1)
-        fallback = preview.locator(".home-furniture-frame-fallback").nth(1)
-        poster.dispatch_event("load")
-        self.assertFalse(poster.is_hidden())
-        self.assertFalse(fallback.is_visible())
-        poster.dispatch_event("error")
-        self.assertTrue(poster.is_hidden())
-        self.assertTrue(fallback.is_visible())
+        # The console carries no images of its own: the "En consulta" frame shows the
+        # poster, so the console never repeats it.
+        self.assertEqual(preview.locator("img").count(), 0)
 
         geometry = page.evaluate(
             """() => {
@@ -330,9 +321,6 @@ class BrowserInterfaceTests(unittest.TestCase):
                 const brand = box('.brand-lockup');
                 const title = box('h1');
                 const consoleBox = box('.spotlight-preview');
-                const frames = [
-                    ...document.querySelectorAll('.spotlight-preview .home-furniture-frame'),
-                ].map(frame => frame.getBoundingClientRect());
                 const credits = box('.spotlight-preview .home-furniture-credits');
                 const summary = document.querySelector('.spotlight-preview .spotlight-copy p');
                 const summaryStyle = getComputedStyle(summary);
@@ -344,10 +332,6 @@ class BrowserInterfaceTests(unittest.TestCase):
                     titleHeight: title.height,
                     consoleWidth: consoleBox.width,
                     consoleInside: consoleBox.left >= 0 && consoleBox.right <= innerWidth,
-                    frameWidth: Math.min(...frames.map(frame => frame.width)),
-                    framesInsideConsole: frames.every(frame =>
-                        frame.left >= consoleBox.left - 1 && frame.right <= consoleBox.right + 1
-                    ),
                     creditsWidth: credits.width,
                     summaryFontSize: Number.parseFloat(summaryStyle.fontSize),
                     summaryLineHeight: Number.parseFloat(summaryStyle.lineHeight),
@@ -362,15 +346,11 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertLess(geometry["titleHeight"], 90)
         self.assertGreater(geometry["consoleWidth"], 300)
         self.assertTrue(geometry["consoleInside"])
-        self.assertGreaterEqual(geometry["frameWidth"], 150)
-        self.assertTrue(geometry["framesInsideConsole"])
         self.assertGreater(geometry["creditsWidth"], 300)
         # The compact console sets the floor: 12px text on an 18px line, never clipped.
         self.assertGreaterEqual(geometry["summaryFontSize"], 12)
         self.assertGreaterEqual(geometry["summaryLineHeight"], 18)
         self.assertTrue(geometry["summaryFits"])
-        self.assertTrue(fallback.is_visible())
-        self.assertEqual(preview.locator(".home-furniture-frame").count(), 2)
         self.assertEqual(preview.locator(".home-console-details").count(), 1)
         self.assertEqual(page.locator(".home-shelf-preview, #homeShelfPreview").count(), 0)
         self.assertEqual(preview.locator(".home-furniture-format-panel").count(), 0)
@@ -653,12 +633,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(consulted_image.is_hidden())
         self.assertTrue(consulted_fallback.is_visible())
 
-        console_images = console.locator(".home-furniture-frame [data-poster-image]")
-        console_fallbacks = console.locator(".home-furniture-frame-fallback")
-        for index in range(console_images.count()):
-            console_images.nth(index).dispatch_event("error")
-            self.assertTrue(console_images.nth(index).is_hidden())
-        self.assertTrue(all(fallback.is_visible() for fallback in console_fallbacks.all()))
+        self.assertEqual(console.locator("img").count(), 0)
 
         for width, height in ((1440, 900), (1920, 1080)):
             page.set_viewport_size({"width": width, "height": height})
@@ -960,7 +935,8 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.set_viewport_size({"width": width, "height": 900})
             metrics = page.evaluate(probe)
             self.assertLessEqual(metrics["overflow"], 1, metrics)
-            self.assertAlmostEqual(metrics["spineHeight"], 308, delta=1)
+            # Desktop gives the space of the retired Videoteca row to the spines.
+            self.assertAlmostEqual(metrics["spineHeight"], 348 if width > 860 else 308, delta=1)
             self.assertAlmostEqual(metrics["plateHeight"], 54, delta=1)
             self.assertGreaterEqual(metrics["plateGap"], 0, metrics)
             self.assertEqual(metrics["spineTransform"], "none", metrics)
@@ -1632,8 +1608,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                 self.assertLessEqual(metrics["consoleWidthDifference"], 1, metrics)
                 self.assertFalse(metrics["rowsOverlapConsole"], metrics)
                 self.assertLessEqual(metrics["localTableScroll"], 1, metrics)
-                self.assertTrue(metrics["imageFit"], metrics)
-                self.assertEqual(metrics["reviewAction"], "Revisar imágenes en ficha")
+                self.assertEqual(metrics["imageCount"], 0, metrics)
         preview = page.locator(".spotlight-preview")
         self.assertEqual(preview.locator(".spotlight-preview-actions button").count(), 2)
         self.assertEqual(preview.locator(".home-console-details").count(), 1)
@@ -2017,7 +1992,7 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.locator(".home-consulted-poster").get_attribute("data-consulted-source"),
             "shelf:club",
         )
-        for surface in ("consultation-view", "consultation-poster", "consultation-images"):
+        for surface in ("consultation-view", "consultation-poster"):
             opener = page.locator(f'[data-home-focus="{surface}"]')
             opener.click()
             page.locator("#sharedDetailDialog").wait_for(state="visible")
@@ -2248,7 +2223,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator('[data-home-section="available"] .home-shelf-tape').first.click()
         preview = page.locator(".spotlight-preview")
         self.assertEqual(preview.get_by_text("Ver más").count(), 1)
-        self.assertEqual(preview.locator(".home-media-empty").count(), 1)
+        self.assertEqual(preview.locator(".home-console-media").count(), 0)
         edit_button = preview.get_by_text("Editar mi ficha")
         self.assertEqual(edit_button.count(), 1)
 
@@ -2573,6 +2548,17 @@ class BrowserInterfaceTests(unittest.TestCase):
         # the actual focus move a tick later while the transition is captured, so
         # poll instead of asserting on a single synchronous read.
         page.wait_for_function("document.activeElement.textContent === 'Ver más'")
+
+        # The back cover has no visible frame or close button for pointer users: the
+        # button keeps its accessible name, and a click beside the case closes it.
+        view_more.click()
+        page.wait_for_selector("#detailDrawer[open]")
+        close = page.locator("#closeDetail")
+        self.assertEqual(close.get_attribute("aria-label") or close.text_content(), "Cerrar")
+        self.assertEqual(close.evaluate("element => getComputedStyle(element).opacity"), "0")
+        case_box = page.locator("#detailDrawer .vhs-back-cover-shell").bounding_box()
+        page.mouse.click(case_box["x"] + case_box["width"] + 40, case_box["y"] + 200)
+        page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
 
     def test_ficha_description_dialog_focus_and_naming(self) -> None:
         page = self.page

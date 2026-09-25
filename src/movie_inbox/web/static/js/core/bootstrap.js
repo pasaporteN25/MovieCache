@@ -278,8 +278,15 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         event.preventDefault();
         closeDetail();
       });
+      // The back cover draws its close control only for keyboard users.
+      document.addEventListener("pointerdown", () => { fields.detailDrawer.dataset.input = "pointer"; }, true);
+      document.addEventListener("keydown", () => { fields.detailDrawer.dataset.input = "keyboard"; }, true);
       fields.detailDrawer.addEventListener("click", (event) => {
-        if (event.target === fields.detailDrawer) closeDetail();
+        // The back cover fills the viewport with no frame, so its empty surroundings
+        // behave like the backdrop.
+        const backCoverSurroundings = fields.detailDrawer.dataset.detailMode === "back-cover"
+          && (event.target === fields.detailBody || event.target.classList.contains("movie-dialog-surface"));
+        if (event.target === fields.detailDrawer || backCoverSurroundings) closeDetail();
       });
       fields.detailBody.addEventListener("input", handleDetailFormMutation);
       fields.detailBody.addEventListener("change", handleDetailFormMutation);

@@ -29,9 +29,7 @@
     contactGap: !narrow && spine && well ? well.top + Number.parseFloat(style('#homeFurniture').getPropertyValue('--home-spine-height')) + 78 - spine.bottom : null,
     plateGap: plate && spine ? spine.top - plate.bottom : null,
     plateHeight: plate?.height,
-    imageCount: document.querySelectorAll('.home-console-media img').length,
-    imageFit: [...document.querySelectorAll('.home-console-media img')].every(n => getComputedStyle(n).objectFit === 'contain'),
-    reviewAction: document.querySelector('[data-home-focus="consultation-images"]')?.textContent,
+    imageCount: document.querySelectorAll('.spotlight-preview img').length,
     focus: document.activeElement?.getAttribute('data-home-focus') || document.activeElement?.className,
   };
 }

@@ -878,37 +878,12 @@ import { closeSharedDetail, openCollection } from "./club.js";
         </aside>`;
       }
 
-      function homeFurnitureFrame(imageUrl, title, label) {
-        const url = String(imageUrl || "").trim();
-        return `<figure class="home-console-image"><span class="home-furniture-frame" data-home-image-state="loading" aria-busy="true">
-          <img data-poster-image data-home-preview-image src="${escapeAttr(cachedImageSrc(url))}" alt="${escapeAttr(`${label} de ${title}`)}" loading="eager" decoding="async">
-          <span class="home-furniture-frame-fallback"><b>Cargando imagen…</b></span>
-        </span><figcaption>${escapeHtml(label)}</figcaption></figure>`;
-      }
-
-      export function homeConsultationImages(item, title, entry = null) {
-        // Consume existing scalar fields only. Provider acquisition and the portable
-        // gallery contract remain U7.2–4; identical URLs aren't two distinct assets.
-        const images = [[item.backdrop_image, "Imagen de la obra"], [item.page_image, "Portada"]]
-          .map(([url, label]) => [String(url || "").trim(), label])
-          .filter(([url], index, all) => url && all.findIndex(([candidate]) => candidate === url) === index);
-        const reviewAction = entry?.origin?.kind === "catalog"
-          ? `data-click="open-detail" data-id="${escapeAttr(item.id || "")}"`
-          : entry ? homeConsultationAction(entry) : "";
-        return `<section class="home-console-media" aria-label="Imágenes de la obra consultada">
-          <div class="home-furniture-frame-strip" data-image-count="${images.length}">
-            ${images.length ? images.map(([url, label]) => homeFurnitureFrame(url, title, label)).join("")
-              : '<p class="home-media-empty"><strong>Sin imágenes de esta obra</strong><span>Podés consultar la ficha igualmente.</span></p>'}
-          </div>
-          ${entry ? `<div class="home-media-review"><button type="button" data-home-focus="consultation-images" ${reviewAction}>Revisar imágenes en ficha</button>${entry.origin?.kind === "catalog" ? '<span>Panorámica: Editar metadata.</span>' : '<span>Imágenes de la colección; sólo consulta.</span>'}</div>` : ""}
-        </section>`;
-      }
-
       function homeFurnitureFact(label, value) {
-        const text = String(value || "Sin dato");
-        return `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeAttr(text)}">${escapeHtml(text)}</dd></div>`;
+        return `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeAttr(value)}">${escapeHtml(value)}</dd></div>`;
       }
 
+      // Consola de consulta, opción A: texto de la obra, créditos y estado con acciones.
+      // Las imágenes quedan en el marco "En consulta"; la consola no las repite.
       export function homeSelectionPreview(entry) {
         if (!entry?.item) return "";
         const item = entry.item;
@@ -923,32 +898,36 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const categoryAction = section?.action?.kind
           ? `<button class="home-furniture-category-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(section.action.label || "Ver colección")}</button>`
           : "";
+        const duration = homeDurationLabel(item);
+        const metadata = [item.year, item.kind, firstListValue(item.genres), duration === "—" ? "" : duration]
+          .filter(Boolean).join(" · ") || "Ficha por completar";
+        const credits = [["Dirección", listText(item.directors, 2)], ["Guion", listText(item.writers, 2)], ["Reparto", listText(item.cast, 3)]]
+          .filter(([, value]) => value);
+        const available = availabilityState(item).effective;
+        const watched = item.status === "watched";
         const viewAction = `<button class="spotlight-preview-action" type="button" data-home-focus="consultation-view" ${homeConsultationAction(entry)}>${origin.kind === "collection" ? "Ver ficha del Club" : "Ver más"}</button>`;
         const editAction = origin.kind === "catalog"
           ? `<button class="spotlight-preview-action is-secondary" type="button" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>` : "";
         return `<aside class="spotlight-preview" aria-labelledby="spotlight-selected-title" data-selection-source="${escapeAttr(selectionSource)}" data-selected-entry-key="${escapeAttr(selectedEntryKey)}" data-selected-item-id="${escapeAttr(selectedItemId)}">
-          <header class="home-console-heading"><p><span>Consulta</span> <strong>${escapeHtml(contextLabel)}</strong></p>${categoryAction}</header>
           <div class="home-console-body">
-            <div class="spotlight-preview-actions">${viewAction}${editAction}</div>
             <div class="spotlight-copy">
+              <div class="home-console-heading"><strong>${escapeHtml(contextLabel)}</strong>${categoryAction}</div>
               <h3 id="spotlight-selected-title">${escapeHtml(title)}</h3>
-              <span class="spotlight-metadata">${escapeHtml([item.year, item.kind, firstListValue(item.genres)].filter(Boolean).join(" · ") || "Ficha por completar")}</span>
+              <span class="spotlight-metadata">${escapeHtml(metadata)}</span>
               <p>${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
             </div>
-            ${homeConsultationImages(item, title, entry)}
-            <section class="home-console-details" aria-label="Créditos y estado resumido">
-              <dl class="home-furniture-credits">
-                ${homeFurnitureFact("Dirección", listText(item.directors, 2))}
-                ${homeFurnitureFact("Guion", listText(item.writers, 2))}
-                ${homeFurnitureFact("Reparto", listText(item.cast, 3))}
-              </dl>
-              <dl class="spotlight-preview-facts">
-                ${homeFurnitureFact("Acceso", availabilityState(item).effective ? "Disponible" : "No disponible")}
-                ${homeFurnitureFact("Estado", item.status === "watched" ? "Vista" : "Pendiente")}
-                ${homeFurnitureFact("Duración", homeDurationLabel(item))}
-              </dl>
-              <span class="home-furniture-format-signature" aria-hidden="true">VHS</span>
+            <section class="home-console-details" aria-label="Créditos">
+              ${credits.length
+                ? `<dl class="home-furniture-credits">${credits.map(([label, value]) => homeFurnitureFact(label, value)).join("")}</dl>`
+                : '<p class="home-console-credits-empty">Créditos por completar.</p>'}
             </section>
+            <div class="home-console-side">
+              <dl class="spotlight-preview-facts" aria-label="Estado resumido">
+                <div data-fact="access" data-state="${available ? "on" : "off"}"><dt>Acceso</dt><dd>${available ? "Disponible" : "No disponible"}</dd></div>
+                <div data-fact="status" data-state="${watched ? "on" : "off"}"><dt>Estado</dt><dd>${watched ? "Vista" : "Pendiente"}</dd></div>
+              </dl>
+              <div class="spotlight-preview-actions">${viewAction}${editAction}</div>
+            </div>
           </div>
         </aside>`;
       }

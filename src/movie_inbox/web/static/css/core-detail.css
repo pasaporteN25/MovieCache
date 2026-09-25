@@ -524,33 +524,74 @@
       .unsaved-dialog-actions { display: flex; gap: 8px; justify-content: end; margin-top: 4px; }
       .unsaved-dialog-actions button { width: auto; }
 
+      /* La contratapa se muestra sola, apoyada sobre el fondo difuminado: sin marco
+         de diálogo ni barra. El título sigue en el DOM para nombrar el diálogo y
+         "Cerrar" flota en la esquina, fuera de la caja. */
       .detail-drawer[data-detail-mode="back-cover"] {
-        background: #050711;
-        border-color: rgba(var(--gold-rgb), 0.62);
-        box-shadow: 0 34px 100px rgba(0, 0, 0, 0.82), 0 18px 42px rgba(var(--violet-rgb), 0.16);
-        height: min(94dvh, 1040px);
-        width: min(1120px, calc(100vw - 32px));
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        height: 100dvh;
+        width: 100vw;
       }
       .detail-drawer[data-detail-mode="back-cover"] .movie-dialog-surface {
-        background:
-          radial-gradient(circle at 18% 30%, rgba(var(--teal-rgb), 0.1), transparent 31%),
-          radial-gradient(circle at 82% 70%, rgba(var(--red-rgb), 0.1), transparent 29%),
-          #050711;
+        background: transparent;
+        grid-template-rows: minmax(0, 1fr);
+        position: relative;
       }
       .detail-drawer[data-detail-mode="back-cover"] .drawer-top {
-        background: #080b16;
-        border-bottom-color: rgba(var(--gold-rgb), 0.48);
+        background: transparent;
+        border: 0;
+        display: block;
+        min-height: 0;
+        padding: 0;
+        position: absolute;
+        right: 20px;
+        top: 18px;
+        z-index: 3;
       }
-      .detail-drawer[data-detail-mode="back-cover"] .drawer-top strong { color: var(--gold); }
-      .detail-drawer[data-detail-mode="back-cover"] .drawer-feedback,
+      .detail-drawer[data-detail-mode="back-cover"] .drawer-top-identity {
+        border: 0;
+        clip: rect(0 0 0 0);
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        padding: 0;
+        position: absolute;
+        white-space: nowrap;
+        width: 1px;
+      }
       .detail-drawer[data-detail-mode="back-cover"] .drawer-navigation { display: none; }
-      .detail-drawer[data-detail-mode="back-cover"] .drawer-top-actions { justify-content: end; }
+      /* Sin botón visible: un toque fuera de la caja la cierra. "Cerrar" conserva su
+         nombre accesible y sólo se dibuja como una X cuando el foco llega por teclado (bootstrap.js anota
+         la última entrada; :focus-visible se hereda tras un Escape). */
+      .detail-drawer[data-detail-mode="back-cover"] .drawer-close {
+        background: rgba(var(--scrim-rgb), 0.72);
+        border-color: rgba(var(--gold-rgb), 0.62);
+        color: transparent;
+        font-size: 0;
+        min-width: 44px;
+        opacity: 0;
+        padding: 0;
+        position: relative;
+        width: 44px;
+      }
+      .detail-drawer[data-detail-mode="back-cover"] .drawer-close::before {
+        color: var(--gold);
+        content: "×";
+        font-size: var(--text-stat);
+        inset: 0;
+        line-height: 40px;
+        position: absolute;
+        text-align: center;
+      }
+      .detail-drawer[data-detail-mode="back-cover"][data-input="keyboard"] .drawer-close:focus { opacity: 1; }
       .detail-drawer[data-detail-mode="back-cover"] .drawer-body {
-        align-content: start;
+        align-content: center;
         background: transparent;
         display: grid;
         justify-items: center;
-        padding: 18px 22px 28px;
+        padding: 16px 22px;
       }
       .vhs-back-cover {
         --back-cover-cyan: #6feaff;
@@ -559,7 +600,7 @@
         --back-cover-pink: #ff3aa7;
         container-type: inline-size;
         isolation: isolate;
-        width: min(620px, max(480px, calc((94dvh - 92px) * 0.621)), 100%);
+        width: min(660px, max(480px, calc((100dvh - 40px) * 0.621)), 100%);
       }
       .vhs-back-cover-shell {
         aspect-ratio: 988 / 1592;
@@ -845,9 +886,11 @@
 
         .detail-drawer[data-detail-mode="back-cover"] { height: 100dvh; width: 100vw; }
 
-        .detail-drawer[data-detail-mode="back-cover"] .drawer-body { padding: 12px 8px 22px; }
+        .detail-drawer[data-detail-mode="back-cover"] .drawer-body { align-content: start; padding: 70px 8px 16px; }
 
-        .vhs-back-cover { width: min(100%, calc((100dvh - 124px) * 0.621)); }
+        .detail-drawer[data-detail-mode="back-cover"] .drawer-top { right: 12px; top: 12px; }
+
+        .vhs-back-cover { width: min(100%, calc((100dvh - 86px) * 0.621)); }
 }
 
 @media (max-width: 440px) {

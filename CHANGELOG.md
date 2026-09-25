@@ -7,6 +7,16 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 Va a ser la **0.10.0**. La versión está abierta en la rama `release/0.10.0` y se cierra al
 fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
+### Cambiado
+
+- La consola de Inicio se reordenó: título y datos primero, créditos al medio, acceso,
+  estado y acciones a la derecha. Ya no repite la portada que muestra el marco «En
+  consulta».
+- La estantería de Inicio ganó altura: los VHS son más altos y el rótulo «Videoteca» ya
+  no ocupa una fila en escritorio.
+- «Ver más» muestra la contratapa VHS sola, sin marco de diálogo; se cierra tocando
+  fuera de la caja o con Escape.
+
 ## [0.9.0] - 2026-09-24
 
 ### Antes de actualizar

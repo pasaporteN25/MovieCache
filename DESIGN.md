@@ -407,6 +407,18 @@ Contenido confirmado: preferir dos imágenes distintas de la misma obra, permiti
 panorámica + portada aunque esa portada esté a la derecha. Si falta material se puede
 repetir una imagen como fallback de presentación; nunca contarlo como dos assets.
 
+**Ajuste del owner, 2026-09-24:** la consola de consulta pasa a una etiqueta en tres
+columnas (opción A): contexto y «Ver colección» en una línea sobre el título, año ·
+tipo · género · duración, sinopsis a tres líneas; créditos con la etiqueta sobre el
+valor (sólo los que tienen dato); acceso y estado como sellos separados, y «Ver más» /
+«Editar mi ficha» a la derecha. Sale la tira de imágenes de la consola, con «Revisar
+imágenes en ficha» y el sello VHS: la portada ya vive en el marco «En consulta».
+El rótulo `Videoteca · Tu archivo por categoría` deja de verse en escritorio (sigue
+como nombre accesible y visible en móvil) y los VHS suben de 308 a 348 px. La
+contratapa de «Ver más» se muestra sola sobre el fondo difuminado, sin marco ni
+barra: un toque fuera de la caja la cierra y «Cerrar» sólo se dibuja como X con
+foco de teclado.
+
 **Display Font:** Arial Narrow (con Trebuchet MS como fallback)
 **Body Font:** Space Grotesk (con Trebuchet MS, Verdana y system-ui como fallbacks)
 **Label/Mono Font:** Courier New
