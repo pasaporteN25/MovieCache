@@ -186,6 +186,9 @@ Primero se propone aprovechar imágenes existentes en la contratapa VHS actual
 [`design/u7-u9-plan-2026-09-26.md`](design/u7-u9-plan-2026-09-26.md).
 Es planificación de pendientes, no cierre ni implementación de esas épicas.
 
+**Avance 2026-09-26:** U7 entrega A integrada (`0970482`). U8 se retomó a pedido del
+owner y quedó integrada el mismo día (merge `e179d6b`), con el efecto B elegido.
+
 ### Próximos incrementos propuestos
 
 - Se proponen al cerrar la 0.10.0.

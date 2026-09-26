@@ -25,10 +25,10 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
 | — | [U4] | **Cerrada 2026-09-24.** Home integrada como una única consola, gate visual y de regresión en verde | — |
-| — | [U7] entrega A | **Implementada localmente 2026-09-26, sin commit.** Imágenes en contratapa, estados 0/1/2 y errores | Evidencia `docs/design/u7-first-delivery/` |
+| — | [U7] entrega A | **Integrada 2026-09-26 (`0970482`).** Imágenes en contratapa, estados 0/1/2 y errores | Evidencia `docs/design/u7-first-delivery/` |
 | 2 | [U9] | Sonido opcional al seleccionar VHS, apagado inicialmente como propuesta | Elección de muestra; independiente de U7 adquisición y de U8 |
 | Según dependencias | [U7] entrega B | Adquisición, galería y corrección persistente | Contrato y resolver del frente lógico |
-| Postergada | [U8] | VHS al azar: lógica de sorteo + objeto/revelación visual | Fuera del corte U7/U9 por decisión del owner del 2026-09-26 |
+| — | [U8] | **Cerrada 2026-09-26 (merge `e179d6b`).** VHS al azar con sorteo compartido y efecto B elegido por el owner | Retomada a pedido del owner el mismo día |
 | — | [B1] | **Cerrada 2026-09-11.** Alcance cubierto, medido y con gates en CI | criterio de cierre acordado con el owner |
 | 3 | [A2] | **Se mudó a `../movieIndexAndroid`** (2026-09-13) | tablero propio de ese repositorio |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
