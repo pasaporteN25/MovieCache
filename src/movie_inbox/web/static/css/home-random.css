@@ -1,0 +1,140 @@
+/* U8 — Terminal "Al azar" VHS. Same spine, plaque asset and material as the
+   editorial shelves; only its label moves. It is not an editorial section, so it
+   carries its own bay/plaque classes instead of .home-shelf-bay. */
+#homeView .home-random-bay {
+  flex: 0 0 auto;
+  min-width: 240px;
+  padding-top: 64px;
+  position: relative;
+}
+
+#homeView .home-random-plaque {
+  align-content: center;
+  box-shadow: 0 3px 3px rgba(0, 0, 0, 0.73);
+  color: var(--text-gold-soft);
+  display: grid;
+  height: 54px;
+  isolation: isolate;
+  justify-items: center;
+  left: 0;
+  padding: 8px 23px;
+  position: absolute;
+  text-align: center;
+  top: 10px;
+  width: 240px;
+}
+
+#homeView .home-random-plaque::before {
+  background: linear-gradient(180deg, rgba(4, 20, 27, 0.1), rgba(0, 0, 0, 0.2)),
+    url("../img/home-category-plaque-inset-v1.png") center / 103.6% 214% no-repeat;
+  clip-path: inset(0 round 3px);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+
+#homeView .home-random-plaque > span {
+  font: 400 18px/1.2 var(--font-home-plaque);
+  text-transform: uppercase;
+}
+
+#homeView .home-random-plaque > small {
+  font-family: var(--font-home-data);
+  font-size: var(--text-label);
+  text-transform: uppercase;
+}
+
+#homeView .home-random-rail {
+  align-items: end;
+  display: flex;
+  gap: var(--home-spine-gap);
+  padding: 4px 1px 0;
+}
+
+#homeView .home-random-tape .vhs-spine-title {
+  translate: 0 0;
+}
+
+#homeView .home-random-tape[data-random-state="initial"],
+#homeView .home-random-tape[data-random-state="empty"],
+#homeView .home-random-tape[data-random-state="error"] {
+  color: color-mix(in srgb, var(--home-spine-ink) 74%, transparent);
+}
+
+/* A result that is not available: dimmed case, legible title, faint "?" behind it.
+   The mark is decoration; the accessible name says "no disponible". */
+#homeView .home-random-tape:is([data-random-state="unavailable"], [data-random-state="out-of-scope"]) {
+  filter: saturate(0.35) brightness(0.78);
+}
+
+#homeView .home-random-mark {
+  color: color-mix(in srgb, var(--home-spine-ink) 36%, transparent);
+  font: 400 72px/1 var(--font-home-plaque);
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  text-align: center;
+  top: 9%;
+}
+
+#homeView .home-random-tape .vhs-spine-title,
+#homeView .home-random-tape .vhs-spine-meta {
+  position: relative;
+  z-index: 1;
+}
+
+#homeView .home-random-tape .vhs-spine-title.is-rewinding {
+  animation: home-random-rewind 420ms cubic-bezier(0.55, 0, 0.9, 0.45) both;
+}
+
+#homeView .home-random-tape .vhs-spine-title.is-settling {
+  animation: home-random-settle 260ms var(--ease-out) both;
+}
+
+@keyframes home-random-rewind {
+  from { filter: blur(0); opacity: 1; translate: 0 0; }
+  to { filter: blur(3px); opacity: 0; translate: 0 70%; }
+}
+
+@keyframes home-random-settle {
+  from { filter: blur(2px); opacity: 0; translate: 0 -30%; }
+  to { filter: blur(0); opacity: 1; translate: 0 0; }
+}
+
+#homeView .home-random-note {
+  align-self: end;
+  background: var(--surface-deep);
+  border: 1px solid rgba(var(--teal-rgb), 0.42);
+  color: var(--text-soft);
+  display: grid;
+  font-family: var(--font-home-data);
+  font-size: var(--text-caption);
+  gap: 8px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  padding: 10px;
+  width: 190px;
+}
+
+#homeView .home-random-note p { margin: 0; }
+
+#homeView .home-random-note button {
+  font-size: var(--text-caption);
+  min-height: var(--touch-target);
+  padding: 4px 8px;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #homeView .home-random-tape .vhs-spine-title:is(.is-rewinding, .is-settling) { animation: none; }
+}
+
+@media (max-width: 860px) {
+  #homeView .home-random-bay { margin-bottom: 20px; min-width: 0; width: 100%; }
+  #homeView .home-random-plaque { width: 100%; }
+  #homeView .home-random-rail { padding: 10px 4px; }
+  #homeView .home-random-note { width: auto; flex: 1 1 auto; }
+}

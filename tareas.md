@@ -312,38 +312,46 @@ no implementar aún lomo nuevo, sorteo conectado ni animación. Se conserva el p
 Owner confirma 2026-09-13: revelar resultado y actualizar consola/derecha; no abrir
 ficha automáticamente. «Ver más» la abre. La animación A/B aún debe compararse.
 
-- [ ] **[U8.1] Alcance y recorrido del comando.** `randomCandidates()`/detail/Home:
+**Retomada en 0.10.0 por pedido del owner (2026-09-26).** Rama `feat/u8-random-vhs`,
+sin mezclar con U7/U9 del otro frente. Alcance en Inicio: todo el catálogo personal,
+según «Solo disponibles»; nunca sólo el estante ni Club. El resultado alimenta lomo,
+consola, cartel derecho y «Ver más»; la lista conserva su fuente y no inventa fila.
+Botón «Al azar» del encabezado: en Inicio sortea en el lomo (revela la bahía, sin
+ficha); fuera de Inicio sigue abriendo una ficha. Pendiente: elección A/B (U8.4.1).
+
+- [x] **[U8.1] Alcance y recorrido del comando.** `randomCandidates()`/detail/Home:
   auditar todo catálogo vs página cargada, filtros, disponibilidad y cero candidatos;
   definir resultado en consulta vs apertura final de ficha. Home no debe sortear sólo
   el estante accidentalmente. Dep.: U5.1 y respuesta del owner. Modelo grande.
-- [ ] **[U8.2] Lomo terminal y estados.** Fixture/asset VHS/Home CSS: inicial,
+- [x] **[U8.2] Lomo terminal y estados.** Fixture/asset VHS/Home CSS: inicial,
   ocupado, disponible, no disponible y vacío; comparación de «?» como decoración,
   rótulo semántico y contraste. Dep.: U8.1 + U4.4/encaje U6.1. Modelo grande, visual.
-  - [ ] **[U8.2.1] Encaje terminal.** Placa AL AZAR y un lomo, fuera del conteo de
+  - [x] **[U8.2.1] Encaje terminal.** Placa AL AZAR y un lomo, fuera del conteo de
     secciones editoriales, mismo material/tamaño que los VHS existentes.
-  - [ ] **[U8.2.2] Estados y copy.** Inicial/ocupado/disponible/no disponible/vacío,
+  - [x] **[U8.2.2] Estados y copy.** Inicial/ocupado/disponible/no disponible/vacío,
     error y resultado fuera de alcance; «?» decorativo, título y foco legibles.
-  - [ ] **[U8.2.3] Objeto integrado.** Foco/navegación reales, no colección ficticia;
+  - [x] **[U8.2.3] Objeto integrado.** Foco/navegación reales, no colección ficticia;
     enlazar resultado de U8.3 sin duplicar lógica ni consola.
-- [ ] **[U8.3] Resultado único y alcance común.** Servicio JS de sorteo y, si hace
+- [x] **[U8.3] Resultado único y alcance común.** Servicio JS de sorteo y, si hace
   falta, Python/API: un ID para todas las superficies, no repetición inmediata con
   varios candidatos, cambio de preferencia y resultado fuera de alcance. Dep.: U8.1;
   no nueva API si catálogo completo ya está disponible. Modelo grande, lógica.
 - [ ] **[U8.4] Comparar y construir revelación.** Animación de etiqueta rebobinada
   o tira breve; elegir con muestras, reduced motion directo, coalescing y anuncio sólo
   del resultado. Dep.: U8.2–3. Modelo grande, visual/interacción.
-  - [ ] **[U8.4.1] Comparación A/B.** Rebobinado recomendado frente a tira breve;
+  - [ ] **[U8.4.1] Comparación A/B.** Ambas construidas sobre la etiqueta real
+    (`#homeView[data-random-effect]`, «rewind» por defecto); falta la elección del owner. Rebobinado recomendado frente a tira breve;
     muestras para elegir antes de cerrar la dirección del efecto.
   - [ ] **[U8.4.2] Efecto elegido.** Sólo etiqueta, resultado elegido de antemano,
     sin relayout del rail ni títulos anunciados durante la transición.
-  - [ ] **[U8.4.3] Movimiento/foco/concurrencia.** Reduced motion directo, clics
+  - [x] **[U8.4.3] Movimiento/foco/concurrencia.** Reduced motion directo, clics
     coalescidos, control estable y un anuncio final; sin sonido U9.
   - [ ] **[U8.4.4] Gate conectado.** Duración/performance y estados finales con
     U8.5–6; ninguna obra distinta entre lomo, consola, derecha y ficha.
-- [ ] **[U8.5] Integración del botón, lomo y consulta.** Home/bootstrap/detail:
+- [x] **[U8.5] Integración del botón, lomo y consulta.** Home/bootstrap/detail:
   llegar al módulo sin perder foco, derecha/consola con mismo resultado, lista según
   contrato y comando usable fuera de Home. Dep.: U5/U6 + U8.3–4. Modelo grande.
-- [ ] **[U8.6] Gate del sorteo.** 0/1/muchos, switch/todo/no disponible, rápido,
+- [x] **[U8.6] Gate del sorteo.** 0/1/muchos, switch/todo/no disponible, rápido,
   teclado, obra removida, offline/autoplay/reduced motion; sin cambios personales.
   Dep.: U8.5. Modelo grande.
 

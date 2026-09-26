@@ -7,8 +7,17 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 Va a ser la **0.10.0**. La versión está abierta en la rama `release/0.10.0` y se cierra al
 fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
+### Agregado
+
+- La biblioteca de Inicio termina en un VHS «Al azar». Al activarlo elige una obra de
+  todo tu catálogo (o sólo de las disponibles, según la preferencia de siempre), la
+  revela en el lomo y la muestra en la consola y el cartel «En consulta»; la ficha se
+  abre con «Ver más». En Inicio el botón «Al azar» del menú usa ese mismo lomo.
+
 ### Cambiado
 
+- En Colección, «Al azar» respeta los filtros aunque no dejen resultados: antes
+  elegía en silencio entre todo el catálogo.
 - La consola de Inicio se reordenó: título y datos primero, créditos al medio, acceso,
   estado y acciones a la derecha. Ya no repite la portada que muestra el marco «En
   consulta».
