@@ -830,6 +830,15 @@
         ],
         "createdAt": "2026-09-25T02:30:30.797Z",
         "reason": "Pre-existing literal of the owner-accepted VHS back cover (U2-P, visual front); documenting it as a DESIGN.md token stays with that front: fluid endpoint of the back-cover title clamp"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(231, 189, 106, 0.25)",
+        "files": [
+          "src/movie_inbox/web/static/css/core-detail.css"
+        ],
+        "createdAt": "2026-09-26T16:50:39.371Z",
+        "reason": "Literal of the visual front's U7 A back-cover work (commit 0970482), integrated on the owner's request; documenting it as a DESIGN.md token stays with that front"
       }
     ]
   }
