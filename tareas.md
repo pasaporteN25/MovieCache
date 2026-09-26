@@ -317,7 +317,8 @@ sin mezclar con U7/U9 del otro frente. Alcance en Inicio: todo el catálogo pers
 según «Solo disponibles»; nunca sólo el estante ni Club. El resultado alimenta lomo,
 consola, cartel derecho y «Ver más»; la lista conserva su fuente y no inventa fila.
 Botón «Al azar» del encabezado: en Inicio sortea en el lomo (revela la bahía, sin
-ficha); fuera de Inicio sigue abriendo una ficha. Pendiente: elección A/B (U8.4.1).
+ficha); fuera de Inicio sigue abriendo una ficha. Owner 2026-09-26: aprueba la
+lámina de estados y elige el efecto B (tira de títulos); A se retiró.
 
 - [x] **[U8.1] Alcance y recorrido del comando.** `randomCandidates()`/detail/Home:
   auditar todo catálogo vs página cargada, filtros, disponibilidad y cero candidatos;
@@ -336,17 +337,17 @@ ficha); fuera de Inicio sigue abriendo una ficha. Pendiente: elección A/B (U8.4
   falta, Python/API: un ID para todas las superficies, no repetición inmediata con
   varios candidatos, cambio de preferencia y resultado fuera de alcance. Dep.: U8.1;
   no nueva API si catálogo completo ya está disponible. Modelo grande, lógica.
-- [ ] **[U8.4] Comparar y construir revelación.** Animación de etiqueta rebobinada
+- [x] **[U8.4] Comparar y construir revelación.** Animación de etiqueta rebobinada
   o tira breve; elegir con muestras, reduced motion directo, coalescing y anuncio sólo
   del resultado. Dep.: U8.2–3. Modelo grande, visual/interacción.
-  - [ ] **[U8.4.1] Comparación A/B.** Ambas construidas sobre la etiqueta real
-    (`#homeView[data-random-effect]`, «rewind» por defecto); falta la elección del owner. Rebobinado recomendado frente a tira breve;
+  - [x] **[U8.4.1] Comparación A/B.** Ambas construidas sobre la etiqueta real y
+    grabadas; el owner eligió B el 2026-09-26. Rebobinado recomendado frente a tira breve;
     muestras para elegir antes de cerrar la dirección del efecto.
-  - [ ] **[U8.4.2] Efecto elegido.** Sólo etiqueta, resultado elegido de antemano,
+  - [x] **[U8.4.2] Efecto elegido.** Sólo etiqueta, resultado elegido de antemano,
     sin relayout del rail ni títulos anunciados durante la transición.
   - [x] **[U8.4.3] Movimiento/foco/concurrencia.** Reduced motion directo, clics
     coalescidos, control estable y un anuncio final; sin sonido U9.
-  - [ ] **[U8.4.4] Gate conectado.** Duración/performance y estados finales con
+  - [x] **[U8.4.4] Gate conectado.** Duración/performance y estados finales con
     U8.5–6; ninguna obra distinta entre lomo, consola, derecha y ficha.
 - [x] **[U8.5] Integración del botón, lomo y consulta.** Home/bootstrap/detail:
   llegar al módulo sin perder foco, derecha/consola con mismo resultado, lista según

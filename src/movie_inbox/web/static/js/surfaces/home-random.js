@@ -27,11 +27,6 @@ function reducedMotion() {
     && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
 }
 
-// "rewind" (A, recommended) or "strip" (B); the owner chooses in U8.4.1.
-function revealEffect() {
-  return fields.homeView?.dataset?.randomEffect === "strip" ? "strip" : "rewind";
-}
-
 export function homeRandomEntry() {
   const item = resultItem();
   if (!item) return null;
@@ -124,31 +119,25 @@ function revealBay() {
   else if (box.left < bounds.left) rail.scrollLeft += box.left - bounds.left;
 }
 
-function playEffect(effect, pool, done) {
-  const tape = spine();
-  const title = tape?.querySelector(".vhs-spine-title");
-  if (!title) {
+// Owner's U8.4.1 choice (2026-09-26), effect B: a short run of real catalogue
+// titles on the label, decorative and hidden from assistive technology.
+function playStrip(pool, done) {
+  const title = spine()?.querySelector(".vhs-spine-title");
+  const names = pool.map((item) => displayTitle(item)).filter(Boolean);
+  if (!title || !names.length) {
+    window.setTimeout(done, HOME_RANDOM_REVEAL_MS);
+    return;
+  }
+  let step = 0;
+  const timer = window.setInterval(() => {
+    if (!title.isConnected) return;
+    title.textContent = names[step % names.length];
+    step += 1;
+  }, 70);
+  window.setTimeout(() => {
+    window.clearInterval(timer);
     done();
-    return;
-  }
-  if (effect === "strip") {
-    // B: a short run of real catalogue titles, decorative and hidden from AT.
-    const names = pool.map((item) => displayTitle(item)).filter(Boolean);
-    let step = 0;
-    const timer = window.setInterval(() => {
-      if (!title.isConnected || !names.length) return;
-      title.textContent = names[step % names.length];
-      step += 1;
-    }, 70);
-    window.setTimeout(() => {
-      window.clearInterval(timer);
-      done();
-    }, HOME_RANDOM_REVEAL_MS);
-    return;
-  }
-  // A: the current label rewinds along the spine before the result settles in.
-  title.classList.add("is-rewinding");
-  window.setTimeout(done, HOME_RANDOM_REVEAL_MS);
+  }, HOME_RANDOM_REVEAL_MS);
 }
 
 function settle() {
@@ -194,7 +183,7 @@ export function drawHomeRandom({ reveal = false, focusSpine = false } = {}) {
   renderEditorialSections();
   if (hadFocus || focusSpine) spine()?.focus({ preventScroll: true });
   const pool = candidates.filter((candidate) => candidate !== item).slice(0, 8);
-  playEffect(revealEffect(), pool, finish);
+  playStrip(pool, finish);
   return true;
 }
 
