@@ -179,6 +179,13 @@ backlog de `tareas.md` — entre lo accionable, [U7] (imágenes de consola), [U8
 azar, postergada de la 0.9.0), [X11] (id durable por fuente, requisito para publicar
 `movieIndexAndroid` v0.1.0) y los traspasos de backend sin pantalla todavía.
 
+**Prioridad visual actualizada 2026-09-26:** U7 y U9, con U8 fuera de este corte.
+Primero se propone aprovechar imágenes existentes en la contratapa VHS actual
+(U7 A); después, sonido opcional por selección (U9). Adquisición/galería persistente
+(U7 B) tiene dependencias propias de lógica y no frena U9. Desglose y criterios en
+[`design/u7-u9-plan-2026-09-26.md`](design/u7-u9-plan-2026-09-26.md).
+Es planificación de pendientes, no cierre ni implementación de esas épicas.
+
 ### Próximos incrementos propuestos
 
 - Se proponen al cerrar la 0.10.0.
@@ -324,6 +331,9 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
    nuevos de `kind`.
 
 ### Evolución visual de Home — plan 2026-09-12
+
+Antecedente histórico. Para destino de U7, prioridad de U9 y postergación de U8,
+prevalece el [corte del 2026-09-26](design/u7-u9-plan-2026-09-26.md).
 
 El owner aceptó la base continua y consola única U4.2d.3. U4.3 integró B el
 2026-09-13 tras la elección U6.1; U4.4 ya está implementada y U4.6a verificada.

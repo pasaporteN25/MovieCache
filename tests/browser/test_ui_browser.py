@@ -220,6 +220,69 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.wait_for_selector("#homeView:not([hidden])")
         page.wait_for_function("document.querySelector('#stats').textContent.includes('2 obras')")
 
+    def test_home_loading_structure_parallel_requests_and_identity_gate(self) -> None:
+        page = self.page
+        pending = {}
+
+        def hold(route) -> None:
+            key = "session" if route.request.url.endswith("/session") else "items"
+            pending[key] = (route, route.fetch())
+
+        page.route("**/api/session", hold)
+        page.route("**/api/items?*", hold)
+        page.expose_function("heldCatalogRequests", lambda: list(pending))
+        with page.expect_request("**/api/session"), page.expect_request("**/api/items?*"):
+            page.goto(self.base_url)
+        page.wait_for_function("async () => (await window.heldCatalogRequests()).length === 2")
+        self.assertEqual(
+            page.locator(".home-loading-status strong").inner_text(), "Preparando tu videoteca"
+        )
+        self.assertEqual(set(pending), {"session", "items"})
+        self.assertEqual(page.locator(".home-loading-tapes > span").count(), 18)
+        self.assertEqual(page.locator(".home-loading-hero button").count(), 0)
+        for width in (320, 390, 860, 1000, 1440, 1920):
+            page.set_viewport_size({"width": width, "height": 900})
+            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+            self.assertTrue(page.locator(".home-loading-status").is_visible())
+        page.emulate_media(reduced_motion="reduce")
+        self.assertEqual(
+            page.locator(".home-loading-status").evaluate(
+                "element => getComputedStyle(element, '::before').animationName"
+            ),
+            "none",
+        )
+        # El catálogo puede terminar primero, pero no se muestra sin la sesión.
+        route, response = pending["items"]
+        with page.expect_response("**/api/items?*"):
+            route.fulfill(response=response)
+        self.assertEqual(page.locator("#homeView").get_attribute("aria-busy"), "true")
+        self.assertTrue(page.locator(".home-loading-hero").is_visible())
+        self.assertEqual(page.locator(".playlist-entry").count(), 0)
+        route, response = pending["session"]
+        route.fulfill(response=response)
+        wait_for_app_ready(page)
+        self.assertEqual(page.locator(".home-loading-hero, .home-loading-section").count(), 0)
+        self.assertIn("2 obras", page.locator("#stats").inner_text().lower())
+
+    def test_home_loading_failure_can_retry(self) -> None:
+        page = self.page
+        page.route(
+            "**/api/items?*",
+            lambda route: route.fulfill(status=503, json={"reason": "unavailable"}),
+        )
+        page.goto(self.base_url)
+        retry = page.get_by_role("button", name="Reintentar", exact=True)
+        retry.wait_for(state="visible")
+        self.assertEqual(page.locator("#homeView").get_attribute("aria-busy"), "false")
+        self.assertFalse(page.locator(".home-loading-hero").is_visible())
+        page.unroute("**/api/items?*")
+        retry.click()
+        wait_for_app_ready(page)
+        self.assertIn("2 obras", page.locator("#stats").inner_text().lower())
+        self.assertIsNone(page.locator("#homeView").get_attribute("data-load-state"))
+        self.assertEqual(page.locator(".home-loading-hero").count(), 0)
+        self.assertEqual(page.evaluate("document.activeElement.id"), "spotlightTitle")
+
     def test_collection_navigation_and_responsive_layout(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)
@@ -314,6 +377,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         # poster, so the console never repeats it.
         self.assertEqual(preview.locator("img").count(), 0)
 
+        preview.get_by_role("button", name="Resumen", exact=True).click()
+        page.wait_for_function(
+            "document.querySelector('#homeSelectionSummary').getBoundingClientRect().height > 100"
+        )
         geometry = page.evaluate(
             """() => {
                 const box = selector => document.querySelector(selector).getBoundingClientRect();
@@ -354,7 +421,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(preview.locator(".home-console-details").count(), 1)
         self.assertEqual(page.locator(".home-shelf-preview, #homeShelfPreview").count(), 0)
         self.assertEqual(preview.locator(".home-furniture-format-panel").count(), 0)
-        self.assertEqual(preview.locator(".spotlight-preview-action").count(), 2)
+        self.assertEqual(preview.locator(".spotlight-preview-action").count(), 1)
         for action in preview.locator(".spotlight-preview-action").all():
             action_box = action.bounding_box()
             self.assertIsNotNone(action_box)
@@ -478,7 +545,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                 "Memory obra 3",
             )
 
-            view_more = console.get_by_role("button", name="Ver más")
+            view_more = console.get_by_role("button", name="Abrir ficha", exact=True)
             view_more.tap()
             touch_page.wait_for_selector("#detailDrawer[open]")
             self.assertEqual(touch_page.evaluate("document.activeElement.id"), "closeDetail")
@@ -1414,7 +1481,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                 self.assertIsNone(spine.get_attribute("onerror"))
         spines.first.click()
         console = page.locator('.spotlight-preview[data-selection-source="shelf:spine-variants"]')
-        console.get_by_role("button", name="Ver más").click()
+        console.get_by_role("button", name="Abrir ficha", exact=True).click()
         page.wait_for_selector("#detailDrawer[open]")
         self.assertIn("pelicula", page.locator("#detailDrawer").inner_text().lower())
 
@@ -1588,6 +1655,113 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.emulate_media(reduced_motion="reduce")
         self.assertEqual(
             furniture.evaluate("element => getComputedStyle(element).scrollBehavior"), "auto"
+        )
+
+    def test_home_summary_disclosure_keeps_selection_focus_and_header_stable(self) -> None:
+        page = self.page
+
+        def add_consultation_fixture(route) -> None:
+            response = route.fetch()
+            payload = response.json()
+            payload["home"]["featured"] = [
+                {"key": item["id"], "origin": {"kind": "catalog"}, "item": item}
+                for item in payload["items"]
+            ]
+            route.fulfill(response=response, json=payload)
+
+        page.route("**/api/items?*", add_consultation_fixture)
+        self._open_and_wait_for_catalog(page)
+        page.emulate_media(reduced_motion="reduce")
+        preview = page.locator(".spotlight-preview")
+        toggle = preview.get_by_role("button", name="Resumen", exact=True)
+        view = preview.get_by_role("button", name="Abrir ficha", exact=True)
+        body = preview.locator("#homeSelectionSummary")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
+        self.assertTrue(body.evaluate("element => element.inert"))
+        self.assertFalse(preview.get_by_role("button", name="Editar mi ficha").is_visible())
+
+        # The primary action is usable without opening the summary.
+        view.click()
+        page.wait_for_selector("#detailDrawer[open]")
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
+        toggle.focus()
+        header_before = preview.locator(".home-console-header").bounding_box()
+        action_before = view.bounding_box()
+        selected_before = preview.get_attribute("data-selected-entry-key")
+        page.keyboard.press("Enter")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
+        self.assertFalse(body.evaluate("element => element.inert"))
+        self.assertEqual(preview.get_attribute("data-selected-entry-key"), selected_before)
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.homeFocus"), "consultation-summary"
+        )
+        self.assertEqual(preview.locator(".home-console-header").bounding_box(), header_before)
+        self.assertEqual(view.bounding_box(), action_before)
+
+        # A different row and the daily poster can update without collapsing consultation.
+        rows = page.locator("[data-playlist-entry]")
+        next_row = rows.nth(1)
+        next_key = next_row.get_attribute("data-entry-key")
+        next_row.click()
+        self.assertEqual(preview.get_attribute("data-selected-entry-key"), next_key)
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
+        page.emulate_media(reduced_motion="no-preference")
+        toggle.focus()
+        self.assertTrue(page.evaluate("window.tickHomeAutoplay()"))
+        self.assertEqual(preview.get_attribute("data-selected-entry-key"), next_key)
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.homeFocus"), "consultation-summary"
+        )
+
+        # Closing with Space removes hidden actions from keyboard navigation.
+        page.keyboard.press("Space")
+        self.assertEqual(toggle.get_attribute("aria-expanded"), "false")
+        self.assertTrue(body.evaluate("element => element.inert"))
+        page.keyboard.press("Tab")
+        self.assertEqual(
+            page.evaluate("document.activeElement.dataset.homeFocus"), "consultation-view"
+        )
+        page.keyboard.press("Tab")
+        self.assertFalse(body.evaluate("element => element.contains(document.activeElement)"))
+
+        page.emulate_media(reduced_motion="reduce")
+        for width, height in (
+            (1920, 1080),
+            (1280, 720),
+            (1000, 900),
+            (860, 900),
+            (390, 844),
+            (320, 740),
+        ):
+            with self.subTest(viewport=(width, height)):
+                page.set_viewport_size({"width": width, "height": height})
+                header_offset = toggle.evaluate(
+                    "el => el.getBoundingClientRect().top - "
+                    "el.closest('.spotlight-layout').getBoundingClientRect().top"
+                )
+                for expanded in (True, False):
+                    toggle.click()
+                    self.assertEqual(toggle.get_attribute("aria-expanded"), str(expanded).lower())
+                    self.assertAlmostEqual(
+                        toggle.evaluate(
+                            "el => el.getBoundingClientRect().top - "
+                            "el.closest('.spotlight-layout').getBoundingClientRect().top"
+                        ),
+                        header_offset,
+                        delta=1,
+                    )
+                    self.assertFalse(
+                        page.evaluate("document.documentElement.scrollWidth > innerWidth + 1")
+                    )
+                    for control in (toggle, view):
+                        box = control.bounding_box()
+                        self.assertGreaterEqual(box["height"], 44)
+                        self.assertGreaterEqual(box["x"], 0)
+                        self.assertLessEqual(box["x"] + box["width"], width)
+        self.assertEqual(
+            body.evaluate("element => getComputedStyle(element).transitionDuration"), "0s"
         )
 
     def test_home_furniture_console_keeps_primary_copy_legible_at_desktop_sizes(self) -> None:
@@ -2222,11 +2396,12 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.locator('[data-home-section="available"] .home-shelf-tape').first.click()
         preview = page.locator(".spotlight-preview")
-        self.assertEqual(preview.get_by_text("Ver más").count(), 1)
+        self.assertEqual(preview.get_by_role("button", name="Abrir ficha", exact=True).count(), 1)
         self.assertEqual(preview.locator(".home-console-media").count(), 0)
         edit_button = preview.get_by_text("Editar mi ficha")
         self.assertEqual(edit_button.count(), 1)
 
+        preview.get_by_role("button", name="Resumen", exact=True).click()
         edit_button.click()
         page.wait_for_selector("#detailDrawer[open]")
         page.wait_for_selector("[data-detail-form='personal']")
@@ -2349,7 +2524,9 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.keyboard.press("Home")
             page.keyboard.press("End")
             shelf.nth(0).click()
-            page.locator(".spotlight-preview").get_by_text("Ver más", exact=True).click()
+            page.locator(".spotlight-preview").get_by_role(
+                "button", name="Abrir ficha", exact=True
+            ).click()
             page.wait_for_selector("#detailDrawer[open]")
             page.keyboard.press("Escape")
             page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
@@ -2371,7 +2548,7 @@ class BrowserInterfaceTests(unittest.TestCase):
                     host.innerHTML = module.renderBackCover({ id, title: id });
                     return {
                         template: host.firstElementChild.dataset.backCoverTemplate,
-                        frames: host.querySelectorAll('.vhs-back-cover-frame[role="img"]').length,
+                        frames: host.querySelectorAll('.vhs-back-cover-frame').length,
                     };
                 });
                 return { templates, rendered };
@@ -2387,13 +2564,134 @@ class BrowserInterfaceTests(unittest.TestCase):
                 ["opaque-2", "archive-grid"],
             ],
         )
-        self.assertEqual([entry["frames"] for entry in result["rendered"]], [2] * 5)
+        self.assertEqual([entry["frames"] for entry in result["rendered"]], [0] * 5)
         self.assertEqual(
             [entry["template"] for entry in result["rendered"]],
             [entry[1] for entry in result["templates"]],
         )
 
-    def test_home_shelf_view_more_opens_deterministic_back_cover_with_reversible_transition(
+    def test_back_cover_images_states_templates_and_late_responses(self) -> None:
+        page = self.page
+        pending = []
+        artwork = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450">'
+            '<rect width="800" height="450" fill="#214451"/>'
+            '<circle cx="400" cy="210" r="100" fill="#e7bd6a"/></svg>'
+        )
+
+        def image_response(route) -> None:
+            if "slow" in route.request.url:
+                pending.append(route)
+            elif "rejected" in route.request.url:
+                route.fulfill(status=403)
+            elif "broken" in route.request.url:
+                route.fulfill(status=404)
+            else:
+                route.fulfill(content_type="image/svg+xml", body=artwork)
+
+        page.route("**/image-cache?*", image_response)
+        self._open_and_wait_for_catalog(page)
+        page.emulate_media(reduced_motion="reduce")
+        # Fixtures sólo en memoria: datos disponibles, rotos, repetidos y ausentes.
+        page.evaluate(
+            """async () => {
+                const state = await import('/static/js/core/state.js');
+                const ids = ['heat', 'akira', 'movie-42', 'opaque:999', 'opaque-2'];
+                state.setItems(ids.map(id => ({
+                    ...state.items[0], id, title: 'Obra de prueba',
+                    page_image: '', backdrop_image: ''
+                })));
+            }"""
+        )
+
+        def open_images(item_id, poster="", backdrop="") -> None:
+            page.evaluate(
+                """async ({id, poster, backdrop}) => {
+                    window.closeDetail({restoreFocus: false});
+                    const state = await import('/static/js/core/state.js');
+                    state.setItems(state.items.map(item => item.id === id
+                        ? {...item, page_image: poster, backdrop_image: backdrop} : item));
+                    window.openDetail(id, {presentation: 'back-cover'});
+                }""",
+                {"id": item_id, "poster": poster, "backdrop": backdrop},
+            )
+
+        for width in (1280, 390):
+            page.set_viewport_size({"width": width, "height": 900})
+            for item_id in ("heat", "akira", "movie-42", "opaque:999", "opaque-2"):
+                for count in (0, 1, 2):
+                    open_images(
+                        item_id,
+                        "https://fixture.invalid/poster.jpg" if count else "",
+                        "https://fixture.invalid/backdrop.jpg" if count == 2 else "",
+                    )
+                    page.wait_for_function(
+                        "!document.querySelector('.vhs-back-cover [aria-busy=true]')"
+                    )
+                    self.assertEqual(
+                        page.locator("[data-back-cover-image-state=loaded]").count(), count
+                    )
+                    self.assertEqual(
+                        page.locator(".vhs-back-cover-images-empty").count(), int(count == 0)
+                    )
+                    geometry = page.locator(".vhs-back-cover").evaluate(
+                        """element => {
+                            const content = element.querySelector('.vhs-back-cover-content');
+                            const box = content.getBoundingClientRect();
+                            return {
+                                horizontalOverflow: content.scrollWidth - content.clientWidth,
+                                inside: [...element.querySelectorAll('.vhs-back-cover-frame')]
+                                    .every(frame => {
+                                        const rect = frame.getBoundingClientRect();
+                                        return rect.width > 0 && rect.height > 0
+                                            && rect.left >= box.left && rect.right <= box.right;
+                                    }),
+                                images: [...element.querySelectorAll('img')].every(image =>
+                                    image.naturalWidth > 0
+                                    && getComputedStyle(image).objectFit === 'contain'
+                                    && image.getAttribute('aria-hidden') === 'false')
+                            };
+                        }"""
+                    )
+                    self.assertTrue(geometry["inside"])
+                    self.assertTrue(geometry["images"])
+                    self.assertLessEqual(geometry["horizontalOverflow"], 1)
+
+        open_images(
+            "heat",
+            "https://image.tmdb.org/t/p/w500/same.jpg",
+            "https://image.tmdb.org/t/p/original/same.jpg",
+        )
+        self.assertEqual(page.locator("[data-back-cover-image]").count(), 1)
+        self.assertEqual(page.locator(".vhs-back-cover-frame figcaption").inner_text(), "Portada")
+        for failure in ("broken", "rejected"):
+            open_images(
+                "heat",
+                f"https://fixture.invalid/{failure}.jpg",
+                "https://fixture.invalid/backdrop.jpg",
+            )
+            page.wait_for_selector("[data-back-cover-image-state=error]")
+            page.wait_for_selector("[data-back-cover-image-state=loaded]")
+            self.assertEqual(page.locator("[data-back-cover-image-state=loaded]").count(), 1)
+            self.assertTrue(
+                page.get_by_text("No se pudo cargar la imagen", exact=True).is_visible()
+            )
+        page.keyboard.press("Escape")
+        self.assertFalse(page.locator("#detailDrawer").is_visible())
+
+        with page.expect_request("**/*slow*"):
+            open_images("heat", "", "https://fixture.invalid/slow.jpg")
+        page.wait_for_selector("[data-back-cover-image-state=loading]")
+        self.assertTrue(page.get_by_text("Cargando imagen…", exact=True).is_visible())
+        open_images("akira", "https://fixture.invalid/poster.jpg")
+        page.wait_for_selector("[data-back-cover-image-state=loaded]")
+        for route in pending:
+            route.fulfill(content_type="image/svg+xml", body=artwork)
+        self.assertEqual(page.locator(".vhs-back-cover").get_attribute("data-item-id"), "akira")
+        self.assertEqual(page.locator("[data-back-cover-image]").count(), 1)
+        self.assertNotIn("slow", page.locator("[data-back-cover-image]").get_attribute("src"))
+
+    def test_home_shelf_opens_back_cover_with_interruptible_local_animation(
         self,
     ) -> None:
         page = self.page
@@ -2439,17 +2737,51 @@ class BrowserInterfaceTests(unittest.TestCase):
         self._open_and_wait_for_catalog(page)
         page.set_viewport_size({"width": 1280, "height": 720})
 
-        # document.startViewTransition support is exercised for real here (this
-        # Playwright build ships a Chromium new enough to have it); we assert on
-        # end-to-end behavior rather than instrumenting the API itself, since
-        # wrapping it changes timing enough to throw off focus restoration.
+        # La apertura se anima sobre la caja real, con el diálogo ya interactivo.
         page.locator('[data-home-section="available"] .home-shelf-tape').first.click()
-        view_more = page.locator(".spotlight-preview").get_by_text("Ver más", exact=True)
+        view_more = page.locator(".spotlight-preview").get_by_role(
+            "button", name="Abrir ficha", exact=True
+        )
         view_more.click()
         page.wait_for_selector("#detailDrawer[open]")
 
         drawer = page.locator("#detailDrawer")
         self.assertEqual(drawer.get_attribute("data-detail-mode"), "back-cover")
+        motion = page.locator("#detailDrawer .vhs-back-cover").evaluate(
+            """element => {
+                const animation = element.getAnimations()[0];
+                if (!animation) return null;
+                animation.pause();
+                const duration = animation.effect.getTiming().duration;
+                const frames = [0, duration / 2, duration].map(time => {
+                    animation.currentTime = time;
+                    const style = getComputedStyle(element);
+                    return {
+                        opacity: Number(style.opacity),
+                        atRest: new DOMMatrixReadOnly(style.transform).isIdentity,
+                    };
+                });
+                animation.finish();
+                return {
+                    frames,
+                    dialogTransform: getComputedStyle(element.closest('dialog')).transform,
+                    pageTransform: getComputedStyle(document.documentElement).transform,
+                    backdropAnimation: getComputedStyle(
+                        element.closest('dialog'), '::backdrop'
+                    ).animationName,
+                };
+            }"""
+        )
+        self.assertIsNotNone(motion)
+        self.assertEqual(motion["frames"][0]["opacity"], 0)
+        self.assertGreater(motion["frames"][1]["opacity"], 0)
+        self.assertLess(motion["frames"][1]["opacity"], 1)
+        self.assertEqual(motion["frames"][2]["opacity"], 1)
+        self.assertFalse(motion["frames"][0]["atRest"])
+        self.assertTrue(motion["frames"][2]["atRest"])
+        self.assertEqual(motion["dialogTransform"], "none")
+        self.assertEqual(motion["pageTransform"], "none")
+        self.assertNotEqual(motion["backdropAnimation"], "none")
         self.assertEqual(
             page.locator("#detailDrawerTitle").text_content(), "Contratapa VHS // Heat"
         )
@@ -2462,8 +2794,8 @@ class BrowserInterfaceTests(unittest.TestCase):
             "vhs-back-cover-shell-v1.png",
             case.evaluate("element => getComputedStyle(element).backgroundImage"),
         )
-        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-frame").count(), 2)
-        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-frame[role='img']").count(), 2)
+        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-frame").count(), 0)
+        self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-images-empty").count(), 1)
         self.assertEqual(page.locator("#detailDrawer .vhs-back-cover-credits").count(), 1)
         self.assertIn("Michael Mann", page.locator("#detailDrawer").inner_text())
         self.assertIn("Una memoria personal de prueba.", page.locator("#detailDrawer").inner_text())
@@ -2532,22 +2864,43 @@ class BrowserInterfaceTests(unittest.TestCase):
         # Reversible + doesn't block Escape/focus.
         page.keyboard.press("Escape")
         page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
-        # The view transition's callback runs synchronously, but Chromium settles
-        # the actual focus move a tick later while the transition is captured, so
-        # poll instead of asserting on a single synchronous read.
-        page.wait_for_function("document.activeElement.textContent === 'Ver más'")
+        page.wait_for_function("document.activeElement.dataset.homeFocus === 'consultation-view'")
 
-        # prefers-reduced-motion: the same open/close still works (the JS gate
-        # skips document.startViewTransition before CSS ever enters the picture).
+        # Escape interrumpe la entrada, devuelve el foco y permite volver a abrir.
+        for width in (1280, 390):
+            page.set_viewport_size({"width": width, "height": 800})
+            view_more.click()
+            page.locator("#detailDrawer .vhs-back-cover").evaluate(
+                """element => {
+                    const animation = element.getAnimations()[0];
+                    animation.pause();
+                    animation.currentTime = 80;
+                }"""
+            )
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
+            page.wait_for_function(
+                "document.activeElement.dataset.homeFocus === 'consultation-view'"
+            )
+
+        page.set_viewport_size({"width": 1280, "height": 720})
+        # Movimiento reducido deja la caja legible sin animar caja ni fondo.
         page.emulate_media(reduced_motion="reduce")
         view_more.click()
         page.wait_for_selector("#detailDrawer[open]")
+        self.assertEqual(
+            page.locator("#detailDrawer .vhs-back-cover").evaluate(
+                "element => getComputedStyle(element).animationName"
+            ),
+            "none",
+        )
+        self.assertEqual(
+            drawer.evaluate("element => getComputedStyle(element, '::backdrop').animationName"),
+            "none",
+        )
         page.keyboard.press("Escape")
         page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
-        # The view transition's callback runs synchronously, but Chromium settles
-        # the actual focus move a tick later while the transition is captured, so
-        # poll instead of asserting on a single synchronous read.
-        page.wait_for_function("document.activeElement.textContent === 'Ver más'")
+        page.wait_for_function("document.activeElement.dataset.homeFocus === 'consultation-view'")
 
         # The back cover has no visible frame or close button for pointer users: the
         # button keeps its accessible name, and a click beside the case closes it.

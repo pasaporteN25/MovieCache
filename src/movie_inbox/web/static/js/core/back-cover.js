@@ -1,4 +1,5 @@
 import { availabilityState, displayTitle, escapeAttr, escapeHtml, listText, normalizeRating } from "./format.js";
+import { renderBackCoverImages } from "./back-cover-images.js";
 
 export const BACK_COVER_TEMPLATES = Object.freeze([
   "rental-classic",
@@ -24,13 +25,6 @@ export function backCoverTemplateForId(id) {
 
 function fact(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "Sin dato")}</dd></div>`;
-}
-
-function framePlaceholder(title, number) {
-  return `<div class="vhs-back-cover-frame vhs-back-cover-frame-${number}" role="img" aria-label="Fotograma ${number} de ${escapeAttr(title)} no disponible">
-    <span>Fotograma ${String(number).padStart(2, "0")}</span>
-    <strong>No disponible</strong>
-  </div>`;
 }
 
 export function renderBackCover(item) {
@@ -68,10 +62,7 @@ export function renderBackCover(item) {
           <p>${escapeHtml(synopsis)}</p>
         </section>
 
-        <div class="vhs-back-cover-frames" aria-label="Espacios reservados para fotogramas">
-          ${framePlaceholder(title, 1)}
-          ${framePlaceholder(title, 2)}
-        </div>
+        ${renderBackCoverImages(item, title)}
 
         <section class="vhs-back-cover-credits" aria-labelledby="back-cover-credits-${accessibleKey}">
           <h3 id="back-cover-credits-${accessibleKey}">Créditos</h3>
@@ -106,7 +97,7 @@ export function renderBackCover(item) {
 
         <footer class="vhs-back-cover-footer">
           <span aria-hidden="true" class="vhs-back-cover-barcode"></span>
-          <p>Contratapa generada con datos de tu catálogo. Los espacios de fotograma no representan imágenes reales.</p>
+          <p>Contratapa generada con datos e imágenes de tu catálogo.</p>
           <strong>VHS</strong>
         </footer>
       </div>

@@ -159,7 +159,7 @@ test('autoplay restores focused console action after rerender without changing t
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
 });
 
-test('the single console carries images, credits, facts and category navigation',async()=>{
+test('the single console carries summary, credits, facts and category navigation without duplicate images',async()=>{
   const {api,data,fields} = await setup();
   data.sections[0].action={kind:'catalog',label:'Ver colección'};
   Object.assign(data.sections[0].items[1].item,{
@@ -169,7 +169,8 @@ test('the single console carries images, credits, facts and category navigation'
   api.selectHomeShelfEntry('memory','memory-b');
   const html=fields.spotlightStage.innerHTML;
   assert.equal((html.match(/class="spotlight-preview"/g)||[]).length,1);
-  for(const text of ['Una sinopsis de muestra','Dirección','Guion','Reparto','104 min','/panorama.jpg','/portada.jpg']) assert.ok(html.includes(text),text);
+  for(const text of ['Una sinopsis de muestra','Dirección','Guion','Reparto','104 min','/portada.jpg']) assert.ok(html.includes(text),text);
+  assert.doesNotMatch(api.homeSelectionPreview(data.sections[0].items[1]),/<img|panorama.jpg|portada.jpg/);
   assert.match(html,/data-click="home-section-action" data-section-id="memory"/);
   assert.doesNotMatch(html,/home-shelf-preview|spotlight-signal|spotlight-preview-cover/);
   assert.equal(fields.homeSelectionAnnouncement.textContent,'Consulta: Recuerdo B');
@@ -183,9 +184,9 @@ test('the single console carries images, credits, facts and category navigation'
 
 test('missing information stays honest and the retired host is absent from production HTML',async()=>{
   const {api,fields} = await setup();
-  assert.match(fields.spotlightStage.innerHTML,/Abrí la ficha para completar/);
-  assert.match(fields.spotlightStage.innerHTML,/data-image-count="0"/);
-  assert.match(fields.spotlightStage.innerHTML,/Sin imágenes de esta obra/);
+  assert.match(fields.spotlightStage.innerHTML,/Todavía no hay una sinopsis/);
+  assert.match(fields.spotlightStage.innerHTML,/Sin portada/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/Créditos por completar|data-image-count/);
   assert.equal(api.homeSelectionPreview(null),'');
   const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
   assert.doesNotMatch(html,/id="homeShelfPreview"/);
@@ -211,21 +212,35 @@ test('consulted poster follows source-qualified selection, not independent autop
   assert.equal((fields.spotlightStage.innerHTML.match(/class="spotlight-preview"/g)||[]).length,1);
 });
 
-test('console images reserve explicit zero, one and two states using only current item fields',async()=>{
-  const {api} = await setup();
-  const render = item => api.homeConsultationImages(item,'Muestra');
-  assert.match(render({}),/data-image-count="0"/);
-  const one=render({page_image:' /poster.jpg '});
-  assert.match(one,/data-image-count="1"/);
-  assert.match(one,/aria-busy="true"/);
-  assert.match(one,/Cargando imagen/);
-  assert.match(render({page_image:'/poster.jpg',backdrop_image:'/wide.jpg'}),/data-image-count="2"/);
-  assert.match(render({page_image:'/same.jpg',backdrop_image:'/same.jpg'}),/data-image-count="1"/);
-  assert.doesNotMatch(render({}),/data-home-preview-image/);
+test('summary remains open across selection, autoplay and day changes; a new catalog starts collapsed',async()=>{
+  const {api,fields,data} = await setup();
+  const toggle = {setAttribute(name,value){this[name]=value;}};
+  const body = {setAttribute(name,value){this[name]=value;},inert:true};
+  const preview = {dataset:{},querySelector:selector=>selector==='#homeSelectionSummary' ? body : toggle};
+  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-preview' ? preview : null;
+  assert.match(fields.spotlightStage.innerHTML,/aria-expanded="false"/);
+  api.toggleHomeSummary();
+  assert.equal(toggle['aria-expanded'],'true');
+  assert.equal(body.inert,false);
+  api.selectHomeShelfEntry('memory','memory-b');
+  api.tickHomeAutoplay();
+  assert.match(fields.spotlightStage.innerHTML,/data-summary-open="true"/);
+  assert.match(fields.spotlightStage.innerHTML,/aria-hidden="false">\s*<div class="home-console-disclosure-clip"/);
+  api.applyEditorialFeaturedDate('2026-09-09',{featured:[data.featured[0]]});
+  assert.match(fields.spotlightStage.innerHTML,/data-summary-open="true"/);
+  api.toggleHomeSummary();
+  assert.equal(body.inert,true);
+  assert.equal(body['aria-hidden'],'true');
+  api.selectPlaylistEntry('daily-a');
+  assert.match(fields.spotlightStage.innerHTML,/aria-hidden="true" inert/);
+  api.toggleHomeSummary();
+  api.setEditorialHome(data);
+  api.renderEditorialHero();
+  assert.match(fields.spotlightStage.innerHTML,/data-summary-open="false"/);
 });
 
 test('rerender restores the originating home surface when poster and console share an action',async()=>{
-  for (const surface of ['consultation-poster','consultation-view','consultation-images']) {
+  for (const surface of ['consultation-poster','consultation-view','consultation-summary','consultation-edit']) {
     const {api,fields,document}=await setup();
     const oldAction={dataset:{click:'open-detail-with-case-transition',homeFocus:surface}};
     document.activeElement=oldAction;
@@ -238,17 +253,17 @@ test('rerender restores the originating home surface when poster and console sha
   }
 });
 
-test('image review uses the existing source-qualified detail without promising Club editing',async()=>{
-  const {api,fields}=await setup();
+test('quick consultation uses source-qualified detail and never mistakes editorial reasons for synopsis',async()=>{
+  const {api,fields,data}=await setup();
+  data.sections[0].items[1].reason={detail:'Disponible por tu biblioteca'};
   api.selectHomeShelfEntry('memory','memory-b');
-  assert.match(fields.spotlightStage.innerHTML,/data-home-focus="consultation-images"/);
-  assert.match(fields.spotlightStage.innerHTML,/data-home-focus="consultation-images" data-click="open-detail"/);
-  assert.match(fields.spotlightStage.innerHTML,/Panorámica: Editar metadata/);
+  assert.match(fields.spotlightStage.innerHTML,/data-home-focus="consultation-view" data-click="open-detail-with-case-transition"/);
+  assert.match(fields.spotlightStage.innerHTML,/Todavía no hay una sinopsis/);
+  assert.doesNotMatch(api.homeSelectionPreview(data.sections[0].items[1]),/Disponible por tu biblioteca/);
   api.selectHomeShelfEntry('club','daily-a');
   const html=fields.spotlightStage.innerHTML;
-  assert.match(html,/data-home-focus="consultation-images" data-click="open-home-collection-detail" data-key="daily-a" data-source="shelf:club"/);
-  assert.match(html,/sólo consulta/);
-  assert.doesNotMatch(html,/Panorámica: Editar metadata/);
+  assert.match(html,/data-home-focus="consultation-view" data-click="open-home-collection-detail" data-key="daily-a" data-source="shelf:club"/);
+  assert.doesNotMatch(html,/data-click="edit-home-shelf-entry"/);
 });
 
 test('U5 source/count/return are honest for 0, 1, 6, 20 and 100 editorial entries',async()=>{

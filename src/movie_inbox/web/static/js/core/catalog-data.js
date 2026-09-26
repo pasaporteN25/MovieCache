@@ -20,12 +20,30 @@ import { syncCurationCounts } from "../surfaces/inbox-curation.js";
       }
 
       export async function load() {
+        const focusAfterRetry = document.activeElement?.dataset?.click === "retry-catalog-load";
+        fields.homeView.setAttribute("aria-busy", "true");
+        fields.homeView.dataset.loadState = "loading";
+        fields.homeFeedback.hidden = true;
+        if (!items.length) fields.stats.textContent = "Cargando…";
         try {
-          if (!currentIdentity) await loadIdentity();
-          await loadCatalog();
+          // Las consultas son independientes; no mostramos datos hasta validar la sesión.
+          const [, payload] = await Promise.all([
+            currentIdentity ? Promise.resolve() : loadIdentity(),
+            fetchCatalogPayload()
+          ]);
+          await loadCatalog(payload);
+          delete fields.homeView.dataset.loadState;
+          if (focusAfterRetry && currentView === "home") fields.spotlight.querySelector("h2")?.focus();
         } catch (error) {
+          if (["authentication_required", "password_change_required"].includes(error.message)) return;
           console.error("[catalog-viewer] catalog load failed", error);
           fields.homeView.setAttribute("aria-busy", "false");
+          if (!items.length) {
+            fields.homeView.dataset.loadState = "error";
+            fields.stats.textContent = "Carga interrumpida";
+          }
+          fields.homeFeedback.innerHTML = 'No pudimos cargar tu videoteca. <button type="button" data-click="retry-catalog-load">Reintentar</button>';
+          fields.homeFeedback.hidden = false;
           fields.empty.textContent = `No se pudo cargar el catalogo: ${error.message || error}`;
           fields.empty.hidden = false;
         }
@@ -74,11 +92,16 @@ import { syncCurationCounts } from "../surfaces/inbox-curation.js";
         }
       }
 
-      export async function loadCatalog() {
-        fields.homeView.setAttribute("aria-busy", "true");
+      async function fetchCatalogPayload() {
         const response = await apiFetch(`/api/items?home_date=${encodeURIComponent(todayLocalDate())}`);
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+        return payload;
+      }
+
+      export async function loadCatalog(prefetchedPayload = null) {
+        fields.homeView.setAttribute("aria-busy", "true");
+        const payload = prefetchedPayload ?? await fetchCatalogPayload();
         setItems(payload.items || []);
         setEditorialHome(normalizeEditorialHome(payload.home));
         editorialFeaturedCache.clear();
@@ -107,4 +130,3 @@ import { syncCurationCounts } from "../surfaces/inbox-curation.js";
           restoreRoute();
         }
       }
-

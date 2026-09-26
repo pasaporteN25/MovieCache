@@ -34,22 +34,10 @@ import { editorialPersonalIds } from "../surfaces/home.js";
 
       export let pendingDetailTransition = null;
 
-      export let detailOpenedWithCaseTransition = false;
-
       export let detailPresentation = "dossier";
 
-      export function runWithCaseTransition(update) {
-        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (reducedMotion || !document.startViewTransition) {
-          update();
-          return;
-        }
-        document.startViewTransition(update);
-      }
-
       export function openDetailWithCaseTransition(target, id) {
-        detailOpenedWithCaseTransition = true;
-        runWithCaseTransition(() => openDetailFromTrigger(target, id, { presentation: "back-cover" }));
+        openDetailFromTrigger(target, id, { presentation: "back-cover" });
       }
 
       export function openRandomDetail() {
@@ -282,7 +270,6 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
         detailPresentation = presentation === "back-cover" ? "back-cover" : "dossier";
-        if (detailPresentation !== "back-cover") detailOpenedWithCaseTransition = false;
         setDetailContext(context, id);
         selectedDetailId = id;
         detailPersonalEditing = false;
@@ -293,7 +280,9 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         if (!fields.detailDrawer.open) fields.detailDrawer.showModal();
         document.body.classList.add("drawer-open");
         if (updateHistory) syncRoute({ movie: id }, "push");
-        requestAnimationFrame(() => fields.closeDetail.focus());
+        requestAnimationFrame(() => {
+          if (fields.detailDrawer.open && selectedDetailId === id) fields.closeDetail.focus();
+        });
       }
 
       export function closeDetail({ restoreFocus = true, updateHistory = true, skipGuard = false } = {}) {
@@ -302,8 +291,6 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           requestDetailTransition(() => closeDetail({ restoreFocus, updateHistory, skipGuard: true }));
           return;
         }
-        const useCaseTransition = detailOpenedWithCaseTransition;
-        detailOpenedWithCaseTransition = false;
         const performClose = () => {
           selectedDetailId = "";
           if (fields.detailDrawer.open) fields.detailDrawer.close();
@@ -332,8 +319,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           detailReturnFocus = null;
           detailReturnCardId = "";
         };
-        if (useCaseTransition) runWithCaseTransition(performClose);
-        else performClose();
+        performClose();
       }
 
       export function setDetailContext(context, selectedId) {

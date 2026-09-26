@@ -36,6 +36,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
       let homeAutoplayTimer = 0;
       let homeDateRequestId = 0;
       let homeDateRequestPending = false;
+      let homeSummaryExpanded = false;
       const HOME_AUTOPLAY_INTERVAL_MS = 6500;
       const HOME_SHELF_BAY_LIMIT = 4;
       const HOME_MOBILE_MEDIA = "(max-width: 860px)";
@@ -56,6 +57,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         selectedEntryKey = "";
         selectionSource = "daily";
         spotlightIndex = 0;
+        homeSummaryExpanded = false;
         if (fields.homeSelectionAnnouncement) fields.homeSelectionAnnouncement.textContent = "";
       }
 
@@ -882,8 +884,22 @@ import { closeSharedDetail, openCollection } from "./club.js";
         return `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeAttr(value)}">${escapeHtml(value)}</dd></div>`;
       }
 
-      // Consola de consulta, opción A: texto de la obra, créditos y estado con acciones.
-      // Las imágenes quedan en el marco "En consulta"; la consola no las repite.
+      // El resumen se abre sin reconstruir la cartelera ni mover el foco.
+      // Su estado pertenece a la consulta, no a una película en particular.
+      export function toggleHomeSummary() {
+        const preview = fields.spotlightStage.querySelector(".spotlight-preview");
+        const toggle = preview?.querySelector('[data-click="home-summary-toggle"]');
+        const body = preview?.querySelector("#homeSelectionSummary");
+        if (!toggle || !body) return;
+        homeSummaryExpanded = !homeSummaryExpanded;
+        preview.dataset.summaryOpen = String(homeSummaryExpanded);
+        toggle.setAttribute("aria-expanded", String(homeSummaryExpanded));
+        body.setAttribute("aria-hidden", String(!homeSummaryExpanded));
+        body.inert = !homeSummaryExpanded;
+      }
+
+      // La barra mantiene identidad, estados y acceso a la ficha siempre visibles.
+      // Sinopsis, créditos y edición se consultan en el despliegue, sin repetir imágenes.
       export function homeSelectionPreview(entry) {
         if (!entry?.item) return "";
         const item = entry.item;
@@ -891,7 +907,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const sectionId = selectionSource.startsWith("shelf:") ? selectionSource.slice(6) : "";
         const section = sectionId ? homeSectionById(sectionId) : null;
         const title = displayTitle(item) || "Sin título";
-        const summary = String(item.description || item.wikipedia_extract || entry.reason?.detail || "").trim();
+        const summary = String(item.description || item.wikipedia_extract || "").trim();
         const contextLabel = origin.kind === "collection"
           ? `En ${origin.collection_title || "una colección seguida"}`
           : section?.title || "Cartelera del día";
@@ -905,28 +921,39 @@ import { closeSharedDetail, openCollection } from "./club.js";
           .filter(([, value]) => value);
         const available = availabilityState(item).effective;
         const watched = item.status === "watched";
-        const viewAction = `<button class="spotlight-preview-action" type="button" data-home-focus="consultation-view" ${homeConsultationAction(entry)}>${origin.kind === "collection" ? "Ver ficha del Club" : "Ver más"}</button>`;
+        const viewAction = `<button class="spotlight-preview-action" type="button" data-home-focus="consultation-view" ${homeConsultationAction(entry)}>${origin.kind === "collection" ? "Ver ficha del Club" : "Abrir ficha"}<span aria-hidden="true">→</span></button>`;
         const editAction = origin.kind === "catalog"
-          ? `<button class="spotlight-preview-action is-secondary" type="button" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>` : "";
-        return `<aside class="spotlight-preview" aria-labelledby="spotlight-selected-title" data-selection-source="${escapeAttr(selectionSource)}" data-selected-entry-key="${escapeAttr(selectedEntryKey)}" data-selected-item-id="${escapeAttr(selectedItemId)}">
-          <div class="home-console-body">
+          ? `<button class="home-console-edit" type="button" data-home-focus="consultation-edit" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>` : "";
+        return `<aside class="spotlight-preview" aria-labelledby="spotlight-selected-title" data-summary-open="${homeSummaryExpanded}" data-selection-source="${escapeAttr(selectionSource)}" data-selected-entry-key="${escapeAttr(selectedEntryKey)}" data-selected-item-id="${escapeAttr(selectedItemId)}">
+          <div class="home-console-header">
             <div class="spotlight-copy">
-              <div class="home-console-heading"><strong>${escapeHtml(contextLabel)}</strong>${categoryAction}</div>
               <h3 id="spotlight-selected-title">${escapeHtml(title)}</h3>
-              <span class="spotlight-metadata">${escapeHtml(metadata)}</span>
-              <p>${escapeHtml(summary || "Abrí la ficha para completar la información de esta obra.")}</p>
+              <div class="home-console-meta">
+                <span class="spotlight-metadata">${escapeHtml(metadata)}</span>
+                <dl class="spotlight-preview-facts" aria-label="Estado resumido">
+                  <div data-fact="access" data-state="${available ? "on" : "off"}"><dt>Acceso</dt><dd>${available ? "Disponible" : "No disponible"}</dd></div>
+                  <div data-fact="status" data-state="${watched ? "on" : "off"}"><dt>Estado</dt><dd>${watched ? "Vista" : "Pendiente"}</dd></div>
+                </dl>
+              </div>
             </div>
-            <section class="home-console-details" aria-label="Créditos">
-              ${credits.length
-                ? `<dl class="home-furniture-credits">${credits.map(([label, value]) => homeFurnitureFact(label, value)).join("")}</dl>`
-                : '<p class="home-console-credits-empty">Créditos por completar.</p>'}
-            </section>
-            <div class="home-console-side">
-              <dl class="spotlight-preview-facts" aria-label="Estado resumido">
-                <div data-fact="access" data-state="${available ? "on" : "off"}"><dt>Acceso</dt><dd>${available ? "Disponible" : "No disponible"}</dd></div>
-                <div data-fact="status" data-state="${watched ? "on" : "off"}"><dt>Estado</dt><dd>${watched ? "Vista" : "Pendiente"}</dd></div>
-              </dl>
-              <div class="spotlight-preview-actions">${viewAction}${editAction}</div>
+            <div class="spotlight-preview-actions">
+              <button class="home-console-toggle" type="button" data-click="home-summary-toggle" data-home-focus="consultation-summary" aria-expanded="${homeSummaryExpanded}" aria-controls="homeSelectionSummary">Resumen<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+              ${viewAction}
+            </div>
+          </div>
+          <div id="homeSelectionSummary" class="home-console-disclosure" aria-hidden="${!homeSummaryExpanded}"${homeSummaryExpanded ? "" : " inert"}>
+            <div class="home-console-disclosure-clip">
+              <div class="home-console-body">
+                <section class="spotlight-copy home-console-synopsis" aria-label="Sinopsis">
+                  <span class="home-console-label">Sinopsis</span>
+                  <p>${escapeHtml(summary || "Todavía no hay una sinopsis para esta obra.")}</p>
+                  <div class="home-console-heading"><strong>${escapeHtml(contextLabel)}</strong>${categoryAction}</div>
+                </section>
+                ${credits.length || editAction ? `<section class="home-console-details" aria-label="Créditos y edición">
+                  ${credits.length ? `<dl class="home-furniture-credits">${credits.map(([label, value]) => homeFurnitureFact(label, value)).join("")}</dl>` : ""}
+                  ${editAction}
+                </section>` : ""}
+              </div>
             </div>
           </div>
         </aside>`;

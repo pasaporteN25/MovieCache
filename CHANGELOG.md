@@ -9,13 +9,25 @@ fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
 ### Cambiado
 
-- La consola de Inicio se reordenó: título y datos primero, créditos al medio, acceso,
-  estado y acciones a la derecha. Ya no repite la portada que muestra el marco «En
-  consulta».
+- La contratapa VHS muestra las imágenes existentes de cada obra: una ventana si
+  sólo hay una, dos si son distintas y un único estado vacío si faltan. Conserva
+  las proporciones, distingue portada de panorámica, evita variantes repetidas y
+  maneja la carga o el error sin bloquear la ficha. Los datos técnicos se adaptan
+  mejor a contratapas angostas.
+- La carga de Inicio anticipa los dos carteles, las filas y los lomos VHS, con una
+  señal discreta que respeta movimiento reducido. Sesión y catálogo se consultan
+  en paralelo, sin mostrar datos antes de validar la sesión; si falla, aparece
+  «Reintentar» en lugar de mantener el skeleton.
+- La consulta de Inicio ahora usa una barra compacta: título, disponibilidad y estado
+  personal junto a «Resumen» y «Abrir ficha». El resumen despliega sinopsis, créditos
+  y edición, conserva su apertura al cambiar de obra y respeta teclado, móvil y
+  movimiento reducido. La portada sigue en el marco «En consulta».
 - La estantería de Inicio ganó altura: los VHS son más altos y el rótulo «Videoteca» ya
   no ocupa una fila en escritorio.
-- «Ver más» muestra la contratapa VHS sola, sin marco de diálogo; se cierra tocando
-  fuera de la caja o con Escape.
+- «Abrir ficha» muestra la contratapa VHS sola, sin marco de diálogo; se cierra tocando
+  fuera de la caja o con Escape. La caja entra con un acercamiento suave de 360 ms y
+  el fondo se oscurece gradualmente; respeta movimiento reducido y permite cerrar
+  incluso durante la entrada.
 
 ## [0.9.0] - 2026-09-24
 

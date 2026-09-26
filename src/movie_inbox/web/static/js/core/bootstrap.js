@@ -1,4 +1,5 @@
 import { handlePosterError, handlePosterLoad } from "./card.js";
+import { handleBackCoverImageError, handleBackCoverImageLoad } from "./back-cover-images.js";
 import { load, logout } from "./catalog-data.js";
 import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, findLinkForCatalog, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, saveDetailChanges, saveMetadata, savePersonal } from "./detail.js";
 import { fields } from "./fields.js";
@@ -13,7 +14,7 @@ import { addStreamingRegion, handleStreamingAction, loadStreamingConfiguration, 
 import { applyCollectionYearRange, changeCollectionMode, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
-import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay } from "../surfaces/home.js";
+import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay, toggleHomeSummary } from "../surfaces/home.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
@@ -37,6 +38,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "home-section-action": () => activateHomeSection(target.dataset.sectionId || ""),
           "spotlight-select": () => selectSpotlight(Number(target.dataset.index || 0), true),
           "playlist-select": () => selectPlaylistEntry(target.dataset.entryKey || "", false),
+          "home-summary-toggle": toggleHomeSummary,
           "home-shelf-select": () => selectHomeShelfEntry(target.dataset.sectionId || "", target.dataset.entryKey || "", true),
           "home-category-select": () => selectHomeCategory(target.dataset.sectionId || "", true),
           "home-shelf-scroll": () => scrollHomeFurniture(target.dataset.direction || "next"),
@@ -68,6 +70,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "detail-next": () => navigateDetail(1),
           "detail-random": openAnotherRandomDetail,
           "retry-merge-comparison": retryMergeComparison,
+          "retry-catalog-load": load,
           "show-more-manual": () => showMoreManualResults(target.dataset.source || ""),
           "retry-external-source": () => retryExternalSource(target.dataset.source || ""),
           "show-more-catalog": showMoreCatalogResults,
@@ -332,6 +335,8 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       window.addEventListener("popstate", restoreRoute);
       document.addEventListener("load", handlePosterLoad, true);
       document.addEventListener("error", handlePosterError, true);
+      document.addEventListener("load", handleBackCoverImageLoad, true);
+      document.addEventListener("error", handleBackCoverImageError, true);
       document.addEventListener("click", handleDelegatedClick);
       fields.sort.addEventListener("input", () => {
         setRandomOrder([]);

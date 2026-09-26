@@ -1,5 +1,9 @@
 # Abrir la caja hacia el dossier (U2.3)
 
+> Registro histórico. En `release/0.10.0`, «Abrir ficha» presenta la contratapa
+> independiente y reemplaza la transición de toda la página por una entrada CSS
+> local de la caja. Ver [consulta rápida de Inicio](home-quick-consultation-v1.md).
+
 ## Alcance
 
 `Ver más`, en la previsualización de una estantería de Inicio, abre el mismo dossier

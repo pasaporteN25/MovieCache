@@ -1,0 +1,35 @@
+[
+  {
+    "file": "01-roce.wav",
+    "audition": "01-roce-escucha.wav",
+    "duration_ms": 120,
+    "sample_rate": 48000,
+    "channels": 1,
+    "pcm_bits": 16,
+    "peak_dbfs": -16.25,
+    "rms_dbfs": -29.0,
+    "sha256": "f6e4fee69f515c3e5a51e62a96a147c35fc76748d11cb58cf896e1c259b2285b"
+  },
+  {
+    "file": "02-clic.wav",
+    "audition": "02-clic-escucha.wav",
+    "duration_ms": 100,
+    "sample_rate": 48000,
+    "channels": 1,
+    "pcm_bits": 16,
+    "peak_dbfs": -14.0,
+    "rms_dbfs": -32.54,
+    "sha256": "6eaab123cd0a1a084a5c357e0722bbfb9a336cf7dcf1ec740bbff409607804d8"
+  },
+  {
+    "file": "03-toque.wav",
+    "audition": "03-toque-escucha.wav",
+    "duration_ms": 90,
+    "sample_rate": 48000,
+    "channels": 1,
+    "pcm_bits": 16,
+    "peak_dbfs": -14.0,
+    "rms_dbfs": -30.87,
+    "sha256": "1e234649ece5d48ccf141d7124f63ec2630b69a28486089f5e0b0bb228fbd0b9"
+  }
+]
