@@ -58,8 +58,9 @@ import { renderEditorialHome } from "./home.js";
       }
 
       export function randomCandidates() {
-        const filtered = currentView === "catalog" ? filteredItems() : [];
-        const candidates = filtered.length ? filtered : items;
+        // In Collection the draw follows the visible filters, even when they leave
+        // nothing to choose; elsewhere (Home included) it covers the whole catalog.
+        const candidates = currentView === "catalog" ? filteredItems() : items;
         return fields.randomCatalogOnly.checked
           ? candidates.filter((item) => isInCatalog(item.en_catalogo))
           : candidates;

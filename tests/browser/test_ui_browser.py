@@ -661,7 +661,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIn(long_genre, selected_row.get_attribute("aria-label"))
         self.assertIn(
             long_title,
-            page.locator(".home-shelf-tape").get_attribute("aria-label"),
+            page.locator("[data-home-section] .home-shelf-tape").get_attribute("aria-label"),
         )
 
         # U4.6b: the console and the consulted poster exist once a spine is chosen.

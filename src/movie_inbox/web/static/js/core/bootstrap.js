@@ -6,7 +6,7 @@ import { fields } from "./fields.js";
 import { localDateOffset, todayLocalDate } from "./format.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
 import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionAdd, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, setInboxMode } from "./router.js";
-import { CATALOG_PAGE_SIZE, inboxMode } from "./state.js";
+import { CATALOG_PAGE_SIZE, currentView, inboxMode } from "./state.js";
 import { addLibraryExclusionRuleRow, browseManagedLibraryPath, checkManagedLibraryPath, closeLibraryDialog, handleLibraryAction, handleLibraryExclusionRuleRowClick, handleLibraryPathDirectory, openLibraryDialog, parentLibraryPath, saveManagedLibrary, toggleLibraryShareAvailabilityFields, useBrowsedLibraryPath } from "../surfaces/admin-libraries.js";
 import { archiveMemberAccount, closeArchiveMemberDialog, closeEditMemberDialog, closeMemberDialog, closePrivacyDialog, closeTemporaryPasswordDialog, copyTemporaryPassword, createMember, handleArchivedMemberAction, handleMemberAction, handleVisibilityChange, openMemberDialog, openPrivacyDialog, refreshAdminData, saveMemberProfile, savePrivacyPreferences, syncPrivacyControls } from "../surfaces/admin-members.js";
 import { createPublicPresentation, handlePublicPresentationAction, previewPublicPresentation } from "../surfaces/admin-public-presentations.js";
@@ -15,9 +15,17 @@ import { applyCollectionYearRange, changeCollectionMode, changeRandomScope, clea
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
 import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay, toggleHomeSummary } from "../surfaces/home.js";
+import { drawHomeRandom, includeUnavailableInHomeRandom, syncHomeRandomScope } from "../surfaces/home-random.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
+
+      // On Home the header command reveals the random VHS instead of opening a dossier
+      // (owner decision, 2026-09-13); elsewhere it keeps opening a random dossier.
+      function runRandomCommand() {
+        if (currentView === "home" && !fields.homeView.hidden) drawHomeRandom({ reveal: true });
+        else openRandomDetail();
+      }
 
       export function handleDelegatedClick(event) {
         const target = event.target.closest("[data-click]");
@@ -54,7 +62,10 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "refresh-home": refreshEditorialHome,
           "menu-inbox": () => { target.closest("details")?.removeAttribute("open"); goToInbox(); },
           "menu-club": () => { target.closest("details")?.removeAttribute("open"); goToClub(); },
-          "menu-random": () => { target.closest("details")?.removeAttribute("open"); openRandomDetail(); },
+          "menu-random": () => { target.closest("details")?.removeAttribute("open"); runRandomCommand(); },
+          "home-random-draw": () => drawHomeRandom({ focusSpine: true }),
+          "home-random-include-all": includeUnavailableInHomeRandom,
+          "home-random-collection": goToCollectionRoot,
           "menu-search": () => { target.closest("details")?.removeAttribute("open"); goToCollectionSearch(); },
           "menu-add": () => { target.closest("details")?.removeAttribute("open"); goToCollectionAdd(); },
           "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
@@ -243,8 +254,11 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.persistCurationHistory.addEventListener("change", changeCurationHistoryMode);
       fields.clearCurationHistory.addEventListener("click", clearCurationHistory);
       fields.autoResolveCuration.addEventListener("click", autoResolveDuplicates);
-      fields.randomButton.addEventListener("click", openRandomDetail);
-      fields.randomCatalogOnly.addEventListener("change", () => changeRandomScope(fields.randomCatalogOnly));
+      fields.randomButton.addEventListener("click", runRandomCommand);
+      fields.randomCatalogOnly.addEventListener("change", () => {
+        changeRandomScope(fields.randomCatalogOnly);
+        if (currentView === "home") syncHomeRandomScope();
+      });
       fields.cancelSearch.addEventListener("click", cancelExternalSearch);
       fields.reviewPrevious.addEventListener("click", previousWikiReview);
       fields.reviewNext.addEventListener("click", nextWikiReview);

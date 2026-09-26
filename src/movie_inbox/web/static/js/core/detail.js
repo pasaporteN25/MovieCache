@@ -9,6 +9,7 @@ import { syncRoute } from "./router.js";
 import { findLinkForItem } from "./search-bridge.js";
 import { items, privacyPreferences } from "./state.js";
 import { catalogDetailItems, randomCandidates } from "../surfaces/catalog-grid.js";
+import { drawRandomItem } from "./random-draw.js";
 import { activeQuery, catalogMergeResults } from "../surfaces/catalog-search.js";
 import { editorialPersonalIds } from "../surfaces/home.js";
 
@@ -42,11 +43,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
 
       export function openRandomDetail() {
         const candidates = randomCandidates();
-        if (!candidates.length) return;
-        const pool = candidates.length > 1 && selectedDetailId
-          ? candidates.filter((item) => item.id !== selectedDetailId)
-          : candidates;
-        const item = pool[Math.floor(Math.random() * pool.length)];
+        const item = drawRandomItem(candidates, { excludeId: selectedDetailId });
         if (item) {
           openDetail(item.id, {
             context: {

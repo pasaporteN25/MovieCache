@@ -9,6 +9,7 @@ import { clubMode, setClubMode } from "../core/state.js";
 import { applyCollectionFilterDescriptor, render, resetCollectionFilters, setLastEditorialRenderRevision } from "./catalog-grid.js";
 import { clearManualSearch } from "./catalog-search.js";
 import { closeSharedDetail, openCollection } from "./club.js";
+import { homeRandomBay, homeRandomEntry } from "./home-random.js";
 
       export let editorialHome = { generated_for: "", featured: [], hero: null, sections: [], warnings: [] };
 
@@ -91,6 +92,11 @@ import { closeSharedDetail, openCollection } from "./club.js";
 
       function playlistEntries(source = playlistSource) {
         if (source === "daily" || !source) return editorialHome.featured || [];
+        // The random result is a consultation source only; the table never shows it.
+        if (source === "random") {
+          const entry = homeRandomEntry();
+          return entry ? [entry] : [];
+        }
         if (source.startsWith("shelf:")) {
           const shelfId = source.slice(6);
           return editorialHome.sections.find((section, index) => homeSectionId(section, index) === shelfId)?.items || [];
@@ -581,6 +587,17 @@ import { closeSharedDetail, openCollection } from "./club.js";
         }
       }
 
+      // U8: the random VHS consults its result; the table keeps its own source.
+      export function selectHomeRandomResult(entry) {
+        if (!entry?.item) return;
+        cancelPendingHomeDate();
+        selectionSource = "random";
+        selectedEntryKey = entry.key;
+        selectedItemId = entryItemId(entry);
+        renderEditorialSections();
+        renderEditorialHero();
+      }
+
       export function moveHomeShelf(event) {
         if (event.ctrlKey || event.metaKey || event.altKey) return;
         const control = event.target.closest("[data-click='home-shelf-select']");
@@ -624,13 +641,15 @@ import { closeSharedDetail, openCollection } from "./club.js";
         fields.homeSections.dataset.bayCount = String(ids.length);
         fields.homeSections.innerHTML = sections
           .map((section, sectionIndex) => editorialSection(section, sectionIndex, ids[sectionIndex] === activeHomeSectionId))
-          .join("");
+          .join("") + (ids.length ? homeRandomBay(selectionSource === "random") || "" : "");
         if (previousFocus && previousFocus !== fields.homeSections && !previousFocus.isConnected) {
+          const randomSpine = previousFocus.matches?.(".home-random-tape, [data-home-random] button")
+            ? fields.homeSections.querySelector(".home-random-tape") : null;
           const sectionId = previousFocus.dataset?.sectionId;
           const key = previousFocus.dataset?.entryKey;
           const sameSpine = key && fields.homeSections.querySelector(`[data-section-id="${CSS.escape(sectionId || "")}"][data-entry-key="${CSS.escape(key)}"]`);
           const plaque = sectionId && fields.homeSections.querySelector(`[data-click="home-shelf-activate"][data-section-id="${CSS.escape(sectionId)}"]`);
-          if (sameSpine || plaque) (sameSpine || plaque).focus({ preventScroll: true });
+          if (randomSpine || sameSpine || plaque) (randomSpine || sameSpine || plaque).focus({ preventScroll: true });
           else if (ids.length) fields.homeSections.focus({ preventScroll: true });
           else focusHomeProgrammingControl();
         }
@@ -910,7 +929,7 @@ import { closeSharedDetail, openCollection } from "./club.js";
         const summary = String(item.description || item.wikipedia_extract || "").trim();
         const contextLabel = origin.kind === "collection"
           ? `En ${origin.collection_title || "una colección seguida"}`
-          : section?.title || "Cartelera del día";
+          : selectionSource === "random" ? "Al azar" : section?.title || "Cartelera del día";
         const categoryAction = section?.action?.kind
           ? `<button class="home-furniture-category-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(section.action.label || "Ver colección")}</button>`
           : "";
@@ -978,6 +997,8 @@ import { closeSharedDetail, openCollection } from "./club.js";
             if (entry.origin?.kind === "catalog" && entry.item?.id) ids.push(entry.item.id);
           }
         }
+        const randomEntry = homeRandomEntry();
+        if (randomEntry?.item?.id) ids.push(randomEntry.item.id);
         return [...new Set(ids)];
       }
 

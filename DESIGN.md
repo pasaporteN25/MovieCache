@@ -419,6 +419,18 @@ contratapa de «Ver más» se muestra sola sobre el fondo difuminado, sin marco 
 barra: un toque fuera de la caja la cierra y «Cerrar» sólo se dibuja como X con
 foco de teclado.
 
+**U8 — VHS «Al azar», 2026-09-26:** la biblioteca termina en una bahía propia (no
+cuenta como sección editorial) con placa «AL AZAR», el alcance vigente («Disponibles»
+o «Todo») y un único lomo con el mismo material. Estados: inicial «Elegir una obra»;
+ocupado «Eligiendo…» con `aria-busy`; disponible con título y año reales; no
+disponible con caja apagada y «?» tenue decorativo detrás de un título legible; fuera
+de alcance y sin obras con una nota breve y salida («Elegir otra», «Incluir no
+disponibles», «Abrir colección»). Sólo se mueve la etiqueta: el owner eligió el
+efecto B el 2026-09-26 (estados aprobados en la misma revisión): durante 420 ms
+pasan títulos reales del catálogo, ocultos a lectores de pantalla, y el resultado
+se asienta en 260 ms. Movimiento reducido muestra el resultado directo; un solo
+anuncio final.
+
 **Display Font:** Arial Narrow (con Trebuchet MS como fallback)
 **Body Font:** Space Grotesk (con Trebuchet MS, Verdana y system-ui como fallbacks)
 **Label/Mono Font:** Courier New

@@ -7,8 +7,17 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 Va a ser la **0.10.0**. La versión está abierta en la rama `release/0.10.0` y se cierra al
 fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
+### Agregado
+
+- La biblioteca de Inicio termina en un VHS «Al azar». Al activarlo elige una obra de
+  todo tu catálogo (o sólo de las disponibles, según la preferencia de siempre), la
+  revela en el lomo y la muestra en la consulta y el cartel «En consulta»; la ficha se
+  abre con «Abrir ficha». En Inicio el botón «Al azar» del menú usa ese mismo lomo.
+
 ### Cambiado
 
+- En Colección, «Al azar» respeta los filtros aunque no dejen resultados: antes
+  elegía en silencio entre todo el catálogo.
 - La contratapa VHS muestra las imágenes existentes de cada obra: una ventana si
   sólo hay una, dos si son distintas y un único estado vacío si faltan. Conserva
   las proporciones, distingue portada de panorámica, evita variantes repetidas y
