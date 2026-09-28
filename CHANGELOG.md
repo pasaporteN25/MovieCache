@@ -23,6 +23,13 @@ fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
 ### Cambiado
 
+- Colección reúne Explorar y Buscar con el campo siempre visible. Agregar pasa a ser
+  una acción propia que conserva la consulta y permite volver con filtros y orden.
+- Colección adopta el mostrador de Inicio, con portadas más grandes y títulos/estados
+  debajo. El orden queda junto al conteo y las fuentes externas tienen acceso directo.
+  Cargar más suma 30 obras sin reconstruir las portadas anteriores, enfoca la primera
+  nueva y conserva la cantidad cargada al recargar o volver desde una ficha.
+
 - En Colección, «Al azar» respeta los filtros aunque no dejen resultados: antes
   elegía en silencio entre todo el catálogo.
 - La contratapa VHS muestra las imágenes existentes de cada obra: una ventana si

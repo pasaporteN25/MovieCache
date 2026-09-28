@@ -173,6 +173,11 @@ posterga el gate de release. U7.5b, U9 y mobile web también quedan fuera.
 
 ### v0.10.0 — abierta
 
+**U10, 2026-09-28:** Colección unifica Explorar/Buscar con consulta siempre visible;
+Agregar conserva el contexto de regreso. Integra el mostrador material de Inicio,
+cinco portadas grandes por fila en escritorio y carga acumulativa de 30 obras.
+Plan y criterios: [brief U10](briefs/collection-counter-v1.md).
+
 Abierta el 2026-09-24 en la rama `release/0.10.0`; se cierra al fusionar su PR contra
 `master`, y hasta entonces se le suman cambios. Alcance todavía no fijado: queda del
 backlog de `tareas.md` — entre lo accionable, [U7] (imágenes de consola), [U8] (VHS al

@@ -735,10 +735,14 @@ class BrowserInterfaceTests(unittest.TestCase):
     def test_collection_task_modes_and_history(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)
+        page.route(
+            "**/api/search?*",
+            lambda route: route.fulfill(json={"results": [], "catalog": {"results": []}}),
+        )
         page.locator("#catalogButton").click()
         collection = page.locator("#collectionView")
         self.assertEqual(collection.get_attribute("data-search-mode"), "browse")
-        self.assertTrue(page.locator(".search-main").is_hidden())
+        self.assertTrue(page.locator(".search-main").is_visible())
         self.assertNotIn("mode=", page.url)
 
         first_status = page.locator("#statusQuickFilters button").first
@@ -746,9 +750,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         selected_status = first_status.get_attribute("data-value")
         self.assertIn(f"status={selected_status}", page.url)
 
-        page.locator('[data-mode="search"]').click()
-        page.wait_for_function("document.activeElement.id === 'query'")
-        self.assertIn("mode=search", page.url)
+        page.locator("#query").focus()
         page.locator("#query").fill("Heat")
         page.evaluate("window.scrollTo(0, 180)")
         page.locator("#searchButton").click()
@@ -767,7 +769,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         self.assertEqual(page.locator("#query").input_value(), "Heat")
         self.assertIn(f"status={selected_status}", page.url)
-        page.wait_for_function("document.activeElement.id === 'searchButton'")
+        page.wait_for_function("document.activeElement.id === 'collectionAddButton'")
         self.assertAlmostEqual(page.evaluate("window.scrollY"), search_scroll, delta=2)
 
     def test_home_marquee_shows_the_available_billboard_label_and_decorative_ambience(
@@ -3341,7 +3343,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
 
         page.locator("#catalogButton").click()
-        page.locator('[data-mode="search"]').click()
+        page.locator("#query").focus()
         page.locator("#externalSource").check()
         page.locator("#query").fill("Heat")
         page.locator("#searchButton").click()
@@ -3425,7 +3427,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.route("**/api/search?*", handle_search)
         page.route("**/api/add", handle_add)
         page.locator("#catalogButton").click()
-        page.locator('[data-mode="search"]').click()
+        page.locator("#query").focus()
         page.locator("#externalSource").check()
         page.locator("#query").fill("Your Name")
         page.locator("#searchButton").click()
@@ -3487,7 +3489,7 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/search?*", handle_search)
         page.locator("#catalogButton").click()
-        page.locator('[data-mode="search"]').click()
+        page.locator("#query").focus()
         page.locator("#externalSource").check()
         page.locator("#query").fill("Death Note")
         page.locator("#searchButton").click()

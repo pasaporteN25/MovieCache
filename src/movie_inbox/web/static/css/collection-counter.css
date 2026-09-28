@@ -1,0 +1,350 @@
+/* U10 · Approved counter + large front covers.
+   THESIS: one searchable personal archive, with Add as a separate task.
+   OWN-WORLD: Home's petroleum paint, inset brass edges, warm signage, cyan data.
+   STORY: search/filter, recognize a cover, open its record; append more shelves.
+   FIRST VIEWPORT: compact counter over five large covers, labels beneath artwork.
+   FORM: continuous video-store counter and shelves, approved concept 2026-09-28. */
+
+body:has(#collectionView:not([hidden])) {
+  background: #091a22 url("../img/home-surface-petroleum-v2.png") repeat 0 0 / 768px 768px;
+}
+body:has(#collectionView:not([hidden]))::before { display: none; }
+body:has(#collectionView:not([hidden])) main {
+  width: calc(100% - 64px);
+  max-width: 1540px;
+  padding: 16px 0 48px;
+}
+
+#collectionView {
+  --counter-ink: #eedbb5;
+  --counter-muted: #b4c7c9;
+  --counter-line: #826b42;
+  --counter-screen: #031117;
+  --counter-data: #9cdae0;
+  --counter-title-font: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --counter-plaque-font: "Oswald", "Arial Narrow", sans-serif;
+  --counter-data-font: "IBM Plex Mono", "Courier New", monospace;
+  color: var(--counter-ink);
+  padding: 12px;
+  overflow: clip;
+  position: relative;
+  isolation: isolate;
+}
+#collectionView::before {
+  content: "";
+  inset: -16px;
+  border: 40px solid transparent;
+  border-image: url("../img/home-aperture-bezel-v1.png") 125 / 40px / 0 stretch;
+  clip-path: inset(28px round 3px);
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+}
+#collectionView .collection-task-header {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  gap: 16px 24px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0;
+  padding: 12px 16px 20px;
+}
+#collectionView .collection-task-heading {
+  align-items: center;
+  gap: 6px 24px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+#collectionView .collection-task-heading h2 {
+  align-self: stretch;
+  background: #081b22 url("../img/home-category-plaque-inset-v1.png") center / 103.6% 214% no-repeat;
+  color: var(--counter-ink);
+  font: 400 clamp(26px, 2.7vw, 38px)/1.15 var(--counter-plaque-font);
+  font-synthesis: none;
+  grid-column: 1;
+  grid-row: 1 / 3;
+  letter-spacing: .025em;
+  padding: 17px 28px;
+  text-align: center;
+}
+#collectionView .collection-task-heading .eyebrow {
+  color: var(--counter-data);
+  font: 400 12px/1.5 var(--counter-data-font);
+  grid-column: 2;
+  align-self: end;
+}
+#collectionView .collection-task-heading p {
+  color: var(--counter-muted);
+  font-size: 13px;
+  grid-column: 2;
+  align-self: start;
+}
+.collection-task-actions { display: flex; gap: 10px; }
+#collectionView .collection-task-actions button {
+  background: linear-gradient(180deg, #f0d7a4, #d3b47b 45%, #c9a86b);
+  border: 1px solid #edcf97;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 3px #5f4b2c, inset 0 0 0 4px #e8ca90, 0 3px 5px #0009;
+  color: #182023;
+  font: 400 20px/1.2 var(--counter-plaque-font);
+  font-synthesis: none;
+  min-height: 48px;
+  padding: 10px 18px;
+  text-transform: uppercase;
+  width: auto;
+}
+#collectionView .collection-task-actions button:hover { background: #ecd4a9; }
+#collectionView .search-console {
+  background: var(--counter-screen);
+  border: 0;
+  border-block: 1px solid var(--counter-line);
+  box-shadow: inset 0 5px 12px #0008;
+  gap: 14px;
+  padding: 18px 20px 14px;
+}
+#collectionView :is(input:not([type="checkbox"]), select) {
+  background: #061a22;
+  border-color: #65858b;
+  color: #e4eff0;
+  font-size: 14px;
+  min-height: 44px;
+}
+#collectionView input::placeholder { color: var(--counter-muted); }
+#collectionView #query { font-family: var(--counter-data-font); }
+#collectionView :is(.search-action, .quiet-action, .filter-segments button, .utility-menu > summary) {
+  background: #0c242c;
+  border-color: #657879;
+  box-shadow: none;
+  color: #e4eff0;
+  min-height: 40px;
+}
+#collectionView #searchButton {
+  font: 400 18px/1.2 var(--counter-plaque-font);
+  min-height: 44px;
+}
+#collectionView .filter-segments button[aria-pressed="true"] {
+  background: #24464b;
+  border-color: #8fdde2;
+  box-shadow: inset 0 -2px #8fdde2;
+  color: #e9feff;
+}
+#collectionView .collection-filter-toolbar {
+  border-color: #344f53;
+  padding: 12px 0 0;
+}
+#collectionView .quick-filter-group legend {
+  color: var(--counter-data);
+  font: 400 11px/1.4 var(--counter-data-font);
+}
+#collectionView .search-secondary { gap: 10px; }
+#collectionView .source-toggle {
+  border: 0;
+  color: var(--counter-muted);
+  justify-content: start;
+  padding: 2px 0;
+  font-size: 13px;
+}
+#collectionView .active-filters { gap: 8px; }
+#collectionView .active-filters button {
+  background: #173139;
+  border-color: #64888c;
+  color: #d0edf0;
+  min-height: 36px;
+}
+#collectionView .utility-panel {
+  background: #071b23;
+  border-color: var(--counter-line);
+  box-shadow: 0 12px 28px #000a;
+}
+#collectionView :is(.utility-section h2, .section-kicker) { color: var(--counter-data); }
+.collection-results-toolbar {
+  align-items: center;
+  background: var(--counter-screen);
+  border-bottom: 1px solid var(--counter-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+  padding: 12px 20px;
+}
+#collectionView .collection-result-summary {
+  border: 0;
+  color: var(--counter-data);
+  font: 400 12px/1.5 var(--counter-data-font);
+  padding: 0;
+  text-align: left;
+}
+.collection-order-control {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+}
+#collectionView #externalResultsJump {
+  background: transparent;
+  border-color: #64888c;
+  color: var(--counter-data);
+  min-height: 40px;
+  width: auto;
+}
+#collectionView .collection-order-control select { width: auto; max-width: 220px; }
+#collectionView :is(.search-sections, .collection-empty) { background: var(--counter-screen); }
+#collectionView .search-sections:has(.active) { padding: 20px; margin-top: 20px; }
+#collectionView.is-add-mode .collection-results-toolbar,
+#collectionView.is-compare-mode .collection-results-toolbar { display: none; }
+#collectionView #grid {
+  align-items: stretch;
+  background: var(--counter-screen);
+  column-gap: 26px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: hidden;
+  padding: 26px 20px 30px;
+  row-gap: 38px;
+}
+#collectionView #grid:empty { padding: 0; }
+#collectionView .collection-case {
+  align-self: stretch;
+  aspect-ratio: auto;
+  background: #05141a;
+  border: 1px solid #826b42;
+  border-radius: 3px;
+  box-shadow: inset 3px 0 3px #bda06944, 3px 5px 7px #000a;
+  contain: none;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: 6px 6px 0 9px;
+  perspective: none;
+}
+#collectionView .collection-case::after {
+  background: linear-gradient(#74613e, #b29660 2px, #433722 4px, #171d1c 9px);
+  box-shadow: 0 5px 8px #000b;
+  bottom: -12px;
+  content: "";
+  height: 12px;
+  left: -15px;
+  pointer-events: none;
+  position: absolute;
+  right: -15px;
+}
+.collection-poster {
+  aspect-ratio: 2 / 3;
+  background: #030b10;
+  overflow: hidden;
+  position: relative;
+}
+#collectionView .collection-poster .dvd-cover-image { object-fit: contain; }
+#collectionView .collection-case-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 4px 14px;
+}
+#collectionView .collection-case h2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--counter-ink);
+  font: 600 22px/1.16 var(--counter-title-font);
+  font-synthesis: none;
+  letter-spacing: .015em;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-shadow: none;
+}
+.collection-case-meta {
+  color: var(--counter-data);
+  display: flex;
+  font: 400 12px/1.5 var(--counter-data-font);
+  gap: 8px;
+  justify-content: space-between;
+}
+.collection-case-meta strong { color: var(--counter-ink); font-weight: 400; }
+#collectionView .dvd-front-statuses { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+#collectionView .dvd-front-status {
+  background: #10232b;
+  border: 1px solid #647777;
+  border-radius: 2px;
+  color: #d6e5e7;
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 1;
+  padding: 4px 6px;
+}
+#collectionView .dvd-front-status.catalogued { border-color: #5d9d9b; color: #acf2e6; }
+#collectionView .dvd-front-status.watched { border-color: #a39570; color: #f1dbaf; }
+#collectionView .collection-case .dvd-open-surface { border-radius: 2px; }
+#collectionView .collection-case .dvd-open-surface:focus-visible {
+  box-shadow: none;
+  outline: 3px solid #7fe2eb;
+  outline-offset: 3px;
+}
+#collectionView .collection-case:hover { border-color: #c5aa72; }
+#collectionView .dvd-placeholder { background: #102832; color: var(--counter-ink); }
+#collectionView .dvd-placeholder::after { display: none; }
+#collectionView .dvd-placeholder strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  font: 600 clamp(20px, 2.4vw, 34px)/1.1 var(--counter-title-font);
+  overflow: hidden;
+  text-shadow: none;
+}
+#collectionView .search-options { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+#collectionView #catalogLoadMore {
+  background: #09222b;
+  border: 1px solid #b29660;
+  color: var(--counter-ink);
+  display: block !important;
+  font: 400 17px/1.4 var(--counter-plaque-font);
+  margin: 26px auto 16px;
+  min-height: 48px;
+  padding: 10px 24px;
+  width: auto;
+}
+#collectionView #catalogLoadMore[hidden],
+#collectionView.is-add-mode #catalogLoadMore,
+#collectionView.is-compare-mode #catalogLoadMore { display: none !important; }
+#collectionView [hidden] { display: none !important; }
+
+@media (max-width: 1100px) {
+  #collectionView #grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #collectionView .collection-task-heading { grid-template-columns: 1fr; }
+  #collectionView .collection-task-heading h2 { grid-row: auto; justify-self: start; }
+  #collectionView .collection-task-heading :is(.eyebrow, p) { grid-column: 1; }
+  #collectionView .collection-task-heading .eyebrow { display: none; }
+}
+@media (max-width: 860px) {
+  body:has(#collectionView:not([hidden])) main { width: calc(100% - 24px); padding: 12px 0 32px; }
+  #collectionView #grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 18px; padding-inline: 14px; }
+  #collectionView .collection-task-header { padding-inline: 8px; }
+  #collectionView .collection-task-heading p { display: none; }
+}
+@media (max-width: 640px) {
+  #collectionView { padding: 8px; }
+  #collectionView .collection-task-header { gap: 12px; padding: 6px 4px 14px; }
+  #collectionView .collection-task-heading h2 { font-size: 25px; padding: 12px; }
+  #collectionView .collection-task-actions button { font-size: 16px; padding: 8px 10px; max-width: 150px; }
+  #collectionView .search-console { padding: 14px 10px; }
+  #collectionView .search-main,
+  #collectionView .search-main:not(:has(#clearManualSearch:not([hidden]))) { grid-template-columns: minmax(0, 1fr) auto; }
+  #collectionView .search-main .search-field { grid-column: 1 / -1; grid-row: 1; }
+  #collectionView #searchButton { grid-column: 1; grid-row: 2; }
+  #collectionView #clearManualSearch { grid-column: 2; grid-row: 2; }
+  #collectionView .search-source-toggle { width: auto; }
+  #collectionView .filter-segments button { min-height: 44px; }
+  .collection-results-toolbar { padding: 12px 10px; gap: 10px; }
+  .collection-order-control { width: 100%; }
+  #collectionView .collection-order-control select { flex: 1; max-width: none; width: 100%; }
+  #collectionView #grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px 14px; padding: 18px 10px 28px; }
+  #collectionView .collection-case { padding: 4px 4px 0 6px; }
+  #collectionView .collection-case h2 { font-size: 19px; }
+  #collectionView .collection-case-label { gap: 6px; padding: 10px 2px 12px; }
+  #collectionView .dvd-front-status { font-size: 11px; padding: 4px; text-align: left; }
+  #collectionView .dvd-placeholder { padding: 12px 8px; }
+  #collectionView .dvd-placeholder :is(span, small) { font-size: 9px; }
+}
+@media (forced-colors: active) {
+  #collectionView::before { border-image: none; border: 1px solid CanvasText; inset: 0; clip-path: none; }
+  #collectionView .collection-case::after { background: CanvasText; }
+}

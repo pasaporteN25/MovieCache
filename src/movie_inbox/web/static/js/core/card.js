@@ -85,6 +85,31 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         return `<button class="dvd-open-surface" type="button" data-click="${escapeAttr(action)}" data-id="${escapeAttr(actionId)}" data-key="${escapeAttr(options.entryKey || "")}" aria-haspopup="dialog" aria-label="Abrir ficha de ${escapeAttr(title)}: ${escapeAttr(accessibleStatus)}"></button>`;
       }
 
+      // Collection's front-facing cases keep the artwork clear. Home/Club retain
+      // their existing card and dossier presentations.
+      export function collectionCard(item, index = 0, prioritize = false) {
+        const title = displayTitle(item) || "Sin título";
+        const availability = availabilityCopy(item);
+        const watched = item.status === "watched";
+        const rating = normalizeRating(item.rating);
+        const status = `${watched ? "vista" : "pendiente"}, ${availability.text}${rating ? `, ${rating} puntos` : ""}`;
+        return `<article class="card dvd-card collection-case" data-click="open-detail" data-id="${escapeAttr(item.id || "")}">
+          <div class="collection-poster" aria-hidden="true">
+            ${posterArtwork(item, title, prioritize && index < 5)}
+            ${Number(item._duplicate_count || 0) > 0 ? `<span class="dvd-sticker">Duplicada +${escapeHtml(item._duplicate_count)}</span>` : ""}
+          </div>
+          <div class="collection-case-label" aria-hidden="true">
+            <h2 title="${escapeAttr(title)}">${escapeHtml(title)}</h2>
+            <div class="collection-case-meta"><span>${escapeHtml(item.year || "Año desconocido")}</span>${rating ? `<strong>${rating}/10</strong>` : ""}</div>
+            <div class="dvd-front-statuses">
+              <span class="dvd-front-status ${watched ? "watched" : "pending"}">${watched ? "Vista" : "Pendiente"}</span>
+              <span class="dvd-front-status ${availability.effective ? "catalogued" : "muted"}" title="${escapeAttr(availability.text)}">${availability.effective ? "Disponible" : "No disponible"}</span>
+            </div>
+          </div>
+          ${openCardButton(item, title, status)}
+        </article>`;
+      }
+
       export function dvdBackSummary(item) {
         const summary = String(item.wikipedia_extract || item.description || item.notes || "Sin sinopsis disponible.").trim();
         return summary.length > 190 ? `${summary.slice(0, 187).trimEnd()}…` : summary;

@@ -5,18 +5,12 @@
             <h2 id="catalogTitle" class="view-focus-target" tabindex="-1">Colección</h2>
             <p id="collectionModeDescription">Recorré tu archivo personal y afiná la estantería.</p>
           </div>
-          <nav id="collectionModeTabs" class="collection-mode-tabs" aria-label="Tarea en Colección">
-            <button type="button" data-click="collection-mode" data-mode="browse" aria-pressed="true">
-              <span>Explorar</span><small>Tu archivo</small>
+          <nav id="collectionModeTabs" class="collection-task-actions" aria-label="Acciones de Colección">
+            <button id="collectionAddButton" type="button" data-click="collection-mode" data-mode="add">
+              + Agregar obra
             </button>
-            <button type="button" data-click="collection-mode" data-mode="search" aria-pressed="false">
-              <span>Buscar</span><small>Encontrar una obra</small>
-            </button>
-            <button type="button" data-click="collection-mode" data-mode="add" aria-pressed="false">
-              <span>Agregar</span><small>Sumar al catálogo</small>
-            </button>
+            <button type="button" data-click="collection-return" hidden>Volver a Colección</button>
           </nav>
-          <p id="catalogSummary" class="collection-result-summary">Disponibilidad, estado y puntuación visibles en cada caja.</p>
         </header>
 
         <section id="collectionAnchor" class="collection-anchor" aria-live="polite" hidden>
@@ -115,17 +109,6 @@
                     </div>
                   </div>
                   <div class="collection-sort-row">
-                    <label>
-                      <span>Orden</span>
-                      <select id="sort" aria-label="Ordenar colección">
-                        <option value="original">Orden original</option>
-                        <option value="title-asc">Título A-Z</option>
-                        <option value="year-desc">Año, más nuevas</option>
-                        <option value="year-asc">Año, más antiguas</option>
-                        <option value="rating-desc">Mejor puntuadas</option>
-                        <option value="added-desc">Agregadas recientemente</option>
-                      </select>
-                    </label>
                     <div class="collection-order-actions">
                       <button id="randomizeView" type="button">Mezclar vista</button>
                       <button id="resetOrder" class="quiet-action" type="button">Restablecer orden</button>
@@ -159,6 +142,29 @@
               <button id="backToCollection" class="quiet-action" type="button" hidden>Terminar comparación</button>
             </div>
           </div>
+        </section>
+
+        <div class="collection-results-toolbar">
+          <p id="catalogSummary" class="collection-result-summary" role="status"></p>
+          <button id="externalResultsJump" type="button" data-click="collection-external-results" hidden>Resultados externos</button>
+          <label class="collection-order-control">
+            <span>Orden</span>
+            <select id="sort" aria-label="Ordenar colección">
+              <option value="original">Orden original</option>
+              <option value="title-asc">Título A-Z</option>
+              <option value="year-desc">Año, más nuevas</option>
+              <option value="year-asc">Año, más antiguas</option>
+              <option value="rating-desc">Mejor puntuadas</option>
+              <option value="added-desc">Agregadas recientemente</option>
+            </select>
+          </label>
+        </div>
+        <section class="grid" id="grid" aria-label="Obras de tu colección"></section>
+        <button id="catalogLoadMore" class="catalog-more" type="button" hidden>Cargar más</button>
+        <section class="empty collection-empty" id="empty" aria-live="polite">
+          No hay obras que coincidan con la búsqueda y los filtros actuales.
+        </section>
+
           <div class="search-sections">
             <section class="search-section comparison-section" id="catalogMergeSection" aria-labelledby="catalogMergeTitle">
               <div class="section-heading">
@@ -170,7 +176,7 @@
               </div>
               <div class="search-results search-shelf-results" id="catalogMergeResults"></div>
             </section>
-            <section class="search-section external-results-section" id="externalSearchSection" aria-labelledby="externalSearchTitle">
+            <section class="search-section external-results-section" id="externalSearchSection" aria-labelledby="externalSearchTitle" tabindex="-1">
               <div class="section-heading">
                 <div>
                   <span class="section-kicker">Búsqueda ampliada</span>
@@ -181,11 +187,4 @@
               <div class="search-source-groups" id="manualSearchResults"></div>
             </section>
           </div>
-        </section>
-
-        <section class="grid" id="grid"></section>
-        <button id="catalogLoadMore" class="catalog-more" type="button" hidden>Cargar más</button>
-        <section class="empty collection-empty" id="empty" aria-live="polite">
-          No hay obras que coincidan con la búsqueda y los filtros actuales.
-        </section>
       </section>

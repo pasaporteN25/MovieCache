@@ -775,6 +775,21 @@ Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
 
 ## Hecho
 
+### [U10] Colección — mostrador y portadas grandes (2026-09-28)
+
+Dirección aprobada por el owner e implementada en `release/0.10.0`.
+Commit de entrega: `feat(collection): unify browsing and add the video-store counter`.
+[Brief y dependencias](docs/briefs/collection-counter-v1.md) ·
+[Evidencia y verificación](docs/design/collection-counter-v1/README.md).
+
+- [x] U10.1 Explorar/Buscar unificados; Agregar conserva consulta y contexto de regreso.
+- [x] U10.2 Mostrador con materiales de Inicio, filtros rápidos y orden visible.
+- [x] U10.3 Cinco portadas grandes, datos debajo y carga acumulativa de 30 en 30.
+- [x] U10.4 Historial, foco, teclado, imágenes, comparación/vinculación y responsive.
+
+61 pruebas de navegador y 34 pruebas JS aprobadas. Los cambios locales de sonido U9
+pertenecen a otro trabajo y quedan fuera de esta entrega. No incluye despliegue.
+
 ### Frente: Ficha — contexto público y guardado seguro
 
 **Implementado 2026-09-19, validado localmente 2026-09-20; sin commit todavía.** El owner

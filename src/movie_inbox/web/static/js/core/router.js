@@ -6,7 +6,7 @@ import { loadLibraries } from "../surfaces/admin-libraries.js";
 import { loadImageCacheStatus, loadMembers, syncImageCacheStatusPolling } from "../surfaces/admin-members.js";
 import { loadPublicPresentations } from "../surfaces/admin-public-presentations.js";
 import { loadStreamingConfiguration } from "../surfaces/admin-streaming.js";
-import { COLLECTION_MULTI_FILTER_KEYS, applyCollectionRoute, collectionRouteValues, collectionSearchMessage, render, renderHeaderStats, resetCollectionFilters, setCatalogVisibleCount, setCollectionSearchMode } from "../surfaces/catalog-grid.js";
+import { COLLECTION_MULTI_FILTER_KEYS, applyCollectionRoute, collectionRouteValues, collectionSearchMessage, collectionSearchMode, render, renderHeaderStats, resetCollectionFilters, setCatalogVisibleCount, setCollectionSearchMode, syncCollectionRoute } from "../surfaces/catalog-grid.js";
 import { activeQuery, clearManualSearch, manualResults, renderManualResults, runSearch, setCatalogMergeResults, setManualResults, setSearchState, setSelectedManualCandidate, setSelectedManualIndex, showCollectionAnchor, showFixedLocalItemForLink } from "../surfaces/catalog-search.js";
 import { loadClub } from "../surfaces/club.js";
 import { loadCurationQueue, setCurationFilter } from "../surfaces/inbox-curation.js";
@@ -38,6 +38,10 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
       }
 
       export function goToCollectionSearch() {
+        if (currentView === "catalog" && ["browse", "search"].includes(collectionSearchMode)) {
+          fields.query.focus();
+          return;
+        }
         resetCollectionFilters();
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
         setCollectionSearchMode("search");
@@ -47,13 +51,36 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
       }
 
       export function goToCollectionAdd() {
+        const fromShelf = currentView === "catalog" && ["browse", "search"].includes(collectionSearchMode);
+        const query = fromShelf ? fields.query.value.trim() : "";
+        if (fromShelf) syncCollectionRoute("replace");
+        const collectionReturn = fromShelf
+          ? { url: window.location.href, state: history.state?.collection || {} }
+          : null;
         resetCollectionFilters();
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
         fields.externalSource.checked = true;
         setCollectionSearchMode("add");
         showView("catalog", { updateHistory: false, focus: false });
-        syncRoute(routeValuesForView("catalog"), "push");
+        syncRoute(routeValuesForView("catalog"), "push", { collectionReturn, collection: {} });
+        fields.query.value = query;
+        if (query) {
+          runSearch({ updateHistory: false });
+          syncCollectionRoute("replace");
+        }
         requestAnimationFrame(() => fields.query.focus());
+      }
+
+      export function returnToCollection() {
+        const saved = history.state?.collectionReturn;
+        if (!saved) {
+          goToCollectionRoot();
+          return;
+        }
+        // The destination was recorded by this page before entering Add. Keep a
+        // normal history entry so Back/Forward can still revisit either task.
+        history.pushState({ collection: saved.state }, "", saved.url);
+        restoreRoute();
       }
 
       export async function goToInbox(filter = "") {
@@ -210,8 +237,8 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         return values;
       }
 
-      export function restoreRoute() {
-        if (!items.length) return;
+      export async function restoreRoute() {
+        const restoringUrl = window.location.href;
         const params = new URLSearchParams(window.location.search);
         const rawQuery = params.get("q") || "";
         const movieId = params.get("movie") || "";
@@ -269,9 +296,10 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
             renderManualResults();
           }
         }
+        fields.query.value = query;
         if (query.length >= 2 && query !== activeQuery) {
-          fields.query.value = query;
-          runSearch({ updateHistory: false });
+          await runSearch({ updateHistory: false });
+          if (window.location.href !== restoringUrl) return;
         } else if (!query && activeQuery) {
           clearManualSearch({
             focus: false,
@@ -290,10 +318,13 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         }
         showView(requestedView, { updateHistory: false, scroll: false });
         if (requestedView === "catalog") {
+          setCatalogVisibleCount(Number(collectionState.visibleCount) || CATALOG_PAGE_SIZE);
+          render();
           requestAnimationFrame(() => {
-            const focusTarget = collectionState.focusId
-              ? document.getElementById(collectionState.focusId)
-              : null;
+            const focusTarget = collectionState.focusCardId
+              ? [...fields.grid.querySelectorAll(".collection-case")]
+                .find((card) => card.dataset.id === collectionState.focusCardId)?.querySelector(".dvd-open-surface")
+              : collectionState.focusId ? document.getElementById(collectionState.focusId) : null;
             focusTarget?.focus({ preventScroll: true });
             if (Number.isFinite(Number(collectionState.scrollY))) {
               window.scrollTo({ top: Number(collectionState.scrollY), behavior: "auto" });

@@ -210,8 +210,9 @@ y categorías en el corte inicial; **IBM Plex Mono 400 normal** en consola, play
 y datos de Home. P.4 reemplaza sólo el rol de placas/categorías por Oswald 400.
 Fuentes WOFF2 autoalojadas, latin/latin-ext a demanda, `font-display: swap`, sin pesos
 ni cursivas sintéticos. Fallbacks: Arial Narrow/Trebuchet y Courier New respectivamente.
-Implementación acotada a `#homeView` en `home-type.css`: la marca global, Colección,
-Club, formularios y el dossier conservan su tipografía. P.2 no cambió la construcción
+Implementación inicial acotada a `#homeView` en `home-type.css`: la marca global,
+Club, formularios y el dossier conservan su tipografía. U10 extiende los roles a
+Colección según la excepción documentada abajo. P.2 no cambió la construcción
 de los lomos; P.3 fue autorizada posteriormente el 2026-09-07 y se describe abajo.
 Las reglas globales siguientes siguen vigentes fuera de estos roles de Home.
 
@@ -448,7 +449,38 @@ anuncio final.
 
 ## Layout
 
-El contenido vive dentro de un contenedor de hasta 1500px, con márgenes laterales generosos en escritorio y compactos en móvil. La búsqueda se organiza como una consola horizontal; la colección usa una grilla autoajustable de cajas con proporción 2:3 y separación flexible.
+### Colección U10 — mostrador y portadas (2026-09-28)
+
+Dirección aprobada: `docs/briefs/collection-counter-v1.md`; muestra de referencia en
+`docs/design/collection-counter-v1/concept.png`. Colección extiende el mundo material
+de Inicio: superficie petróleo y bisel empotrado reutilizados, placa compacta Oswald
+400, títulos Barlow Condensed 600 y consulta/datos IBM Plex Mono 400. No cambia marca,
+Club ni dossier. La tipografía expresiva deja de tapar la portada de esta superficie.
+
+La cabecera contiene Colección y Agregar obra; debajo, consulta persistente, filtros
+rápidos, opciones de búsqueda y la línea de conteo/orden. Agregar tiene rótulo propio,
+acción Volver y los mismos materiales. Los resultados externos se separan de la grilla
+local y disponen de un acceso con cantidad/estado junto al conteo.
+
+El mostrador mide hasta 1540 px. Cinco columnas por encima de 1100 px, cuatro hasta
+1100, tres hasta 860 y dos hasta 640; las portadas mantienen su ventana 2:3 con
+`object-fit: contain`, sin recortar la imagen. Título y estados viven debajo; títulos
+extremos usan hasta tres líneas y conservan texto completo en nombre accesible,
+atributo title y ficha. Estantes continuos, etiquetas cálidas y cantos de metal
+comunican material. Las cajas de Colección no giran al pasar el puntero.
+
+La paleta de esta superficie deriva del kit de Home: petróleo `#091a22`, pantalla
+`#031117`, tinta cálida `#eedbb5`, metadata `#9cdae0`, secundarios `#b4c7c9`, línea
+metálica `#826b42` y controles `#061a22`/`#0c242c`. El latón tiene luces y sombras
+propias del bisel y de la tecla Agregar. Esquinas de 2–3 px, títulos 22/19 px y placa
+26–38 px reflejan el tamaño de los objetos, no una nueva escala global.
+
+La carga es acumulativa y mueve foco a la primera caja nueva; la línea de conteo
+anuncia el avance. Volver desde una ficha conserva la cantidad y la posición. Foco
+cyan, placeholders honestos, contraste legible y ausencia de desbordamiento horizontal
+son obligatorios. La página puede crecer verticalmente sin comprimir las portadas.
+
+La base anterior a las excepciones Home/U10 usa un contenedor de hasta 1500px, con márgenes laterales generosos en escritorio y compactos en móvil. La búsqueda se organiza como una consola horizontal; las grillas heredadas usan cajas con proporción 2:3 y separación flexible.
 
 La densidad cambia en 1100px, 860px, 640px y 440px. A partir de 640px la cabecera se apila, el spotlight adopta una proporción más alta, su selector de recomendaciones se desplaza horizontalmente, la colección mantiene dos columnas y la ficha ocupa el viewport completo. Los objetos de formato fijo deben conservar proporciones y tracks estables para que títulos, badges y estados no desplacen la composición.
 

@@ -344,6 +344,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         discardDetailChanges: document.querySelector("#discardDetailChanges"),
         saveDetailChanges: document.querySelector("#saveDetailChanges"),
         catalogLoadMore: document.querySelector("#catalogLoadMore"),
+        externalResultsJump: document.querySelector("#externalResultsJump"),
         descriptionDialog: document.querySelector("#descriptionDialog"),
         descriptionDialogTitle: document.querySelector("#descriptionDialogTitle"),
         descriptionDialogText: document.querySelector("#descriptionDialogText"),

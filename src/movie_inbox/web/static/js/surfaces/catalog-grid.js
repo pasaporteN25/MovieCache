@@ -1,10 +1,10 @@
-import { card, shuffle } from "../core/card.js";
+import { collectionCard, shuffle } from "../core/card.js";
 import { editorialRevision, load, sourceFiles, writeJsonPath } from "../core/catalog-data.js";
 import { renderDetail, selectedDetailId, setDetailFeedback } from "../core/detail.js";
 import { fields } from "../core/fields.js";
 import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, hasExternalLink, hasHost, isInCatalog, localFilesText, normalizeRating, normalizeText, setInlineFeedback, todayLocalDate } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
-import { goToCollection, routeValuesForView, syncRoute } from "../core/router.js";
+import { goToCollection, goToCollectionAdd, routeValuesForView, syncRoute } from "../core/router.js";
 import { CATALOG_PAGE_SIZE, currentView, items, selectedExistingIdForSearch } from "../core/state.js";
 import { activeQuery, clearManualSearch, externalHealth, externalSourceSearchStates, externalSourcesAttempted, externalSourcesLastUsed, manualResults, matchesNormalizedSearchText, selectedManualCandidateRef, selectedManualCandidateSource, selectedManualIndex, setSearchState } from "./catalog-search.js";
 import { renderEditorialHome } from "./home.js";
@@ -39,7 +39,9 @@ import { renderEditorialHome } from "./home.js";
 
       export let collectionYearRange = { from: "", to: "" };
 
-      export let catalogVisibleCount = 36;
+      // Bootstrap's existing module cycle initializes state.js after this module.
+      // loadCatalog resets this value to CATALOG_PAGE_SIZE before the first render.
+      export let catalogVisibleCount = 30;
 
       export const COLLECTION_MULTI_FILTER_KEYS = [
         "status", "availability", "kind", "source", "decade", "genre", "director", "record", "release_day"
@@ -117,6 +119,7 @@ import { renderEditorialHome } from "./home.js";
             scrollY: window.scrollY,
             visibleCount: catalogVisibleCount,
             focusId: activeElement?.id || "",
+            focusCardId: activeElement?.closest?.(".collection-case")?.dataset.id || "",
             ...state
           }
         });
@@ -343,11 +346,8 @@ import { renderEditorialHome } from "./home.js";
         fields.collectionView.dataset.searchMode = collectionSearchMode;
         fields.backToCollection.hidden = !comparisonMode;
         fields.collectionAnchor.hidden = !comparisonMode;
-        fields.collectionModeTabs.querySelectorAll("[data-mode]").forEach((button) => {
-          const selected = button.dataset.mode === collectionSearchMode;
-          button.setAttribute("aria-pressed", String(selected));
-          button.classList.toggle("active", selected);
-        });
+        fields.collectionModeTabs.querySelector('[data-mode="add"]').hidden = collectionSearchMode === "add";
+        fields.collectionModeTabs.querySelector('[data-click="collection-return"]').hidden = collectionSearchMode !== "add";
         const copy = collectionModeCopy(collectionSearchMode);
         fields.collectionModeKicker.textContent = copy.kicker;
         fields.catalogSection.querySelector("#catalogTitle").textContent = copy.title;
@@ -364,24 +364,24 @@ import { renderEditorialHome } from "./home.js";
       export function collectionModeCopy(mode = collectionSearchMode) {
         const copies = {
           browse: {
-            kicker: "Archivo nocturno",
+            kicker: "Tu archivo personal",
             title: "Colección",
-            description: "Recorré tu archivo personal y afiná la estantería.",
+            description: "Recorré, buscá y elegí tu próxima película.",
             queryLabel: "Buscar en tu colección",
-            placeholder: "Título, persona o dato…",
+            placeholder: "Buscar en tu colección…",
             action: "Buscar"
           },
           search: {
-            kicker: "Localizar en el archivo",
+            kicker: "Tu archivo personal",
             title: "Colección",
-            description: "Encontrá una obra propia y, si hace falta, ampliá la búsqueda.",
+            description: "Recorré, buscá y elegí tu próxima película.",
             queryLabel: "Buscar en tu colección",
-            placeholder: "Título, persona o dato…",
+            placeholder: "Buscar en tu colección…",
             action: "Buscar"
           },
           add: {
             kicker: "Nueva entrada",
-            title: "Colección",
+            title: "Agregar obra",
             description: "Buscá una obra afuera antes de sumarla a tu catálogo.",
             queryLabel: "Buscar una obra para agregar",
             placeholder: "Obra para agregar…",
@@ -408,6 +408,10 @@ import { renderEditorialHome } from "./home.js";
       }
 
       export function changeCollectionMode(mode, options = {}) {
+        if (mode === "add") {
+          goToCollectionAdd();
+          return;
+        }
         const requested = ["browse", "search", "add"].includes(mode) ? mode : "browse";
         const updateHistory = options.updateHistory !== false;
         const focus = options.focus !== false;
@@ -699,6 +703,7 @@ import { renderEditorialHome } from "./home.js";
 
       export function clearFilters() {
         resetCollectionFilters();
+        clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
         render();
         syncCollectionRoute("push");
       }
@@ -828,15 +833,22 @@ import { renderEditorialHome } from "./home.js";
             <span>La colección sigue intacta; sólo estás viendo una selección vacía.</span>
             <button type="button" data-click="clear-all-collection-filters">Limpiar filtros</button>`;
         }
-        const gridKey = `${catalogRevision}:${currentView === "catalog" ? "catalog" : "background"}:${shown.map((item) => item.id).join("|")}`;
+        const gridPrefix = `${catalogRevision}:${currentView === "catalog" ? "catalog" : "background"}:`;
+        const gridKey = `${gridPrefix}${shown.map((item) => item.id).join("|")}`;
         if (gridKey !== lastCatalogGridKey) {
-          fields.grid.innerHTML = shown
-            .map((item, index) => card(item, index, currentView === "catalog"))
+          const existingCount = fields.grid.children.length;
+          const appendOnly = existingCount > 0 && existingCount < shown.length
+            && lastCatalogGridKey === `${gridPrefix}${shown.slice(0, existingCount).map((item) => item.id).join("|")}`;
+          const start = appendOnly ? existingCount : 0;
+          const markup = shown.slice(start)
+            .map((item, index) => collectionCard(item, start + index, currentView === "catalog"))
             .join("");
+          if (appendOnly) fields.grid.insertAdjacentHTML("beforeend", markup);
+          else fields.grid.innerHTML = markup;
           lastCatalogGridKey = gridKey;
         }
         fields.catalogLoadMore.hidden = shown.length >= filtered.length;
-        fields.catalogLoadMore.textContent = `Cargar más (${filtered.length - shown.length})`;
+        fields.catalogLoadMore.textContent = `Cargar ${Math.min(CATALOG_PAGE_SIZE, filtered.length - shown.length)} más · ${shown.length} de ${filtered.length}`;
         if (lastEditorialRenderRevision !== editorialRevision) {
           renderEditorialHome();
           lastEditorialRenderRevision = editorialRevision;
@@ -853,15 +865,21 @@ import { renderEditorialHome } from "./home.js";
       export function catalogSummaryText(filtered) {
         const count = filtered.length;
         const noun = count === 1 ? "título" : "títulos";
-        if (activeQuery) return `${count} ${noun} para “${activeQuery}”`;
-        if (hasActiveCollectionFilters()) return `${count} ${noun} con los filtros actuales`;
-        if (randomOrder.length) return `${count} ${noun} en orden aleatorio`;
-        return `${count} ${noun} en la estantería`;
+        const summary = count > catalogVisibleCount ? `${catalogVisibleCount} de ${count} ${noun}` : `${count} ${noun}`;
+        if (activeQuery) return `${summary} para “${activeQuery}”`;
+        if (hasActiveCollectionFilters()) return `${summary} con los filtros actuales`;
+        if (randomOrder.length) return `${summary} en orden aleatorio`;
+        return `${summary} en la estantería`;
       }
 
       export function showMoreCatalogItems() {
+        const firstAdded = fields.grid.children.length;
         catalogVisibleCount += CATALOG_PAGE_SIZE;
         render();
+        const nextCard = fields.grid.children[firstAdded]?.querySelector(".dvd-open-surface");
+        nextCard?.focus({ preventScroll: true });
+        nextCard?.scrollIntoView({ block: "nearest", behavior: "instant" });
+        syncCollectionRoute("replace");
       }
 
       export function randomizeView() {

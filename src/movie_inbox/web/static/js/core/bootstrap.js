@@ -5,7 +5,7 @@ import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChange
 import { fields } from "./fields.js";
 import { localDateOffset, todayLocalDate } from "./format.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
-import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionAdd, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, setInboxMode } from "./router.js";
+import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionAdd, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, returnToCollection, setInboxMode } from "./router.js";
 import { CATALOG_PAGE_SIZE, currentView, inboxMode } from "./state.js";
 import { addLibraryExclusionRuleRow, browseManagedLibraryPath, checkManagedLibraryPath, closeLibraryDialog, handleLibraryAction, handleLibraryExclusionRuleRowClick, handleLibraryPathDirectory, openLibraryDialog, parentLibraryPath, saveManagedLibrary, toggleLibraryShareAvailabilityFields, useBrowsedLibraryPath } from "../surfaces/admin-libraries.js";
 import { archiveMemberAccount, closeArchiveMemberDialog, closeEditMemberDialog, closeMemberDialog, closePrivacyDialog, closeTemporaryPasswordDialog, copyTemporaryPassword, createMember, handleArchivedMemberAction, handleMemberAction, handleVisibilityChange, openMemberDialog, openPrivacyDialog, refreshAdminData, saveMemberProfile, savePrivacyPreferences, syncPrivacyControls } from "../surfaces/admin-members.js";
@@ -94,6 +94,11 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "clear-all-collection-filters": clearFilters,
           "toggle-collection-filter": () => toggleCollectionFilter(target.dataset.filter || "", target.dataset.value || ""),
           "collection-mode": () => changeCollectionMode(target.dataset.mode || "browse"),
+          "collection-return": returnToCollection,
+          "collection-external-results": () => {
+            fields.externalSearchSection.scrollIntoView({ block: "start", behavior: "instant" });
+            fields.externalSearchSection.focus({ preventScroll: true });
+          },
           "run-search": runSearch
         };
         actions[target.dataset.click]?.();

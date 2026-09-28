@@ -130,6 +130,16 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
 - El despliegue debe poder vivir en un servidor personal y leer bibliotecas distribuidas
   en varios discos.
 
+### Colección unificada (U10, 2026-09-28)
+
+Colección ofrece búsqueda y exploración en una sola grilla con consulta siempre
+visible. Agregar es una tarea explícita que conserva la consulta y permite regresar
+al archivo con sus filtros, orden y cantidad visible. Los enlaces antiguos de
+búsqueda siguen funcionando. La grilla carga 30 obras y suma bloques de 30 sin
+reemplazar las portadas ya presentes; el historial conserva cantidad, foco y posición.
+Las fuentes externas mantienen su procedencia y un acceso directo junto al conteo.
+Comparar/vincular y el matching conservador conservan sus reglas.
+
 ## Brand Commitments
 
 El nombre del producto es **Movie Inbox**. La terminologia debe conservar la diferencia

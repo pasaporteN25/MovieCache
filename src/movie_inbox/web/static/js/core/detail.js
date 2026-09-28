@@ -8,7 +8,7 @@ import { apiFetch } from "./http.js";
 import { syncRoute } from "./router.js";
 import { findLinkForItem } from "./search-bridge.js";
 import { items, privacyPreferences } from "./state.js";
-import { catalogDetailItems, randomCandidates } from "../surfaces/catalog-grid.js";
+import { catalogDetailItems, randomCandidates, syncCollectionRoute } from "../surfaces/catalog-grid.js";
 import { drawRandomItem } from "./random-draw.js";
 import { activeQuery, catalogMergeResults } from "../surfaces/catalog-search.js";
 import { editorialPersonalIds } from "../surfaces/home.js";
@@ -262,6 +262,9 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           return;
         }
         const activeElement = document.activeElement;
+        if (updateHistory && !fields.collectionView.hidden && !selectedDetailId) {
+          syncCollectionRoute("replace", { focusCardId: id });
+        }
         detailReturnFocus = (activeElement?.dataset?.click?.startsWith("open-detail") || activeElement?.dataset?.click === "edit-home-shelf-entry")
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;

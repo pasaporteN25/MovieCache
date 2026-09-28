@@ -180,6 +180,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function setSearchState(state, message = "") {
+        fields.externalResultsJump.hidden = state === "idle" || collectionSearchMode !== "search" || !fields.externalSource.checked;
         const comparisonMode = ["compare", "link"].includes(collectionSearchMode);
         fields.collectionView.classList.toggle("has-search-results", Boolean(activeQuery) && state !== "idle");
         fields.searchContext.hidden = state !== "searching" && state !== "error" && !comparisonMode;
@@ -285,6 +286,9 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         const fallbacks = states.filter((state) => state.status === "fallback").length;
         const completed = states.length - loading;
         const count = manualResults.length;
+        fields.externalResultsJump.textContent = loading
+          ? `Resultados externos · consultando ${loading} fuentes`
+          : `Resultados externos · ${count}${failed ? " · consulta incompleta" : ""}`;
         if (!states.length) {
           fields.manualSearchStatus.textContent = "";
         } else if (loading) {
@@ -547,8 +551,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         if (updateHistory && hadSearch) syncCollectionRoute("push");
         render();
         renderDatabaseMenu();
-        if (focus && returnMode === "add") fields.query.focus();
-        if (focus && returnMode === "browse") fields.catalogSection.querySelector("#catalogTitle")?.focus();
+        if (focus) fields.query.focus();
       }
 
       export function showFixedLocalItemForLink(itemId) {
