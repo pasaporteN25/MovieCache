@@ -1,4 +1,8 @@
-"""Diagnose how well a catalogue can fill the console's image windows ([U7.1]).
+"""Diagnose ([U7.1]) and fill ([U7 B]) a catalogue's two images per work.
+
+`coverage` looks only at what is on this machine. `fill` is the explicit batch of
+the U7 B contract: it asks TMDb, only by ids the works already carry, for up to
+`--limit` works and completes empty, unlocked image fields.
 
 It looks only at what is on this machine: the catalogue, optionally the instance
 database for the Club collections an account can open, and the listing of the
@@ -11,12 +15,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepositoryError
+from movie_inbox.application.image_service import ImageService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.charades import work_key
@@ -30,12 +37,15 @@ from movie_inbox.domain.image_coverage import (
     classify_work,
     summarize,
 )
+from movie_inbox.external.image_sources import TmdbImageSource
+from movie_inbox.external.tmdb import TmdbAdapter
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.web.config import DEFAULT_IMAGE_ALLOWED_HOSTS
 from movie_inbox.web.image_proxy import cached_image_keys, image_cache_url_keys
 from movie_inbox.web.security import validate_http_url
+from movie_inbox.web.server import external_api_token
 
 SLOT_LABELS = {
     "empty": "vacía",
@@ -95,7 +105,34 @@ def main(argv: list[str] | None = None) -> int:
         help="Extra allowed image host, exactly as passed to serve. Repeatable.",
     )
     coverage.add_argument("--json", action="store_true", help="Print the report as JSON.")
+    fill = commands.add_parser(
+        "fill",
+        help="Complete empty, unlocked images from TMDb, only through ids the works carry.",
+    )
+    fill.add_argument("catalog", type=Path, help="Catalog to fill (.json or SQLite).")
+    fill.add_argument(
+        "--limit",
+        type=int,
+        required=True,
+        help="Maximum number of works to ask TMDb about in this run.",
+    )
+    fill.add_argument(
+        "--dry-run", action="store_true", help="Ask TMDb and report, but write nothing."
+    )
+    fill.add_argument(
+        "--tmdb-read-access-token-file",
+        type=Path,
+        default=(
+            Path(os.environ["MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE"])
+            if os.environ.get("MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE")
+            else None
+        ),
+        help="TMDb API Read Access Token file, the same one serve reads.",
+    )
+    fill.add_argument("--json", action="store_true", help="Print the summary as JSON.")
     args = parser.parse_args(argv)
+    if args.command == "fill":
+        return run_fill(args)
 
     cache_dir = args.image_cache_dir or (
         args.catalog.resolve().parent / ".catalog-cache" / "images"
@@ -117,6 +154,91 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(format_report(report))
     return 0
+
+
+FILL_STATUS_LABELS = {
+    "ok": "con imágenes nuevas",
+    "no_images": "TMDb no tiene más imágenes",
+    "needs_review": "cruce dudoso, sin escribir",
+    "no_identity": "sin id para cruzar",
+    "complete": "ya completas",
+    "unavailable": "TMDb no respondió",
+    "rate_limited": "TMDb pidió esperar (se cortó la corrida)",
+}
+CROSSWALK_LABELS = {
+    "accepted": "aceptado",
+    "no_result": "sin resultado",
+    "ambiguous": "varios resultados",
+    "kind_mismatch": "tipo distinto",
+    "year_mismatch": "año distinto",
+    "no_year": "la obra no tiene año",
+}
+
+
+def run_fill(args: argparse.Namespace) -> int:
+    if args.limit <= 0:
+        print("error: --limit tiene que ser mayor que cero", file=sys.stderr)
+        return 2
+    try:
+        token = external_api_token(args.tmdb_read_access_token_file, source_label="TMDb")
+    except ValueError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    if not token:
+        print(
+            "error: falta el token de TMDb (--tmdb-read-access-token-file o "
+            "MOVIE_INBOX_TMDB_READ_ACCESS_TOKEN_FILE)",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        catalog = CatalogService(open_catalog_repository(args.catalog, normalize_item))
+        service = ImageService(TmdbImageSource(TmdbAdapter(token)))
+
+        def progress(done: int, total: int) -> None:
+            if not args.json:
+                print(f"\r{done}/{total}", end="", file=sys.stderr, flush=True)
+
+        summary = service.fill_batch(
+            catalog, limit=args.limit, dry_run=args.dry_run, progress=progress
+        )
+    except CatalogRepositoryError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    if not args.json:
+        print("", file=sys.stderr)
+        print(format_fill_summary(summary))
+    else:
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
+def format_fill_summary(summary: Mapping[str, Any]) -> str:
+    """Counts only, like `coverage`: no titles, no addresses."""
+
+    lines = [
+        f"Imágenes desde TMDb: {summary['considered']} obras consultadas"
+        + (" (simulación, no se escribió nada)." if summary.get("dry_run") else "."),
+    ]
+    for status, count in sorted(summary["by_status"].items(), key=lambda row: -row[1]):
+        lines.append(f"  {FILL_STATUS_LABELS.get(status, status)}: {count}")
+    if summary["crosswalk"]:
+        crosswalk = " · ".join(
+            f"{CROSSWALK_LABELS.get(name, name)} {count}"
+            for name, count in sorted(summary["crosswalk"].items(), key=lambda row: -row[1])
+        )
+        lines.append(f"  Cruce de ids: {crosswalk}")
+    if summary.get("dry_run"):
+        lines.append(
+            f"  Se escribirían {summary['would_fill']} imágenes y "
+            f"{summary['would_add_identity']} ids de TMDb."
+        )
+    else:
+        lines.append(
+            f"  Escritas: {summary.get('filled_fields', 0)} campos, "
+            f"{summary.get('identities_added', 0)} ids de TMDb nuevos."
+        )
+    return "\n".join(lines)
 
 
 def coverage_report(

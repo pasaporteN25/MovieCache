@@ -282,22 +282,27 @@ Plan ejecutable: `docs/design/u7-u9-plan-2026-09-26.md`; conserva la historia de
     ver `docs/analisis/u7-1-cobertura-de-imagenes-2026-09-12.md`. No reconstruir.
   - [x] **[U7.1b] Matriz actual para presentación.** URLs vacías/rechazadas/rotas,
     cache frío y variantes repetidas; fixtures descartables. Medio, visual.
-  - [ ] **[U7.1c] Corrida real agregada.** Lógica, con autorización específica del
+  - [x] **[U7.1c] Corrida real agregada.** Lógica, con autorización específica del
     catálogo/entorno al tomarla; no es prerrequisito para U7 A ni para U9.
-- [ ] **[U7.2] Fuentes y selección de imagen.** `external/tmdb.py`, metadata y
+- [x] **[U7.2] Fuentes y selección de imagen.** `external/tmdb.py`, metadata y
   autoridad: IDs confirmados, imágenes distintas, procedencia/atribución y cobertura
   por cine/series/anime. Sin matching por título parecido. Dep.: U7.1 + elección de
   contenido de las dos ventanas. Modelo grande, lógica/investigación.
-- [ ] **[U7.3] Contrato de assets portable.** `catalog.schema.json`, schema,
+- [x] **[U7.3] Contrato de assets portable.** `catalog.schema.json`, schema,
   repositorios JSON/SQLite, serializers/API: lista acotada con rol/origen y selección
   manual, compatibilidad con escalares y export/import. Dep.: U7.2. Modelo grande,
   principalmente lógica; visual entrega consumo/estados.
   **Decisión de imágenes 2026-09-12:** dos distintas como preferencia; panorámica
   + portada permitidas, incluso con portada a la derecha. Repetición de la única
   disponible permitida como fallback visual, sin duplicar el asset almacenado.
-- [ ] **[U7.4] Adquisición y cache acotados.** Resolver/proxy/warmer: identidad,
+- [x] **[U7.4] Adquisición y cache acotados.** Resolver/proxy/warmer: identidad,
   dedupe de misma imagen en tamaños distintos, prioridad de consulta, backoff,
   cache y corrección manual preservada. Dep.: U7.3. Modelo grande, lógica.
+  **U7.1c–U7.4 lógica, 2026-09-26/27:** cobertura real sin ninguna obra con TMDb;
+  opción A (sin galería guardada) y cruce de ids IMDb/Wikidata → TMDb aprobados por
+  el owner. Implementado: candidatas en vivo, fill-only con procedencia, lote
+  `movie-inbox images fill --limit N`. Contrato, casos y prueba del owner en
+  `docs/analisis/u7b-contrato-imagenes-2026-09-26.md`. Sigue U7.5b (visual).
 - [ ] **[U7.5] Ventanas y corrección visual.** Separación aprobada por el owner
   el 2026-09-13: cierre visual ahora, integración de datos explícitamente pendiente.
   `homeSelectionPreview()`/Home CSS y

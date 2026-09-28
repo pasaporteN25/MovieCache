@@ -211,6 +211,52 @@ class TmdbAdapter:
             return {}
         return {"average": round(average, 1), "votes": votes}
 
+    def images(self, media_type: str, tmdb_id: str) -> dict[str, Any]:
+        """[U7 B] Every poster and backdrop TMDb holds for one work, raw."""
+
+        if media_type not in {"movie", "tv"} or not str(tmdb_id).isdigit():
+            return {}
+        return self._request(
+            f"/{media_type}/{tmdb_id}/images", {"include_image_language": "es,en,null"}
+        )
+
+    def find_by_imdb(self, imdb_id: str) -> list[dict[str, str]]:
+        """[U7 B] The works TMDb files under an IMDb id: an id lookup, never a title search."""
+
+        if not re.fullmatch(r"tt\d{7,9}", str(imdb_id or ""), flags=re.IGNORECASE):
+            return []
+        raw = self._request(
+            f"/find/{imdb_id.lower()}", {"external_source": "imdb_id", "language": self.language}
+        )
+        found: list[dict[str, str]] = []
+        for media_type, key, date_field in (
+            ("movie", "movie_results", "release_date"),
+            ("tv", "tv_results", "first_air_date"),
+        ):
+            for row in object_list(raw.get(key)):
+                if not isinstance(row, Mapping):
+                    continue
+                tmdb_id = _positive_id(row.get("id"))
+                if tmdb_id:
+                    found.append(
+                        {
+                            "media_type": media_type,
+                            "tmdb_id": tmdb_id,
+                            "year": str(row.get(date_field) or "")[:4],
+                        }
+                    )
+        return found
+
+    def release_year(self, media_type: str, tmdb_id: str) -> str:
+        """[U7 B] One work's year, from a bare detail call."""
+
+        if media_type not in {"movie", "tv"} or not str(tmdb_id).isdigit():
+            return ""
+        raw = self._request(f"/{media_type}/{tmdb_id}", {"language": self.language})
+        date_field = "release_date" if media_type == "movie" else "first_air_date"
+        year = str(raw.get(date_field) or "")[:4]
+        return year if year.isdigit() else ""
+
     def _request(self, path: str, parameters: Mapping[str, object]) -> dict[str, Any]:
         url = f"{TMDB_API_BASE_URL}{path}?{urlencode(parameters)}"
         return fetch_json(

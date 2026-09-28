@@ -29,6 +29,7 @@ from movie_inbox.application.external_retirement import (
 )
 from movie_inbox.application.home_service import EditorialHomeService
 from movie_inbox.application.identity_repository import IdentityRepositoryError
+from movie_inbox.application.image_service import ImageService
 from movie_inbox.application.import_service import ImportService
 from movie_inbox.application.library_service import (
     AvailabilityService,
@@ -47,6 +48,7 @@ from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.public_ratings import PublicRating
 from movie_inbox.external.common import configure_operator_contact
+from movie_inbox.external.image_sources import TmdbImageSource
 from movie_inbox.external.imdb import imdb_id_from_text
 from movie_inbox.external.imdb_dataset_source import ImdbDatasetSource
 from movie_inbox.external.tmdb import TmdbAdapter
@@ -115,6 +117,7 @@ from movie_inbox.web.routers import (
     device_catalog,
     device_charades,
     home,
+    images,
     imports,
     integrations,
     pairing,
@@ -347,6 +350,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.tmdb_retirement_service = tmdb_retirement_service
     app.state.streaming_service = streaming_service
     app.state.public_ratings_service = public_ratings_service
+    # [U7 B] Same credential rule as the other TMDb loaders: without a token the
+    # routes still answer, with status "unavailable", instead of failing.
+    app.state.image_service = ImageService(
+        TmdbImageSource(streaming_adapter) if streaming_adapter else None
+    )
     app.state.pairing_service = PairingService(
         identity_repository,
         auth_service,
@@ -568,6 +576,7 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.include_router(integrations.router)
     app.include_router(streaming.router)
     app.include_router(ratings.router)
+    app.include_router(images.router)
     app.include_router(charades.router)
     app.include_router(search.router)
     app.include_router(pairing.router)

@@ -1,8 +1,9 @@
 # [U7 B] Contrato y adquisición de imágenes — propuesta de lógica
 
 **Fecha:** 2026-09-26. **Tareas:** [U7.2], [U7.3], [U7.4] (lógica) y el traspaso a
-[U7.5b] (visual). **Estado:** opción A aprobada por el owner el 2026-09-26; cobertura real medida el mismo
-día (abajo). Sin código todavía. El plan
+[U7.5b] (visual). **Estado:** opción A y cruce de ids aprobados por el owner el 2026-09-26; cobertura
+real medida el mismo día (abajo). **Lógica implementada el 2026-09-27**; falta la
+prueba del owner con token real y el consumo visual (U7.5b). El plan
 (`docs/design/u7-u9-plan-2026-09-26.md`) pide ejemplos de payload y casos de
 aceptación antes de implementar contrato o adquisición.
 
@@ -118,8 +119,9 @@ Lo llama la contratapa al abrirse si la obra tiene menos de dos imágenes. Es la
 
 ```json
 // respuesta
-{"filled": ["backdrop_image"], "kept": ["page_image"], "skipped_locked": [],
- "status": "ok", "item": { "...": "la obra actualizada" }}
+{"status": "ok", "crosswalk": "", "identity": {"source": "tmdb", "media_type": "movie",
+ "tmdb_id": "78"}, "filled": ["backdrop_image"], "kept": ["page_image"],
+ "skipped_locked": [], "identity_added": false}
 ```
 
 - **Sólo completa vacíos.** Nunca reemplaza una URL existente ni toca un campo en
@@ -171,20 +173,49 @@ Ninguna búsqueda por título. Sólo traducción entre ids que ya están en la o
 
 Regla propuesta: se guarda `tmdb_id` sólo si hay **un único resultado** y coincide
 el **tipo** (película/serie) y el **año** con tolerancia de ±1. Cualquier otra cosa
-(cero o varios resultados, tipo o año distintos, IMDb y Wikidata que apuntan a obras
-diferentes) no se escribe y queda para Curaduría. Procedencia `tmdb` con
+(cero o varios resultados, tipo o año distintos, obra sin año) no se escribe: el
+resumen del lote lo cuenta como «cruce dudoso» por motivo. Todavía no crea una entrada
+de Curaduría. Si la obra tiene IMDb se usa IMDb; Wikidata sólo cuando no lo tiene. Procedencia `tmdb` con
 `inferred: true` para que se distinga de una identidad elegida a mano, y la retirada
 de TMDb la borra junto con lo demás. `tmdb_id` bloqueado nunca se toca.
 
 Corre sólo por el mismo lote explícito (`movie-inbox images fill --limit N`), nunca
 en segundo plano. Requiere TMDb activo en la instancia donde corra.
 
-## Lo que necesito del owner antes de implementar
+## Implementación (2026-09-27)
 
-1. ~~Opción A o B~~ — **A**, aprobada el 2026-09-26.
-2. ~~Cobertura real~~ — medida el 2026-09-26 (arriba).
-3. **Paso 0, cruce de identidad por id.** Sin él la entrega no llena ninguna obra.
-   Propuesta: incluirlo con la regla de arriba (único resultado, tipo y año ±1).
-4. **Dónde corre TMDb.** El token tiene que estar en la instancia real: la nativa de
-   Windows o la de Docker en Linux. Va en `./secrets/`, como documenta
-   `docs/docker.md`, en cualquiera de los dos casos.
+- `domain/images.py`: candidatas de TMDb, regla del cruce y escritura fill-only.
+- `application/image_service.py`: una obra a pedido (sólo con identidad TMDb ya
+  guardada) y el lote explícito (con cruce de ids, una sola escritura por corrida,
+  se corta si TMDb pide esperar). Recuerda 7 días, en memoria, las obras sin imágenes.
+- `external/image_sources.py`, `external/tmdb.py` (`images`, `find_by_imdb`,
+  `release_year`) y `external/wikidata.py` (P4947/P4983).
+- `web/routers/images.py`: `GET /api/items/{id}/image-candidates` y
+  `POST /api/items/{id}/images/fill`. Sin token responden `unavailable`.
+- `movie-inbox images fill <catálogo> --limit N [--dry-run] [--json]`: sólo imprime
+  totales, como `coverage`.
+- `page_image` pasa a ser editable desde `/api/metadata`, como la panorámica.
+- Pruebas: `tests/test_images_u7b.py`, con los casos de aceptación numerados.
+
+Pendiente de la parte visual (U7.5b): llamar a `fill` al abrir la contratapa de una
+obra con identidad TMDb e imágenes incompletas, y el selector de candidatas en la
+ficha editable.
+
+## Prueba del owner
+
+Sobre la instancia nativa de Windows, con el servidor detenido y un backup previo
+(`movie-inbox backup`). El token va en `secrets/tmdb-read-access-token.txt`, como
+documenta `docs/docker.md`.
+
+1. Simulación, no escribe nada:
+   `movie-inbox images fill <catálogo> --limit 20 --dry-run --tmdb-read-access-token-file secrets/tmdb-read-access-token.txt`
+2. Si los números cierran, la misma línea sin `--dry-run`.
+3. `movie-inbox images coverage <catálogo> --instance-db <instance.db>` otra vez, para
+   comparar con la corrida del 2026-09-26.
+4. Abrir Inicio y ver la contratapa de alguna obra completada.
+
+## Decisiones del owner
+
+1. Opción A — aprobada el 2026-09-26.
+2. Cobertura real — medida el 2026-09-26 (arriba).
+3. Cruce de identidad por id con la regla de arriba — aprobado el 2026-09-26.

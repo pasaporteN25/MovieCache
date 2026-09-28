@@ -38,10 +38,15 @@ class HomeRandomTests(unittest.TestCase):
             payload = response.json()
             items = [dict(UNAVAILABLE)] if only_unavailable else payload["items"]
             payload["items"] = items
+
             def entries(prefix: str) -> list[dict[str, Any]]:
                 return [
-                    {"key": f"{prefix}-{item['id']}", "origin": {"kind": "catalog"},
-                     "item": item, "reason": {"label": "Memoria"}}
+                    {
+                        "key": f"{prefix}-{item['id']}",
+                        "origin": {"kind": "catalog"},
+                        "item": item,
+                        "reason": {"label": "Memoria"},
+                    }
                     for item in items
                 ]
 
@@ -100,8 +105,9 @@ class HomeRandomTests(unittest.TestCase):
         self.assertEqual(page.locator(".spotlight-preview h3").text_content(), first_title)
         self.assertEqual(page.locator(".home-console-heading strong").text_content(), "Al azar")
         self.assertTrue(
-            (page.locator(".home-consulted-poster").get_attribute("data-consulted-key") or "")
-            .startswith("random:")
+            (
+                page.locator(".home-consulted-poster").get_attribute("data-consulted-key") or ""
+            ).startswith("random:")
         )
         # The draw never opens the dossier and never reprograms the table.
         self.assertEqual(page.locator("dialog[open]").count(), 0)
@@ -111,9 +117,9 @@ class HomeRandomTests(unittest.TestCase):
             page.locator("#homeSelectionAnnouncement").text_content(),
             f"Al azar: {first_title}, {'1995' if first_title == 'Heat' else '1988'}. Disponible.",
         )
-        self.assertTrue(page.evaluate(
-            "document.activeElement.classList.contains('home-random-tape')"
-        ))
+        self.assertTrue(
+            page.evaluate("document.activeElement.classList.contains('home-random-tape')")
+        )
 
         # With two candidates the next draw never repeats the one on screen.
         tape.click()
@@ -133,7 +139,8 @@ class HomeRandomTests(unittest.TestCase):
         page = self.page
         # "Solo disponibles" is on by default and nothing is available.
         self.assertEqual(self.spine_state(), "empty")
-        self.assertEqual(page.locator(".home-random-note").get_by_text("Incluir no disponibles").count(), 1)
+        include_all = page.locator(".home-random-note").get_by_text("Incluir no disponibles")
+        self.assertEqual(include_all.count(), 1)
 
         page.locator(".home-random-note").get_by_text("Incluir no disponibles").click()
         self.assertEqual(self.spine_state(), "initial")
@@ -167,13 +174,15 @@ class HomeRandomTests(unittest.TestCase):
         spine_title = page.locator(".home-random-tape .vhs-spine-title").text_content()
         self.assertEqual(page.locator(".spotlight-preview h3").text_content(), spine_title)
         # The terminal bay is brought into the shelf's view.
-        self.assertTrue(page.locator("[data-home-random]").evaluate(
-            """bay => {
+        self.assertTrue(
+            page.locator("[data-home-random]").evaluate(
+                """bay => {
                 const rail = document.querySelector('#homeSections').getBoundingClientRect();
                 const box = bay.getBoundingClientRect();
                 return box.left >= rail.left - 1 && box.right <= rail.right + 1;
             }"""
-        ))
+            )
+        )
 
         # Outside Home the command keeps opening a random dossier.
         page.locator("#catalogButton").click()

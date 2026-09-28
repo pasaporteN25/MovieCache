@@ -9,6 +9,13 @@ fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
 ### Agregado
 
+- `movie-inbox images fill <catálogo> --limit N` completa la portada y la panorámica
+  que falten desde TMDb. Sólo usa ids que la obra ya tiene: su id de TMDb, o uno
+  traducido desde IMDb o Wikidata cuando hay un único resultado del mismo tipo y año
+  (±1). Nunca reemplaza una imagen existente ni un campo bloqueado, y `--dry-run`
+  muestra lo que haría sin escribir. Requiere token de TMDb.
+- La API expone las imágenes candidatas de una obra y completa las faltantes a pedido;
+  la portada se puede corregir desde la ficha como la panorámica.
 - La biblioteca de Inicio termina en un VHS «Al azar». Al activarlo elige una obra de
   todo tu catálogo (o sólo de las disponibles, según la preferencia de siempre), la
   revela en el lomo y la muestra en la consulta y el cartel «En consulta»; la ficha se
