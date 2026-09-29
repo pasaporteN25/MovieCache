@@ -9,6 +9,8 @@ fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
 ### Agregado
 
+- Marca Movie Inbox para el videoclub: logo y sticker con cassette, con originales
+  y variantes PNG/WebP de varios tamaños guardados en el proyecto.
 - `movie-inbox images fill <catálogo> --limit N` completa la portada y la panorámica
   que falten desde TMDb. Sólo usa ids que la obra ya tiene: su id de TMDb, o uno
   traducido desde IMDb o Wikidata cuando hay un único resultado del mismo tipo y año
@@ -23,6 +25,11 @@ fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
 ### Cambiado
 
+- Las cajas de Colección abren la contratapa VHS. El sticker «Editar ficha» lleva
+  a un editor por tareas: registro personal, datos, imágenes, disponibilidad y
+  opciones avanzadas. Conserva borradores entre secciones y protege el guardado
+  frente a cambios de obra y conflictos de edición.
+- Las obras sin portada usan una caja negra con cinta de papel y título manuscrito.
 - Colección reúne Explorar y Buscar con el campo siempre visible. Agregar pasa a ser
   una acción propia que conserva la consulta y permite volver con filtros y orden.
 - Colección adopta el mostrador de Inicio, con portadas más grandes y títulos/estados
