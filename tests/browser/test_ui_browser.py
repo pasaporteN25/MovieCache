@@ -2854,7 +2854,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(all(overflow <= 1 for overflow in template_overflows))
 
         page.locator("#detailDrawer .vhs-back-cover-synopsis p").evaluate(
-            "element => { element.textContent = `${element.textContent} `.repeat(80); }"
+            """element => {
+                element.textContent = `${element.textContent} `.repeat(80);
+                element.classList.add('is-expanded');
+            }"""
         )
         content_region.focus()
         self.assertEqual(

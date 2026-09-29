@@ -21,9 +21,9 @@ La imagen ambiental del primer mockup de edición se resolverá al final en otra
 Datos y créditos comparten columna de dos tercios junto a la imagen. En contenedores
 menores a 400 px se apilan para no comprimir las etiquetas. Los créditos vacíos
 muestran una sola nota. Sinopsis al 96% del tamaño base, con mínimo de 11 px.
-El contenido completo conserva scroll cuando hace falta: recortar 5/6 líneas,
-«Leer más/menos», detección de desborde y restauración de foco quedan pendientes
-como interacción separada. No simular ese comportamiento ocultando contenido.
+La interacción se completó el 2026-09-29: seis líneas, botón sólo si desborda,
+texto completo al expandir, foco visible al contraer y estado compacto por obra.
+En móvil se mantiene el scroll cuando los demás datos exceden la caja.
 
 La variante `.collection-zoom-title` permanece en `core/card.js` y en
 `css/vhs-experience.css`, sin selectores que la activen. No confundir con la cinta

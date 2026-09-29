@@ -11,7 +11,6 @@ cooldown; a 429 from some of them did not.
 from __future__ import annotations
 
 import json
-import time
 import unittest
 from datetime import UTC, datetime, timedelta
 from email.message import Message
@@ -24,6 +23,7 @@ from movie_inbox.external import common
 from movie_inbox.external.common import (
     DEFAULT_RETRY_AFTER_SECONDS,
     note_rate_limit,
+    rate_limit_cursor,
     rate_limited_seconds,
     retry_after_seconds,
 )
@@ -90,7 +90,7 @@ class NoteTests(Clean):
             common.fetch_text(url)
 
     def test_a_429_is_noted_against_its_host_with_the_time_it_asked_for(self) -> None:
-        started = time.monotonic()
+        started = rate_limit_cursor()
 
         self._fetch(WIKI, _too_many(WIKI, "17"))
 
@@ -101,7 +101,7 @@ class NoteTests(Clean):
         self._fetch(WIKI, _too_many(WIKI))
 
     def test_only_a_429_is_noted(self) -> None:
-        started = time.monotonic()
+        started = rate_limit_cursor()
 
         self._fetch(WIKI, HTTPError(WIKI, 503, "Unavailable", _headers(), None))
         self._fetch(WIKI, HTTPError(WIKI, 404, "Not found", _headers(), None))
@@ -109,14 +109,14 @@ class NoteTests(Clean):
         self.assertEqual(rate_limited_seconds(("wikipedia.org",), started), 0)
 
     def test_a_subdomain_counts_and_a_lookalike_does_not(self) -> None:
-        started = time.monotonic()
+        started = rate_limit_cursor()
         note_rate_limit("https://es.wikipedia.org/w/api.php", 9)
         note_rate_limit("https://notwikipedia.org/", 99)
 
         self.assertEqual(rate_limited_seconds(("wikipedia.org",), started), 9)
 
     def test_the_longest_wait_asked_for_is_the_one_reported(self) -> None:
-        started = time.monotonic()
+        started = rate_limit_cursor()
         note_rate_limit("https://en.wikipedia.org/a", 5)
         note_rate_limit("https://www.wikidata.org/b", 40)
 
@@ -124,12 +124,12 @@ class NoteTests(Clean):
 
     def test_a_429_from_before_the_question_was_asked_is_not_this_ones(self) -> None:
         note_rate_limit("https://en.wikipedia.org/a", 30)
-        started = time.monotonic()
+        started = rate_limit_cursor()
 
         self.assertEqual(rate_limited_seconds(("wikipedia.org",), started), 0)
 
     def test_a_source_that_names_no_hosts_is_never_limited_by_this(self) -> None:
-        started = time.monotonic()
+        started = rate_limit_cursor()
         note_rate_limit("https://en.wikipedia.org/a", 30)
 
         self.assertEqual(rate_limited_seconds((), started), 0)

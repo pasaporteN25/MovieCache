@@ -23,6 +23,52 @@ export function backCoverTemplateForId(id) {
   return BACK_COVER_TEMPLATES[stableOpaqueIdHash(id) % BACK_COVER_TEMPLATES.length];
 }
 
+let synopsisResizeObserver;
+
+export function mountBackCoverSynopsis(host) {
+  synopsisResizeObserver?.disconnect();
+  synopsisResizeObserver = undefined;
+  if (!host) return;
+  const section = host.querySelector(".vhs-back-cover-synopsis");
+  const paragraph = section?.querySelector("p");
+  const button = section?.querySelector("[data-click='toggle-back-cover-synopsis']");
+  const content = host.querySelector(".vhs-back-cover-content");
+  if (!section || !paragraph || !button || !content) return;
+
+  section.dataset.clamped = "true";
+  const sync = () => {
+    if (!host.isConnected) return;
+    const expanded = button.getAttribute("aria-expanded") === "true";
+    if (expanded) paragraph.classList.remove("is-expanded");
+    const overflows = paragraph.scrollHeight > paragraph.clientHeight + 1;
+    if (expanded) paragraph.classList.add("is-expanded");
+    button.hidden = !overflows;
+    if (!overflows && expanded) {
+      paragraph.classList.remove("is-expanded");
+      button.setAttribute("aria-expanded", "false");
+      button.textContent = "Leer más";
+    }
+  };
+  synopsisResizeObserver = new ResizeObserver(sync);
+  synopsisResizeObserver.observe(content);
+  document.fonts.ready.then(sync);
+  requestAnimationFrame(sync);
+}
+
+export function toggleBackCoverSynopsis(button) {
+  const section = button.closest(".vhs-back-cover-synopsis");
+  const paragraph = section?.querySelector("p");
+  if (!paragraph) return;
+  const expanded = button.getAttribute("aria-expanded") === "true";
+  paragraph.classList.toggle("is-expanded", !expanded);
+  button.setAttribute("aria-expanded", String(!expanded));
+  button.textContent = expanded ? "Leer más" : "Leer menos";
+  if (expanded) {
+    button.focus({ preventScroll: true });
+    button.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }
+}
+
 function fact(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "Sin dato")}</dd></div>`;
 }
@@ -58,7 +104,8 @@ export function renderBackCover(item, { editable = false } = {}) {
 
         <section class="vhs-back-cover-synopsis" aria-labelledby="back-cover-synopsis-${accessibleKey}">
           <h3 id="back-cover-synopsis-${accessibleKey}">Sinopsis</h3>
-          <p>${escapeHtml(synopsis)}</p>
+          <p id="back-cover-synopsis-text-${accessibleKey}">${escapeHtml(synopsis)}</p>
+          <button class="vhs-back-cover-read-more" type="button" data-click="toggle-back-cover-synopsis" aria-controls="back-cover-synopsis-text-${accessibleKey}" aria-expanded="false" hidden>Leer más</button>
         </section>
 
         <div class="vhs-back-cover-edition">

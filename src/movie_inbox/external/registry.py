@@ -20,6 +20,7 @@ from movie_inbox.external.base import SourceAdapter
 from movie_inbox.external.common import (
     clean_text,
     dedupe_results,
+    rate_limit_cursor,
     rate_limited_seconds,
     retry_after_seconds,
     utc_now,
@@ -177,13 +178,14 @@ class ExternalSourceService:
     def _run_source(
         self, name: str, adapter: SourceAdapter, query: str
     ) -> tuple[list[dict[str, Any]], bool]:
+        note_cursor = rate_limit_cursor()
         started = time.monotonic()
         try:
             results = adapter.search(query)
         except Exception as error:
             self._record_error(name, error, started)
             return [], False
-        limited_for = rate_limited_seconds(getattr(adapter, "rate_limit_hosts", ()), started)
+        limited_for = rate_limited_seconds(getattr(adapter, "rate_limit_hosts", ()), note_cursor)
         if limited_for:
             # It answered, so what it found is kept -- but it was told to slow down,
             # and an answer that was cut short is not one to remember as whole.

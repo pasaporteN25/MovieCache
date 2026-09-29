@@ -1,0 +1,13 @@
+[
+  {
+    "antipattern": "design-system-color",
+    "name": "Color outside DESIGN.md",
+    "description": "A literal color is outside the DESIGN.md palette and sidecar tonal ramps. This may be legitimate, but it should be an intentional design-system addition rather than drift.",
+    "severity": "advisory",
+    "category": "quality",
+    "file": "C:\\Users\\Lucas\\Documents\\Codex\\2026-04-27\\tengo-una-lista-de-peliculas-en\\src\\movie_inbox\\web\\static\\css\\core-detail.css",
+    "line": 220,
+    "snippet": "Undocumented color rgba(0, 0, 0, 0.72) is outside DESIGN.md colors",
+    "ignoreValue": "rgba(0, 0, 0, 0.72)"
+  }
+]

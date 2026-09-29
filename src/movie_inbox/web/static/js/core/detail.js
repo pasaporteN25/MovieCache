@@ -1,5 +1,5 @@
 import { cachedImageSrc } from "./card.js";
-import { renderBackCover } from "./back-cover.js";
+import { mountBackCoverSynopsis, renderBackCover } from "./back-cover.js";
 import { EDITOR_SECTIONS, renderDetailEditor } from "./detail-editor.js";
 import { mountDetailContext } from "./detail-context.js";
 import { load, loadCatalog } from "./catalog-data.js";
@@ -298,6 +298,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           selectedDetailId = "";
           if (fields.detailDrawer.open) fields.detailDrawer.close();
           fields.detailBody.innerHTML = "";
+          mountBackCoverSynopsis(null);
           fields.detailNavigation.innerHTML = "";
           fields.detailDrawer.removeAttribute("data-detail-mode");
           fields.detailDrawerTitle.textContent = "Ficha // lado B";
@@ -415,9 +416,11 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         if (detailPresentation === "back-cover") {
           fields.detailNavigation.innerHTML = "";
           fields.detailBody.innerHTML = renderBackCover(item, { editable: true });
+          mountBackCoverSynopsis(fields.detailBody);
           clearDetailFeedback();
           return;
         }
+        mountBackCoverSynopsis(null);
         renderDetailNavigation();
         fields.detailBody.innerHTML = renderDetailEditor(item, {
           personalRecordEditor, metadataEditorRow, availabilityPanel, detailLinks, drawerPoster

@@ -700,6 +700,29 @@
         line-height: 1.48;
         padding-right: 0.35em;
       }
+      .vhs-back-cover-synopsis[data-clamped="true"] p:not(.is-expanded) {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 6;
+        overflow: hidden;
+      }
+      .vhs-back-cover-read-more {
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid currentColor;
+        border-radius: 0;
+        color: var(--back-cover-cyan);
+        cursor: pointer;
+        font: 700 1em/1.4 var(--font-body);
+        margin-top: 0.7em;
+        min-height: 32px;
+        padding: 0 0.2em;
+      }
+      .vhs-back-cover-read-more[hidden] { display: none; }
+      .vhs-back-cover-read-more:focus-visible {
+        outline: 2px solid var(--back-cover-cyan);
+        outline-offset: 3px;
+      }
       .vhs-back-cover-frames {
         display: grid;
         gap: 1.7cqw;

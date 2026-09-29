@@ -25,6 +25,8 @@ fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
 ### Cambiado
 
+- La sinopsis de la contratapa se abre en seis líneas; «Leer más/menos» aparece sólo
+  cuando hay contenido oculto, conserva el foco y permite desplazar el texto completo.
 - Las cajas VHS se acercan proporcionalmente sin estirarse ni añadir una cinta sobre
   portadas reales. La contratapa reúne imagen, datos y créditos sin repetir metadatos
   en el encabezado; los créditos vacíos se resumen en una nota.

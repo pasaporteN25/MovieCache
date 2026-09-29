@@ -1,5 +1,6 @@
 import { handlePosterError, handlePosterLoad } from "./card.js";
 import { handleBackCoverImageError, handleBackCoverImageLoad } from "./back-cover-images.js";
+import { toggleBackCoverSynopsis } from "./back-cover.js";
 import { load, logout } from "./catalog-data.js";
 import { editVhsDossier, returnToVhsBack, saveEditorChanges, selectDetailSection, cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, findLinkForCatalog, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, saveDetailChanges, saveMetadata, savePersonal } from "./detail.js";
 import { fields } from "./fields.js";
@@ -36,6 +37,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         const index = Number(target.dataset.index);
         const actions = {
           "edit-vhs-dossier": editVhsDossier,
+          "toggle-back-cover-synopsis": () => toggleBackCoverSynopsis(target),
           "return-vhs-back": returnToVhsBack,
           "detail-section": () => selectDetailSection(target.dataset.section),
           "save-editor": saveEditorChanges,

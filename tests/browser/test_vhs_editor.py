@@ -27,6 +27,71 @@ class VhsEditorTests(unittest.TestCase):
         self.page.locator('#grid [data-id="heat"] .dvd-open-surface').click()
         self.page.wait_for_selector('[data-detail-mode="back-cover"] .vhs-edit-sticker')
 
+    def test_synopsis_disclosure_only_for_overflow_and_resets_on_new_work(self):
+        page = self.page
+        page.emulate_media(reduced_motion="reduce")
+        self.open_case()
+        button = page.locator(".vhs-back-cover-read-more")
+        self.assertTrue(button.is_hidden())
+        for width in (1440, 390):
+            page.set_viewport_size({"width": width, "height": 900})
+            page.evaluate("""async () => {
+                const state = await import('/static/js/core/state.js');
+                const detail = await import('/static/js/core/detail.js');
+                state.items.find(item => item.id === 'heat').description =
+                    'Una historia extensa de dos personajes y su ciudad. '.repeat(35);
+                detail.renderDetail({force: true});
+            }""")
+            button = page.locator(".vhs-back-cover-read-more")
+            page.wait_for_function("!document.querySelector('.vhs-back-cover-read-more').hidden")
+            paragraph = page.locator(".vhs-back-cover-synopsis p")
+            collapsed = paragraph.evaluate(
+                """el => ({height: el.clientHeight, full: el.scrollHeight,
+                    line: parseFloat(getComputedStyle(el).lineHeight)})"""
+            )
+            self.assertGreater(collapsed["full"], collapsed["height"])
+            self.assertLessEqual(collapsed["height"], collapsed["line"] * 6 + 2)
+            evidence_dir = os.environ.get("VHS_SYNOPSIS_EVIDENCE_DIR")
+            if evidence_dir:
+                Path(evidence_dir).mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(Path(evidence_dir) / f"synopsis-closed-{width}.png"))
+            button.focus()
+            page.keyboard.press("Enter")
+            self.assertEqual(button.get_attribute("aria-expanded"), "true")
+            self.assertEqual(button.inner_text(), "Leer menos")
+            self.assertEqual(paragraph.evaluate("el => el.clientHeight"), collapsed["full"])
+            if evidence_dir:
+                page.screenshot(path=str(Path(evidence_dir) / f"synopsis-open-{width}.png"))
+            button.scroll_into_view_if_needed()
+            page.keyboard.press("Enter")
+            self.assertEqual(button.get_attribute("aria-expanded"), "false")
+            self.assertTrue(button.evaluate("el => el === document.activeElement"))
+            self.assertEqual(paragraph.evaluate("el => el.clientHeight"), collapsed["height"])
+            self.assertTrue(
+                button.evaluate("""el => {
+                const view = el.closest('.vhs-back-cover-content').getBoundingClientRect();
+                const box = el.getBoundingClientRect();
+                return box.top >= view.top && box.bottom <= view.bottom;
+            }""")
+            )
+            page.evaluate("window.openDetail('akira', {presentation: 'back-cover'})")
+            page.wait_for_function(
+                "document.querySelector('.vhs-back-cover').dataset.itemId === 'akira'"
+            )
+            self.assertTrue(page.locator(".vhs-back-cover-read-more").is_hidden())
+            page.evaluate("window.openDetail('heat', {presentation: 'back-cover'})")
+            page.wait_for_function(
+                "document.querySelector('.vhs-back-cover').dataset.itemId === 'heat'"
+            )
+            page.wait_for_function("!document.querySelector('.vhs-back-cover-read-more').hidden")
+            self.assertEqual(
+                page.locator(".vhs-back-cover-read-more").get_attribute("aria-expanded"), "false"
+            )
+            self.assertLess(
+                page.locator(".vhs-back-cover-synopsis p").evaluate("el => el.clientHeight"),
+                collapsed["full"],
+            )
+
     def test_drafts_survive_sections_save_and_guard_return(self):
         page = self.page
         self.open_case()
