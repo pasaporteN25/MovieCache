@@ -27,7 +27,7 @@ function fact(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "Sin dato")}</dd></div>`;
 }
 
-export function renderBackCover(item) {
+export function renderBackCover(item, { editable = false } = {}) {
   const title = displayTitle(item) || "Sin título";
   const template = backCoverTemplateForId(item?.id);
   const accessibleKey = stableOpaqueIdHash(item?.id).toString(36);
@@ -85,7 +85,7 @@ export function renderBackCover(item) {
 
         <section class="vhs-back-cover-memory" aria-labelledby="back-cover-memory-${accessibleKey}">
           <div>
-            <h3 id="back-cover-memory-${accessibleKey}">Memoria personal</h3>
+            <h3 id="back-cover-memory-${accessibleKey}">Mi registro</h3>
             <p>${escapeHtml(memorySummary)}</p>
           </div>
           <dl>
@@ -93,6 +93,7 @@ export function renderBackCover(item) {
             ${fact("Fecha", item?.watched_at || "Sin fecha")}
             ${fact("Puntaje", rating ? `${rating}/10` : "Sin puntuar")}
           </dl>
+          ${editable ? `<button class="vhs-edit-sticker" type="button" data-click="edit-vhs-dossier" aria-label="Movie Inbox · Editar ficha de ${escapeAttr(title)}"><img src="/static/img/brand/movie-inbox-sticker-256.webp" srcset="/static/img/brand/movie-inbox-sticker-256.webp 1x, /static/img/brand/movie-inbox-sticker-512.webp 2x" alt="Movie Inbox — Editar ficha" width="256" height="192"></button>` : ""}
         </section>
 
         <footer class="vhs-back-cover-footer">

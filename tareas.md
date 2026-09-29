@@ -790,6 +790,23 @@ Commit de entrega: `feat(collection): unify browsing and add the video-store cou
 61 pruebas de navegador y 34 pruebas JS aprobadas. Los cambios locales de sonido U9
 pertenecen a otro trabajo y quedan fuera de esta entrega. No incluye despliegue.
 
+### [U11] Caja VHS, sticker y editor por tareas (2026-09-29)
+
+Dirección aprobada e implementada en `release/0.10.0`.
+[Brief](docs/briefs/vhs-case-editor-v1.md) · [Evidencia](docs/design/vhs-case-v1/README.md).
+
+- [x] Caja negra con cinta/fibrón; portada completa y acercamiento sin mover la grilla.
+- [x] Clic abre contratapa, sticker Movie Inbox menor lleva a edición propia.
+- [x] Logo y sticker: masters PNG y derivados PNG/WebP 128/256/512/1024 en el proyecto.
+- [x] Ficha por tareas, borradores persistentes, guardado conjunto y guardia de navegación.
+- [x] Revisión visual escritorio/móvil, imágenes ausentes/fallidas y títulos largos.
+- [ ] Fondo fotográfico similar a la primera propuesta: diferido por el owner.
+
+Validación final: 68 pruebas de navegador, 80 HTTP/paquete y 34 JS aprobadas (182).
+Ruff, mypy y revisión visual aprobados.
+
+No incluye despliegue; los cambios locales de sonido U9 quedan fuera de esta entrega.
+
 ### Frente: Ficha — contexto público y guardado seguro
 
 **Implementado 2026-09-19, validado localmente 2026-09-20; sin commit todavía.** El owner

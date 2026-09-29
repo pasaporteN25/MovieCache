@@ -169,3 +169,12 @@ dimensiones debe presentarse como sustituta de las otras.
    de verdad.
 5. La evolucion hacia multiples usuarios y clientes adicionales debe preservar una
    experiencia personal, confiable y recuperable.
+
+
+### Consulta y edición de obras — decisión 2026-09-29
+En Colección, abrir una obra consulta su contratapa VHS. El sticker Movie Inbox lleva
+al editor personal organizado por tareas. Los borradores se conservan al cambiar de
+sección y el guardado reúne los cambios pendientes; salir requiere guardar o descartar.
+Durante el guardado se bloquea cambiar de obra. Las fichas ajenas del Club conservan
+sus permisos de consulta. El estado vista/pendiente mantiene su acción inmediata,
+explicada al lado del control. Fondo fotográfico del editor pendiente, no bloqueante.

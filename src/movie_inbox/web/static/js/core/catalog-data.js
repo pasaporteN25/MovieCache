@@ -99,7 +99,7 @@ import { syncCurationCounts } from "../surfaces/inbox-curation.js";
         return payload;
       }
 
-      export async function loadCatalog(prefetchedPayload = null) {
+      export async function loadCatalog(prefetchedPayload = null, { preserveCollection = false } = {}) {
         fields.homeView.setAttribute("aria-busy", "true");
         const payload = prefetchedPayload ?? await fetchCatalogPayload();
         setItems(payload.items || []);
@@ -117,8 +117,10 @@ import { syncCurationCounts } from "../surfaces/inbox-curation.js";
           ...curationCounts,
           ...(payload.curation?.counts || {})
         });
-        setRandomOrder([]);
-        setCatalogVisibleCount(CATALOG_PAGE_SIZE);
+        if (!preserveCollection) {
+          setRandomOrder([]);
+          setCatalogVisibleCount(CATALOG_PAGE_SIZE);
+        }
         setupCollectionFilterOptions();
         render();
         fields.homeView.setAttribute("aria-busy", "false");

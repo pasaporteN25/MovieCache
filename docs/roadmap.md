@@ -173,6 +173,10 @@ posterga el gate de release. U7.5b, U9 y mobile web también quedan fuera.
 
 ### v0.10.0 — abierta
 
+**U11, 2026-09-29:** cajas VHS con cinta, apertura a contratapa, marca/sticker propio
+y editor por tareas con guardado protegido. Fondo ambiental diferido por el owner.
+[Brief U11](briefs/vhs-case-editor-v1.md).
+
 **U10, 2026-09-28:** Colección unifica Explorar/Buscar con consulta siempre visible;
 Agregar conserva el contexto de regreso. Integra el mostrador material de Inicio,
 cinco portadas grandes por fila en escritorio y carga acumulativa de 30 obras.

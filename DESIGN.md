@@ -36,6 +36,10 @@ colors:
   danger-border: "#b9564c"
   danger-ink: "#8e2f28"
 typography:
+  vhs-tape:
+    fontFamily: '"VHS Marker", "Segoe Print", cursive'
+    fontWeight: 400
+    lineHeight: 1.25
   home-plaque:
     fontFamily: '"Oswald", "Arial Narrow", "Trebuchet MS", sans-serif'
     fontWeight: 400
@@ -557,3 +561,27 @@ Los bordes son finos, violetas o cyan según contexto. Las barras laterales de c
 - **Don't** reemplazar el mundo nocturno por minimalismo pálido, neutro o excesivamente aireado.
 - **Don't** usar sombras, gradientes o neón sin una función de jerarquía, material o estado.
 - **Don't** ocultar disponibilidad, intención de ver y memoria personal detrás de metadata externa.
+
+
+## Caja y editor VHS — 2026-09-29
+
+Dirección aprobada: caja negra gastada, cinta de papel crema y título con fibrón.
+Permanent Marker local (alias CSS VHS Marker, Apache 2.0) sólo rotula las cintas;
+Barlow Condensed y Oswald conservan sus roles. La cinta usa #dfcea9 y tinta #171916;
+el panel de edición usa petróleo #0b2025 y texto #f1eadb. No sustituye la marca global.
+
+La portada siempre conserva sus proporciones con object-fit: contain. Foco de teclado
+y hover de puntero fino elevan el frente, ocultan la etiqueta informativa y muestran
+una cinta pequeña en el margen negro; touch abre la contratapa al primer toque.
+La grilla no cambia de medidas. Títulos largos se acotan con elipsis y mantienen el
+nombre completo accesible. Prefers-reduced-motion elimina la transición.
+
+Sticker Movie Inbox con cassette, cigarrillo y humo de película, crema/negro/oro.
+En la contratapa ocupa un espacio propio de 32% del ancho del bloque de memoria y
+es el botón Editar ficha; no se superpone a los datos. Archivos fuente y derivados
+viven en static/img/brand. No aparece como permiso de edición en fichas ajenas.
+
+Editor por tareas, con marco de metal gastado de Home: Mi registro, Datos de la obra,
+Imágenes, Disponibilidad y enlaces, Opciones avanzadas. Navegación lateral en escritorio,
+horizontal desplazable en móvil; guardar permanece visible. El fondo fotográfico
+ambiental se difiere por pedido del usuario. Brief: docs/briefs/vhs-case-editor-v1.md.

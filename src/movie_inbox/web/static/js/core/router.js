@@ -312,7 +312,7 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
           setSearchState(query.length >= 2 ? "results" : "idle", query.length >= 2 ? collectionSearchMessage() : "");
         }
         if (movieId && items.some((item) => item.id === movieId) && movieId !== selectedDetailId) {
-          openDetail(movieId, { updateHistory: false });
+          openDetail(movieId, { updateHistory: false, presentation: requestedView === "catalog" ? "back-cover" : "dossier" });
         } else if (!movieId && selectedDetailId) {
           closeDetail({ restoreFocus: false, updateHistory: false });
         }

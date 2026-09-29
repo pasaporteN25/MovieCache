@@ -82,7 +82,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
       export function openCardButton(item, title, accessibleStatus, options = {}) {
         const action = options.action || "open-detail";
         const actionId = options.actionId || item.id || "";
-        return `<button class="dvd-open-surface" type="button" data-click="${escapeAttr(action)}" data-id="${escapeAttr(actionId)}" data-key="${escapeAttr(options.entryKey || "")}" aria-haspopup="dialog" aria-label="Abrir ficha de ${escapeAttr(title)}: ${escapeAttr(accessibleStatus)}"></button>`;
+        return `<button class="dvd-open-surface" type="button" data-click="${escapeAttr(action)}" data-id="${escapeAttr(actionId)}" data-key="${escapeAttr(options.entryKey || "")}" aria-haspopup="dialog" aria-label="Abrir ${options.backCover ? "contratapa" : "ficha"} de ${escapeAttr(title)}: ${escapeAttr(accessibleStatus)}"></button>`;
       }
 
       // Collection's front-facing cases keep the artwork clear. Home/Club retain
@@ -93,10 +93,13 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
         const watched = item.status === "watched";
         const rating = normalizeRating(item.rating);
         const status = `${watched ? "vista" : "pendiente"}, ${availability.text}${rating ? `, ${rating} puntos` : ""}`;
-        return `<article class="card dvd-card collection-case" data-click="open-detail" data-id="${escapeAttr(item.id || "")}">
+        return `<article class="card dvd-card collection-case" data-click="open-detail-with-case-transition" data-id="${escapeAttr(item.id || "")}">
           <div class="collection-poster" aria-hidden="true">
+            <div class="collection-case-front">
             ${posterArtwork(item, title, prioritize && index < 5)}
+            <span class="vhs-title-tape collection-zoom-title">${escapeHtml(title)}</span>
             ${Number(item._duplicate_count || 0) > 0 ? `<span class="dvd-sticker">Duplicada +${escapeHtml(item._duplicate_count)}</span>` : ""}
+            </div>
           </div>
           <div class="collection-case-label" aria-hidden="true">
             <h2 title="${escapeAttr(title)}">${escapeHtml(title)}</h2>
@@ -106,7 +109,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
               <span class="dvd-front-status ${availability.effective ? "catalogued" : "muted"}" title="${escapeAttr(availability.text)}">${availability.effective ? "Disponible" : "No disponible"}</span>
             </div>
           </div>
-          ${openCardButton(item, title, status)}
+          ${openCardButton(item, title, status, { action: "open-detail-with-case-transition", backCover: true })}
         </article>`;
       }
 
@@ -118,9 +121,7 @@ import { displayTitle, escapeAttr, escapeHtml, firstListValue, meta, normalizeRa
       export function posterArtwork(item, title, priority = false) {
         const variant = posterVariant(item.id || title);
         const placeholder = `<div class="dvd-placeholder poster-${variant}" aria-hidden="true">
-          <span>Movie Inbox presenta</span>
-          <strong class="${titleSizeClass(title)}">${escapeHtml(title)}</strong>
-          <small>Edición videoclub</small>
+          <strong class="vhs-title-tape ${titleSizeClass(title)}">${escapeHtml(title)}</strong>
         </div>`;
         if (!item.page_image) return placeholder;
         const fetchPriority = priority ? "high" : "auto";

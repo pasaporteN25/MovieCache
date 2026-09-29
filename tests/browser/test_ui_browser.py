@@ -755,6 +755,9 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.evaluate("window.scrollTo(0, 180)")
         page.locator("#searchButton").click()
         page.wait_for_function("new URL(location.href).searchParams.get('q') === 'Heat'")
+        page.wait_for_function("!document.querySelector('#searchButton').disabled")
+        # Clicking a partly clipped Add button scrolls it into view first.
+        page.locator("#collectionAddButton").scroll_into_view_if_needed()
         search_scroll = page.evaluate("window.scrollY")
 
         page.locator('#collectionModeTabs [data-mode="add"]').click()
@@ -2648,7 +2651,8 @@ class BrowserInterfaceTests(unittest.TestCase):
                                         return rect.width > 0 && rect.height > 0
                                             && rect.left >= box.left && rect.right <= box.right;
                                     }),
-                                images: [...element.querySelectorAll('img')].every(image =>
+                                images: [...element.querySelectorAll('[data-back-cover-image]')]
+                                    .every(image =>
                                     image.naturalWidth > 0
                                     && getComputedStyle(image).objectFit === 'contain'
                                     && image.getAttribute('aria-hidden') === 'false')
@@ -2966,13 +2970,13 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.wait_for_selector("#detailDrawer[open]")
         # The panel lives inside a collapsed <details> accordion; expand it
         # before reading, the same way a person would need to.
-        page.locator("summary", has_text="Disponibilidad y fuentes").click()
+        page.locator('[data-section="availability"]').click()
         heat_panel = page.locator(".availability-panel").inner_text()
         page.evaluate("closeDetail()")
 
         page.evaluate("openDetail('akira')")
         page.wait_for_selector("#detailDrawer[open]")
-        page.locator("summary", has_text="Disponibilidad y fuentes").click()
+        page.locator('[data-section="availability"]').click()
         akira_panel = page.locator(".availability-panel").inner_text()
         page.evaluate("closeDetail()")
 
@@ -3526,7 +3530,7 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.evaluate("openDetail('heat')")
         page.wait_for_selector("#detailDrawer[open]")
-        page.get_by_text("Disponibilidad y fuentes").click()
+        page.locator('[data-section="availability"]').click()
         page.locator('[data-click="find-link"]').click()
         page.wait_for_selector("#catalogMergeSection.active")
         self.assertIn("mode=link", page.url)

@@ -1,7 +1,7 @@
 import { handlePosterError, handlePosterLoad } from "./card.js";
 import { handleBackCoverImageError, handleBackCoverImageLoad } from "./back-cover-images.js";
 import { load, logout } from "./catalog-data.js";
-import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, findLinkForCatalog, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, saveDetailChanges, saveMetadata, savePersonal } from "./detail.js";
+import { editVhsDossier, returnToVhsBack, saveEditorChanges, selectDetailSection, cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, findLinkForCatalog, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, saveDetailChanges, saveMetadata, savePersonal } from "./detail.js";
 import { fields } from "./fields.js";
 import { localDateOffset, todayLocalDate } from "./format.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
@@ -35,6 +35,10 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         const id = target.dataset.id || "";
         const index = Number(target.dataset.index);
         const actions = {
+          "edit-vhs-dossier": editVhsDossier,
+          "return-vhs-back": returnToVhsBack,
+          "detail-section": () => selectDetailSection(target.dataset.section),
+          "save-editor": saveEditorChanges,
           "open-detail": () => openDetailFromTrigger(target, id),
           "open-shared-detail": () => openSharedDetail(id),
           "open-home-collection-detail": () => openHomeCollectionDetail(target.dataset.key || "", target.dataset.source || ""),

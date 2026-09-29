@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 from pathlib import Path
 from typing import Any
@@ -103,6 +104,7 @@ class DetailContextTests(unittest.TestCase):
         self.mock_context()
         self.open_detail()
         page = self.page
+        page.locator('[data-section="availability"]').click()
         page.wait_for_selector(".detail-public-scores")
         page.wait_for_selector(".detail-offer-group")
         self.assertEqual(
@@ -114,9 +116,11 @@ class DetailContextTests(unittest.TestCase):
         self.assertIn("JustWatch", page.locator(".detail-streaming-section").inner_text())
         output = Path("docs/design/detail-context-evidence")
         output.mkdir(parents=True, exist_ok=True)
-        page.screenshot(path=str(output / "desktop.png"))
+        if os.environ.get("DETAIL_CONTEXT_EVIDENCE"):
+            page.screenshot(path=str(output / "desktop.png"))
         page.locator(".detail-streaming-section").scroll_into_view_if_needed()
-        page.screenshot(path=str(output / "desktop-context.png"))
+        if os.environ.get("DETAIL_CONTEXT_EVIDENCE"):
+            page.screenshot(path=str(output / "desktop-context.png"))
         for width in (390, 320):
             page.set_viewport_size({"width": width, "height": 844})
             page.locator(".detail-streaming-section").scroll_into_view_if_needed()
@@ -126,7 +130,8 @@ class DetailContextTests(unittest.TestCase):
                     "document.querySelector('#detailBody').clientWidth + 1"
                 )
             )
-            page.screenshot(path=str(output / f"mobile-{width}.png"))
+            if os.environ.get("DETAIL_CONTEXT_EVIDENCE"):
+                page.screenshot(path=str(output / f"mobile-{width}.png"))
 
     def test_partial_save_and_noop_preserve_personal_fields(self) -> None:
         self.mock_context()
@@ -145,15 +150,12 @@ class DetailContextTests(unittest.TestCase):
 
         page.route("**/api/personal", save_personal)
         page.route("**/api/privacy/items/*", save_privacy)
-        page.get_by_role("button", name="Editar registro", exact=True).click()
-        page.get_by_role("button", name="Guardar cambios", exact=True).click()
-        page.wait_for_selector(".personal-record-read")
+        self.assertTrue(page.locator("[data-editor-save]").is_disabled())
         self.assertEqual(personal, [])
         self.assertEqual(privacy, [])
-        page.get_by_role("button", name="Editar registro", exact=True).click()
         page.locator("[data-personal-review]").fill("Mi edición")
         page.get_by_role("button", name="Guardar cambios", exact=True).click()
-        page.wait_for_selector(".personal-record-read")
+        page.wait_for_function("document.querySelector('[data-editor-save]').disabled")
         self.assertEqual(len(personal), 1)
         self.assertEqual(personal[0]["review"], "Mi edición")
         self.assertNotIn("rating", personal[0])
@@ -191,6 +193,7 @@ class DetailContextTests(unittest.TestCase):
         page.route("**/api/streaming/preferences", preferences)
         page.route("**/api/streaming/availability?*", availability)
         self.open_detail()
+        page.locator('[data-section="availability"]').click()
         retry = page.locator(".detail-streaming-section").get_by_role("button", name="Reintentar")
         retry.click()
         page.wait_for_function(
@@ -212,7 +215,6 @@ class DetailContextTests(unittest.TestCase):
         self.mock_context()
         self.open_detail()
         page = self.page
-        page.get_by_role("button", name="Editar registro", exact=True).click()
         page.locator("[data-personal-review]").fill("Mi texto sin perder")
         calls: list[dict[str, Any]] = []
 
@@ -269,8 +271,8 @@ class DetailContextTests(unittest.TestCase):
 
         page.route("**/api/personal", save_personal)
         page.route("**/api/privacy/items/*", save_privacy)
-        page.get_by_role("button", name="Editar registro", exact=True).click()
         page.locator("[data-personal-review]").fill("Texto conservado")
+        page.locator(".personal-privacy-fields > summary").click()
         page.locator("[data-personal-rating-privacy]").select_option("shared")
         page.get_by_role("button", name="Guardar cambios", exact=True).click()
         page.wait_for_function(
@@ -278,7 +280,7 @@ class DetailContextTests(unittest.TestCase):
         )
         self.assertEqual(page.locator("[data-personal-review]").input_value(), "Texto conservado")
         page.get_by_role("button", name="Guardar cambios", exact=True).click()
-        page.wait_for_selector(".personal-record-read")
+        page.wait_for_function("document.querySelector('[data-editor-save]').disabled")
         self.assertEqual(len(personal), 1)
         self.assertEqual(len(privacy), 2)
 
@@ -289,7 +291,9 @@ class DetailContextTests(unittest.TestCase):
         page.route("**/api/ratings?item_id=heat", lambda route: pending.append(route))
         self.open_detail()
         page.get_by_role("button", name="Abrir ficha siguiente").click()
-        page.wait_for_function("document.querySelector('.drawer-intro h2').textContent === 'Akira'")
+        page.wait_for_function(
+            "document.querySelector('.vhs-editor-heading h2').textContent === 'Akira'"
+        )
         self.assertEqual(len(pending), 1)
         pending[0].fulfill(
             json={
@@ -304,6 +308,7 @@ class DetailContextTests(unittest.TestCase):
             "document.querySelector('[data-public-ratings]').getAttribute('aria-busy') === 'false'"
         )
         self.assertEqual(page.locator(".detail-public-scores").count(), 0)
+        page.locator('[data-section="availability"]').click()
         self.assertIn("Todavía", page.locator("[data-public-ratings]").inner_text())
 
 
