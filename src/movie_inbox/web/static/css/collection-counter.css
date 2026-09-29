@@ -342,7 +342,7 @@ body:has(#collectionView:not([hidden])) main {
   #collectionView .collection-case-label { gap: 6px; padding: 10px 2px 12px; }
   #collectionView .dvd-front-status { font-size: 11px; padding: 4px; text-align: left; }
   #collectionView .dvd-placeholder { padding: 12px 8px; }
-  #collectionView .dvd-placeholder :is(span, small) { font-size: 9px; }
+  #collectionView .dvd-placeholder :is(span, small) { font-size: var(--text-label); }
 }
 @media (forced-colors: active) {
   #collectionView::before { border-image: none; border: 1px solid CanvasText; inset: 0; clip-path: none; }
