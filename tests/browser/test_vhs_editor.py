@@ -73,7 +73,8 @@ class VhsEditorTests(unittest.TestCase):
         page.goto(self.base_url + "?view=catalog")
         fixture.wait_for_app_ready(page)
         page.evaluate("document.fonts.ready")
-        output = Path("docs/design/vhs-case-v1")
+        output = Path(os.environ.get("VHS_EVIDENCE_DIR", "docs/design/vhs-case-v1"))
+        output.mkdir(parents=True, exist_ok=True)
         if os.environ.get("VHS_EVIDENCE"):
             page.screenshot(path=str(output / "collection-desktop.png"))
         card = page.locator('#grid article[data-id="heat"]')
@@ -153,22 +154,41 @@ class VhsEditorTests(unittest.TestCase):
             card.locator(".collection-zoom-title").evaluate("el => getComputedStyle(el).opacity"),
             "0",
         )
+        front_before = card.locator(".collection-case-front").bounding_box()
+        photo_before = photo.bounding_box()
+        card_before = card.bounding_box()
         page.keyboard.press("Tab")
         card.locator(".dvd-open-surface").focus()
         card.hover()
         self.assertEqual(
             card.locator(".collection-zoom-title").evaluate("el => getComputedStyle(el).opacity"),
-            "1",
+            "0",
         )
         self.assertEqual(
             card.locator(".collection-case-label").evaluate("el => getComputedStyle(el).opacity"),
-            "0",
+            "1",
         )
+        front_after = card.locator(".collection-case-front").bounding_box()
+        photo_after = photo.bounding_box()
+        self.assertEqual(card.bounding_box(), card_before)
+        for before, after in ((front_before, front_after), (photo_before, photo_after)):
+            self.assertAlmostEqual(after["width"] / before["width"], 1.045, places=2)
+            self.assertAlmostEqual(after["height"] / before["height"], 1.045, places=2)
         if os.environ.get("VHS_EVIDENCE"):
-            card.screenshot(path="docs/design/vhs-case-v1/case-artwork-focus.png")
+            card.screenshot(
+                path=str(
+                    Path(os.environ.get("VHS_EVIDENCE_DIR", "docs/design/vhs-case-v1"))
+                    / "case-artwork-focus.png"
+                )
+            )
             page.mouse.move(0, 0)
             card.locator(".dvd-open-surface").blur()
-            page.locator("#grid").screenshot(path="docs/design/vhs-case-v1/cases-with-artwork.png")
+            page.locator("#grid").screenshot(
+                path=str(
+                    Path(os.environ.get("VHS_EVIDENCE_DIR", "docs/design/vhs-case-v1"))
+                    / "cases-with-artwork.png"
+                )
+            )
         page.mouse.move(0, 0)
         card.locator(".dvd-open-surface").blur()
         self.assertEqual(

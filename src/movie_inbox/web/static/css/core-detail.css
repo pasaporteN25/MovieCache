@@ -622,8 +622,10 @@
         font-family: var(--font-label);
         font-size: clamp(11px, 2.15cqw, 13px);
         gap: 2.1cqw;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-template-rows: auto auto auto auto 1fr auto;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: repeat(5, auto);
+        grid-template-areas: "heading" "synopsis" "edition" "memory" "footer";
+        align-content: start;
         height: 100%;
         line-height: 1.38;
         overflow: auto;
@@ -694,7 +696,7 @@
       .vhs-back-cover-synopsis p {
         color: var(--back-cover-paper);
         font-family: var(--font-body);
-        font-size: 1em;
+        font-size: max(11px, 0.96em);
         line-height: 1.48;
         padding-right: 0.35em;
       }
@@ -734,10 +736,9 @@
       .vhs-back-cover-credits dl > div,
       .vhs-back-cover-facts dl > div,
       .vhs-back-cover-memory dl > div {
-        column-gap: 0.65em;
         display: grid;
-        gap: 0.15em;
-        grid-template-columns: minmax(5.5em, auto) minmax(0, 1fr);
+        gap: 0.2em 0.8em;
+        grid-template-columns: 9em minmax(0, 1fr);
       }
       .vhs-back-cover dt { color: var(--back-cover-cyan); text-transform: uppercase; }
       .vhs-back-cover dd { color: var(--back-cover-paper); margin: 0; overflow-wrap: anywhere; }
@@ -779,62 +780,32 @@
         opacity: 0.86;
       }
 
-      .vhs-back-cover--rental-classic .vhs-back-cover-content {
-        grid-template-areas:
-          "heading heading"
-          "synopsis frames"
-          "synopsis credits"
-          "facts credits"
-          "memory memory"
-          "footer footer";
+      /* All five edition identities share the compact reading order. Credits
+         grow with their text instead of spanning the image and facts rows. */
+      .vhs-back-cover-edition {
+        align-items: start;
+        display: grid;
+        gap: 2.1cqw;
+        grid-area: edition;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        min-width: 0;
       }
-      .vhs-back-cover--episode-collage .vhs-back-cover-content {
-        grid-template-areas:
-          "heading heading"
-          "synopsis synopsis"
-          "frames credits"
-          "facts credits"
-          "memory memory"
-          "footer footer";
+      .vhs-back-cover-metadata { display: grid; gap: 2.1cqw; min-width: 0; }
+      .vhs-back-cover-metadata > section { grid-area: auto; }
+      .vhs-back-cover-edition .vhs-back-cover-frames {
+        align-content: start;
+        grid-area: auto;
+        grid-template-columns: minmax(0, 1fr);
       }
-      .vhs-back-cover--episode-collage .vhs-back-cover-frames { grid-template-columns: 1fr 1fr; }
-      .vhs-back-cover--studio-triptych .vhs-back-cover-content {
-        grid-template-areas:
-          "heading heading"
-          "frames frames"
-          "synopsis synopsis"
-          "credits facts"
-          "memory memory"
-          "footer footer";
-      }
-      .vhs-back-cover--studio-triptych .vhs-back-cover-frames { grid-template-columns: 1fr 1fr; }
-      .vhs-back-cover--midnight-noir .vhs-back-cover-content {
-        grid-template-areas:
-          "heading heading"
-          "synopsis synopsis"
-          "credits frames"
-          "credits facts"
-          "memory memory"
-          "footer footer";
-      }
-      .vhs-back-cover--midnight-noir .vhs-back-cover-frame-2 { transform: translateX(-2.2cqw); }
-      .vhs-back-cover--archive-grid .vhs-back-cover-content {
-        grid-template-areas:
-          "heading heading"
-          "facts synopsis"
-          "frames synopsis"
-          "credits credits"
-          "memory memory"
-          "footer footer";
-      }
-      .vhs-back-cover--archive-grid .vhs-back-cover-frames { grid-template-columns: 1fr 1fr; }
-      .vhs-back-cover .vhs-back-cover-frames:not([data-image-count="2"]) { grid-template-columns: minmax(0, 1fr); }
-      @container (max-width: 520px) {
-        .vhs-back-cover-facts dl > div { display: flex; flex-wrap: wrap; gap: 0.2em 0.65em; }
-        .vhs-back-cover-facts dd { flex: 1 1 8ch; }
-      }
+      .vhs-back-cover-frame[data-image-role="poster"] { aspect-ratio: 2 / 3; max-height: none; }
+      .vhs-back-cover-frame[data-image-role="backdrop"] { aspect-ratio: 16 / 11; }
       @container (max-width: 400px) {
-        .vhs-back-cover-credits dl > div { grid-template-columns: minmax(0, 1fr); gap: 0.2em; }
+        .vhs-back-cover-edition { grid-template-columns: minmax(0, 1fr); }
+        .vhs-back-cover-edition .vhs-back-cover-frames { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .vhs-back-cover-frame { max-height: 42cqw; }
+        .vhs-back-cover-frame[data-image-role="poster"] { max-height: 42cqw; }
+        .vhs-back-cover-images-empty { grid-column: 1 / -1; }
+        .vhs-back-cover-memory dl > div { grid-template-columns: minmax(0, 1fr); }
       }
 
       @media (prefers-reduced-motion: reduce) {

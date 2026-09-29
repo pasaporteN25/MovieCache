@@ -25,6 +25,11 @@ fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
 
 ### Cambiado
 
+- Las cajas VHS se acercan proporcionalmente sin estirarse ni añadir una cinta sobre
+  portadas reales. La contratapa reúne imagen, datos y créditos sin repetir metadatos
+  en el encabezado; los créditos vacíos se resumen en una nota.
+
+
 - Las cajas de Colección abren la contratapa VHS. El sticker «Editar ficha» lleva
   a un editor por tareas: registro personal, datos, imágenes, disponibilidad y
   opciones avanzadas. Conserva borradores entre secciones y protege el guardado

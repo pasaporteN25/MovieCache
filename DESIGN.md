@@ -571,8 +571,9 @@ Barlow Condensed y Oswald conservan sus roles. La cinta usa #dfcea9 y tinta #171
 el panel de edición usa petróleo #0b2025 y texto #f1eadb. No sustituye la marca global.
 
 La portada siempre conserva sus proporciones con object-fit: contain. Foco de teclado
-y hover de puntero fino elevan el frente, ocultan la etiqueta informativa y muestran
-una cinta pequeña en el margen negro; touch abre la contratapa al primer toque.
+y hover de puntero fino acercan el frente un 4,5% de forma proporcional y lo elevan
+4 px, manteniendo la etiqueta informativa visible. La cinta sobre portada real queda
+inactiva; sólo el fallback conserva su cinta grande. Touch abre la contratapa al primer toque.
 La grilla no cambia de medidas. Títulos largos se acotan con elipsis y mantienen el
 nombre completo accesible. Prefers-reduced-motion elimina la transición.
 

@@ -54,7 +54,6 @@ export function renderBackCover(item, { editable = false } = {}) {
         <header class="vhs-back-cover-heading">
           <span>Movie Inbox // archivo personal</span>
           <h2>${escapeHtml(title)}</h2>
-          <p>${escapeHtml([item?.year, duration, genres].filter(Boolean).join(" · "))}</p>
         </header>
 
         <section class="vhs-back-cover-synopsis" aria-labelledby="back-cover-synopsis-${accessibleKey}">
@@ -62,26 +61,30 @@ export function renderBackCover(item, { editable = false } = {}) {
           <p>${escapeHtml(synopsis)}</p>
         </section>
 
-        ${renderBackCoverImages(item, title)}
+        <div class="vhs-back-cover-edition">
+          ${renderBackCoverImages(item, title)}
+          <div class="vhs-back-cover-metadata">
+            <section class="vhs-back-cover-facts" aria-label="Datos de la edición">
+              <dl>
+                ${fact("Año", item?.year || "Sin dato")}
+                ${fact("Tipo", item?.kind || "Sin dato")}
+                ${fact("Duración", duration)}
+                ${fact("Géneros", genres)}
+                ${fact("Disponibilidad", availability.effective ? "Disponible" : "No disponible")}
+              </dl>
+            </section>
 
-        <section class="vhs-back-cover-credits" aria-labelledby="back-cover-credits-${accessibleKey}">
-          <h3 id="back-cover-credits-${accessibleKey}">Créditos</h3>
-          <dl>
-            ${fact("Dirección", directors)}
-            ${fact("Guion", writers)}
-            ${fact("Reparto", cast)}
-          </dl>
-        </section>
+            <section class="vhs-back-cover-credits" aria-labelledby="back-cover-credits-${accessibleKey}">
+              <h3 id="back-cover-credits-${accessibleKey}">Créditos</h3>
+              ${[directors, writers, cast].every(value => value === "Sin dato") ? "<p>Créditos sin completar.</p>" : `<dl>
+                ${fact("Dirección", directors)}
+                ${fact("Guion", writers)}
+                ${fact("Reparto", cast)}
+              </dl>`}
+            </section>
 
-        <section class="vhs-back-cover-facts" aria-label="Datos de la edición">
-          <dl>
-            ${fact("Año", item?.year || "Sin dato")}
-            ${fact("Tipo", item?.kind || "Sin dato")}
-            ${fact("Duración", duration)}
-            ${fact("Géneros", genres)}
-            ${fact("Disponibilidad", availability.effective ? "Disponible" : "No disponible")}
-          </dl>
-        </section>
+          </div>
+        </div>
 
         <section class="vhs-back-cover-memory" aria-labelledby="back-cover-memory-${accessibleKey}">
           <div>
