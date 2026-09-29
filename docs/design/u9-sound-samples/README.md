@@ -14,6 +14,31 @@ Las versiones `-escucha.wav` contienen el mismo efecto a idéntico nivel, repeti
 veces, con 250 ms de silencio inicial y 700 ms después de cada repetición. Las pausas
 son sólo para comparar; no forman parte del efecto que se integraría.
 
+## Segunda exploración: sacar y abrir la caja
+
+Pedido del owner del 2026-09-26: representar el movimiento físico completo. Se toma
+como referencia conceptual una caja plástica con bisagra: deslizamiento al sacarla
+del estante, liberación del cierre y flexión/crujido de la tapa. Es síntesis, no foley
+grabado. La fidelidad percibida queda pendiente de escucha.
+
+| Muestra | Duración | Escucha (dos repeticiones) |
+| --- | --- | --- |
+| [04 · Sacar VHS](04-sacar-vhs.wav) | 440 ms | [Reproducir](04-sacar-vhs-escucha.wav) |
+| [05 · Abrir caja](05-abrir-caja.wav) | 560 ms | [Reproducir](05-abrir-caja-escucha.wav) |
+| [06 · Sacar y abrir](06-sacar-y-abrir.wav) | 1220 ms, incluye 220 ms entre gestos | [Reproducir](06-sacar-y-abrir-escucha.wav) |
+
+Estas versiones `-escucha` tienen 250 ms iniciales y 900 ms de pausa después de cada
+repetición. Se generan con `python docs/design/u9-sound-samples/generate_vhs_case.py`,
+que reutiliza las utilidades de `generate.py`. PCM mono, 48 kHz, 16 bits; nivel RMS
+objetivo −26 dBFS, pico máximo −12 dBFS. Duraciones/niveles/hashes en
+[manifest-vhs-case.json](manifest-vhs-case.json). Se verifican PCM, extremos a cero,
+picos, composición exacta y regeneración idéntica, sin afirmar evaluación auditiva.
+
+Son deliberadamente más largos que los microefectos de 70–120 ms del plan inicial.
+Propuesta por evaluar: roce al extraer/seleccionar y apertura sólo al abrir la ficha;
+la secuencia completa sirve para escuchar el gesto, no para cada paso de teclado.
+No hay cambios en el audio de la aplicación ni una elección aprobada todavía.
+
 ## Procedencia y licencia
 
 Síntesis procedural creada para Movie Inbox con [generate.py](generate.py): ruido
