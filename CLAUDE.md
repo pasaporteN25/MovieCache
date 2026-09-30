@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Movie Inbox: gestor self-hosted de catálogo audiovisual. Python + FastAPI + SQLite,
-frontend vanilla sin build step. Estable v0.9.0; la 0.10.0 está abierta, ver "Versiones".
+frontend vanilla sin build step. Estable v0.10.0; ver "Versiones".
 
 Antes de trabajar, leé los contratos vigentes: `SDD.md`, `PRODUCT.md`, `DESIGN.md`,
 `docs/roadmap.md`, `CHANGELOG.md` (`[Sin publicar]`), `tests/test_layering.py`.
@@ -83,11 +83,10 @@ los mismos archivos.
 
 ## Versiones
 
-La 0.10.0 está abierta en la rama `release/0.10.0` y se cierra al fusionar su PR contra
-`master`. Mientras tanto se trabaja y se commitea en esa rama: todo lo que se commitea en
-este checkout entra en la versión. `master` no recibe commits directos, sólo esa fusión, y
-con merge commit, porque los documentos citan hashes de la rama. El gate y los pasos de
-cierre están en `docs/release-checklist.md`.
+La 0.10.0 se fusionó con el PR #2 el 2026-09-29. El commit de cierre de versión se
+integra por un merge adicional, ya que el PR original entró con `0.10.0.dev0`.
+`master` recibe merge commits, nunca commits directos. El gate y los pasos de cierre
+están en `docs/release-checklist.md`.
 
 ## Archivos personales — no tocar, no leer como fixture
 

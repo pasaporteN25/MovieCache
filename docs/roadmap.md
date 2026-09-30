@@ -171,7 +171,7 @@ Orden y criterios en `design/v0-9-0-visual-closeout.md`; el plan U5/U8 anterior
 queda como antecedente. Retoques no bloqueantes irán a un fix posterior; no se
 posterga el gate de release. U7.5b, U9 y mobile web también quedan fuera.
 
-### v0.10.0 — abierta
+### v0.10.0 — cerrada 2026-09-29
 
 **U11, 2026-09-29:** cajas VHS con cinta, apertura a contratapa, marca/sticker propio
 y editor por tareas con guardado protegido. Fondo ambiental diferido por el owner.
@@ -182,25 +182,19 @@ Agregar conserva el contexto de regreso. Integra el mostrador material de Inicio
 cinco portadas grandes por fila en escritorio y carga acumulativa de 30 obras.
 Plan y criterios: [brief U10](briefs/collection-counter-v1.md).
 
-Abierta el 2026-09-24 en la rama `release/0.10.0`; se cierra al fusionar su PR contra
-`master`, y hasta entonces se le suman cambios. Alcance todavía no fijado: queda del
-backlog de `tareas.md` — entre lo accionable, [U7] (imágenes de consola), [U8] (VHS al
-azar, postergada de la 0.9.0), [X11] (id durable por fuente, requisito para publicar
-`movieIndexAndroid` v0.1.0) y los traspasos de backend sin pantalla todavía.
+Abierta el 2026-09-24 en `release/0.10.0` y fusionada con el PR #2 el 2026-09-29.
+Quedaron integradas Colección [U10], las cajas y el editor VHS [U11], la entrega A de
+imágenes [U7], el VHS al azar [U8] y el llenado de imágenes desde TMDb. Los pendientes
+de [U7], [U9] y [X11] permanecen en `tareas.md`.
 
-**Prioridad visual actualizada 2026-09-26:** U7 y U9, con U8 fuera de este corte.
-Primero se propone aprovechar imágenes existentes en la contratapa VHS actual
-(U7 A); después, sonido opcional por selección (U9). Adquisición/galería persistente
-(U7 B) tiene dependencias propias de lógica y no frena U9. Desglose y criterios en
+**Decisiones del corte:** U7 entrega A se integró en `0970482`. U8 se retomó a pedido
+del owner y se integró en `e179d6b` con el efecto B. La galería/corrección completa de
+U7 y el sonido opcional U9 siguen pendientes; ver
 [`design/u7-u9-plan-2026-09-26.md`](design/u7-u9-plan-2026-09-26.md).
-Es planificación de pendientes, no cierre ni implementación de esas épicas.
-
-**Avance 2026-09-26:** U7 entrega A integrada (`0970482`). U8 se retomó a pedido del
-owner y quedó integrada el mismo día (merge `e179d6b`), con el efecto B elegido.
 
 ### Próximos incrementos propuestos
 
-- Se proponen al cerrar la 0.10.0.
+- Ver el backlog vigente en [`tareas.md`](../tareas.md).
 
 ## Implementado en el incremento de descubrimiento y scanner
 

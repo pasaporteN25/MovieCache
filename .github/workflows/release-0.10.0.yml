@@ -1,0 +1,57 @@
+name: Publish v0.10.0
+
+on:
+  push:
+    tags:
+      - v0.10.0
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Build wheel
+        run: |
+          python -m pip install build
+          python -m build --wheel
+      - name: Extract release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ["RELEASE_TAG"].removeprefix("v")
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+          start = next(
+              (index + 1 for index, line in enumerate(lines)
+               if line.startswith(f"## [{version}] - ")),
+              None,
+          )
+          if start is None:
+              raise SystemExit(f"Missing changelog section for {version}")
+          end = next(
+              (index for index in range(start, len(lines))
+               if lines[index].startswith("## [")),
+              len(lines),
+          )
+          notes = "\n".join(lines[start:end]).strip()
+          if not notes:
+              raise SystemExit(f"Empty changelog section for {version}")
+          Path("release-notes.md").write_text(notes + "\n", encoding="utf-8")
+          PY
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.whl \
+            --title "Movie Inbox $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag
