@@ -28,7 +28,7 @@ import { storedClubMode } from "../surfaces/club.js";
 
       export const SEARCH_PAGE_SIZE = 6;
 
-      export const CATALOG_PAGE_SIZE = 36;
+      export const CATALOG_PAGE_SIZE = 30;
 
       export function setCurrentIdentity(value) {
         currentIdentity = value;
@@ -65,4 +65,3 @@ import { storedClubMode } from "../surfaces/club.js";
       export function setRouteRestored(value) {
         routeRestored = value;
       }
-

@@ -58,6 +58,7 @@ EDITABLE_METADATA_FIELDS = {
     "directors",
     "writers",
     "cast",
+    "page_image",
     "backdrop_image",
     "tmdb_id",
 }

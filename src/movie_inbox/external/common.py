@@ -6,7 +6,6 @@ import html
 import json
 import re
 import threading
-import time
 from collections import deque
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -105,8 +104,9 @@ def fetch_json_safe(url: str, timeout: float = 5) -> dict[str, Any]:
 # the fact that the source was limited even when its adapter carried on.
 DEFAULT_RETRY_AFTER_SECONDS = 45
 _RATE_LIMIT_NOTES_MAX = 64
-_rate_limit_notes: deque[tuple[float, str, int]] = deque(maxlen=_RATE_LIMIT_NOTES_MAX)
+_rate_limit_notes: deque[tuple[int, str, int]] = deque(maxlen=_RATE_LIMIT_NOTES_MAX)
 _rate_limit_lock = threading.Lock()
+_rate_limit_sequence = 0
 
 
 def retry_after_seconds(headers: Any, default: int = DEFAULT_RETRY_AFTER_SECONDS) -> int:
@@ -127,19 +127,27 @@ def retry_after_seconds(headers: Any, default: int = DEFAULT_RETRY_AFTER_SECONDS
 
 
 def note_rate_limit(url: str, retry_after: int) -> None:
+    global _rate_limit_sequence
     try:
         host = (urlparse(url).hostname or "").casefold()
     except ValueError:
         return
     with _rate_limit_lock:
-        _rate_limit_notes.append((time.monotonic(), host, retry_after))
+        _rate_limit_sequence += 1
+        _rate_limit_notes.append((_rate_limit_sequence, host, retry_after))
 
 
-def rate_limited_seconds(hosts: Sequence[str], since: float) -> int:
+def rate_limit_cursor() -> int:
+    """Snapshot note order before asking a source; safe even on coarse system clocks."""
+    with _rate_limit_lock:
+        return _rate_limit_sequence
+
+
+def rate_limited_seconds(hosts: Sequence[str], since: int) -> int:
     """The longest cooldown any of these hosts asked for since `since`, or 0.
 
-    `since` is a `time.monotonic()` reading taken before the source was asked, so a
-    429 from an earlier search is never charged to this one. The notes are by host,
+    `since` is a note cursor taken before the source was asked, so a 429 from an
+    earlier search is never charged to this one. The notes are by host,
     not by search: two searches to the same source at once can see each other's
     429, which is right, because a rate limit belongs to the host.
     """
@@ -152,7 +160,7 @@ def rate_limited_seconds(hosts: Sequence[str], since: float) -> int:
         (
             seconds
             for noted_at, host, seconds in notes
-            if noted_at >= since
+            if noted_at > since
             and any(host == suffix or host.endswith(f".{suffix}") for suffix in hosts)
         ),
         default=0,

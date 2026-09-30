@@ -1,5 +1,10 @@
 # Home — evolución del archivo visual
 
+> Actualización 2026-09-26: para U7/U9 y el orden de ejecución prevalece el
+> [plan U7/U9](u7-u9-plan-2026-09-26.md). Propone U7 en la contratapa actual,
+> sin restaurar ventanas en la barra compacta; U8 queda postergada. Este documento
+> conserva el alcance y las decisiones históricas de septiembre 12.
+
 2026-09-12. Plan de producto y diseño; avance de integración al 2026-09-13. El tablero ejecutable
 está en `tareas.md`. Modo: Operate, con exploración de la biblioteca personal.
 Se preservan el frente empotrado, material petróleo/latón, tipografía acordada,

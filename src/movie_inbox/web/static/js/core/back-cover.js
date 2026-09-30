@@ -1,4 +1,5 @@
 import { availabilityState, displayTitle, escapeAttr, escapeHtml, listText, normalizeRating } from "./format.js";
+import { renderBackCoverImages } from "./back-cover-images.js";
 
 export const BACK_COVER_TEMPLATES = Object.freeze([
   "rental-classic",
@@ -22,18 +23,57 @@ export function backCoverTemplateForId(id) {
   return BACK_COVER_TEMPLATES[stableOpaqueIdHash(id) % BACK_COVER_TEMPLATES.length];
 }
 
+let synopsisResizeObserver;
+
+export function mountBackCoverSynopsis(host) {
+  synopsisResizeObserver?.disconnect();
+  synopsisResizeObserver = undefined;
+  if (!host) return;
+  const section = host.querySelector(".vhs-back-cover-synopsis");
+  const paragraph = section?.querySelector("p");
+  const button = section?.querySelector("[data-click='toggle-back-cover-synopsis']");
+  const content = host.querySelector(".vhs-back-cover-content");
+  if (!section || !paragraph || !button || !content) return;
+
+  section.dataset.clamped = "true";
+  const sync = () => {
+    if (!host.isConnected) return;
+    const expanded = button.getAttribute("aria-expanded") === "true";
+    if (expanded) paragraph.classList.remove("is-expanded");
+    const overflows = paragraph.scrollHeight > paragraph.clientHeight + 1;
+    if (expanded) paragraph.classList.add("is-expanded");
+    button.hidden = !overflows;
+    if (!overflows && expanded) {
+      paragraph.classList.remove("is-expanded");
+      button.setAttribute("aria-expanded", "false");
+      button.textContent = "Leer más";
+    }
+  };
+  synopsisResizeObserver = new ResizeObserver(sync);
+  synopsisResizeObserver.observe(content);
+  document.fonts.ready.then(sync);
+  requestAnimationFrame(sync);
+}
+
+export function toggleBackCoverSynopsis(button) {
+  const section = button.closest(".vhs-back-cover-synopsis");
+  const paragraph = section?.querySelector("p");
+  if (!paragraph) return;
+  const expanded = button.getAttribute("aria-expanded") === "true";
+  paragraph.classList.toggle("is-expanded", !expanded);
+  button.setAttribute("aria-expanded", String(!expanded));
+  button.textContent = expanded ? "Leer más" : "Leer menos";
+  if (expanded) {
+    button.focus({ preventScroll: true });
+    button.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }
+}
+
 function fact(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value || "Sin dato")}</dd></div>`;
 }
 
-function framePlaceholder(title, number) {
-  return `<div class="vhs-back-cover-frame vhs-back-cover-frame-${number}" role="img" aria-label="Fotograma ${number} de ${escapeAttr(title)} no disponible">
-    <span>Fotograma ${String(number).padStart(2, "0")}</span>
-    <strong>No disponible</strong>
-  </div>`;
-}
-
-export function renderBackCover(item) {
+export function renderBackCover(item, { editable = false } = {}) {
   const title = displayTitle(item) || "Sin título";
   const template = backCoverTemplateForId(item?.id);
   const accessibleKey = stableOpaqueIdHash(item?.id).toString(36);
@@ -60,41 +100,42 @@ export function renderBackCover(item) {
         <header class="vhs-back-cover-heading">
           <span>Movie Inbox // archivo personal</span>
           <h2>${escapeHtml(title)}</h2>
-          <p>${escapeHtml([item?.year, duration, genres].filter(Boolean).join(" · "))}</p>
         </header>
 
         <section class="vhs-back-cover-synopsis" aria-labelledby="back-cover-synopsis-${accessibleKey}">
           <h3 id="back-cover-synopsis-${accessibleKey}">Sinopsis</h3>
-          <p>${escapeHtml(synopsis)}</p>
+          <p id="back-cover-synopsis-text-${accessibleKey}">${escapeHtml(synopsis)}</p>
+          <button class="vhs-back-cover-read-more" type="button" data-click="toggle-back-cover-synopsis" aria-controls="back-cover-synopsis-text-${accessibleKey}" aria-expanded="false" hidden>Leer más</button>
         </section>
 
-        <div class="vhs-back-cover-frames" aria-label="Espacios reservados para fotogramas">
-          ${framePlaceholder(title, 1)}
-          ${framePlaceholder(title, 2)}
+        <div class="vhs-back-cover-edition">
+          ${renderBackCoverImages(item, title)}
+          <div class="vhs-back-cover-metadata">
+            <section class="vhs-back-cover-facts" aria-label="Datos de la edición">
+              <dl>
+                ${fact("Año", item?.year || "Sin dato")}
+                ${fact("Tipo", item?.kind || "Sin dato")}
+                ${fact("Duración", duration)}
+                ${fact("Géneros", genres)}
+                ${fact("Disponibilidad", availability.effective ? "Disponible" : "No disponible")}
+              </dl>
+            </section>
+
+            <section class="vhs-back-cover-credits" aria-labelledby="back-cover-credits-${accessibleKey}">
+              <h3 id="back-cover-credits-${accessibleKey}">Créditos</h3>
+              ${[directors, writers, cast].every(value => value === "Sin dato") ? "<p>Créditos sin completar.</p>" : `<dl>
+                ${fact("Dirección", directors)}
+                ${fact("Guion", writers)}
+                ${fact("Reparto", cast)}
+              </dl>`}
+            </section>
+
+          </div>
         </div>
-
-        <section class="vhs-back-cover-credits" aria-labelledby="back-cover-credits-${accessibleKey}">
-          <h3 id="back-cover-credits-${accessibleKey}">Créditos</h3>
-          <dl>
-            ${fact("Dirección", directors)}
-            ${fact("Guion", writers)}
-            ${fact("Reparto", cast)}
-          </dl>
-        </section>
-
-        <section class="vhs-back-cover-facts" aria-label="Datos de la edición">
-          <dl>
-            ${fact("Año", item?.year || "Sin dato")}
-            ${fact("Tipo", item?.kind || "Sin dato")}
-            ${fact("Duración", duration)}
-            ${fact("Géneros", genres)}
-            ${fact("Disponibilidad", availability.effective ? "Disponible" : "No disponible")}
-          </dl>
-        </section>
 
         <section class="vhs-back-cover-memory" aria-labelledby="back-cover-memory-${accessibleKey}">
           <div>
-            <h3 id="back-cover-memory-${accessibleKey}">Memoria personal</h3>
+            <h3 id="back-cover-memory-${accessibleKey}">Mi registro</h3>
             <p>${escapeHtml(memorySummary)}</p>
           </div>
           <dl>
@@ -102,11 +143,12 @@ export function renderBackCover(item) {
             ${fact("Fecha", item?.watched_at || "Sin fecha")}
             ${fact("Puntaje", rating ? `${rating}/10` : "Sin puntuar")}
           </dl>
+          ${editable ? `<button class="vhs-edit-sticker" type="button" data-click="edit-vhs-dossier" aria-label="Movie Inbox · Editar ficha de ${escapeAttr(title)}"><img src="/static/img/brand/movie-inbox-sticker-256.webp" srcset="/static/img/brand/movie-inbox-sticker-256.webp 1x, /static/img/brand/movie-inbox-sticker-512.webp 2x" alt="Movie Inbox — Editar ficha" width="256" height="192"></button>` : ""}
         </section>
 
         <footer class="vhs-back-cover-footer">
           <span aria-hidden="true" class="vhs-back-cover-barcode"></span>
-          <p>Contratapa generada con datos de tu catálogo. Los espacios de fotograma no representan imágenes reales.</p>
+          <p>Contratapa generada con datos e imágenes de tu catálogo.</p>
           <strong>VHS</strong>
         </footer>
       </div>

@@ -1094,11 +1094,6 @@
   margin: 0;
 }
 
-#collectionView[data-search-mode="browse"] .search-main,
-#collectionView[data-search-mode="browse"] .search-secondary {
-  display: none;
-}
-
 #collectionView[data-search-mode="browse"] .search-console {
   box-shadow: none;
 }

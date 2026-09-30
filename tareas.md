@@ -24,14 +24,24 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
-| 1 | [U4] | Integrar materialmente la Home como una única consola | U4.1 visual antes de código |
-| 2 | [U5] → [U6] → [U7] → [U8] | Lista del conjunto, cartelera consultada, imágenes y VHS al azar | B integrada con U4.3/U6.1; quedan U5, compatibilidad U6 e imágenes U7 |
+| — | [U4] | **Cerrada 2026-09-24.** Home integrada como una única consola, gate visual y de regresión en verde | — |
+| — | [U7] entrega A | **Integrada 2026-09-26 (`0970482`).** Imágenes en contratapa, estados 0/1/2 y errores | Evidencia `docs/design/u7-first-delivery/` |
+| 2 | [U9] | Sonido opcional al seleccionar VHS, apagado inicialmente como propuesta | Elección de muestra; independiente de U7 adquisición y de U8 |
+| Según dependencias | [U7] entrega B | Adquisición, galería y corrección persistente | Contrato y resolver del frente lógico |
+| — | [U8] | **Cerrada 2026-09-26 (merge `e179d6b`).** VHS al azar con sorteo compartido y efecto B elegido por el owner | Retomada a pedido del owner el mismo día |
 | — | [B1] | **Cerrada 2026-09-11.** Alcance cubierto, medido y con gates en CI | criterio de cierre acordado con el owner |
 | 3 | [A2] | **Se mudó a `../movieIndexAndroid`** (2026-09-13) | tablero propio de ese repositorio |
 | 4 | [M1] | Descubrimiento de verticales propias | frentes previos estables |
-| Posterior | [U9] | Sonido opcional de biblioteca | interacción VHS estable; no bloquea las otras épicas |
 | Último | [MW1] | Revisión y ajustes de web en navegador de celular | baja prioridad; cliente Kotlin por delante |
 | — | [I1] | **Cerrada 2026-09-07.** Evaluación hecha, construcción postergada | ADR-0006/0007/0008 |
+
+**Corte vigente del frente visual, 2026-09-26:** el owner prioriza planificar U7 y U9;
+U8 queda fuera. Orden propuesto: U7 visual con campos actuales → U9; el tramo de
+adquisición/galería U7 avanza por sus dependencias de lógica. Desglose, responsables,
+criterios y decisiones por comparar en [plan U7/U9](docs/design/u7-u9-plan-2026-09-26.md).
+La barra compacta, entrada de contratapa y skeleton están implementados localmente;
+los apartados históricos que describen dos ventanas de consola no son el encaje actual.
+Este corte prevalece sobre las prioridades visuales antiguas conservadas abajo.
 
 **Aviso entre frentes, 2026-09-11 — del lado lógica.** Este archivo lo escriben los dos
 frentes y conviene decir en voz alta quién movió qué, porque durante esta semana se
@@ -75,7 +85,7 @@ es el nuevo pulido visual de Home [U4], abierto después de la aceptación de [U
 
 ### Frente: Inicio videoclub (integración material U4)
 
-#### [U4] Integrar Home como una única consola de archivo audiovisual
+#### [U4] Integrar Home como una única consola de archivo audiovisual — **cerrada 2026-09-24**
 
 **Abierta y aprobada 2026-09-09.** El mueble, la cartelera y sus controles conservan su
 función y contenido, pero deben dejar de verse como capas HTML apoyadas sobre imágenes.
@@ -138,19 +148,21 @@ internas y luz contenida, con un campo nocturno abstracto que prolonga el objeto
     evidencia en `docs/design/u4-4-visual-gate/`, cierre técnico en `Hecho`.
   - **[U4.5] Cerrada por absorción en d.3/U4.3.** Sin panel inferior separado;
     registro en `Hecho` junto con la integración de B.
-  - [ ] **[U4.6] Gate visual y responsive acotado.** Comparar los tres anchos desktop,
+  - [x] **[U4.6] Gate visual y responsive acotado.** Comparar los tres anchos desktop,
     verificar foco y contraste, y hacer sólo un smoke móvil de reflow y overflow.
     Actualizar/correr las aserciones geométricas de navegador que aún describen U2
     y la carcasa rechazada; U4.2c tiene QA conectado y 20 tests de servicio/packaging.
     - [x] **[U4.6a] Gate visual conectado.** 2026-09-13: 1280/1440/1920, smoke
       390/320, foco separado de selección, contraste de pantalla, 0/1/2 imágenes,
       error, vacío, título largo y origen Club. Evidencia `u4-4-visual-gate/`.
-    - [ ] **[U4.6b] Regresión histórica de navegador.** Se migraron geometrías de
-      cartelera, placas, mueble y consola a B y a `home_visual_metrics.js`; la sonda
-      se ejecutó en navegador conectado. Falta migrar los tests de interacción que
-      aún usan `.home-shelf-preview`/señal eliminada y ejecutar el runner completo.
-      Preservar escenarios móvil, fuentes, fechas y foco; no saltarlos ni adaptar
-      expectativas para aprobar silenciosamente. Es trabajo de tests, no rediseño.
+    - [x] **[U4.6b] Regresión histórica de navegador.** **Cerrada** (commits
+      `f66beab` "test: migrate the browser suite to the single Home console" y
+      `214a753` "test: measure Home's height once drawn, against the accepted U4
+      contract"). Los tests de interacción que usaban `.home-shelf-preview`/señal
+      eliminada ya se migraron a la consola única; `tests/browser/test_ui_browser.py`
+      ahora afirma que esos selectores dan `count() == 0`. Suite completa verificada
+      en verde el 2026-09-24 (`scripts\check.ps1`, 1105 pruebas). **Cierra [U4.6] y con
+      él todo [U4].**
 
 ### Frente: Home — lista del conjunto seleccionado
 
@@ -246,30 +258,51 @@ la lista quedan fijadas por la opción B elegida. Plan: `home-evolution-backlog-
 
 ### Frente: Home — imágenes de cada obra
 
-#### [U7] Completar las dos ventanas de imágenes de consola
+#### [U7] Imágenes de la obra en la ficha actual
 
 **Abierta 2026-09-12.** Investigar adquisición/cobertura además de presentación.
 Los escalares y el cache existentes no descubren URLs vacías ni almacenan una galería
 de dos panorámicas. Plan y fuentes primarias: `home-evolution-backlog-2026-09-12.md`.
 
+**Replanificada 2026-09-26:** se propone usar los espacios de la contratapa VHS,
+sin restaurar imágenes en la barra de consulta compacta. El renderer actual sólo
+dibuja placeholders. **Entrega A visual:** U7.0 + U7.1b + U7.5c, usando los escalares
+existentes. **Entrega B mixta:** U7.2–4 + U7.5b + U7.6. U9 no espera a B.
+Plan ejecutable: `docs/design/u7-u9-plan-2026-09-26.md`; conserva la historia de U7.5a.
+
+- [x] **[U7.0] Ajustar destino y composición.** `back-cover.js`/`core-detail.css`:
+  comparar 0/1/2 imágenes en las cinco plantillas actuales, con muestra descartable.
+  Decidir una ventana amplia vs dos antes de integrar. Medio, visual; sin dependencia
+  de una API nueva. Entrega: composición registrada y estados definidos.
 - [ ] **[U7.1] Diagnóstico de cobertura por causa.** `image_warmer.py`, payload
   editorial y diagnóstico de conteos: vacío/roto/cache frío/identidad, tipo y origen.
   Sin descarga masiva. Dep.: ninguna de implementación; muestra descartable.
   Modelo grande, investigación; traspaso de datos.
-- [ ] **[U7.2] Fuentes y selección de imagen.** `external/tmdb.py`, metadata y
+  - [x] **[U7.1a] Herramienta y prueba sintética existentes.** Entregadas por lógica;
+    ver `docs/analisis/u7-1-cobertura-de-imagenes-2026-09-12.md`. No reconstruir.
+  - [x] **[U7.1b] Matriz actual para presentación.** URLs vacías/rechazadas/rotas,
+    cache frío y variantes repetidas; fixtures descartables. Medio, visual.
+  - [x] **[U7.1c] Corrida real agregada.** Lógica, con autorización específica del
+    catálogo/entorno al tomarla; no es prerrequisito para U7 A ni para U9.
+- [x] **[U7.2] Fuentes y selección de imagen.** `external/tmdb.py`, metadata y
   autoridad: IDs confirmados, imágenes distintas, procedencia/atribución y cobertura
   por cine/series/anime. Sin matching por título parecido. Dep.: U7.1 + elección de
   contenido de las dos ventanas. Modelo grande, lógica/investigación.
-- [ ] **[U7.3] Contrato de assets portable.** `catalog.schema.json`, schema,
+- [x] **[U7.3] Contrato de assets portable.** `catalog.schema.json`, schema,
   repositorios JSON/SQLite, serializers/API: lista acotada con rol/origen y selección
   manual, compatibilidad con escalares y export/import. Dep.: U7.2. Modelo grande,
   principalmente lógica; visual entrega consumo/estados.
   **Decisión de imágenes 2026-09-12:** dos distintas como preferencia; panorámica
   + portada permitidas, incluso con portada a la derecha. Repetición de la única
   disponible permitida como fallback visual, sin duplicar el asset almacenado.
-- [ ] **[U7.4] Adquisición y cache acotados.** Resolver/proxy/warmer: identidad,
+- [x] **[U7.4] Adquisición y cache acotados.** Resolver/proxy/warmer: identidad,
   dedupe de misma imagen en tamaños distintos, prioridad de consulta, backoff,
   cache y corrección manual preservada. Dep.: U7.3. Modelo grande, lógica.
+  **U7.1c–U7.4 lógica, 2026-09-26/27:** cobertura real sin ninguna obra con TMDb;
+  opción A (sin galería guardada) y cruce de ids IMDb/Wikidata → TMDb aprobados por
+  el owner. Implementado: candidatas en vivo, fill-only con procedencia, lote
+  `movie-inbox images fill --limit N`. Contrato, casos y prueba del owner en
+  `docs/analisis/u7b-contrato-imagenes-2026-09-26.md`. Sigue U7.5b (visual).
 - [ ] **[U7.5] Ventanas y corrección visual.** Separación aprobada por el owner
   el 2026-09-13: cierre visual ahora, integración de datos explícitamente pendiente.
   `homeSelectionPreview()`/Home CSS y
@@ -290,6 +323,22 @@ de dos panorámicas. Plan y fuentes primarias: `home-evolution-backlog-2026-09-1
     bloqueo manual, deduplicar tamaños y verificar persistencia/export/import.
     Reutilizar ventanas y acceso existentes; no reconstruir la consola. Incluir
     permisos de Club, rechazo de respuestas viejas y error recuperable.
+    - [ ] **[U7.5b.1] Consumo del contrato y atribución.** Adaptar el resolver de A,
+      compatibilidad antigua/nueva; dep. U7.3–4. Medio, visual.
+    - [ ] **[U7.5b.2] Corrección persistente.** Selección de imágenes desde la ficha
+      editable, bloqueo manual, permisos y feedback; dep. b.1. Grande, visual + lógica.
+  - [x] **[U7.5c] Contratapa con imágenes actuales — primera entrega.** Independiente
+    de U7.2–4; reemplaza el encaje de consola de U7.5 para este corte.
+    - [x] **[U7.5c.1] Resolver 0/1/2 imágenes.** `page_image`/`backdrop_image`, rol
+      honesto y orden estable; reusar proxy. Dep. U7.0/U7.1b. Medio, visual.
+    - [x] **[U7.5c.2] Render y estados.** `back-cover.js`/`core-detail.css`: carga,
+      ausencia/error local, dimensiones, alt y pie correcto. Dep. c.1. Grande, visual.
+    - [x] **[U7.5c.3] Gate de primera entrega.** Cinco plantillas, móvil/escritorio,
+      cambios rápidos, permisos y foco; sin imagen anterior ni bloquear apertura.
+      Dep. c.2. Medio, visual. Cierra A, no toda U7.
+    **2026-09-26:** implementada localmente, sin commit. 45 pruebas de navegador,
+    31 JS y controles de empaquetado/cobertura aprobados. Comparación y cierre técnico
+    en `docs/design/u7-first-delivery/README.md`. U7 B sigue pendiente; próximo frente U9.
 - [ ] **[U7.6] Gate de cobertura e identidad.** Tests del resolver/intercambio y QA
   visual: remake/homónimo/idioma/origen, offline y manual bloqueado; conteos antes/
   después por causa, sin promesa de 100%. Dep.: U7.5. Modelo grande.
@@ -297,6 +346,10 @@ de dos panorámicas. Plan y fuentes primarias: `home-evolution-backlog-2026-09-1
 ### Frente: Home — VHS al azar
 
 #### [U8] Sorteo visible al final de la biblioteca
+
+**2026-09-26:** el owner deja U8 fuera del corte U7/U9. Es un frente mixto:
+selección/sorteo/sincronización son lógica; lomo y revelación son visuales.
+Se conserva el plan, sin comenzar su implementación.
 
 **Abierta 2026-09-12.** Categoría especial con un lomo que reemplaza su título mediante
 animación y consulta el resultado. Botón existente y lomo comparten sorteo. Apagado y
@@ -310,38 +363,47 @@ no implementar aún lomo nuevo, sorteo conectado ni animación. Se conserva el p
 Owner confirma 2026-09-13: revelar resultado y actualizar consola/derecha; no abrir
 ficha automáticamente. «Ver más» la abre. La animación A/B aún debe compararse.
 
-- [ ] **[U8.1] Alcance y recorrido del comando.** `randomCandidates()`/detail/Home:
+**Retomada en 0.10.0 por pedido del owner (2026-09-26).** Rama `feat/u8-random-vhs`,
+sin mezclar con U7/U9 del otro frente. Alcance en Inicio: todo el catálogo personal,
+según «Solo disponibles»; nunca sólo el estante ni Club. El resultado alimenta lomo,
+consola, cartel derecho y «Ver más»; la lista conserva su fuente y no inventa fila.
+Botón «Al azar» del encabezado: en Inicio sortea en el lomo (revela la bahía, sin
+ficha); fuera de Inicio sigue abriendo una ficha. Owner 2026-09-26: aprueba la
+lámina de estados y elige el efecto B (tira de títulos); A se retiró.
+
+- [x] **[U8.1] Alcance y recorrido del comando.** `randomCandidates()`/detail/Home:
   auditar todo catálogo vs página cargada, filtros, disponibilidad y cero candidatos;
   definir resultado en consulta vs apertura final de ficha. Home no debe sortear sólo
   el estante accidentalmente. Dep.: U5.1 y respuesta del owner. Modelo grande.
-- [ ] **[U8.2] Lomo terminal y estados.** Fixture/asset VHS/Home CSS: inicial,
+- [x] **[U8.2] Lomo terminal y estados.** Fixture/asset VHS/Home CSS: inicial,
   ocupado, disponible, no disponible y vacío; comparación de «?» como decoración,
   rótulo semántico y contraste. Dep.: U8.1 + U4.4/encaje U6.1. Modelo grande, visual.
-  - [ ] **[U8.2.1] Encaje terminal.** Placa AL AZAR y un lomo, fuera del conteo de
+  - [x] **[U8.2.1] Encaje terminal.** Placa AL AZAR y un lomo, fuera del conteo de
     secciones editoriales, mismo material/tamaño que los VHS existentes.
-  - [ ] **[U8.2.2] Estados y copy.** Inicial/ocupado/disponible/no disponible/vacío,
+  - [x] **[U8.2.2] Estados y copy.** Inicial/ocupado/disponible/no disponible/vacío,
     error y resultado fuera de alcance; «?» decorativo, título y foco legibles.
-  - [ ] **[U8.2.3] Objeto integrado.** Foco/navegación reales, no colección ficticia;
+  - [x] **[U8.2.3] Objeto integrado.** Foco/navegación reales, no colección ficticia;
     enlazar resultado de U8.3 sin duplicar lógica ni consola.
-- [ ] **[U8.3] Resultado único y alcance común.** Servicio JS de sorteo y, si hace
+- [x] **[U8.3] Resultado único y alcance común.** Servicio JS de sorteo y, si hace
   falta, Python/API: un ID para todas las superficies, no repetición inmediata con
   varios candidatos, cambio de preferencia y resultado fuera de alcance. Dep.: U8.1;
   no nueva API si catálogo completo ya está disponible. Modelo grande, lógica.
-- [ ] **[U8.4] Comparar y construir revelación.** Animación de etiqueta rebobinada
+- [x] **[U8.4] Comparar y construir revelación.** Animación de etiqueta rebobinada
   o tira breve; elegir con muestras, reduced motion directo, coalescing y anuncio sólo
   del resultado. Dep.: U8.2–3. Modelo grande, visual/interacción.
-  - [ ] **[U8.4.1] Comparación A/B.** Rebobinado recomendado frente a tira breve;
+  - [x] **[U8.4.1] Comparación A/B.** Ambas construidas sobre la etiqueta real y
+    grabadas; el owner eligió B el 2026-09-26. Rebobinado recomendado frente a tira breve;
     muestras para elegir antes de cerrar la dirección del efecto.
-  - [ ] **[U8.4.2] Efecto elegido.** Sólo etiqueta, resultado elegido de antemano,
+  - [x] **[U8.4.2] Efecto elegido.** Sólo etiqueta, resultado elegido de antemano,
     sin relayout del rail ni títulos anunciados durante la transición.
-  - [ ] **[U8.4.3] Movimiento/foco/concurrencia.** Reduced motion directo, clics
+  - [x] **[U8.4.3] Movimiento/foco/concurrencia.** Reduced motion directo, clics
     coalescidos, control estable y un anuncio final; sin sonido U9.
-  - [ ] **[U8.4.4] Gate conectado.** Duración/performance y estados finales con
+  - [x] **[U8.4.4] Gate conectado.** Duración/performance y estados finales con
     U8.5–6; ninguna obra distinta entre lomo, consola, derecha y ficha.
-- [ ] **[U8.5] Integración del botón, lomo y consulta.** Home/bootstrap/detail:
+- [x] **[U8.5] Integración del botón, lomo y consulta.** Home/bootstrap/detail:
   llegar al módulo sin perder foco, derecha/consola con mismo resultado, lista según
   contrato y comando usable fuera de Home. Dep.: U5/U6 + U8.3–4. Modelo grande.
-- [ ] **[U8.6] Gate del sorteo.** 0/1/muchos, switch/todo/no disponible, rápido,
+- [x] **[U8.6] Gate del sorteo.** 0/1/muchos, switch/todo/no disponible, rápido,
   teclado, obra removida, offline/autoplay/reduced motion; sin cambios personales.
   Dep.: U8.5. Modelo grande.
 
@@ -588,20 +650,34 @@ consumir y qué reglas no se pueden romper.
 
 ### Frente: Biblioteca — sonido opcional
 
-#### [U9] Respuesta sonora al enfocar VHS
+#### [U9] Respuesta sonora al seleccionar VHS
 
-**Abierta 2026-09-12, posterior.** Un efecto breve y silenciable desde el menú;
-no bloquea U5–U8. El primer foco no garantiza audio permitido por el navegador.
+**Abierta 2026-09-12; priorizada 2026-09-26.** Sigue a la entrega visual U7 A y
+no depende de U7 B ni de U8. Un efecto breve y silenciable desde el menú;
+el primer foco no garantiza audio permitido por el navegador. Plan detallado:
+`docs/design/u7-u9-plan-2026-09-26.md`. Defaults propuestos: apagado inicialmente,
+por navegador/dispositivo y sólo ante selección explícita; no hover ni Tab pasivo.
 
 - [ ] **[U9.1] Samples y gesto.** `docs/design/` + audio original/libre con licencia:
   comparar 2–3 sonidos; decidir teclado/tap vs hover, duración y volumen. Dep.:
   interacción VHS estable. Modelo grande, visual/sonoro.
+  - [x] **[U9.1a] Muestras y procedencia.** Tres efectos sintetizados desde cero
+    (roce, clic y toque), WAV y generador bajo GPLv3, sin audio de películas.
+    Entrega local 2026-09-26, sin commit: [muestras](docs/design/u9-sound-samples/README.md).
+    Formato/niveles y regeneración verificados; elección perceptiva pendiente.
+  - [ ] **[U9.1b] Comparación en contexto.** Elegir timbre, volumen y duración con
+    clic/tap/flechas en un prototipo; objetivo inicial 70–120 ms. Dep. a. Medio.
 - [ ] **[U9.2] Preferencia y mute fácil.** Menú HTML/fields/settings: switch visible,
   prueba opcional, elegir persistencia dispositivo/cuenta y default; propuesto apagado
   y por dispositivo. Dep.: U9.1. Modelo medio; grande si requiere nuevo contrato.
 - [ ] **[U9.3] Audio por intención.** Módulo JS pequeño y eventos VHS: desbloquear
   por gesto, debounce, silencio si bloqueado, no sonido al restaurar foco/autoplay y
   mute inmediato. Dep.: U9.2. Modelo grande, interacción.
+  - [ ] **[U9.3a] Servicio de audio.** Crear/cargar al habilitar; desbloqueo por gesto,
+    una reproducción activa y cancelación al silenciar. Dep. U9.2. Medio, frontend.
+  - [ ] **[U9.3b] Conexión a selección.** Una señal por gesto/cambio; controlar
+    repetición y duplicados pointer/focus/click. Silencio ante autoplay, retorno de
+    foco, selección programática y pestaña oculta. Dep. a. Medio, frontend.
 - [ ] **[U9.4] Gate de silencio y carga.** Navegación rápida, recarga, pestaña oculta,
   políticas Safari/Chromium, lector de pantalla, storage bloqueado y licencia.
   Dep.: U9.3. Modelo medio.
@@ -698,6 +774,38 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
 
 ## Hecho
+
+### [U10] Colección — mostrador y portadas grandes (2026-09-28)
+
+Dirección aprobada por el owner e implementada en `release/0.10.0`.
+Commit de entrega: `feat(collection): unify browsing and add the video-store counter`.
+[Brief y dependencias](docs/briefs/collection-counter-v1.md) ·
+[Evidencia y verificación](docs/design/collection-counter-v1/README.md).
+
+- [x] U10.1 Explorar/Buscar unificados; Agregar conserva consulta y contexto de regreso.
+- [x] U10.2 Mostrador con materiales de Inicio, filtros rápidos y orden visible.
+- [x] U10.3 Cinco portadas grandes, datos debajo y carga acumulativa de 30 en 30.
+- [x] U10.4 Historial, foco, teclado, imágenes, comparación/vinculación y responsive.
+
+61 pruebas de navegador y 34 pruebas JS aprobadas. Los cambios locales de sonido U9
+pertenecen a otro trabajo y quedan fuera de esta entrega. No incluye despliegue.
+
+### [U11] Caja VHS, sticker y editor por tareas (2026-09-29)
+
+Dirección aprobada e implementada en `release/0.10.0`.
+[Brief](docs/briefs/vhs-case-editor-v1.md) · [Evidencia](docs/design/vhs-case-v1/README.md).
+
+- [x] Caja negra con cinta/fibrón; portada completa y acercamiento sin mover la grilla.
+- [x] Clic abre contratapa, sticker Movie Inbox menor lleva a edición propia.
+- [x] Logo y sticker: masters PNG y derivados PNG/WebP 128/256/512/1024 en el proyecto.
+- [x] Ficha por tareas, borradores persistentes, guardado conjunto y guardia de navegación.
+- [x] Revisión visual escritorio/móvil, imágenes ausentes/fallidas y títulos largos.
+- [ ] Fondo fotográfico similar a la primera propuesta: diferido por el owner.
+
+Validación final: 68 pruebas de navegador, 80 HTTP/paquete y 34 JS aprobadas (182).
+Ruff, mypy y revisión visual aprobados.
+
+No incluye despliegue; los cambios locales de sonido U9 quedan fuera de esta entrega.
 
 ### Frente: Ficha — contexto público y guardado seguro
 

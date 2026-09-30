@@ -4,6 +4,68 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+Va a ser la **0.10.0**. La versión está abierta en la rama `release/0.10.0` y se cierra al
+fusionar su PR contra `master`; hasta entonces se le pueden sumar cambios.
+
+### Agregado
+
+- Marca Movie Inbox para el videoclub: logo y sticker con cassette, con originales
+  y variantes PNG/WebP de varios tamaños guardados en el proyecto.
+- `movie-inbox images fill <catálogo> --limit N` completa la portada y la panorámica
+  que falten desde TMDb. Sólo usa ids que la obra ya tiene: su id de TMDb, o uno
+  traducido desde IMDb o Wikidata cuando hay un único resultado del mismo tipo y año
+  (±1). Nunca reemplaza una imagen existente ni un campo bloqueado, y `--dry-run`
+  muestra lo que haría sin escribir. Requiere token de TMDb.
+- La API expone las imágenes candidatas de una obra y completa las faltantes a pedido;
+  la portada se puede corregir desde la ficha como la panorámica.
+- La biblioteca de Inicio termina en un VHS «Al azar». Al activarlo elige una obra de
+  todo tu catálogo (o sólo de las disponibles, según la preferencia de siempre), la
+  revela en el lomo y la muestra en la consulta y el cartel «En consulta»; la ficha se
+  abre con «Abrir ficha». En Inicio el botón «Al azar» del menú usa ese mismo lomo.
+
+### Cambiado
+
+- La sinopsis de la contratapa se abre en seis líneas; «Leer más/menos» aparece sólo
+  cuando hay contenido oculto, conserva el foco y permite desplazar el texto completo.
+- Las cajas VHS se acercan proporcionalmente sin estirarse ni añadir una cinta sobre
+  portadas reales. La contratapa reúne imagen, datos y créditos sin repetir metadatos
+  en el encabezado; los créditos vacíos se resumen en una nota.
+
+
+- Las cajas de Colección abren la contratapa VHS. El sticker «Editar ficha» lleva
+  a un editor por tareas: registro personal, datos, imágenes, disponibilidad y
+  opciones avanzadas. Conserva borradores entre secciones y protege el guardado
+  frente a cambios de obra y conflictos de edición.
+- Las obras sin portada usan una caja negra con cinta de papel y título manuscrito.
+- Colección reúne Explorar y Buscar con el campo siempre visible. Agregar pasa a ser
+  una acción propia que conserva la consulta y permite volver con filtros y orden.
+- Colección adopta el mostrador de Inicio, con portadas más grandes y títulos/estados
+  debajo. El orden queda junto al conteo y las fuentes externas tienen acceso directo.
+  Cargar más suma 30 obras sin reconstruir las portadas anteriores, enfoca la primera
+  nueva y conserva la cantidad cargada al recargar o volver desde una ficha.
+
+- En Colección, «Al azar» respeta los filtros aunque no dejen resultados: antes
+  elegía en silencio entre todo el catálogo.
+- La contratapa VHS muestra las imágenes existentes de cada obra: una ventana si
+  sólo hay una, dos si son distintas y un único estado vacío si faltan. Conserva
+  las proporciones, distingue portada de panorámica, evita variantes repetidas y
+  maneja la carga o el error sin bloquear la ficha. Los datos técnicos se adaptan
+  mejor a contratapas angostas.
+- La carga de Inicio anticipa los dos carteles, las filas y los lomos VHS, con una
+  señal discreta que respeta movimiento reducido. Sesión y catálogo se consultan
+  en paralelo, sin mostrar datos antes de validar la sesión; si falla, aparece
+  «Reintentar» en lugar de mantener el skeleton.
+- La consulta de Inicio ahora usa una barra compacta: título, disponibilidad y estado
+  personal junto a «Resumen» y «Abrir ficha». El resumen despliega sinopsis, créditos
+  y edición, conserva su apertura al cambiar de obra y respeta teclado, móvil y
+  movimiento reducido. La portada sigue en el marco «En consulta».
+- La estantería de Inicio ganó altura: los VHS son más altos y el rótulo «Videoteca» ya
+  no ocupa una fila en escritorio.
+- «Abrir ficha» muestra la contratapa VHS sola, sin marco de diálogo; se cierra tocando
+  fuera de la caja o con Escape. La caja entra con un acercamiento suave de 360 ms y
+  el fondo se oscurece gradualmente; respeta movimiento reducido y permite cerrar
+  incluso durante la entrada.
+
 ## [0.9.0] - 2026-09-24
 
 ### Antes de actualizar

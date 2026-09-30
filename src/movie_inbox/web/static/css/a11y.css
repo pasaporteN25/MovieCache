@@ -25,9 +25,7 @@
         .source-search-spinner { animation: none; }
         .dvd-card:hover .dvd-flipper,
         .dvd-card:has(.dvd-open-surface:focus-visible) .dvd-flipper { transform: none; }
-        /* Defensa en profundidad: openDetailWithCaseTransition ya evita llamar a
-           document.startViewTransition() bajo reduced-motion, esto es un respaldo
-           por si el navegador dispara una transición de todos modos. */
+        /* Respaldo para cualquier transición de vista iniciada por el navegador. */
         ::view-transition-group(*),
         ::view-transition-old(*),
         ::view-transition-new(*) { animation: none !important; }

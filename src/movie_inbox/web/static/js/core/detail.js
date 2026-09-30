@@ -1,14 +1,16 @@
-import { cachedImageSrc, card, posterVariant } from "./card.js";
-import { renderBackCover } from "./back-cover.js";
-import { availabilityIcon, mountDetailContext, streamingSignal } from "./detail-context.js";
+import { cachedImageSrc } from "./card.js";
+import { mountBackCoverSynopsis, renderBackCover } from "./back-cover.js";
+import { EDITOR_SECTIONS, renderDetailEditor } from "./detail-editor.js";
+import { mountDetailContext } from "./detail-context.js";
 import { load, loadCatalog } from "./catalog-data.js";
 import { fields } from "./fields.js";
-import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localFilesText, meta, normalizeRating, titleSubtitle } from "./format.js";
+import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, listText, localFilesText, normalizeRating } from "./format.js";
 import { apiFetch } from "./http.js";
 import { syncRoute } from "./router.js";
 import { findLinkForItem } from "./search-bridge.js";
 import { items, privacyPreferences } from "./state.js";
-import { catalogDetailItems, randomCandidates } from "../surfaces/catalog-grid.js";
+import { catalogDetailItems, randomCandidates, syncCollectionRoute } from "../surfaces/catalog-grid.js";
+import { drawRandomItem } from "./random-draw.js";
 import { activeQuery, catalogMergeResults } from "../surfaces/catalog-search.js";
 import { editorialPersonalIds } from "../surfaces/home.js";
 
@@ -34,31 +36,17 @@ import { editorialPersonalIds } from "../surfaces/home.js";
 
       export let pendingDetailTransition = null;
 
-      export let detailOpenedWithCaseTransition = false;
-
       export let detailPresentation = "dossier";
-
-      export function runWithCaseTransition(update) {
-        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        if (reducedMotion || !document.startViewTransition) {
-          update();
-          return;
-        }
-        document.startViewTransition(update);
-      }
+      let detailEditorSection = "personal";
+      let detailEditorSaving = false;
 
       export function openDetailWithCaseTransition(target, id) {
-        detailOpenedWithCaseTransition = true;
-        runWithCaseTransition(() => openDetailFromTrigger(target, id, { presentation: "back-cover" }));
+        openDetailFromTrigger(target, id, { presentation: "back-cover" });
       }
 
       export function openRandomDetail() {
         const candidates = randomCandidates();
-        if (!candidates.length) return;
-        const pool = candidates.length > 1 && selectedDetailId
-          ? candidates.filter((item) => item.id !== selectedDetailId)
-          : candidates;
-        const item = pool[Math.floor(Math.random() * pool.length)];
+        const item = drawRandomItem(candidates, { excludeId: selectedDetailId });
         if (item) {
           openDetail(item.id, {
             context: {
@@ -135,7 +123,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const rating = normalizeRating(item.rating);
         const privacy = item._privacy || {};
         const ratingOptions = Array.from({ length: 11 }, (_, value) => (
-          `<option value="${value}" ${value === rating ? "selected" : ""}>${value}</option>`
+          `<option value="${value}" ${value === rating ? "selected" : ""}>${value ? `${value} / 10` : "Sin puntuar"}</option>`
         )).join("");
         return `<div class="personal-record-editor" data-detail-form="personal" data-id="${escapeAttr(item.id)}">
           <div class="record-heading">
@@ -157,11 +145,10 @@ import { editorialPersonalIds } from "../surfaces/home.js";
               </select>
             </label>
             <label class="review-field">
-              Review
+              Mi reseña
               <textarea name="review" data-personal-review rows="6">${escapeHtml(item.review || "")}</textarea>
             </label>
-            <fieldset class="personal-privacy-fields">
-              <legend>Visibilidad en el Club</legend>
+            <details class="personal-privacy-fields"><summary>Privacidad del registro</summary>
               <label>
                 Puntaje
                 <select name="rating_privacy" data-personal-rating-privacy>
@@ -169,13 +156,13 @@ import { editorialPersonalIds } from "../surfaces/home.js";
                 </select>
               </label>
               <label>
-                Review
+                Mi reseña
                 <select name="review_privacy" data-personal-review-privacy>
                   ${personalPrivacyOptions("review", privacy.review)}
                 </select>
               </label>
               <small>Estos ajustes reemplazan tu preferencia general solamente para esta obra.</small>
-            </fieldset>
+            </details>
             <div class="personal-actions">
               <button type="button" data-click="save-personal" data-detail-save data-id="${escapeAttr(item.id)}">Guardar cambios</button>
               <button class="quiet-action" type="button" data-click="cancel-personal" data-id="${escapeAttr(item.id)}">Cancelar</button>
@@ -271,18 +258,21 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       }
 
       export function openDetail(id, { updateHistory = true, context = null, skipGuard = false, presentation = "dossier" } = {}) {
-        if (!id) return;
-        if (!skipGuard && selectedDetailId && selectedDetailId !== id && hasUnsavedDetailChanges()) {
+        if (!id || detailEditorSaving) return;
+        if (!skipGuard && selectedDetailId && hasUnsavedDetailChanges()) {
           requestDetailTransition(() => openDetail(id, { updateHistory, context, skipGuard: true, presentation }));
           return;
         }
         const activeElement = document.activeElement;
+        if (updateHistory && !fields.collectionView.hidden && !selectedDetailId) {
+          syncCollectionRoute("replace", { focusCardId: id });
+        }
         detailReturnFocus = (activeElement?.dataset?.click?.startsWith("open-detail") || activeElement?.dataset?.click === "edit-home-shelf-entry")
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
         detailPresentation = presentation === "back-cover" ? "back-cover" : "dossier";
-        if (detailPresentation !== "back-cover") detailOpenedWithCaseTransition = false;
+        detailEditorSection = "personal";
         setDetailContext(context, id);
         selectedDetailId = id;
         detailPersonalEditing = false;
@@ -293,21 +283,22 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         if (!fields.detailDrawer.open) fields.detailDrawer.showModal();
         document.body.classList.add("drawer-open");
         if (updateHistory) syncRoute({ movie: id }, "push");
-        requestAnimationFrame(() => fields.closeDetail.focus());
+        requestAnimationFrame(() => {
+          if (fields.detailDrawer.open && selectedDetailId === id) fields.closeDetail.focus();
+        });
       }
 
       export function closeDetail({ restoreFocus = true, updateHistory = true, skipGuard = false } = {}) {
-        if (!selectedDetailId && !fields.detailDrawer.open) return;
+        if (detailEditorSaving || (!selectedDetailId && !fields.detailDrawer.open)) return;
         if (!skipGuard && hasUnsavedDetailChanges()) {
           requestDetailTransition(() => closeDetail({ restoreFocus, updateHistory, skipGuard: true }));
           return;
         }
-        const useCaseTransition = detailOpenedWithCaseTransition;
-        detailOpenedWithCaseTransition = false;
         const performClose = () => {
           selectedDetailId = "";
           if (fields.detailDrawer.open) fields.detailDrawer.close();
           fields.detailBody.innerHTML = "";
+          mountBackCoverSynopsis(null);
           fields.detailNavigation.innerHTML = "";
           fields.detailDrawer.removeAttribute("data-detail-mode");
           fields.detailDrawerTitle.textContent = "Ficha // lado B";
@@ -332,8 +323,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           detailReturnFocus = null;
           detailReturnCardId = "";
         };
-        if (useCaseTransition) runWithCaseTransition(performClose);
-        else performClose();
+        performClose();
       }
 
       export function setDetailContext(context, selectedId) {
@@ -417,88 +407,32 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           closeDetail({ skipGuard: true });
           return;
         }
-        const rating = normalizeRating(item.rating);
         const shownTitle = displayTitle(item);
         const title = shownTitle || "Sin título";
-        const subtitle = titleSubtitle(item);
-        const summary = item.wikipedia_extract || item.description || item.notes || "";
-        const watched = item.status === "watched";
-        const availability = availabilityState(item);
         fields.detailDrawer.dataset.detailMode = detailPresentation;
         fields.detailDrawerTitle.textContent = detailPresentation === "back-cover"
           ? `Contratapa VHS // ${title}`
           : "Ficha // lado B";
         if (detailPresentation === "back-cover") {
           fields.detailNavigation.innerHTML = "";
-          fields.detailBody.innerHTML = renderBackCover(item);
+          fields.detailBody.innerHTML = renderBackCover(item, { editable: true });
+          mountBackCoverSynopsis(fields.detailBody);
           clearDetailFeedback();
           return;
         }
-        const metadataSection = detailPersonalEditing ? "" : `
-          <details class="drawer-accordion drawer-editor">
-            <summary><span>Editar metadata</span><small>Campos, procedencia y bloqueos</small></summary>
-            <div class="drawer-accordion-body">${metadataEditor(item)}</div>
-          </details>
-        `;
+        mountBackCoverSynopsis(null);
         renderDetailNavigation();
-        fields.detailBody.innerHTML = `
-          <section class="drawer-hero">
-            ${drawerPoster(item, title)}
-            <div class="drawer-intro">
-              <span class="drawer-kicker">Ficha del videoclub</span>
-              <h2>${escapeHtml(title)}</h2>
-              ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
-              <div class="drawer-byline">${[item.year, firstListValue(item.directors), listText(item.genres, 2)].filter(Boolean).map((value) => `<span>${escapeHtml(value)}</span>`).join("")}</div>
-            </div>
-          </section>
-          <section class="drawer-quick-actions" aria-label="Estado y disponibilidad">
-            <button class="drawer-state ${watched ? "active" : ""}" type="button" data-click="toggle-watched" data-id="${escapeAttr(item.id)}" data-status="${escapeAttr(item.status || "to_watch")}" aria-pressed="${watched}">
-              <span>Estado</span><strong>${watched ? "Vista" : "Pendiente"}</strong><small>${item.watched_at ? escapeHtml(item.watched_at) : "Sin fecha"}</small>
-            </button>
-            <div class="drawer-access" aria-label="Acceso a la obra">
-              <span class="detail-access-signal${availability.effective ? " is-available" : ""}" title="${escapeAttr(availability.origin)}">${availabilityIcon("library")}<span>Biblioteca<small>${availability.effective ? "Disponible" : "No disponible"}</small></span></span>
-              <span data-detail-streaming-signal>${streamingSignal(null, "loading")}</span>
-            </div>
-            <button class="drawer-state rating-state ${rating ? "active" : ""}" type="button" data-click="edit-personal" data-id="${escapeAttr(item.id)}">
-              <span>Mi puntaje</span><strong>${rating ? `${rating}/10` : "Sin puntuar"}</strong><small>Editar registro</small>
-            </button>
-          </section>
-          <section class="drawer-synopsis">
-            <h3>Sinopsis</h3>
-            <p>${escapeHtml(summary || "Todavía no hay una sinopsis disponible para esta película.")}</p>
-          </section>
-          <section class="drawer-section drawer-personal-section">
-            ${personalRecordPanel(item)}
-          </section>
-          <div class="detail-context" data-detail-context></div>
-          <details class="drawer-accordion">
-            <summary><span>Ficha técnica</span><small>Dirección, reparto y títulos</small></summary>
-            <div class="drawer-accordion-body">${factsPanel(item) || `<span class="status-line">Sin ficha enriquecida.</span>`}</div>
-          </details>
-          <details class="drawer-accordion">
-            <summary><span>Disponibilidad y fuentes</span><small>Archivos, catálogos y enlaces</small></summary>
-            <div class="drawer-accordion-body">
-              ${availabilityPanel(item)}
-              <div class="links">${detailLinks(item)}</div>
-              <button class="drawer-secondary-action" type="button" data-click="find-link" data-id="${escapeAttr(item.id)}">Buscar o completar enlaces</button>
-            </div>
-          </details>
-          ${metadataSection}
-          <details class="drawer-accordion danger-zone">
-            <summary><span>Mantenimiento</span><small>Acciones sensibles</small></summary>
-            <div class="drawer-accordion-body">
-              <p>Eliminar quita esta ficha del catálogo personal. No borra videos ni el inventario del servidor; otra ficha equivalente puede conservar la disponibilidad.</p>
-              <button class="danger" type="button" data-click="delete-item" data-id="${escapeAttr(item.id)}">Eliminar del catálogo</button>
-            </div>
-          </details>
-        `;
+        fields.detailBody.innerHTML = renderDetailEditor(item, {
+          personalRecordEditor, metadataEditorRow, availabilityPanel, detailLinks, drawerPoster
+        });
+        selectDetailSection(detailEditorSection, { focus: false });
         primeDetailForms();
         mountDetailContext(fields.detailBody.querySelector("[data-detail-context]"), item.id, fields.detailBody.querySelector("[data-detail-streaming-signal]"));
         syncDetailFeedback();
       }
 
       export function drawerPoster(item, title) {
-        const placeholder = `<div class="drawer-poster drawer-poster-placeholder poster-${posterVariant(item.id || title)}" aria-hidden="true"><span>Movie Inbox</span><strong>${escapeHtml(title)}</strong></div>`;
+        const placeholder = `<div class="drawer-poster drawer-poster-placeholder" aria-hidden="true"><strong class="vhs-title-tape">${escapeHtml(title)}</strong></div>`;
         const image = item.page_image
           ? `<img class="drawer-poster" data-poster-image src="${escapeAttr(cachedImageSrc(item.page_image))}" alt="Portada de ${escapeAttr(title)}" loading="eager" fetchpriority="high" decoding="async">`
           : "";
@@ -511,23 +445,82 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         </div>`;
       }
 
-      export function editPersonalRecord() {
-        if (!selectedDetailId || detailPersonalEditing) return;
-        if (detailDirtyScopes.has("metadata")) {
-          requestDetailTransition(editPersonalRecord);
-          return;
+      export function selectDetailSection(section, { focus = true } = {}) {
+        if (!EDITOR_SECTIONS.some(([key]) => key === section)) return;
+        detailEditorSection = section;
+        fields.detailBody.querySelectorAll("[data-editor-section]").forEach(panel => {
+          panel.hidden = panel.dataset.editorSection !== section;
+        });
+        fields.detailBody.querySelectorAll('[data-click="detail-section"]').forEach(button => {
+          if (button.dataset.section === section) button.setAttribute("aria-current", "page");
+          else button.removeAttribute("aria-current");
+        });
+        if (focus) {
+          const panel = fields.detailBody.querySelector(`[data-editor-section="${section}"]`);
+          panel?.setAttribute("tabindex", "-1");
+          panel?.focus({ preventScroll: true });
+          const content = fields.detailBody.querySelector(".vhs-editor-content");
+          if (content) content.scrollTop = 0;
         }
+      }
+
+      export function editVhsDossier() {
+        if (!selectedDetailId) return;
+        detailPresentation = "dossier";
         detailPersonalEditing = true;
+        detailEditorSection = "personal";
         renderDetail({ force: true });
-        const editor = fields.detailBody.querySelector("[data-detail-form='personal']");
-        editor?.scrollIntoView({ block: "center" });
-        requestAnimationFrame(() => editor?.querySelector("[data-personal-watched-at]")?.focus());
+        selectDetailSection("personal");
+      }
+
+      export function returnToVhsBack() {
+        if (detailEditorSaving) return;
+        requestDetailTransition(() => {
+          detailPresentation = "back-cover";
+          detailPersonalEditing = false;
+          renderDetail({ force: true });
+          requestAnimationFrame(() => fields.detailBody.querySelector(".vhs-edit-sticker")?.focus());
+        });
+      }
+
+      export function editPersonalRecord() {
+        if (!selectedDetailId) return;
+        if (detailPresentation === "back-cover") editVhsDossier();
+        selectDetailSection("personal");
+        requestAnimationFrame(() => fields.detailBody.querySelector("[data-personal-watched-at]")?.focus());
       }
 
       export function cancelPersonalEdit() {
-        detailDirtyScopes.delete("personal");
-        detailPersonalEditing = false;
-        renderDetail({ force: true });
+        returnToVhsBack();
+      }
+
+      export async function saveEditorChanges() {
+        if (detailEditorSaving || !hasUnsavedDetailChanges()) return;
+        detailEditorSaving = true;
+        const body = fields.detailBody;
+        const controls = [...fields.detailDrawer.querySelectorAll("button, input, select, textarea")].map(control => [control, control.disabled]);
+        controls.forEach(([control]) => { control.disabled = true; });
+        setDetailFeedback("Guardando cambios…", "working", 0);
+        try {
+          if (!await saveDirtyDetailForms()) {
+            const problem = body.querySelector("[data-personal-conflict]");
+            const dirtyForm = body.querySelector(`[data-detail-form="${detailDirtyScopes.has("personal") ? "personal" : "metadata"}"]`);
+            const panel = problem?.closest("[data-editor-section]") || dirtyForm?.closest("[data-editor-section]");
+            selectDetailSection(panel?.dataset.editorSection || "data");
+            problem?.focus();
+            return;
+          }
+          await loadCatalog(null, { preserveCollection: true });
+          setDetailFeedback("Cambios guardados", "success");
+          fields.detailBody.querySelector(`[data-click="detail-section"][data-section="${detailEditorSection}"]`)?.focus();
+        } catch (error) {
+          console.error("[catalog-viewer] editor save failed", error);
+          setDetailFeedback("No pudimos actualizar la ficha. Reintentá.", "error", 0);
+        } finally {
+          detailEditorSaving = false;
+          controls.forEach(([control, disabled]) => { if (control.isConnected) control.disabled = disabled; });
+          syncDetailFeedback();
+        }
       }
 
       export function detailLinks(item) {
@@ -584,10 +577,10 @@ import { editorialPersonalIds } from "../surfaces/home.js";
             : `<input data-metadata-field="${field}" type="text" value="${escapeAttr(value)}">`;
         return `<div class="metadata-row">
           <label>${escapeHtml(label)}${input}</label>
-          <div class="metadata-control">
+          <details class="metadata-control"><summary>Origen y bloqueo</summary>
             <span class="metadata-origin">${escapeHtml(source)}</span>
             <label class="lock-control"><input data-lock-field="${field}" type="checkbox" ${locked ? "checked" : ""}> Bloquear</label>
-          </div>
+          </details>
         </div>`;
       }
 
@@ -600,7 +593,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       export function serializeDetailForm(form) {
         const values = [...form.querySelectorAll("input, select, textarea")].map((control, index) => {
           const key = control.dataset.metadataField
-            || control.dataset.lockField
+            || (control.dataset.lockField ? `lock:${control.dataset.lockField}` : "")
             || control.name
             || String(index);
           const value = control.type === "checkbox" ? control.checked : control.value;
@@ -651,14 +644,19 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       export function syncDetailFeedback() {
         if (!fields.detailFeedback) return;
         const dirty = hasUnsavedDetailChanges();
-        fields.detailFeedback.textContent = dirty
+        fields.detailFeedback.textContent = ["error", "working"].includes(detailFeedbackState.tone) ? detailFeedbackState.message : dirty
           ? `Cambios sin guardar · ${detailDirtyScopes.size}`
           : detailFeedbackState.message;
         fields.detailFeedback.dataset.tone = dirty ? "dirty" : detailFeedbackState.tone;
         fields.detailDrawer.classList.toggle("has-dirty-detail", dirty);
+        const feedback = fields.detailBody.querySelector("[data-editor-feedback]");
+        if (feedback) feedback.textContent = fields.detailFeedback.textContent || "Sin cambios pendientes";
+        const save = fields.detailBody.querySelector("[data-editor-save]");
+        if (save) save.disabled = !dirty || detailEditorSaving;
       }
 
       export function requestDetailTransition(action) {
+        if (detailEditorSaving) return;
         if (!hasUnsavedDetailChanges()) {
           action();
           return;
@@ -672,7 +670,8 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         pendingDetailTransition = null;
         if (fields.unsavedDetailDialog.open) fields.unsavedDetailDialog.close();
         if (selectedDetailId) syncRoute({ movie: selectedDetailId }, "replace");
-        requestAnimationFrame(() => fields.detailBody.querySelector("[data-detail-form] input, [data-detail-form] select, [data-detail-form] textarea")?.focus());
+        const control = [...fields.detailBody.querySelectorAll("[data-detail-form] input, [data-detail-form] select, [data-detail-form] textarea")].find(element => element.checkVisibility());
+        requestAnimationFrame(() => control?.focus());
       }
 
       export function discardDetailChanges() {
@@ -700,16 +699,17 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         if (fields.unsavedDetailDialog.open) fields.unsavedDetailDialog.close();
         detailPersonalEditing = false;
         setDetailFeedback("Cambios guardados", "success");
-        await loadCatalog();
+        await loadCatalog(null, { preserveCollection: true });
         transition?.();
       }
 
       export async function saveDirtyDetailForms() {
+        const id = selectedDetailId;
         const personal = fields.detailBody.querySelector("[data-detail-form='personal']");
         const metadata = fields.detailBody.querySelector("[data-detail-form='metadata']");
-        if (detailDirtyScopes.has("personal") && !await persistPersonalForm(personal, selectedDetailId)) return false;
+        if (detailDirtyScopes.has("personal") && !await persistPersonalForm(personal, id)) return false;
         detailDirtyScopes.delete("personal");
-        if (detailDirtyScopes.has("metadata") && !await persistMetadataForm(metadata, selectedDetailId)) return false;
+        if (detailDirtyScopes.has("metadata") && !await persistMetadataForm(metadata, id)) return false;
         detailDirtyScopes.delete("metadata");
         syncDetailFeedback();
         return true;

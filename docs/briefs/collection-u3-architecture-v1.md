@@ -1,5 +1,9 @@
 # U3.1 — Arquitectura de Colección v1
 
+**Evolución 2026-09-28:** [U10](collection-counter-v1.md) sustituye el selector
+Explorar/Buscar/Agregar por búsqueda siempre visible y Agregar como acción.
+Los contratos de comparación, vinculación y filtros de este documento se conservan.
+
 **Estado:** aprobada por el usuario y congelada para implementación<br>
 **Fecha:** 2026-09-08<br>
 **Modo de superficie:** Operate<br>

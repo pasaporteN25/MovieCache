@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from movie_inbox.domain.catalog import merge_lists
 from movie_inbox.domain.releases import normalize_release_dates
-from movie_inbox.external.common import fetch_json_safe, object_dict, string_list
+from movie_inbox.external.common import fetch_json, fetch_json_safe, object_dict, string_list
 
 WIKIDATA_LIST_FIELDS = {
     "countries": ("P495", 8),
@@ -158,6 +158,33 @@ def fetch_wikidata_metadata(entity_id: str) -> dict[str, object]:
         if values:
             metadata[field] = values
     return metadata
+
+
+# [U7 B] Wikidata's own statements of a work's TMDb id.
+WIKIDATA_TMDB_PROPERTIES = (("movie", "P4947"), ("tv", "P4983"))
+
+
+def fetch_wikidata_tmdb_references(entity_id: str) -> list[tuple[str, str]]:
+    """(media_type, tmdb_id) pairs the entity states, with no title involved.
+
+    Raises on network failure, unlike the rest of this module: an unreachable
+    Wikidata must not read as "Wikidata names no TMDb id".
+    """
+
+    if not re.fullmatch(r"Q\d+", str(entity_id or "")):
+        return []
+    raw = fetch_json(
+        f"https://www.wikidata.org/wiki/Special:EntityData/{quote(entity_id)}.json", timeout=5
+    )
+    entity = object_dict(object_dict(raw.get("entities")).get(entity_id))
+    claims = object_dict(entity.get("claims"))
+    references: list[tuple[str, str]] = []
+    for media_type, prop in WIKIDATA_TMDB_PROPERTIES:
+        for statement in _ordered_statements(claims, prop):
+            value = str(_claim_value(statement) or "").strip()
+            if value.isdigit() and int(value) > 0 and (media_type, value) not in references:
+                references.append((media_type, str(int(value))))
+    return references
 
 
 def wikidata_kind(claims: dict[str, object]) -> str:

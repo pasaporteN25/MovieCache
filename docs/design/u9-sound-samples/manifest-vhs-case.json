@@ -1,0 +1,26 @@
+[
+  {
+    "file": "04-sacar-vhs.wav",
+    "audition": "04-sacar-vhs-escucha.wav",
+    "duration_ms": 440,
+    "peak_dbfs": -12.0,
+    "rms_dbfs": -27.16,
+    "sha256": "7892d3d6abab7ebb735bbb9cfaf00e778d5635229697e3038b462148f2295744"
+  },
+  {
+    "file": "05-abrir-caja.wav",
+    "audition": "05-abrir-caja-escucha.wav",
+    "duration_ms": 560,
+    "peak_dbfs": -12.0,
+    "rms_dbfs": -32.83,
+    "sha256": "4e99e084ef19a1a90ef3ace2ca48881c8f1a396b45fd25ff73fde6e0cb1f5bb3"
+  },
+  {
+    "file": "06-sacar-y-abrir.wav",
+    "audition": "06-sacar-y-abrir-escucha.wav",
+    "duration_ms": 1220,
+    "peak_dbfs": -12.0,
+    "rms_dbfs": -30.3,
+    "sha256": "1d68ae40133a7783b9bd0cf61431ce6107efde917c8ca60263ab7ae0a6980e5e"
+  }
+]

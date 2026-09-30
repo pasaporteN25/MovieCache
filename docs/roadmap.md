@@ -171,9 +171,36 @@ Orden y criterios en `design/v0-9-0-visual-closeout.md`; el plan U5/U8 anterior
 queda como antecedente. Retoques no bloqueantes irán a un fix posterior; no se
 posterga el gate de release. U7.5b, U9 y mobile web también quedan fuera.
 
+### v0.10.0 — abierta
+
+**U11, 2026-09-29:** cajas VHS con cinta, apertura a contratapa, marca/sticker propio
+y editor por tareas con guardado protegido. Fondo ambiental diferido por el owner.
+[Brief U11](briefs/vhs-case-editor-v1.md).
+
+**U10, 2026-09-28:** Colección unifica Explorar/Buscar con consulta siempre visible;
+Agregar conserva el contexto de regreso. Integra el mostrador material de Inicio,
+cinco portadas grandes por fila en escritorio y carga acumulativa de 30 obras.
+Plan y criterios: [brief U10](briefs/collection-counter-v1.md).
+
+Abierta el 2026-09-24 en la rama `release/0.10.0`; se cierra al fusionar su PR contra
+`master`, y hasta entonces se le suman cambios. Alcance todavía no fijado: queda del
+backlog de `tareas.md` — entre lo accionable, [U7] (imágenes de consola), [U8] (VHS al
+azar, postergada de la 0.9.0), [X11] (id durable por fuente, requisito para publicar
+`movieIndexAndroid` v0.1.0) y los traspasos de backend sin pantalla todavía.
+
+**Prioridad visual actualizada 2026-09-26:** U7 y U9, con U8 fuera de este corte.
+Primero se propone aprovechar imágenes existentes en la contratapa VHS actual
+(U7 A); después, sonido opcional por selección (U9). Adquisición/galería persistente
+(U7 B) tiene dependencias propias de lógica y no frena U9. Desglose y criterios en
+[`design/u7-u9-plan-2026-09-26.md`](design/u7-u9-plan-2026-09-26.md).
+Es planificación de pendientes, no cierre ni implementación de esas épicas.
+
+**Avance 2026-09-26:** U7 entrega A integrada (`0970482`). U8 se retomó a pedido del
+owner y quedó integrada el mismo día (merge `e179d6b`), con el efecto B elegido.
+
 ### Próximos incrementos propuestos
 
-- Se proponen al cerrar la 0.9.0.
+- Se proponen al cerrar la 0.10.0.
 
 ## Implementado en el incremento de descubrimiento y scanner
 
@@ -316,6 +343,9 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
    nuevos de `kind`.
 
 ### Evolución visual de Home — plan 2026-09-12
+
+Antecedente histórico. Para destino de U7, prioridad de U9 y postergación de U8,
+prevalece el [corte del 2026-09-26](design/u7-u9-plan-2026-09-26.md).
 
 El owner aceptó la base continua y consola única U4.2d.3. U4.3 integró B el
 2026-09-13 tras la elección U6.1; U4.4 ya está implementada y U4.6a verificada.
