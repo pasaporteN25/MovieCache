@@ -1,8 +1,9 @@
 # Preparación de release/0.10.0
 
-Estado al 2026-09-29: abierta. PR [#2](https://github.com/pasaporteN25/MovieCache/pull/2)
-contra `master`. El owner pidió dejarlo listo para revisar, sin fusionarlo todavía.
-Se conserva la versión `0.10.0.dev0` y el changelog en «Sin publicar» hasta el cierre.
+Estado al 2026-09-29: el PR [#2](https://github.com/pasaporteN25/MovieCache/pull/2)
+se fusionó en `c28745c` con `0.10.0.dev0`. El owner informó que completó la
+aceptación manual. El cierre de versión estable se hace en un merge adicional para
+preservar la regla de no commitear directamente en `master`.
 
 ## Trabajo ya guardado
 
@@ -33,7 +34,7 @@ además de Ruff y mypy sobre los cambios. Eso no sustituye el gate final de rele
 El fondo fotográfico del editor continúa diferido por el owner; no implementarlo
 automáticamente al preparar la rama. No mezclar la integración de sonido con los retoques.
 
-## Antes del merge
+## Cierre de versión
 
 - [x] Completar y revisar los retoques acordados.
 - [x] Actualizar changelog y evidencia conforme al resultado final.
@@ -43,10 +44,12 @@ automáticamente al preparar la rama. No mezclar la integración de sonido con l
   `0.10.0.dev0` construido e instalado en un entorno limpio con assets verificados.
   La suite detectó un test dependiente de la resolución del reloj de Windows;
   las notas de rate limit usan ahora un cursor secuencial y el gate volvió a pasar.
-- [ ] Confirmar CI del último commit y estado del PR contra `master`.
-- [ ] Cerrar versión/changelog siguiendo la sección 8 del checklist.
-- [ ] Aceptación manual sobre biblioteca descartable y backup/restauración Docker:
-  pendiente; este equipo no tiene Docker ni hay servidor de pruebas disponible.
-- [ ] Fusionar después de completar la aceptación y revisar el PR.
+- [x] Confirmar CI del último commit del PR #2: siete jobs en verde.
+- [x] Aceptación manual informada por el owner el 2026-09-29. No se adjuntó a este
+  checkout un registro de pasos, backup o restauración; no se afirma evidencia técnica
+  que no esté disponible aquí.
+- [ ] Integrar el cierre de `0.10.0` en `master` mediante merge commit y verificar CI.
+- [ ] Crear y subir el tag anotado `v0.10.0` sobre ese merge commit.
+- [ ] Publicar el GitHub Release de `v0.10.0`.
 
-Esta preparación no es un merge ni un despliegue.
+Este documento registra el cierre; no representa un despliegue.
