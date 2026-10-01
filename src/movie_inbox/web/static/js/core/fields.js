@@ -216,6 +216,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         clearManualSearch: document.querySelector("#clearManualSearch"),
         manualSearchStatus: document.querySelector("#manualSearchStatus"),
         manualSearchResults: document.querySelector("#manualSearchResults"),
+        duplicateReview: document.querySelector("#duplicateReview"),
         externalSearchSection: document.querySelector("#externalSearchSection"),
         catalogMergeSection: document.querySelector("#catalogMergeSection"),
         catalogMergeKicker: document.querySelector("#catalogMergeKicker"),

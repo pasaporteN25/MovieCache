@@ -711,6 +711,19 @@ no repite su auditoría como si fuera vigente. Plan: `home-evolution-backlog-202
 
 ## En curso
 
+### [U12] Mesa de búsqueda y revisión de coincidencias — v0.11.0
+
+Dirección aprobada 2026-10-01: filas compactas por fuente y comparación integrada
+en la búsqueda. [Brief](docs/briefs/search-workbench-v1.md). La primera entrega
+actualiza resultados externos y la decisión ante `possible_duplicate`, sin cambiar
+matching ni el comparador de campos.
+
+- [x] U12.1 Estructura de resultados externos y revisión de duplicados.
+- [x] U12.2 Gate de interacción, accesibilidad y responsive con datos descartables.
+- [x] U12.3 Revisión visual y cierre de esta entrega; la release sigue abierta.
+
+Las notas históricas de v0.9.0 que siguen debajo aún no se depuraron.
+
 [U4.2c] integrada en Home tras aprobación de [U4.2b]. Playlist ampliada sin scroll
 interno desktop, material continuo y aberturas con apoyo compartido. Comprobación
 con app real/datos desechables; revisión independiente aplicada. Aceptación

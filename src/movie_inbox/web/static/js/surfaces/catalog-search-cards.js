@@ -35,27 +35,27 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
       export function searchResult(result, index) {
         const description = result.description || result.wikipedia_extract || "";
         const similarity = selectedExistingIdForSearch ? candidateSimilarity(result) : "";
-        const primaryAction = selectedExistingIdForSearch ? "Combinar" : "Agregar";
+        const primaryAction = selectedExistingIdForSearch ? "Combinar" : "Agregar a colección";
         const shownTitle = displayTitle(result);
         const subtitle = titleSubtitle(result);
-        return `<article class="search-result compact-result">
+        const badges = [
+          result._search?.reason === "director_match" ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(result._search))}</span>` : "",
+          !result.url ? `<span class="pill muted">Sin enlace de fuente</span>` : ""
+        ].filter(Boolean).join("");
+        return `<article class="search-result compact-result external-result" data-result-index="${index}">
           ${resultMedia(shownTitle, result.page_image, index < 6)}
           <div class="result-body">
             <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
             <div class="meta">
-              ${meta(sourceLabel(result.source))}${meta(result.year)}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(result.url ? new URL(result.url).hostname.replace(/^www\./, "") : "")}${meta(similarity)}
+              ${meta(result.year)}${meta(result.kind)}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(similarity)}
             </div>
-            <div class="card-badges">
-              ${result._search?.reason === "director_match" ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(result._search))}</span>` : ""}
-              <span class="pill good">${escapeHtml(sourceLabel(result.source))}</span>
-              <span class="pill ${result.url ? "good" : "muted"}">${result.url ? "con referencia" : "sin referencia"}</span>
-            </div>
+            ${badges ? `<div class="card-badges">${badges}</div>` : ""}
             ${searchDescription(description, "manual", index)}
             <div class="result-actions">
               <button class="action-primary" data-click="add-result" data-index="${index}">${primaryAction}</button>
-              <button class="action-secondary" type="button" data-click="prepare-merge" data-index="${index}">Comparar</button>
-              ${result.url ? `<a class="action-secondary span-all" href="${escapeAttr(result.url)}" target="_blank" rel="noreferrer">Detalle</a>` : ""}
+              <button class="action-secondary" type="button" data-click="prepare-merge" data-index="${index}">Comparar con mi colección</button>
+              ${result.url ? `<a class="action-secondary" href="${escapeAttr(result.url)}" target="_blank" rel="noreferrer">Abrir en ${escapeHtml(sourceLabel(result.source))}</a>` : ""}
             </div>
           </div>
         </article>`;
@@ -76,7 +76,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
         const more = text.length > 90
           ? `<button class="description-more" type="button" data-click="show-description" data-collection="${escapeAttr(collection)}" data-key="${escapeAttr(key)}">Ver más</button>`
           : "";
-        return `<p class="result-summary">${escapeHtml(text)}</p>${more}`;
+        return `<p class="result-summary${more ? "" : " summary-full"}">${escapeHtml(text)}</p>${more}`;
       }
 
       export function candidateSimilarity(result) {
@@ -215,27 +215,46 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
       }
 
       export function showDuplicateChoice(index, candidates) {
-        const blocks = candidates.map((candidate) => `
-          <div>
-            <strong>${escapeHtml(candidate.title || "Sin titulo")}</strong>
-            <div class="meta">
-              ${meta(candidate.year)}${meta(candidate.source)}${meta(firstListValue(candidate.genres))}${meta(firstListValue(candidate.directors))}${meta(isInCatalog(candidate.en_catalogo) ? "disponibilidad manual: sí" : "disponibilidad manual: no")}
+        const incoming = manualResults[index] || {};
+        const title = displayTitle(incoming) || "Sin título";
+        const blocks = candidates.map((candidate) => `<article class="duplicate-candidate">
+          <div class="duplicate-candidate-main">
+            <strong>${escapeHtml(displayTitle(candidate) || candidate.title || "Sin título")}</strong>
+            <span class="duplicate-candidate-reason">${escapeHtml(searchReasonLabel({ reason: candidate.reason }))}</span>
+            <div class="meta">${meta(candidate.year)}${meta(candidate.kind)}${meta(firstListValue(candidate.directors))}</div>
+          </div>
+          <div class="duplicate-candidate-actions">
+            <button class="duplicate-compare" type="button" data-click="merge-result" data-index="${index}" data-id="${escapeAttr(candidate.id)}">Comparar y combinar</button>
+            <button class="duplicate-open" type="button" data-click="open-detail" data-id="${escapeAttr(candidate.id)}">Abrir ficha guardada</button>
+          </div>
+        </article>`).join("");
+        fields.duplicateReview.dataset.index = String(index);
+        fields.duplicateReview.innerHTML = `<section aria-labelledby="duplicateReviewTitle">
+          <header class="duplicate-review-header">
+            <div>
+              <h3 id="duplicateReviewTitle" tabindex="-1">Revisá esta posible coincidencia</h3>
+              <p>Esta obra todavía no se agregó. Elegí si corresponde a una ficha guardada.</p>
+            </div>
+            <button class="duplicate-dismiss" type="button" data-click="dismiss-duplicate">Seguir buscando</button>
+          </header>
+          <div class="duplicate-review-layout">
+            <div class="duplicate-incoming">
+              <span>Querés agregar</span>
+              <strong>${escapeHtml(title)}</strong>
+              <div class="meta">${meta(incoming.year)}${meta(incoming.kind)}${meta(sourceLabel(incoming.source))}</div>
+            </div>
+            <div class="duplicate-candidates">
+              <h4>En tu colección · ${candidates.length}</h4>
+              ${blocks || `<p class="duplicate-empty">No llegaron candidatas para comparar. Podés seguir buscando o agregarla como obra distinta.</p>`}
             </div>
           </div>
-          <div class="duplicate-actions">
-            <button data-click="merge-result" data-index="${index}" data-id="${escapeAttr(candidate.id)}">Combinar</button>
-            ${candidate.url ? `<a href="${escapeAttr(candidate.url)}" target="_blank" rel="noreferrer">Ver existente</a>` : ""}
-          </div>
-        `).join("");
-        fields.manualSearchResults.insertAdjacentHTML("afterbegin", `
-          <section class="duplicate-box">
-            <strong>Posible duplicado encontrado</strong>
-            <span>Ya existe una entrada con titulo y año parecidos. Podés combinarla, agregar igual o cancelar.</span>
-            ${blocks}
-            <div class="duplicate-actions">
-              <button data-click="force-add" data-index="${index}">Agregar igual</button>
-              <button data-click="run-search">Cancelar</button>
-            </div>
-          </section>
-        `);
+          <details class="duplicate-distinct">
+            <summary>Es otra obra distinta</summary>
+            <p>Se creará una segunda ficha aunque tenga un título parecido. Comprobá que no sea la misma obra antes de seguir.</p>
+            <button type="button" data-click="force-add" data-index="${index}">Agregar como obra distinta</button>
+          </details>
+        </section>`;
+        fields.duplicateReview.hidden = false;
+        fields.duplicateReview.scrollIntoView({ block: "nearest" });
+        fields.duplicateReview.querySelector("#duplicateReviewTitle")?.focus({ preventScroll: true });
       }

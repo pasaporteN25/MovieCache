@@ -4,6 +4,15 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Cambiado
+
+- La búsqueda externa de Colección presenta fichas compactas por fuente, con acciones
+  identificadas y sin carriles horizontales de tarjetas altas.
+- Las coincidencias que requieren revisión se comparan en la búsqueda con el motivo
+  de cada candidata; abrir una ficha guardada ya no lleva a la fuente externa.
+  Seguir buscando conserva los resultados y agregar una obra distinta requiere una
+  confirmación explícita.
+
 ## [0.10.0] - 2026-09-29
 
 ### Agregado

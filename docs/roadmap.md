@@ -192,6 +192,14 @@ del owner y se integró en `e179d6b` con el efecto B. La galería/corrección co
 U7 y el sonido opcional U9 siguen pendientes; ver
 [`design/u7-u9-plan-2026-09-26.md`](design/u7-u9-plan-2026-09-26.md).
 
+### v0.11.0 — en desarrollo
+
+Primer frente [U12]: búsqueda externa como mesa de consulta del videoclub, con filas
+compactas por fuente y revisión de posibles duplicados dentro de la búsqueda.
+Conserva el matching y el comparador detallado. Dirección, tareas y estados:
+[brief U12](briefs/search-workbench-v1.md). La versión sigue abierta para los demás
+componentes que se decidan rediseñar; todavía no tiene gate de cierre.
+
 ### Próximos incrementos propuestos
 
 - Ver el backlog vigente en [`tareas.md`](../tareas.md).

@@ -814,7 +814,12 @@ import { renderEditorialHome } from "./home.js";
         fields.sourceFiles.textContent = sourceFiles.length;
         fields.catalogSummary.textContent = catalogSummaryText(filtered);
         fields.empty.style.display = filtered.length ? "none" : "block";
-        if (activeQuery) {
+        const searchingExternalSources = activeQuery && fields.externalSource.checked;
+        fields.empty.classList.toggle("collection-empty-inline", Boolean(searchingExternalSources));
+        if (searchingExternalSources) {
+          fields.empty.innerHTML = `<strong>Sin coincidencias en tu colección para “${escapeHtml(activeQuery)}”.</strong>
+            <span>Revisá los resultados de otras fuentes más abajo.</span>`;
+        } else if (activeQuery) {
           fields.empty.innerHTML = `<strong>No aparece “${escapeHtml(activeQuery)}” en esta estantería.</strong>
             <span>Probá quitando filtros o ampliá la búsqueda a fuentes externas.</span>
             <div class="collection-empty-actions">

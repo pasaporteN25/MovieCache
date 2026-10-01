@@ -13,7 +13,7 @@ import { archiveMemberAccount, closeArchiveMemberDialog, closeEditMemberDialog, 
 import { createPublicPresentation, handlePublicPresentationAction, previewPublicPresentation } from "../surfaces/admin-public-presentations.js";
 import { addStreamingRegion, handleStreamingAction, loadStreamingConfiguration, saveStreamingPolicy } from "../surfaces/admin-streaming.js";
 import { applyCollectionYearRange, changeCollectionMode, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
-import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
+import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, dismissDuplicateReview, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
 import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay, toggleHomeSummary } from "../surfaces/home.js";
 import { drawHomeRandom, includeUnavailableInHomeRandom, syncHomeRandomScope } from "../surfaces/home-random.js";
@@ -96,6 +96,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "prepare-merge": () => prepareManualMerge(index),
           "show-description": () => openSearchDescription(target.dataset.collection || "", target.dataset.key || ""),
           "force-add": () => forceAddSearchResult(index),
+          "dismiss-duplicate": dismissDuplicateReview,
           "clear-filter": () => clearFilter(target.dataset.filter || "", target.dataset.value || ""),
           "clear-all-collection-filters": clearFilters,
           "toggle-collection-filter": () => toggleCollectionFilter(target.dataset.filter || "", target.dataset.value || ""),

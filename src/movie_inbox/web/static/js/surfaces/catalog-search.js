@@ -111,6 +111,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export async function runSearch({ updateHistory = true } = {}) {
+        resetDuplicateReview();
         const requestedQuery = fields.query.value.trim();
         fields.collectionUtilityMenu.open = false;
         if (!requestedQuery) {
@@ -393,6 +394,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export async function searchManual(source = "all", statusPrefix = "") {
         const query = fields.query.value.trim();
         if (query.length < 2) return;
+        resetDuplicateReview();
         const includeExternal = fields.externalSource.checked || ["add", "link"].includes(collectionSearchMode);
         fields.externalSource.checked = includeExternal;
         if (externalSearchController) externalSearchController.abort();
@@ -454,6 +456,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export async function retryExternalSource(source) {
         const query = fields.query.value.trim();
         if (!isExternalSourceConfigured(source) || !EXTERNAL_SEARCH_SOURCES.includes(source) || query.length < 2 || externalSearchController) return;
+        resetDuplicateReview();
         const controller = new AbortController();
         externalSearchController = controller;
         if (!externalSourcesAttempted.includes(source)) externalSourcesAttempted.push(source);
@@ -507,6 +510,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         resetExternal = false,
         forceModeChange = false
       } = {}) {
+        resetDuplicateReview();
         const hadSearch = Boolean(activeQuery || fields.query.value.trim());
         if (["compare", "link"].includes(collectionSearchMode) && !forceModeChange) {
           fields.query.value = "";
@@ -761,11 +765,10 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export async function addSearchResult(index) {
-        const cards = [...fields.manualSearchResults.querySelectorAll("[data-index]")];
-        const button = cards.find((element) => Number(element.dataset.index) === index);
+        const button = fields.manualSearchResults.querySelector(`.external-result [data-click="add-result"][data-index="${index}"]`);
         if (!button) return;
         const targetId = selectedExistingIdForSearch;
-        const idleLabel = targetId ? "Combinar" : "Agregar";
+        const idleLabel = targetId ? "Combinar" : "Agregar a colección";
         let completed = false;
         button.disabled = true;
         button.textContent = targetId ? "Preparando..." : "Agregando...";
@@ -822,9 +825,32 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export async function forceAddSearchResult(index) {
-        await postAdd(manualResults[index], "force", "");
-        await load();
-        await runSearch();
+        const button = fields.duplicateReview.querySelector('[data-click="force-add"]');
+        if (button) button.disabled = true;
+        try {
+          const response = await postAdd(manualResults[index], "force", "");
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          resetDuplicateReview();
+          await load();
+          await runSearch();
+        } catch (error) {
+          console.error("[catalog-viewer] force add failed", error);
+          reportExternalResultProblem("No pudimos agregar la obra distinta. Reintentá desde esta revisión.");
+          if (button?.isConnected) button.disabled = false;
+        }
+      }
+
+      export function resetDuplicateReview() {
+        fields.duplicateReview.hidden = true;
+        fields.duplicateReview.innerHTML = "";
+        delete fields.duplicateReview.dataset.index;
+      }
+
+      export function dismissDuplicateReview() {
+        const index = fields.duplicateReview.dataset.index;
+        resetDuplicateReview();
+        fields.manualSearchResults.querySelector(`.external-result [data-click="add-result"][data-index="${index}"]`)
+          ?.focus({ preventScroll: true });
       }
 
       export async function postAdd(result, action, targetId) {
