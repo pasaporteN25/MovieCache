@@ -52,6 +52,8 @@ from movie_inbox.domain.curation import curation_item_reference, duplicate_decis
 from movie_inbox.domain.metadata import (
     normalize_external_positive_id,
     normalize_local_files,
+    normalize_locked_fields,
+    normalize_metadata_sources,
     normalize_optional_positive_int,
 )
 from movie_inbox.domain.normalization import normalize_kind, normalize_search_text
@@ -480,6 +482,62 @@ def _media_label(media_type: str) -> str:
 
 def _language_name(code: str) -> str:
     return LANGUAGE_NAMES.get(code, code)
+
+
+def identity_resolution_target(item: Mapping[str, Any]) -> WikipediaArticle | None:
+    """The Wikipedia article whose Wikidata id this entry still lacks, if any.
+
+    [X12 B]: entries saved before every Wikipedia result carried its Wikidata id
+    only have the article link. That id is what joins the English and the
+    Spanish article of one film, so it is worth one batched lookup to fill in.
+    """
+
+    if str(item.get("wikidata_id") or "").strip():
+        return None
+    if "wikidata_id" in normalize_locked_fields(item.get("locked_fields")):
+        return None
+    articles = wikipedia_articles(item)
+    return articles[0] if articles else None
+
+
+def apply_resolved_identity(
+    item: MutableMapping[str, Any], wikidata_id: str, year: str, now: str
+) -> list[str]:
+    """Fill the Wikidata id, and the year when missing, without overriding anyone.
+
+    Only empty fields are written and locked fields never are (invariant 5).
+    Each written field says it came from Wikidata. Returns the fields written.
+    """
+
+    entity = str(wikidata_id or "").strip().upper()
+    if not _WIKIDATA_ID.match(entity):
+        return []
+    locked = set(normalize_locked_fields(item.get("locked_fields")))
+    source = {
+        "source": "wikidata",
+        "url": f"https://www.wikidata.org/wiki/{entity}",
+        "updated_at": now,
+        "inferred": False,
+    }
+    written: list[str] = []
+    if not str(item.get("wikidata_id") or "").strip() and "wikidata_id" not in locked:
+        item["wikidata_id"] = entity
+        written.append("wikidata_id")
+    release_year = str(year or "").strip()
+    if (
+        release_year
+        and _NUMERIC_TITLE.fullmatch(release_year)
+        and not str(item.get("year") or "").strip()
+        and "year" not in locked
+    ):
+        item["year"] = release_year
+        written.append("year")
+    if written:
+        sources = dict(normalize_metadata_sources(item.get("metadata_sources")))
+        for field_name in written:
+            sources[field_name] = dict(source)
+        item["metadata_sources"] = sources
+    return written
 
 
 def duplicate_verdict(left: WorkProfile, right: WorkProfile) -> IdentityVerdict:

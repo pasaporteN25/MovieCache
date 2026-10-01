@@ -17,7 +17,7 @@ import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescript
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
 import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay, toggleHomeSummary } from "../surfaces/home.js";
 import { drawHomeRandom, includeUnavailableInHomeRandom, syncHomeRandomScope } from "../surfaces/home-random.js";
-import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, searchCurationQueue } from "../surfaces/inbox-curation.js";
+import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, resolveIdentities, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
 
@@ -266,6 +266,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.persistCurationHistory.addEventListener("change", changeCurationHistoryMode);
       fields.clearCurationHistory.addEventListener("click", clearCurationHistory);
       fields.autoResolveCuration.addEventListener("click", autoResolveDuplicates);
+      fields.resolveIdentitiesCuration.addEventListener("click", resolveIdentities);
       fields.randomButton.addEventListener("click", runRandomCommand);
       fields.randomCatalogOnly.addEventListener("change", () => {
         changeRandomScope(fields.randomCatalogOnly);

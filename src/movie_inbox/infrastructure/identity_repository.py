@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 24
+INSTANCE_SCHEMA_VERSION = 25
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -532,6 +532,16 @@ ALTER TABLE archived_catalog_sources ADD COLUMN source_uid TEXT NOT NULL DEFAULT
 UPDATE archived_catalog_sources SET source_uid = lower(hex(randomblob(16)));
 """
 
+# [X12 B]: Wikipedia articles that answered without a Wikidata id, so the
+# background resolution asks about them again after a month and not every pass.
+# Keyed by language and article, not by entry: the answer is about the article.
+INSTANCE_SCHEMA_V25 = """
+CREATE TABLE identity_resolution_misses (
+    article_key TEXT PRIMARY KEY,
+    attempted_at INTEGER NOT NULL
+);
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -556,6 +566,7 @@ INSTANCE_MIGRATIONS = {
     22: ("receipts for works a phone added while offline", INSTANCE_SCHEMA_V22),
     23: ("the record of works removed from a catalogue", INSTANCE_SCHEMA_V23),
     24: ("a durable id per catalogue source", INSTANCE_SCHEMA_V24),
+    25: ("wikipedia articles without a wikidata id", INSTANCE_SCHEMA_V25),
 }
 
 

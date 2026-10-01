@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote
 
@@ -400,6 +401,31 @@ def fetch_wikidata_labels(entity_ids: list[str]) -> dict[str, str]:
             if label:
                 labels[str(item_id)] = label
     return labels
+
+
+def fetch_wikidata_release_years(entity_ids: Sequence[str]) -> dict[str, str]:
+    """[X12 B] The first-release year of each entity, fifty per request."""
+
+    unique_ids = [
+        entity
+        for entity in dict.fromkeys(str(value).strip().upper() for value in entity_ids)
+        if re.fullmatch(r"Q[1-9]\d*", entity)
+    ]
+    years: dict[str, str] = {}
+    for index in range(0, len(unique_ids), 50):
+        chunk = unique_ids[index : index + 50]
+        raw = fetch_json(
+            "https://www.wikidata.org/w/api.php?action=wbgetentities&format=json"
+            f"&props=claims&ids={quote('|'.join(chunk), safe='|')}",
+            timeout=8,
+        )
+        for entity_id, entity in object_dict(raw.get("entities")).items():
+            if not isinstance(entity, dict):
+                continue
+            year = wikidata_claim_year(object_dict(entity.get("claims")), "P577")
+            if year:
+                years[str(entity_id)] = year
+    return years
 
 
 def wikidata_label(labels: dict[str, object]) -> str:

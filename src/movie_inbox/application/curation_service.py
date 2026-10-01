@@ -85,12 +85,16 @@ def _duplicate_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ]
         evidence: list[str] = []
         certain = False
+        by_external_id = False
         for (left_reference, right_reference), _ in component_edges:
             verdict = duplicate_verdict(
                 work_profile(by_reference[left_reference]),
                 work_profile(by_reference[right_reference]),
             )
             certain = certain or verdict.level == "same"
+            by_external_id = by_external_id or (
+                verdict.level == "same" and verdict.reason != "exact_title_year"
+            )
             for row in verdict.evidence or ("La similitud del catálogo requiere revisión manual",):
                 if row not in evidence:
                     evidence.append(row)
@@ -106,6 +110,8 @@ def _duplicate_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 # [X12]: how sure the case is, so the queue can lead with the
                 # ones an external id already settles.
                 "level": "same" if certain else "possible",
+                # What settled it: a shared external id, or title and year.
+                "basis": ("external_id" if by_external_id else "title_year" if certain else ""),
                 "reason": "Misma obra" if certain else "Posible obra repetida",
                 "evidence": evidence,
                 "members": [
@@ -179,7 +185,8 @@ def _case_sort_key(case: Mapping[str, Any]) -> tuple[int, int, int, str]:
     return (
         1 if case.get("status") == "deferred" else 0,
         0 if case.get("type") == "duplicate" else 1,
-        # Settled by an external id first: those take one look to confirm.
-        0 if case.get("level") == "same" else 1,
+        # Settled by an external id first: those take one look to confirm. Then
+        # title and year, then the open questions.
+        {"external_id": 0, "title_year": 1}.get(str(case.get("basis") or ""), 2),
         title,
     )

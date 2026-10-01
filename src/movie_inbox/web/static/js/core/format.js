@@ -38,6 +38,14 @@
       // stripped it still carry it, so the display drops it too.
       const WIKIPEDIA_DISAMBIGUATOR = /\s*\((?=[^()]*\b(?:film|movie|tv series|television series|miniseries|series|documentary|anime|animated|short|pel[ií]cula|serie|miniserie|documental|telefilme|cortometraje|largometraje)\b)[^()]*\)\s*$/i;
 
+      const KIND_LABELS = { pelicula: "Película", serie: "Serie", anime: "Anime", documental: "Documental" };
+
+      // The stored kind is a key ("pelicula"); people read "Película".
+      export function kindLabel(value) {
+        const key = String(value || "").trim().toLowerCase();
+        return KIND_LABELS[key] || (key ? key.charAt(0).toUpperCase() + key.slice(1) : "");
+      }
+
       export function stripWikipediaDisambiguator(value) {
         const text = String(value || "");
         return text.replace(WIKIPEDIA_DISAMBIGUATOR, "").trim() || text.trim();

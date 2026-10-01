@@ -124,6 +124,7 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         persistCurationHistory: document.querySelector("#persistCurationHistory"),
         clearCurationHistory: document.querySelector("#clearCurationHistory"),
         autoResolveCuration: document.querySelector("#autoResolveCuration"),
+        resolveIdentitiesCuration: document.querySelector("#resolveIdentitiesCuration"),
         curationFeedback: document.querySelector("#curationFeedback"),
         curationQueueTitle: document.querySelector("#curationQueueTitle"),
         curationQueueMeta: document.querySelector("#curationQueueMeta"),

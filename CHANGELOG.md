@@ -6,12 +6,23 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Antes de actualizar
 
-- **Hacé un backup: `instance.db` no vuelve atrás.** Pasa del esquema v23 al v24 apenas se
+- **Hacé un backup: `instance.db` no vuelve atrás.** Pasa del esquema v23 al v25 apenas se
   abre, y la 0.10.0 se niega a abrirlo después. Los catálogos (JSON y `movie-inbox.db`) no
   cambian de formato.
 - **Los teléfonos apareados ven cambiar una vez el id de todas sus obras.** Un teléfono que
   ya tenía una réplica tiene que volver a descargarla, y los cambios que no había subido
   quedan sin obra a la que aplicarse: sincronizalo antes de actualizar.
+
+### Agregado
+
+- Las fichas que sólo tienen un enlace a Wikipedia reciben su id de Wikidata, y el año
+  si les falta [X12]. Es lo que permite reconocer la misma obra en dos idiomas. El
+  servidor lo hace solo y despacio, 50 fichas cada 5 minutos
+  (`--identity-resolution-interval-seconds`; `0` lo apaga). Para hacerlo de una vez:
+  el botón «Completar identidades» de Curaduría, que muestra cuántas faltan, o
+  `movie-inbox identity resolve <catálogo>`. Nunca pisa un campo con valor ni uno
+  bloqueado. Cada campo escrito queda registrado como dato de Wikidata. Un artículo
+  que Wikipedia devuelve sin id no se vuelve a consultar hasta dentro de un mes.
 
 ### Cambiado
 
@@ -30,6 +41,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   el mismo archivo). Si tienen ids distintos de la misma fuente, son obras distintas y no
   aparecen: dos *Frankenstein* enriquecidas ya no se proponen como repetidas. Nada de
   esto se une solo; la decisión sigue siendo de una persona.
+- Al unir o decidir un caso en Curaduría, la cola ya no vuelve al primer caso: queda
+  seleccionado el siguiente, con el foco y el scroll donde estaban. «Resolver
+  duplicados claros» sólo une los casos que son la misma obra, nunca los «posibles».
+  Las fichas de la cola muestran el título limpio y el tipo legible («Película»).
 - Los títulos que llegan de Wikipedia ya no arrastran el desambiguador del artículo:
   «Kingdom of Heaven (film)» se guarda y se muestra como «Kingdom of Heaven». El nombre
   del artículo se conserva aparte, y las fichas guardadas antes se muestran sin él.

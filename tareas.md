@@ -588,11 +588,25 @@ commit por fase.
   corroboración (dirección, duración ±3 min o el mismo archivo) y sin ids que se
   contradigan. Se quitan los desambiguadores de Wikipedia del título. Gate de búsqueda:
   32/32, precisión de auto-match 1.000. Diagnóstico multilingüe: PASS.
-- [ ] **B. Completar identidades** en segundo plano, con un botón en Curaduría y el
-  comando `movie-inbox identity resolve`.
-- [ ] **C. Curaduría:**
-  - evidencia legible y casos seguros primero en la interfaz;
-  - foco en el caso siguiente después de unir;
+- [x] **B. Completar identidades** (2026-10-01).
+  - `application/identity_resolution_service.py`: lotes de 50 artículos por idioma, más
+    el año desde Wikidata (P577). Sólo escribe campos vacíos y no bloqueados.
+  - Un artículo sin id se recuerda un mes en `identity_resolution_misses` (esquema de
+    instancia v25).
+  - Un corte de red nunca se registra como «sin id».
+  - Corre en segundo plano cada 300 s (`--identity-resolution-interval-seconds`). En
+    los tests está apagado, porque `ViewerConfig` arranca con 0.
+  - Botón «Completar identidades (N)» en Curaduría, que sólo toca el catálogo propio.
+  - `movie-inbox identity resolve`, que imprime sólo conteos.
+- [x] **C1. Que se entienda por qué** (2026-10-01). Cada caso dice «Misma obra» o
+  «Posible duplicado», y por qué: «Confirmada por un identificador externo» o «Mismo
+  título y mismo año». Los confirmados por id van primero. «Resolver duplicados claros»
+  ya no une casos «posibles» (invariante 3); test incluido.
+- [x] **C2. Foco después de unir** (2026-10-01). La selección no se borra: si el caso
+  seleccionado sale de la cola, toma su lugar el que queda en esa posición (el
+  siguiente). Si el foco estaba en la cola o en el caso, vuelve al seleccionado, y se
+  conserva el scroll. Verificado con Playwright.
+- [ ] **C. Curaduría, lo que falta:**
   - búsqueda de referencia dentro del caso;
   - dos copias o idiomas en la biblioteca;
   - unir como partes;
@@ -603,6 +617,29 @@ commit por fase.
   - flechas sutiles en la contratapa;
   - calendario propio;
   - 10 estrellas.
+
+#### [X13] Claves de API desde el menú — *decidida el 2026-10-01, después de X12*
+
+- **Decisión del owner:** el dueño puede cargar las claves (hoy, el token de TMDb) desde
+  un panel de administración. Se guardan en un **archivo aparte** con permisos 600, en el
+  directorio de datos y fuera de `instance.db`, para que un backup o una copia de la base
+  no lleve la clave. Al restaurar en otra máquina hay que volver a cargarla.
+- El campo nunca muestra el valor guardado (sólo «configurada · …a1b2»), y la app usa
+  la clave nueva sin reiniciar.
+- Si la clave viene de Docker (`*_FILE`), el panel muestra «la administra el servidor» y
+  no deja pisarla.
+- Sin HTTPS sólo se acepta desde la misma máquina, para que la clave no viaje en texto
+  plano por la red.
+
+#### [X14] HTTPS en la red de casa sin openssl — *decidida el 2026-10-01, después de X12*
+
+- `movie-inbox tls init --ip 192.168.x.x` genera el certificado autofirmado con el
+  `subjectAltName` correcto y permisos 600.
+- Variables en `compose.yaml` para activar `--ssl-certfile` / `--ssl-keyfile` sin editar
+  el `command`.
+- Ya existe: el proceso sirve TLS y deriva solo el pin de apareamiento
+  (`docs/deployment.md`, «HTTPS en la red local, sin dominio»). Lo que falta es no tener
+  que usar openssl a mano.
 
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 

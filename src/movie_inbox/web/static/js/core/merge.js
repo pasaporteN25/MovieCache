@@ -7,7 +7,7 @@ import { asList, escapeAttr, escapeHtml, formatDateTime, normalizeText, sourceLa
 import { apiFetch } from "./http.js";
 import { items, setSelectedExistingIdForSearch } from "./state.js";
 import { isExternalResult, manualResults, renderCatalogMergeResults, renderManualResults, reportExternalResultProblem } from "../surfaces/catalog-search.js";
-import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignalsCollide, setCurationFeedback, setSelectedCurationCaseId } from "../surfaces/inbox-curation.js";
+import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignalsCollide, setCurationFeedback } from "../surfaces/inbox-curation.js";
 
       export let mergeReview = null;
 
@@ -508,7 +508,9 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
           }
           const externalMerge = mergeContext.type === "external";
           closeMergeComparator(true);
-          setSelectedCurationCaseId("");
+          // [X12 C2] The selection is not cleared: the merged case leaves the
+          // queue on reload and the next one takes its place. Clearing it sent
+          // the queue back to its first case.
           await loadCatalog();
           setCurationFeedback("Entradas combinadas", "success", payload.operation);
           if (externalMerge) {
