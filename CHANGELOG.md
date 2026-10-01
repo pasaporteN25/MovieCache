@@ -4,7 +4,21 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+### Antes de actualizar
+
+- **Hacé un backup: `instance.db` no vuelve atrás.** Pasa del esquema v23 al v24 apenas se
+  abre, y la 0.10.0 se niega a abrirlo después. Los catálogos (JSON y `movie-inbox.db`) no
+  cambian de formato.
+- **Los teléfonos apareados ven cambiar una vez el id de todas sus obras.** Un teléfono que
+  ya tenía una réplica tiene que volver a descargarla, y los cambios que no había subido
+  quedan sin obra a la que aplicarse: sincronizalo antes de actualizar.
+
 ### Cambiado
+
+- El id con el que la API de dispositivos (`/api/v1/`) nombra cada obra ya no depende de
+  la posición de su fuente en la cuenta, sino de un id propio de esa fuente que se guarda
+  en `instance.db` [X11]. Agregar, quitar, reordenar o mover un archivo de catálogo ya no
+  cambia los ids de las obras de las demás fuentes.
 
 - La búsqueda externa de Colección presenta fichas compactas por fuente, con acciones
   identificadas y sin carriles horizontales de tarjetas altas.

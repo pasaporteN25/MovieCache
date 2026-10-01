@@ -30,7 +30,7 @@ from movie_inbox.domain.identity import (
 )
 from movie_inbox.domain.privacy import ItemPrivacyOverride, PrivacyPreferences
 
-INSTANCE_SCHEMA_VERSION = 23
+INSTANCE_SCHEMA_VERSION = 24
 INSTANCE_SCHEMA_V1 = """
 CREATE TABLE instance_migrations (
     version INTEGER PRIMARY KEY,
@@ -517,6 +517,21 @@ CREATE TABLE device_removals (
 CREATE INDEX ix_device_removals_retention ON device_removals(removed_at);
 """
 
+# [X11]: a durable id per catalogue source, so the id a phone holds stops
+# depending on where the source sits in the account's list. It lives with the
+# source's row rather than inside the catalogue file: it is sync state, like
+# the removal record above, and the portable formats do not carry it. Existing
+# sources get one each here, which re-keys every phone id once; records in
+# `device_removals` keep the ids from before and simply age out.
+INSTANCE_SCHEMA_V24 = """
+ALTER TABLE catalog_sources ADD COLUMN source_uid TEXT NOT NULL DEFAULT '';
+UPDATE catalog_sources SET source_uid = lower(hex(randomblob(16)));
+CREATE UNIQUE INDEX ux_catalog_sources_uid ON catalog_sources(catalog_id, source_uid);
+
+ALTER TABLE archived_catalog_sources ADD COLUMN source_uid TEXT NOT NULL DEFAULT '';
+UPDATE archived_catalog_sources SET source_uid = lower(hex(randomblob(16)));
+"""
+
 INSTANCE_MIGRATIONS = {
     2: ("privacy preferences and reversible member archives", INSTANCE_SCHEMA_V2),
     3: ("curated collections and local follows", INSTANCE_SCHEMA_V3),
@@ -540,6 +555,7 @@ INSTANCE_MIGRATIONS = {
     21: ("device sessions carry a stable id a browser can name them by", INSTANCE_SCHEMA_V21),
     22: ("receipts for works a phone added while offline", INSTANCE_SCHEMA_V22),
     23: ("the record of works removed from a catalogue", INSTANCE_SCHEMA_V23),
+    24: ("a durable id per catalogue source", INSTANCE_SCHEMA_V24),
 }
 
 
@@ -579,6 +595,7 @@ class SqliteIdentityRepository:
         write_path: str,
     ) -> tuple[UserAccount, PersonalCatalog]:
         sources, writable_path = _catalog_paths(source_paths, write_path)
+        source_uids = [uuid.uuid4().hex for _ in sources]
         now = _utc_now()
         user_id = uuid.uuid4().hex
         catalog_id = uuid.uuid4().hex
@@ -604,12 +621,14 @@ class SqliteIdentityRepository:
                         VALUES (?, ?, ?, 1, ?)""",
                         (catalog_id, user_id, str(catalog_name or "Mi catalogo").strip(), now),
                     )
-                    for position, path in enumerate(sources):
+                    for position, (path, source_uid) in enumerate(
+                        zip(sources, source_uids, strict=True)
+                    ):
                         connection.execute(
                             """INSERT INTO catalog_sources
-                            (catalog_id, position, storage_path, writable)
-                            VALUES (?, ?, ?, ?)""",
-                            (catalog_id, position, path, int(path == writable_path)),
+                            (catalog_id, position, storage_path, writable, source_uid)
+                            VALUES (?, ?, ?, ?, ?)""",
+                            (catalog_id, position, path, int(path == writable_path), source_uid),
                         )
                     connection.commit()
             except IdentityAlreadyInitialized:
@@ -623,7 +642,10 @@ class SqliteIdentityRepository:
             catalog_id,
             user_id,
             str(catalog_name or "Mi catalogo").strip(),
-            tuple(CatalogSource(path, path == writable_path) for path in sources),
+            tuple(
+                CatalogSource(path, path == writable_path, uid=source_uid)
+                for path, source_uid in zip(sources, source_uids, strict=True)
+            ),
             now,
         )
         return user, catalog
@@ -637,6 +659,7 @@ class SqliteIdentityRepository:
         write_path: str,
     ) -> tuple[UserAccount, PersonalCatalog]:
         sources, writable_path = _catalog_paths(source_paths, write_path)
+        source_uids = [uuid.uuid4().hex for _ in sources]
         now = _utc_now()
         user_id = uuid.uuid4().hex
         catalog_id = uuid.uuid4().hex
@@ -657,12 +680,14 @@ class SqliteIdentityRepository:
                         VALUES (?, ?, ?, 1, ?)""",
                         (catalog_id, user_id, str(catalog_name or "Mi catalogo").strip(), now),
                     )
-                    for position, path in enumerate(sources):
+                    for position, (path, source_uid) in enumerate(
+                        zip(sources, source_uids, strict=True)
+                    ):
                         connection.execute(
                             """INSERT INTO catalog_sources
-                            (catalog_id, position, storage_path, writable)
-                            VALUES (?, ?, ?, ?)""",
-                            (catalog_id, position, path, int(path == writable_path)),
+                            (catalog_id, position, storage_path, writable, source_uid)
+                            VALUES (?, ?, ?, ?, ?)""",
+                            (catalog_id, position, path, int(path == writable_path), source_uid),
                         )
                     connection.commit()
             except sqlite3.IntegrityError as error:
@@ -676,7 +701,10 @@ class SqliteIdentityRepository:
             catalog_id,
             user_id,
             str(catalog_name or "Mi catalogo").strip(),
-            tuple(CatalogSource(path, path == writable_path) for path in sources),
+            tuple(
+                CatalogSource(path, path == writable_path, uid=source_uid)
+                for path, source_uid in zip(sources, source_uids, strict=True)
+            ),
             now,
         )
         return user, catalog
@@ -856,13 +884,14 @@ class SqliteIdentityRepository:
                     for source in source_rows:
                         connection.execute(
                             """INSERT INTO archived_catalog_sources(
-                                archive_id, position, storage_path, writable
-                            ) VALUES (?, ?, ?, ?)""",
+                                archive_id, position, storage_path, writable, source_uid
+                            ) VALUES (?, ?, ?, ?, ?)""",
                             (
                                 archive_id,
                                 int(source["position"]),
                                 str(source["storage_path"]),
                                 int(source["writable"]),
+                                str(source["source_uid"]),
                             ),
                         )
                     connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -872,10 +901,7 @@ class SqliteIdentityRepository:
                         user_id,
                         str(user_row["username"]),
                         str(catalog_row["name"]),
-                        tuple(
-                            CatalogSource(str(source["storage_path"]), bool(source["writable"]))
-                            for source in source_rows
-                        ),
+                        tuple(_catalog_source(source) for source in source_rows),
                         archived_at,
                     )
             except (IdentityMemberActive, IdentityNotFound, IdentityOwnerProtected):
@@ -941,13 +967,14 @@ class SqliteIdentityRepository:
                     for source in source_rows:
                         connection.execute(
                             """INSERT INTO catalog_sources
-                            (catalog_id, position, storage_path, writable)
-                            VALUES (?, ?, ?, ?)""",
+                            (catalog_id, position, storage_path, writable, source_uid)
+                            VALUES (?, ?, ?, ?, ?)""",
                             (
                                 catalog_id,
                                 int(source["position"]),
                                 str(source["storage_path"]),
                                 int(source["writable"]),
+                                str(source["source_uid"]),
                             ),
                         )
                     connection.execute("DELETE FROM archived_members WHERE id = ?", (archive_id,))
@@ -957,10 +984,7 @@ class SqliteIdentityRepository:
                         catalog_id,
                         user_id,
                         str(archive_row["catalog_name"]),
-                        tuple(
-                            CatalogSource(str(source["storage_path"]), bool(source["writable"]))
-                            for source in source_rows
-                        ),
+                        tuple(_catalog_source(source) for source in source_rows),
                         now,
                     )
                     return user, catalog
@@ -1773,7 +1797,7 @@ class SqliteIdentityRepository:
         if row is None:
             return None
         sources = connection.execute(
-            """SELECT storage_path, writable FROM catalog_sources
+            """SELECT storage_path, writable, source_uid FROM catalog_sources
             WHERE catalog_id = ? ORDER BY position""",
             (row["id"],),
         ).fetchall()
@@ -1781,17 +1805,14 @@ class SqliteIdentityRepository:
             str(row["id"]),
             str(row["owner_user_id"]),
             str(row["name"]),
-            tuple(
-                CatalogSource(str(source["storage_path"]), bool(source["writable"]))
-                for source in sources
-            ),
+            tuple(_catalog_source(source) for source in sources),
             str(row["created_at"]),
         )
 
     @staticmethod
     def _archived_member(connection: sqlite3.Connection, row: sqlite3.Row) -> ArchivedMember:
         sources = connection.execute(
-            """SELECT storage_path, writable FROM archived_catalog_sources
+            """SELECT storage_path, writable, source_uid FROM archived_catalog_sources
             WHERE archive_id = ? ORDER BY position""",
             (row["id"],),
         ).fetchall()
@@ -1800,10 +1821,7 @@ class SqliteIdentityRepository:
             str(row["former_user_id"]),
             str(row["username"]),
             str(row["catalog_name"]),
-            tuple(
-                CatalogSource(str(source["storage_path"]), bool(source["writable"]))
-                for source in sources
-            ),
+            tuple(_catalog_source(source) for source in sources),
             str(row["archived_at"]),
         )
 
@@ -1829,6 +1847,12 @@ def _user(row: sqlite3.Row) -> UserAccount:
         active=bool(row["active"]),
         must_change_password=bool(row["must_change_password"]),
         created_at=str(row["created_at"]),
+    )
+
+
+def _catalog_source(row: sqlite3.Row) -> CatalogSource:
+    return CatalogSource(
+        str(row["storage_path"]), bool(row["writable"]), uid=str(row["source_uid"])
     )
 
 

@@ -44,15 +44,25 @@ class SessionCatalog:
     references_by_path: dict[str, str]
     source_names: tuple[str, ...]
     write_name: str
+    # [X11]: the public reference (`source-1`) is positional and only lives for
+    # one request; a phone's id is keyed on the source's durable uid instead.
+    source_uids: dict[str, str]
 
     @classmethod
     def from_identity(cls, base: ViewerConfig, identity: AuthenticatedIdentity) -> SessionCatalog:
-        source_paths = [source.path for source in identity.catalog.sources]
+        sources = identity.catalog.sources
+        source_paths = [source.path for source in sources]
         if not source_paths or not identity.catalog.write_path:
+            raise ApiRequestError("catalog_unavailable", 503)
+        uids = [source.uid for source in sources]
+        if not all(uids) or len(set(uids)) != len(uids):
+            # Two sources sharing a uid would share device ids, and a phone's
+            # write could land on the other work.
             raise ApiRequestError("catalog_unavailable", 503)
         references = {
             f"source-{position}": path for position, path in enumerate(source_paths, start=1)
         }
+        source_uids = {f"source-{position}": uid for position, uid in enumerate(uids, start=1)}
         references_by_path = {
             _resolved_path(path): reference for reference, path in references.items()
         }
@@ -67,6 +77,7 @@ class SessionCatalog:
             references_by_path,
             tuple(Path(path).name for path in source_paths),
             Path(identity.catalog.write_path).name,
+            source_uids,
         )
 
     def source_path(self, reference: str) -> str:

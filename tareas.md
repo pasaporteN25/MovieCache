@@ -533,7 +533,22 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X11] Un id durable por fuente, en lugar de su posición — *decidida el 2026-09-20; requisito para publicar el cliente Android*
+#### [X11] Un id durable por fuente, en lugar de su posición — **hecha el 2026-10-01** *(decidida el 2026-09-20; requisito para publicar el cliente Android)*
+
+- [x] **Hecho el 2026-10-01**, en `release/0.11.0`. Por decisión del owner de ese día, el id
+  vive en `instance.db` y no en el almacén de cada catálogo: columna `source_uid` en
+  `catalog_sources` y `archived_catalog_sources` (esquema de instancia v24). La migración da
+  un id a cada fuente existente; las altas lo crean en la misma transacción, y archivar o
+  restaurar un miembro lo conserva. El id del teléfono es
+  `HMAC(cuenta, source_uid, id de la obra)` (`web/device_ids.py`,
+  `_device_catalog_entries`). `SessionCatalog` rechaza con 503 una cuenta con una fuente
+  sin id o con dos fuentes que compartan uno. Los catálogos JSON y SQLite no cambian de
+  formato. Los registros de `device_removals` se dejan caducar. Motivo y costo, en la
+  sección 6 del diseño de [X5]. Pruebas: `SourceListChangesTests` (reordenar, quitar,
+  agregar y mover fuentes no cambia ningún id ajeno), `SessionCatalogSourceUidTests` y
+  `SourceUidMigrationTests` en `tests/test_device_sync_identity.py`. Falta del lado del
+  cliente: que el tablero de `movieIndexAndroid` lo registre en M2. Ese repo no se tocó
+  desde acá.
 
 Surge de evaluar la idea del owner en [X5]. El id que ve el teléfono incluye la posición de la
 fuente, así que quitar o reordenar una fuente cambia todos los ids (caso 17 de la matriz de
@@ -758,7 +773,7 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 | Incluir Inicio nuevo [U4], U5, cartelera U6 y U7.5a ya integradas; sin nuevas épicas | Owner / frente visual | **Alcance actualizado** 2026-09-14: U8 completa fuera de 0.9.0. Cierre según `docs/design/v0-9-0-visual-closeout.md` |
 | Changelog: las entradas del trabajo visual desde la 0.8.0 | Frente visual | Pendiente |
 | Changelog: "Antes de actualizar" | Frente lógico | **Hecho** (2026-09-13) |
-| Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup | Owner, o el frente lógico con su autorización | Pendiente |
+| ~~Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup~~ | Owner, o el frente lógico con su autorización | **Hecho** (2026-10-01): Docker ya corre la v0.10.0, que supera este upgrade |
 | El gate de `docs/release-checklist.md`, con el CI del PR en verde | Todos | Pendiente |
 | Último commit: versión `0.9.0`, changelog, `README.md`, `CLAUDE.md` y roadmap | Frente lógico | **Hecho** (2026-09-24). Gate automático confirmado verde sobre `fee5845` antes del commit: `scripts\check.ps1` completo (Ruff, mypy estricto, compileall, 1105 tests) y los 7 checks de CI del PR #1 (Linux, Windows, wheel, Chromium, Docker Compose, ruff/mypy, search quality gate). Falta la aceptación manual del owner (`docs/release-checklist.md` §2-7) antes de fusionar y taggear |
 | Fusionar con merge commit y etiquetar `v0.9.0` | Owner | Pendiente |
@@ -781,8 +796,9 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
   sigue buscando `.spotlight-stage` en el CSS monolítico retirado. Se transfiere a
   U4.6b, que migra tests históricos; no cerrar V9.V3 hasta repetir suite verde.
 - [ ] **[V9.V4] Candidata y entrega.** Preparar commit revisado y actualizar PR con
-  autorización; CI del commit exacto y upgrade Docker 0.8.0 → 0.9.0 con copia,
-  backup y restauración. Luego cierre de versión/merge/tag por responsables V9.
+  autorización; CI del commit exacto y ~~upgrade Docker 0.8.0 → 0.9.0 con copia,
+  backup y restauración~~ (hecho 2026-10-01: Docker ya corre la v0.10.0). Luego cierre
+  de versión/merge/tag por responsables V9.
 
 Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
 

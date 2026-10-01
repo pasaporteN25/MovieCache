@@ -345,14 +345,16 @@ class IdentityTests(unittest.TestCase):
                     );
                     INSERT INTO scanner_history(id, action, label, created_at)
                     VALUES ('history-1', 'link', 'Vincular', '2026-08-22T10:00:00Z');
-                    -- Minimal stand-ins for the real v5/v3 tables this fixture
-                    -- otherwise skips (this test only exercises v8's
-                    -- scanner_history repair in isolation) -- v9's and v10's
-                    -- own migrations ALTER these tables, so they must exist.
+                    -- Minimal stand-ins for the real v5/v3/v2/v1 tables this
+                    -- fixture otherwise skips (this test only exercises v8's
+                    -- scanner_history repair in isolation) -- later migrations
+                    -- ALTER these tables, so they must exist.
                     CREATE TABLE library_scan_runs (id TEXT PRIMARY KEY);
                     CREATE TABLE media_libraries (id TEXT PRIMARY KEY);
                     CREATE TABLE curated_collections (id TEXT PRIMARY KEY);
                     CREATE TABLE import_drafts (id TEXT PRIMARY KEY);
+                    CREATE TABLE catalog_sources (catalog_id TEXT NOT NULL);
+                    CREATE TABLE archived_catalog_sources (archive_id TEXT NOT NULL);
                     """
                 )
                 connection.executemany(
@@ -430,6 +432,13 @@ class IdentityTests(unittest.TestCase):
             archived = members.archive_member(owner, member.user.id, confirmed_username="maria")
             self.assertIsNone(repository.account(member.user.id))
             self.assertTrue(Path(archived.sources[0].path).exists())
+            # [X11]: the source keeps its durable uid through the archive.
+            self.assertTrue(member.catalog.sources[0].uid)
+            self.assertEqual(archived.sources[0].uid, member.catalog.sources[0].uid)
+            self.assertEqual(
+                repository.list_archived_members()[0].sources[0].uid,
+                member.catalog.sources[0].uid,
+            )
             archived_item = member_repository.get("heat")
             assert archived_item is not None
             self.assertEqual(archived_item.title, "Heat")
@@ -441,6 +450,7 @@ class IdentityTests(unittest.TestCase):
             )
             self.assertEqual(restored.member.user.username, "maria")
             self.assertEqual(restored.member.catalog.write_path, member.catalog.write_path)
+            self.assertEqual(restored.member.catalog.sources[0].uid, member.catalog.sources[0].uid)
             restored_item = member_repository.get("heat")
             assert restored_item is not None
             self.assertEqual(restored_item.rating, 9)
@@ -766,26 +776,28 @@ class DeviceSessionListTests(unittest.TestCase):
         # A real instance at v20, built by the real migrations rather than by
         # undoing the latest one, so this keeps meaning the same thing whichever
         # version happens to be last.
+        # The owner row goes in by hand: creating an account writes columns
+        # that later migrations add, which a v20 database does not have yet.
         root = Path(self.temporary.name)
-        catalog_path = root / "catalog.json"
         old_database = root / "old-instance.db"
         with patch("movie_inbox.infrastructure.identity_repository.INSTANCE_SCHEMA_VERSION", 20):
-            old_repository = SqliteIdentityRepository(old_database)
-            owner, _ = AuthService(old_repository).bootstrap_owner(
-                "owner",
-                "a-long-local-password",
-                catalog_name="Mi catalogo",
-                source_paths=[str(catalog_path)],
-                write_path=str(catalog_path),
-            )
+            SqliteIdentityRepository(old_database).initialize()
+        owner_id = "owner-id"
         with closing(sqlite3.connect(old_database)) as connection:
+            connection.execute(
+                """INSERT INTO users(
+                    id, username, username_key, password_hash, role, active,
+                    must_change_password, created_at, updated_at
+                ) VALUES (?, 'owner', 'owner', 'hash', 'owner', 1, 0, 'now', 'now')""",
+                (owner_id,),
+            )
             for index, name in enumerate(("Pixel", "Tablet")):
                 connection.execute(
                     """INSERT INTO device_sessions(
                         access_token_hash, refresh_token_hash, user_id, device_name,
                         created_at, access_expires_at, refresh_expires_at, last_seen_at
                     ) VALUES (?, ?, ?, ?, 1000, 1060, 1500, 1000)""",
-                    (f"access-{index}", f"refresh-{index}", owner.id, name),
+                    (f"access-{index}", f"refresh-{index}", owner_id, name),
                 )
             connection.commit()
             self.assertNotIn(
@@ -793,7 +805,7 @@ class DeviceSessionListTests(unittest.TestCase):
                 {row[1] for row in connection.execute("PRAGMA table_info(device_sessions)")},
             )
 
-        rows = SqliteIdentityRepository(old_database).list_device_sessions(owner.id, 1_000)
+        rows = SqliteIdentityRepository(old_database).list_device_sessions(owner_id, 1_000)
 
         ids = {row.id for row in rows}
         self.assertEqual(len(ids), 2)
