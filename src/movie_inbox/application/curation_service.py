@@ -6,15 +6,14 @@ import hashlib
 from collections.abc import Mapping
 from typing import Any
 
-from movie_inbox.domain.catalog import (
-    annotate_duplicate_items,
-    external_link_coverage,
-    external_urls,
-    has_external_link,
-    title_match_keys_for_item,
-)
+from movie_inbox.domain.catalog import external_link_coverage, has_external_link
 from movie_inbox.domain.curation import curation_item_reference
 from movie_inbox.domain.metadata import normalize_local_files
+from movie_inbox.domain.work_identity import (
+    annotate_duplicate_items,
+    duplicate_verdict,
+    work_profile,
+)
 
 
 def build_curation_payload(items: list[dict[str, Any]]) -> dict[str, Any]:
@@ -85,10 +84,14 @@ def _duplicate_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if pair[0] in component and pair[1] in component
         ]
         evidence: list[str] = []
+        certain = False
         for (left_reference, right_reference), _ in component_edges:
-            for row in _duplicate_evidence(
-                by_reference[left_reference], by_reference[right_reference]
-            ):
+            verdict = duplicate_verdict(
+                work_profile(by_reference[left_reference]),
+                work_profile(by_reference[right_reference]),
+            )
+            certain = certain or verdict.level == "same"
+            for row in verdict.evidence or ("La similitud del catálogo requiere revisión manual",):
                 if row not in evidence:
                     evidence.append(row)
         cases.append(
@@ -100,7 +103,10 @@ def _duplicate_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     if any(status == "pending" for _, status in component_edges)
                     else "deferred"
                 ),
-                "reason": "Posible obra repetida",
+                # [X12]: how sure the case is, so the queue can lead with the
+                # ones an external id already settles.
+                "level": "same" if certain else "possible",
+                "reason": "Misma obra" if certain else "Posible obra repetida",
                 "evidence": evidence,
                 "members": [
                     _item_summary(by_reference[reference]) for reference in member_references
@@ -132,31 +138,6 @@ def _missing_link_cases(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return cases
 
 
-def _duplicate_evidence(left: Mapping[str, Any], right: Mapping[str, Any]) -> list[str]:
-    evidence: list[str] = []
-    if external_urls(left) & external_urls(right):
-        evidence.append("Comparten el mismo enlace externo")
-    left_titles = set(title_match_keys_for_item(left))
-    right_titles = set(title_match_keys_for_item(right))
-    shared_titles = left_titles & right_titles
-    if shared_titles:
-        left_year = str(left.get("year") or "")
-        right_year = str(right.get("year") or "")
-        if left_year and left_year == right_year:
-            evidence.append(f"Comparten título normalizado y año {left_year}")
-        elif any(
-            len(title) == 4
-            and title.isdigit()
-            and title in {left_year, right_year}
-            and left_year != right_year
-            for title in shared_titles
-        ):
-            evidence.append("Una ficha parece usar el título numérico como año heredado")
-        else:
-            evidence.append("Comparten un título normalizado")
-    return evidence or ["La similitud del catálogo requiere revisión manual"]
-
-
 def _item_summary(item: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "ref": curation_item_reference(item),
@@ -184,7 +165,7 @@ def _case_digest(*values: str) -> str:
     return hashlib.sha1("\0".join(values).encode("utf-8")).hexdigest()[:16]
 
 
-def _case_sort_key(case: Mapping[str, Any]) -> tuple[int, int, str]:
+def _case_sort_key(case: Mapping[str, Any]) -> tuple[int, int, int, str]:
     members = case.get("members")
     if isinstance(members, list):
         titles = [
@@ -198,5 +179,7 @@ def _case_sort_key(case: Mapping[str, Any]) -> tuple[int, int, str]:
     return (
         1 if case.get("status") == "deferred" else 0,
         0 if case.get("type") == "duplicate" else 1,
+        # Settled by an external id first: those take one look to confirm.
+        0 if case.get("level") == "same" else 1,
         title,
     )

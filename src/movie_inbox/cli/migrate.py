@@ -6,7 +6,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from movie_inbox.domain.catalog import annotate_duplicate_items, normalize_item
+from movie_inbox.domain.catalog import normalize_item
+from movie_inbox.domain.work_identity import annotate_duplicate_items
 from movie_inbox.infrastructure.repositories import open_catalog_repository
 from movie_inbox.infrastructure.schema import SCHEMA_VERSION
 

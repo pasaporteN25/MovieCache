@@ -16,6 +16,7 @@ from movie_inbox.domain.titles import (
     clean_whitespace,
     infer_kind_from_text,
     infer_year,
+    strip_wikipedia_disambiguator,
 )
 from movie_inbox.external.common import (
     dedupe_results,
@@ -227,13 +228,14 @@ def wikipedia_results_from_query(
         page_url = str(row.get("canonicalurl") or "") or (
             f"https://{language}.wikipedia.org/wiki/{quote(title.replace(' ', '_'), safe='')}"
         )
+        work_title = strip_wikipedia_disambiguator(title)
         results.append(
             {
                 "source": "wikipedia",
-                "title": title,
+                "title": work_title,
                 "original_title": "",
-                "spanish_title": title if language == "es" else "",
-                "english_title": title if language == "en" else "",
+                "spanish_title": work_title if language == "es" else "",
+                "english_title": work_title if language == "en" else "",
                 "alternative_titles": [],
                 "kind": kind or "pelicula",
                 "year": infer_year(title, extract),
@@ -352,7 +354,8 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
     if not page:
         return {}
 
-    title = clean_title(str(page.get("title") or page_title))
+    article_title = clean_title(str(page.get("title") or page_title))
+    title = strip_wikipedia_disambiguator(article_title)
     description = clean_whitespace(str(page.get("description") or ""))
     intro, sections = _split_wikipedia_sections(str(page.get("extract") or ""))
     intro = clean_whitespace(intro)
@@ -371,7 +374,7 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
         "spanish_title": title if language == "es" else "",
         "english_title": title if language == "en" else "",
         "description": description,
-        "wikipedia_title": title,
+        "wikipedia_title": article_title,
         "wikidata_id": wikidata_id,
         "page_image": str(thumbnail.get("source") or ""),
         "wikipedia_extract": synopsis,
@@ -380,8 +383,9 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
     # infer_kind_from_text() only needs to see the intro -- feeding it the
     # synopsis/full article risks an unrelated later section (e.g. "a
     # television series adaptation was announced") outscoring the film
-    # markers that are reliably in the opening sentence.
-    metadata["kind"] = infer_kind_from_text(title, description, intro) or "pelicula"
+    # markers that are reliably in the opening sentence. The article title
+    # still carries its "(film)", which is exactly such a marker.
+    metadata["kind"] = infer_kind_from_text(article_title, description, intro) or "pelicula"
     metadata.update(fetch_wikidata_metadata(wikidata_id))
     return metadata
 

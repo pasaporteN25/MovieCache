@@ -20,10 +20,10 @@ from movie_inbox.application.repository import (
     CatalogRepositoryError,
     T,
 )
-from movie_inbox.domain.catalog import possible_duplicate_candidates
 from movie_inbox.domain.metadata import normalize_local_files
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.releases import normalize_release_dates
+from movie_inbox.domain.work_identity import possible_duplicate_candidates
 from movie_inbox.infrastructure.schema import CATALOG_FIELDS, CatalogSchemaError, catalog_document
 
 DATABASE_SCHEMA_VERSION = 6

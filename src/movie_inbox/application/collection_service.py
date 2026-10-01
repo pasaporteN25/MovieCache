@@ -8,14 +8,14 @@ from typing import Any
 
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
-from movie_inbox.domain.catalog import (
-    CatalogComparisonIndex,
-    catalog_membership,
-    possible_duplicate_candidates,
-)
 from movie_inbox.domain.collections import (
     CuratedCollection,
     catalog_item_from_collection,
+)
+from movie_inbox.domain.work_identity import (
+    CatalogComparisonIndex,
+    catalog_membership,
+    possible_duplicate_candidates,
 )
 
 

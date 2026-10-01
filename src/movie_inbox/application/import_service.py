@@ -15,7 +15,7 @@ from typing import Any
 from movie_inbox.application.catalog_service import CatalogService
 from movie_inbox.application.collection_repository import CollectionRepository
 from movie_inbox.application.import_repository import ImportDraftRepository
-from movie_inbox.domain.catalog import CatalogComparisonIndex, catalog_membership, normalize_item
+from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.collections import (
     CollectionItem,
     CuratedCollection,
@@ -31,6 +31,7 @@ from movie_inbox.domain.imports import (
     ParsedImportItem,
 )
 from movie_inbox.domain.titles import clean_whitespace
+from movie_inbox.domain.work_identity import CatalogComparisonIndex, catalog_membership
 
 IMPORT_DRAFT_TTL_SECONDS = 48 * 60 * 60
 

@@ -571,6 +571,39 @@ las obras. Detalle y comparación con la alternativa por obra en el diseño de [
   hacerla mientras no haya réplicas que conserven cambios pendientes. **Modelo sugerido**:
   Grande.
 
+#### [X12] Identidad de obras, Curaduría repensada y ficha más limpia — *abierta el 2026-10-01*
+
+El owner encontró dos «Kingdom of Heaven», una enlazada a Wikipedia en inglés y otra en
+español, que Curaduría nunca marcó. La causa era que había cinco reglas de identidad
+distintas, y la de Curaduría comparaba URLs literales y título+año, sin mirar Wikidata,
+TMDb ni MAL. El plan completo (fases A a E) está aprobado y se ejecuta por fases, con un
+commit por fase.
+
+- [x] **A. Una sola regla de identidad** (2026-10-01). Nuevo `domain/work_identity.py`:
+  `work_profile` y `compare_profiles` dan un veredicto `same`, `possible`, `conflict` o
+  `none`, con evidencia en castellano. Lo usan `decide_match`, Curaduría
+  (`annotate_duplicate_items`), `catalog_membership`, los candidatos al agregar y la
+  identidad de bibliotecas. Los ids de IMDb y FilmAffinity se comparan por id y no por
+  URL. Wikipedia se compara por idioma y artículo. Título sin año: «posible» sólo con
+  corroboración (dirección, duración ±3 min o el mismo archivo) y sin ids que se
+  contradigan. Se quitan los desambiguadores de Wikipedia del título. Gate de búsqueda:
+  32/32, precisión de auto-match 1.000. Diagnóstico multilingüe: PASS.
+- [ ] **B. Completar identidades** en segundo plano, con un botón en Curaduría y el
+  comando `movie-inbox identity resolve`.
+- [ ] **C. Curaduría:**
+  - evidencia legible y casos seguros primero en la interfaz;
+  - foco en el caso siguiente después de unir;
+  - búsqueda de referencia dentro del caso;
+  - dos copias o idiomas en la biblioteca;
+  - unir como partes;
+  - anime directo a Jikan.
+- [ ] **D. Unir desde la grilla y la búsqueda**, con selección múltiple.
+- [ ] **E. Ficha:**
+  - cabecera única;
+  - flechas sutiles en la contratapa;
+  - calendario propio;
+  - 10 estrellas.
+
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 
 Encontrado en la matriz de sincronización del cliente ([A5.1], caso 14). `/api/personal`

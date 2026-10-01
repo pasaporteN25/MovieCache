@@ -28,7 +28,19 @@
           ...asList(item.alternative_titles),
           item.local_name
         ].filter(Boolean);
-        return candidates.find((value) => !isExternalIdTitle(value)) || candidates[0] || "";
+        return stripWikipediaDisambiguator(
+          candidates.find((value) => !isExternalIdTitle(value)) || candidates[0] || ""
+        );
+      }
+
+      // [X12] Mirrors domain/titles.py: "Kingdom of Heaven (film)" names the
+      // Wikipedia article, not the work. Entries saved before the server
+      // stripped it still carry it, so the display drops it too.
+      const WIKIPEDIA_DISAMBIGUATOR = /\s*\((?=[^()]*\b(?:film|movie|tv series|television series|miniseries|series|documentary|anime|animated|short|pel[ií]cula|serie|miniserie|documental|telefilme|cortometraje|largometraje)\b)[^()]*\)\s*$/i;
+
+      export function stripWikipediaDisambiguator(value) {
+        const text = String(value || "");
+        return text.replace(WIKIPEDIA_DISAMBIGUATOR, "").trim() || text.trim();
       }
 
       export function isExternalIdTitle(value) {

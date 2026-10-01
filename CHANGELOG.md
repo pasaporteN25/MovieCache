@@ -19,6 +19,20 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   la posición de su fuente en la cuenta, sino de un id propio de esa fuente que se guarda
   en `instance.db` [X11]. Agregar, quitar, reordenar o mover un archivo de catálogo ya no
   cambia los ids de las obras de las demás fuentes.
+- Curaduría reconoce como la misma obra dos fichas que comparten un id externo aunque sus
+  enlaces y títulos difieran [X12]. Por ejemplo, el artículo de Wikipedia en inglés y el
+  en español de una misma película comparten el id de Wikidata. Lo mismo vale para IMDb y
+  FilmAffinity con enlaces en otro idioma o región. Cada caso dice si es «Misma obra»
+  (la confirma un id) o «Posible obra repetida», y explica por qué en frases. Los casos
+  confirmados aparecen primero.
+- Dos fichas con el mismo título donde falta el año ya no se ignoran siempre: se marcan
+  como posibles si algo independiente coincide (la dirección, una duración casi igual o
+  el mismo archivo). Si tienen ids distintos de la misma fuente, son obras distintas y no
+  aparecen: dos *Frankenstein* enriquecidas ya no se proponen como repetidas. Nada de
+  esto se une solo; la decisión sigue siendo de una persona.
+- Los títulos que llegan de Wikipedia ya no arrastran el desambiguador del artículo:
+  «Kingdom of Heaven (film)» se guarda y se muestra como «Kingdom of Heaven». El nombre
+  del artículo se conserva aparte, y las fichas guardadas antes se muestran sin él.
 
 - La búsqueda externa de Colección presenta fichas compactas por fuente, con acciones
   identificadas y sin carriles horizontales de tarjetas altas.

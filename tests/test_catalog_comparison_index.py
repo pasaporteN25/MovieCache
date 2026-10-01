@@ -21,11 +21,11 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
-from movie_inbox.domain import catalog as catalog_module
-from movie_inbox.domain.catalog import (
+from movie_inbox.domain import work_identity as identity_module
+from movie_inbox.domain.catalog import normalize_item, title_match_keys_for_item
+from movie_inbox.domain.work_identity import (
     CatalogComparisonIndex,
     catalog_membership,
-    normalize_item,
     possible_duplicate_candidates,
 )
 
@@ -84,14 +84,13 @@ class PreparedCatalogEquivalenceTests(unittest.TestCase):
 
 class PreparedCatalogWorkTests(unittest.TestCase):
     def _counted(self):
-        real = catalog_module.title_match_keys_for_item
         calls: list[int] = [0]
 
         def counting(item):
             calls[0] += 1
-            return real(item)
+            return title_match_keys_for_item(item)
 
-        return calls, patch.object(catalog_module, "title_match_keys_for_item", counting)
+        return calls, patch.object(identity_module, "title_match_keys_for_item", counting)
 
     def test_each_catalogue_item_is_normalised_once_however_many_comparisons(self) -> None:
         items = _catalog(20)
