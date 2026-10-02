@@ -1,8 +1,9 @@
 import { cachedImageSrc } from "../core/card.js";
+import { availabilityCopy } from "../core/availability.js";
 import { fields } from "../core/fields.js";
 import { asList, displayTitle, escapeAttr, escapeHtml, firstListValue, hasExternalLink, isInCatalog, localFiles, meta, normalizeText, sourceLabel, titleSizeClass, titleSubtitle } from "../core/format.js";
 import { items, selectedExistingIdForSearch } from "../core/state.js";
-import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, manualResults, selectedManualIndex } from "./catalog-search.js";
+import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, completedExternalResults, externalResultKey, externalSearchController, manualResults, selectedManualIndex } from "./catalog-search.js";
 
       export function catalogMergeResult(item, index) {
         const incoming = selectedManualIndex === null ? null : manualResults[selectedManualIndex];
@@ -12,7 +13,7 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
         return `<article class="search-result compact-result">
           ${resultMedia(shownTitle || item.local_name, item.page_image, index < 6)}
           <div class="result-body">
-            <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
+            <h3 class="${titleSizeClass(shownTitle)}" tabindex="-1">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
             <div class="meta">
               ${meta(item.year)}${meta(item.kind)}${meta(item.source)}${meta(firstListValue(item.genres))}${meta(firstListValue(item.directors))}
@@ -35,28 +36,44 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, externalSearchController, ma
       export function searchResult(result, index) {
         const description = result.description || result.wikipedia_extract || "";
         const similarity = selectedExistingIdForSearch ? candidateSimilarity(result) : "";
-        const primaryAction = selectedExistingIdForSearch ? "Combinar" : "Agregar a colección";
+        const savedLabel = completedExternalResults.get(externalResultKey(result));
+        const primaryAction = savedLabel || (selectedExistingIdForSearch ? "Combinar" : "Agregar a colección");
         const shownTitle = displayTitle(result);
         const subtitle = titleSubtitle(result);
         const badges = [
           result._search?.reason === "director_match" ? `<span class="pill match-reason">${escapeHtml(searchReasonLabel(result._search))}</span>` : "",
           !result.url ? `<span class="pill muted">Sin enlace de fuente</span>` : ""
         ].filter(Boolean).join("");
-        return `<article class="search-result compact-result external-result" data-result-index="${index}">
+        return `<article class="search-result compact-result external-result" data-result-index="${index}" data-result-source="${escapeAttr(result.source)}" data-result-key="${escapeAttr(externalResultKey(result))}">
           ${resultMedia(shownTitle, result.page_image, index < 6)}
           <div class="result-body">
-            <h3 class="${titleSizeClass(shownTitle)}">${escapeHtml(shownTitle || "Sin titulo")}</h3>
+            <h3 class="${titleSizeClass(shownTitle)}" tabindex="-1">${escapeHtml(shownTitle || "Sin titulo")}</h3>
             ${subtitle ? `<div class="meta">${meta(subtitle)}</div>` : ""}
             <div class="meta">
-              ${meta(result.year)}${meta(result.kind)}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(similarity)}
+              ${meta(result.year)}${meta(result.kind)}${meta(sourceLabel(result.source))}${meta(firstListValue(result.genres))}${meta(firstListValue(result.directors))}${meta(similarity)}
             </div>
             ${badges ? `<div class="card-badges">${badges}</div>` : ""}
             ${searchDescription(description, "manual", index)}
             <div class="result-actions">
-              <button class="action-primary" data-click="add-result" data-index="${index}">${primaryAction}</button>
+              <button class="action-primary" data-click="add-result" data-index="${index}" ${savedLabel ? "disabled" : ""}>${primaryAction}</button>
               <button class="action-secondary" type="button" data-click="prepare-merge" data-index="${index}">Comparar con mi colección</button>
               ${result.url ? `<a class="action-secondary" href="${escapeAttr(result.url)}" target="_blank" rel="noreferrer">Abrir en ${escapeHtml(sourceLabel(result.source))}</a>` : ""}
             </div>
+          </div>
+        </article>`;
+      }
+
+      export function localSearchResult(item, index) {
+        const title = displayTitle(item) || "Sin título";
+        const summary = item.wikipedia_extract || item.description || "";
+        return `<article class="search-result compact-result external-result local-result" data-local-id="${escapeAttr(item.id)}">
+          ${resultMedia(title, item.page_image, index < 6)}
+          <div class="result-body">
+            <h3 class="${titleSizeClass(title)}" tabindex="-1">${escapeHtml(title)}</h3>
+            <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(firstListValue(item.directors))}</div>
+            <div class="card-badges"><span class="pill good">En tu colección</span><span class="pill">${item.status === "watched" ? "Vista" : "Pendiente"}</span><span class="pill">${availabilityCopy(item).label}</span></div>
+            ${searchDescription(summary, "catalog", item.id)}
+            <div class="result-actions"><button class="action-primary" type="button" data-click="open-detail-with-case-transition" data-id="${escapeAttr(item.id)}">Abrir VHS</button><button class="action-secondary" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Editar ficha</button></div>
           </div>
         </article>`;
       }

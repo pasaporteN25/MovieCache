@@ -81,7 +81,8 @@ class CollectionCounterTests(unittest.TestCase):
         self.assertTrue(page.locator("#activeFilters").is_visible())
         page.locator("#query").fill("no-existe")
         page.locator("#query").press("Enter")
-        self.assertTrue(page.locator("#empty").is_visible())
+        page.locator(".unified-result-list").get_by_text("No encontramos obras").wait_for()
+        self.assertTrue(page.locator("#grid").is_hidden())
         self.assertEqual(page.locator("#grid .collection-case").count(), 0)
         page.locator("#advancedFiltersMenu > summary").click()
         page.locator("#clearFilters").click()
@@ -89,15 +90,13 @@ class CollectionCounterTests(unittest.TestCase):
         self.assertNotIn("q=", page.url)
         self.assertEqual(page.locator("#grid .collection-case").count(), 30)
 
-    def test_add_preserves_query_and_return_restores_filters_sort_and_count(self) -> None:
+    def test_add_preserves_query_and_return_restores_filters_and_sort(self) -> None:
         self.open_collection()
         page = self.page
         page.locator('[data-filter="status"][data-value="watched"]').first.click()
+        page.locator("#sort").select_option("year-desc")
         page.locator("#query").fill("prueba")
         page.locator("#query").press("Enter")
-        page.locator("#sort").select_option("year-desc")
-        page.locator("#catalogLoadMore").click()
-        self.assertEqual(page.locator("#grid .collection-case").count(), 32)
         page.locator('#collectionModeTabs [data-mode="add"]').click()
         page.wait_for_function("!document.querySelector('#searchButton').disabled")
         self.assertEqual(page.locator("#query").input_value(), "prueba")
@@ -106,24 +105,22 @@ class CollectionCounterTests(unittest.TestCase):
         self.assertTrue(page.locator("#grid").is_hidden())
         self.assertTrue(page.locator(".collection-filter-toolbar").is_hidden())
         page.get_by_role("button", name="Volver a Colección", exact=True).click()
-        page.wait_for_selector("#grid .collection-case")
+        page.wait_for_selector(".unified-result-list")
         self.assertIn("status=watched", page.url)
         self.assertEqual(page.locator("#sort").input_value(), "year-desc")
         self.assertEqual(page.locator("#query").input_value(), "prueba")
-        self.assertEqual(page.locator("#grid .collection-case").count(), 32)
+        self.assertTrue(page.locator("#grid").is_hidden())
         page.go_back()
         page.wait_for_function(
             "document.querySelector('#collectionView').dataset.searchMode === 'add'"
         )
         page.go_forward()
-        page.wait_for_selector("#grid .collection-case")
-        self.assertEqual(page.locator("#grid .collection-case").count(), 32)
+        page.wait_for_selector(".unified-result-list")
+        self.assertTrue(page.locator("#grid").is_hidden())
 
     def test_cumulative_loading_survives_history_and_reload(self) -> None:
         self.open_collection()
         page = self.page
-        page.locator("#query").fill("prueba")
-        page.locator("#query").press("Enter")
         self.assertEqual(page.locator("#grid .collection-case").count(), 30)
         first = page.locator("#grid .collection-case").first.get_attribute("data-id")
         page.evaluate(
@@ -169,8 +166,8 @@ class CollectionCounterTests(unittest.TestCase):
         page.locator("#query").fill("prueba")
         page.locator("#query").press("Enter")
         page.wait_for_function("!document.querySelector('#searchButton').disabled")
-        page.locator("#externalResultsJump").click()
-        self.assertEqual(page.evaluate("document.activeElement.id"), "externalSearchSection")
+        self.assertTrue(page.locator("#externalResultsJump").is_hidden())
+        self.assertTrue(page.locator(".unified-result-list").is_visible())
         page.locator("#clearManualSearch").click()
         self.assertTrue(page.locator("#externalResultsJump").is_hidden())
 
