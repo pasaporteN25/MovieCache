@@ -404,6 +404,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertEqual(payload["sources"]["wikipedia"]["count"], 1)
         self.assertEqual(payload["sources"]["imdb"]["count"], 1)
         self.assertEqual(payload["sources"]["filmaffinity"]["count"], 1)
+        scores = [row["_search"]["score"] for row in payload["results"]]
+        self.assertGreater(scores[0], scores[1])
+        self.assertEqual(scores[0], 100.0)
 
     def test_a_director_query_labels_both_local_and_external_results_as_discovery(self) -> None:
         # [Q4] tareas.md: "director:X" is a distinct discovery match, never

@@ -3394,6 +3394,88 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIn("Heat", page.locator("#collectionAnchor").inner_text())
         self.assertFalse(page.locator("#collectionAnchor").is_hidden())
 
+    def test_search_unifies_saved_and_external_results_by_relevance(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        def handle_search(route) -> None:
+            url = route.request.url
+            body: dict[str, Any] = {"results": []}
+            if "external=false" in url:
+                body = {
+                    "catalog": {
+                        "results": [
+                            {
+                                "id": "heat",
+                                "title": "Heat",
+                                "year": "1995",
+                                "kind": "pelicula",
+                                "_search": {"score": 100},
+                            }
+                        ]
+                    }
+                }
+            elif "source=wikipedia" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Heat: documental",
+                            "year": "2010",
+                            "source": "wikipedia",
+                            "url": "https://en.wikipedia.org/wiki/Heat",
+                            "_search": {"score": 65},
+                        }
+                    ]
+                }
+                body["results"].extend(
+                    {
+                        "title": f"Heat {number}",
+                        "source": "wikipedia",
+                        "url": f"https://example.com/heat/{number}",
+                        "_search": {"score": 40},
+                    }
+                    for number in range(5)
+                )
+            elif "source=imdb" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Heat",
+                            "year": "1995",
+                            "source": "imdb",
+                            "url": "https://www.imdb.com/title/tt0113277/",
+                            "_search": {"score": 100},
+                        }
+                    ]
+                }
+            route.fulfill(json=body)
+
+        page.route("**/api/search?*", handle_search)
+        page.locator("#catalogButton").click()
+        page.locator("#externalSource").check()
+        page.locator("#query").fill("Heat")
+        page.locator("#searchButton").click()
+        page.wait_for_function("!document.querySelector('#searchButton').disabled")
+        rows = page.locator(".unified-result-list article")
+        self.assertEqual(rows.count(), 6)
+        self.assertEqual(rows.nth(0).get_attribute("data-local-id"), "heat")
+        self.assertEqual(rows.nth(1).get_attribute("data-result-source"), "imdb")
+        self.assertEqual(rows.nth(2).get_attribute("data-result-source"), "wikipedia")
+        self.assertTrue(page.locator("#grid").is_hidden())
+        self.assertTrue(page.locator("#catalogMergeSection").is_hidden())
+        self.assertEqual(page.locator(".search-source-heading").count(), 0)
+        page.locator(".unified-load-more").click()
+        self.assertEqual(rows.count(), 8)
+        self.assertTrue(rows.nth(6).locator("h3").evaluate("el => document.activeElement === el"))
+        self.assertTrue(page.locator(".unified-load-more").is_hidden())
+        rows.nth(0).get_by_role("button", name="Abrir VHS").click()
+        page.wait_for_selector("#detailDrawer[open] .vhs-back-cover")
+        page.keyboard.press("Escape")
+        page.set_viewport_size({"width": 320, "height": 740})
+        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+        page.locator("#clearManualSearch").click()
+        self.assertTrue(page.locator("#grid").is_visible())
+
     def test_catalog_can_search_and_add_a_jikan_result(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)
@@ -3439,12 +3521,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator("#query").fill("Your Name")
         page.locator("#searchButton").click()
 
-        jikan_group = page.locator('[data-source-group="jikan"]')
+        jikan_group = page.locator('.external-result[data-result-source="jikan"]')
         jikan_group.get_by_role("heading", name="Kimi no Na wa.", exact=True).wait_for()
-        self.assertIn("no está afiliada a MyAnimeList", jikan_group.inner_text())
+        self.assertIn(
+            "no está afiliada a MyAnimeList", page.locator("#manualSearchResults").inner_text()
+        )
         jikan_group.get_by_role("button", name="Agregar").click()
         page.wait_for_function(
-            "[...document.querySelectorAll('[data-source-group=\"jikan\"] button')]"
+            "[...document.querySelectorAll('[data-result-source=\"jikan\"] button')]"
             ".some((button) => button.textContent === 'Agregado')"
         )
 
@@ -3514,7 +3598,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator("#query").fill("Heat")
         page.locator("#searchButton").click()
 
-        row = page.locator('[data-source-group="wikipedia"] .external-result')
+        row = page.locator('.external-result[data-result-source="wikipedia"]')
         row.get_by_role("heading", name="Heat", exact=True).wait_for()
         self.assertLess(row.bounding_box()["height"], 220)
         self.assertEqual(
@@ -3607,9 +3691,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator("#query").fill("Death Note")
         page.locator("#searchButton").click()
 
-        jikan_group = page.locator('[data-source-group="jikan"]')
+        jikan_group = page.locator('.external-result[data-result-source="anime_offline_database"]')
         jikan_group.get_by_role("heading", name="Death Note", exact=True).wait_for()
-        text = jikan_group.inner_text()
+        page.locator(".unified-sources summary").click()
+        text = page.locator("#manualSearchResults").inner_text()
         self.assertIn("Respaldo local", text)
         self.assertIn("Anime DB offline", text)
         self.assertIn("ODbL/DbCL", text)

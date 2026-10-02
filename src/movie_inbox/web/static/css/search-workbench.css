@@ -1,5 +1,44 @@
-/* U12 · External results are catalogue references on the existing counter,
-   while VHS cases continue to represent works already in the collection. */
+/* U12 · One compact search list; the full VHS shelf returns when browsing. */
+#collectionView.has-unified-search #grid,
+#collectionView.has-unified-search #catalogLoadMore,
+#collectionView.has-unified-search #empty,
+#collectionView.has-unified-search .collection-results-toolbar {
+  display: none !important;
+}
+#collectionView.has-unified-search .search-sections { margin-top: 0; }
+#collectionView .unified-result-list { display: grid; gap: 0; }
+#collectionView .unified-sources {
+  border-bottom: 1px solid var(--counter-line);
+  color: var(--counter-muted);
+  padding: 0 0 12px;
+}
+#collectionView .unified-sources summary {
+  color: var(--counter-data);
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 32px;
+}
+#collectionView .unified-sources > div { display: grid; gap: 10px; padding-top: 8px; }
+#collectionView .unified-source-state { align-items: baseline; display: flex; flex-wrap: wrap; gap: 6px 12px; }
+#collectionView .unified-source-state strong { color: var(--counter-ink); }
+#collectionView .unified-source-state p { flex-basis: 100%; margin: 0; }
+#collectionView .unified-filter-note { color: var(--counter-muted); font-size: 13px; }
+#collectionView .unified-load-more { justify-self: center; width: auto; }
+#collectionView .external-result.local-result .result-media-frame {
+  background: #101211 url("../img/brand/vhs-blank-512.webp") center / 100% 100% no-repeat;
+  padding: 4px;
+}
+#collectionView .local-result .card-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+#collectionView .external-result.local-result .result-placeholder {
+  background: var(--counter-ink);
+  color: #171b18;
+  height: auto;
+  inset: 38% 5px auto;
+  padding: 4px 2px;
+  position: absolute;
+  transform: rotate(-3deg);
+}
+#collectionView .local-result .result-actions .action-secondary { grid-column: 1 / -1; }
 #collectionView .external-results-section {
   border-top-color: var(--counter-line);
   gap: 18px;

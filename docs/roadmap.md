@@ -195,9 +195,9 @@ U7 y el sonido opcional U9 siguen pendientes; ver
 ### v0.11.0 — en desarrollo
 
 Primer frente [U12]: búsqueda externa como mesa de consulta del videoclub, con filas
-compactas por fuente y revisión de posibles duplicados dentro de la búsqueda.
+compactas unificadas por relevancia y revisión de posibles duplicados dentro de la búsqueda.
 Conserva el matching y el comparador detallado. Dirección, tareas y estados:
-[brief U12](briefs/search-workbench-v1.md). La versión sigue abierta para los demás
+[brief U12 actualizado](briefs/search-unified-v2.md). La versión sigue abierta para los demás
 componentes que se decidan rediseñar; todavía no tiene gate de cierre.
 
 ### Próximos incrementos propuestos
