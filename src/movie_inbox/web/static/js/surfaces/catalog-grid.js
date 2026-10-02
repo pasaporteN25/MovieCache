@@ -6,7 +6,7 @@ import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, hasExt
 import { apiFetch } from "../core/http.js";
 import { goToCollection, goToCollectionAdd, routeValuesForView, syncRoute } from "../core/router.js";
 import { CATALOG_PAGE_SIZE, currentView, items, selectedExistingIdForSearch } from "../core/state.js";
-import { activeQuery, clearManualSearch, externalHealth, externalSourceSearchStates, externalSourcesAttempted, externalSourcesLastUsed, manualResults, matchesNormalizedSearchText, selectedManualCandidateRef, selectedManualCandidateSource, selectedManualIndex, setSearchState } from "./catalog-search.js";
+import { activeQuery, clearManualSearch, externalHealth, externalSourceSearchStates, externalSourcesAttempted, externalSourcesLastUsed, manualResults, matchesNormalizedSearchText, renderManualResults, selectedManualCandidateRef, selectedManualCandidateSource, selectedManualIndex, setSearchState, usesUnifiedSearch } from "./catalog-search.js";
 import { renderEditorialHome } from "./home.js";
 
       export let catalogSearchIndex = new WeakMap();
@@ -639,8 +639,8 @@ import { renderEditorialHome } from "./home.js";
         lastCatalogGridKey = "";
       }
 
-      export function filteredItems() {
-        const normalizedQuery = normalizeText(activeQuery.trim());
+      export function filteredItems({ includeQuery = true } = {}) {
+        const normalizedQuery = includeQuery ? normalizeText(activeQuery.trim()) : "";
         return items.filter((item) => {
           const searchText = catalogSearchIndex.get(item) || normalizeText(catalogSearchDocument(item));
           return (!normalizedQuery || matchesNormalizedSearchText(searchText, normalizedQuery))
@@ -794,6 +794,7 @@ import { renderEditorialHome } from "./home.js";
       }
 
       export function render() {
+        fields.collectionView.classList.toggle("has-unified-search", usesUnifiedSearch());
         const baseFiltered = sortItems(filteredItems());
         const filtered = applyRandomOrder(baseFiltered);
         const shown = filtered.slice(0, catalogVisibleCount);
@@ -814,7 +815,12 @@ import { renderEditorialHome } from "./home.js";
         fields.sourceFiles.textContent = sourceFiles.length;
         fields.catalogSummary.textContent = catalogSummaryText(filtered);
         fields.empty.style.display = filtered.length ? "none" : "block";
-        if (activeQuery) {
+        const searchingExternalSources = activeQuery && fields.externalSource.checked;
+        fields.empty.classList.toggle("collection-empty-inline", Boolean(searchingExternalSources));
+        if (searchingExternalSources) {
+          fields.empty.innerHTML = `<strong>Sin coincidencias en tu colección para “${escapeHtml(activeQuery)}”.</strong>
+            <span>Revisá los resultados de otras fuentes más abajo.</span>`;
+        } else if (activeQuery) {
           fields.empty.innerHTML = `<strong>No aparece “${escapeHtml(activeQuery)}” en esta estantería.</strong>
             <span>Probá quitando filtros o ampliá la búsqueda a fuentes externas.</span>
             <div class="collection-empty-actions">
@@ -849,6 +855,7 @@ import { renderEditorialHome } from "./home.js";
         }
         fields.catalogLoadMore.hidden = shown.length >= filtered.length;
         fields.catalogLoadMore.textContent = `Cargar ${Math.min(CATALOG_PAGE_SIZE, filtered.length - shown.length)} más · ${shown.length} de ${filtered.length}`;
+        if (usesUnifiedSearch()) renderManualResults();
         if (lastEditorialRenderRevision !== editorialRevision) {
           renderEditorialHome();
           lastEditorialRenderRevision = editorialRevision;
