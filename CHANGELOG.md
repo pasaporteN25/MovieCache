@@ -49,8 +49,9 @@ Los cambios relevantes del proyecto se documentan en este archivo.
   «Kingdom of Heaven (film)» se guarda y se muestra como «Kingdom of Heaven». El nombre
   del artículo se conserva aparte, y las fichas guardadas antes se muestran sin él.
 
-- La búsqueda externa de Colección presenta fichas compactas por fuente, con acciones
-  identificadas y sin carriles horizontales de tarjetas altas.
+- La búsqueda de Colección reúne obras guardadas y referencias externas en una
+  lista de filas compactas ordenada por relevancia, con una sola paginación y la
+  procedencia identificada en cada resultado. La estantería vuelve al limpiar la consulta.
 - Las coincidencias que requieren revisión se comparan en la búsqueda con el motivo
   de cada candidata; abrir una ficha guardada ya no lleva a la fuente externa.
   Seguir buscando conserva los resultados y agregar una obra distinta requiere una

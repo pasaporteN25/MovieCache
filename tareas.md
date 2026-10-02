@@ -806,6 +806,10 @@ matching ni el comparador de campos.
 - [x] U12.1 Estructura de resultados externos y revisión de duplicados.
 - [x] U12.2 Gate de interacción, accesibilidad y responsive con datos descartables.
 - [x] U12.3 Revisión visual y cierre de esta entrega; la release sigue abierta.
+- [x] U12.4 Lista única local/externa por relevancia, paginación común y estados compactos.
+- [x] U12.5 Gate de la lista unificada en escritorio, móvil, historial y decisiones.
+
+Revisión aprobada el 2026-10-02: [brief de la lista unificada](docs/briefs/search-unified-v2.md).
 
 Las notas históricas de v0.9.0 que siguen debajo aún no se depuraron.
 
