@@ -12,7 +12,7 @@ import { addLibraryExclusionRuleRow, browseManagedLibraryPath, checkManagedLibra
 import { archiveMemberAccount, closeArchiveMemberDialog, closeEditMemberDialog, closeMemberDialog, closePrivacyDialog, closeTemporaryPasswordDialog, copyTemporaryPassword, createMember, handleArchivedMemberAction, handleMemberAction, handleVisibilityChange, openMemberDialog, openPrivacyDialog, refreshAdminData, saveMemberProfile, savePrivacyPreferences, syncPrivacyControls } from "../surfaces/admin-members.js";
 import { createPublicPresentation, handlePublicPresentationAction, previewPublicPresentation } from "../surfaces/admin-public-presentations.js";
 import { addStreamingRegion, handleStreamingAction, loadStreamingConfiguration, saveStreamingPolicy } from "../surfaces/admin-streaming.js";
-import { applyCollectionYearRange, changeCollectionMode, changeRandomScope, clearFilter, clearFilters, collectionFiltersChanged, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setCollectionFilterValue, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
+import { initializeCollectionFilterPanel, addCollectionFilterSelection, applyCollectionYearRange, changeCollectionMode, changeRandomScope, clearFilter, clearFilters, downloadCatalogExport, randomizeView, render, renderDatabaseMenu, resetViewOrder, setCatalogVisibleCount, setRandomOrder, showMoreCatalogItems, syncCollectionRoute, toggleCatalog, toggleCollectionFilter, toggleWatched } from "../surfaces/catalog-grid.js";
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, dismissDuplicateReview, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, renderManualResults, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { clearMergeSelection, mergeItems, mergeSelected, toggleMergeSelection } from "../surfaces/merge-selection.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
@@ -290,6 +290,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         else goToCollectionRoot();
       });
       fields.externalSource.addEventListener("change", renderDatabaseMenu);
+      initializeCollectionFilterPanel();
       fields.clearFilters.addEventListener("click", clearFilters);
       [
         [fields.decadeFilter, "decade"],
@@ -298,9 +299,8 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         [fields.sourceFilter, "source"]
       ].forEach(([field, filter]) => field.addEventListener("change", () => {
         if (!field.value) return;
-        setCollectionFilterValue(filter, field.value, true);
+        addCollectionFilterSelection(filter, field.value);
         field.value = "";
-        collectionFiltersChanged();
       }));
       fields.applyYearRange.addEventListener("click", applyCollectionYearRange);
       [fields.yearFromFilter, fields.yearToFilter].forEach((field) => field.addEventListener("keydown", (event) => {

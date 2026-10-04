@@ -1,5 +1,10 @@
 # Tareas — Movie Inbox
 
+Panel de filtros de Colección aprobado e implementado el 2026-10-04: ver
+[`collection-controls-v1`](docs/briefs/collection-controls-v1.md) y capturas de
+[la implementación v2](docs/design/collection-controls-v2/README.md). Conserva VHS,
+facetas múltiples e historial; edición en borrador con confirmación explícita.
+
 Tablero en Markdown, versionado en el repo. Columnas = estado (`Backlog` / `En curso` /
 `Hecho`). Dentro de `Backlog`, las tareas se agrupan por frente. Cada tarea tiene alcance
 de archivo/línea concreto, dependencias explícitas y un nivel de modelo sugerido —

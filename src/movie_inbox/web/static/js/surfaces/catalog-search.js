@@ -125,7 +125,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, l
       export async function runSearch({ updateHistory = true } = {}) {
         resetDuplicateReview();
         const requestedQuery = fields.query.value.trim();
-        fields.collectionUtilityMenu.open = false;
+        if (fields.advancedFiltersMenu.open) fields.advancedFiltersMenu.close();
         if (!requestedQuery) {
           clearManualSearch({ focus: false, updateHistory });
           return;
@@ -561,7 +561,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, l
           return;
         }
         const returnMode = collectionSearchMode === "add" ? "add" : "browse";
-        fields.collectionUtilityMenu.open = false;
+        if (fields.advancedFiltersMenu.open) fields.advancedFiltersMenu.close();
         if (externalSearchController) externalSearchController.abort();
         externalSearchController = null;
         setSearchBusy(false);

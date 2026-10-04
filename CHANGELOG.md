@@ -26,6 +26,10 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Cambiado
 
+- Colección reúne los filtros en un panel superpuesto. Podés preparar una selección
+  y aplicarla al confirmar; cancelar conserva la estantería VHS y sus filtros. En
+  móvil el panel ocupa la pantalla y mantiene visible la confirmación.
+
 - Los rótulos de las carteleras se centran sobre sus placas y usan la misma tipografía:
   «Hoy/Ayer en cartel» para la programación y «Tu selección» para la obra consultada.
 - Los resultados guardados de búsqueda permiten seleccionar varias fichas y abrir el

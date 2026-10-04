@@ -39,6 +39,57 @@ import { renderEditorialHome } from "./home.js";
 
       export let collectionYearRange = { from: "", to: "" };
 
+      let collectionFilterDraft = null;
+      let collectionYearDraft = null;
+
+      export function initializeCollectionFilterPanel() {
+        const dialog = fields.advancedFiltersMenu;
+        const close = () => dialog.close();
+        document.querySelector("#openCollectionFilters").addEventListener("click", () => {
+          fields.yearFromFilter.setCustomValidity("");
+          fields.yearToFilter.setCustomValidity("");
+          collectionFilterDraft = Object.fromEntries(COLLECTION_MULTI_FILTER_KEYS.map((key) => [key, new Set(collectionFilters[key])]));
+          collectionYearDraft = { ...collectionYearRange };
+          dialog.showModal();
+          syncCollectionFilterControls();
+        });
+        for (const id of ["closeCollectionFilters", "cancelCollectionFilters"]) {
+          document.getElementById(id).addEventListener("click", close);
+        }
+        dialog.addEventListener("close", () => {
+          if (dialog.open) return;
+          collectionFilterDraft = null;
+          collectionYearDraft = null;
+          syncCollectionFilterControls();
+        });
+        dialog.addEventListener("click", (event) => {
+          if (event.target !== dialog) return;
+          const box = dialog.getBoundingClientRect();
+          if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) close();
+        });
+        window.addEventListener("popstate", () => { if (dialog.open) close(); });
+        for (const [field, key] of [[fields.yearFromFilter, "from"], [fields.yearToFilter, "to"]]) {
+          field.addEventListener("input", () => {
+            field.setCustomValidity("");
+            if (collectionYearDraft) collectionYearDraft[key] = field.value;
+          });
+        }
+        document.getElementById("applyCollectionFilters").addEventListener("click", () => {
+          if (!applyCollectionYearRange()) return;
+          collectionFilters = collectionFilterDraft;
+          collectionYearRange = collectionYearDraft;
+          close();
+          collectionFilterDraft = null;
+          collectionYearDraft = null;
+          collectionFiltersChanged();
+        });
+      }
+
+      export function addCollectionFilterSelection(filter, value) {
+        setCollectionFilterValue(filter, value, true, collectionFilterDraft || collectionFilters);
+        collectionFiltersChanged();
+      }
+
       // Bootstrap's existing module cycle initializes state.js after this module.
       // loadCatalog resets this value to CATALOG_PAGE_SIZE before the first render.
       export let catalogVisibleCount = 30;
@@ -462,9 +513,9 @@ import { renderEditorialHome } from "./home.js";
         return [...values].find((candidate) => normalizeText(candidate) === key) || "";
       }
 
-      export function setCollectionFilterValue(filter, value, selected) {
+      export function setCollectionFilterValue(filter, value, selected, target = collectionFilters) {
         if (!COLLECTION_MULTI_FILTER_KEYS.includes(filter) || !String(value || "").trim()) return;
-        const values = collectionFilters[filter];
+        const values = target[filter];
         const existing = matchingFilterValue(values, value);
         if (selected && !existing) values.add(String(value).trim());
         if (!selected && existing) values.delete(existing);
@@ -472,11 +523,16 @@ import { renderEditorialHome } from "./home.js";
 
       export function toggleCollectionFilter(filter, value) {
         if (!COLLECTION_MULTI_FILTER_KEYS.includes(filter) || !value) return;
-        setCollectionFilterValue(filter, value, !matchingFilterValue(collectionFilters[filter], value));
+        const target = collectionFilterDraft || collectionFilters;
+        setCollectionFilterValue(filter, value, !matchingFilterValue(target[filter], value), target);
         collectionFiltersChanged();
       }
 
       export function collectionFiltersChanged() {
+        if (collectionFilterDraft) {
+          syncCollectionFilterControls();
+          return;
+        }
         randomOrder = [];
         catalogVisibleCount = CATALOG_PAGE_SIZE;
         syncCollectionFilterControls();
@@ -509,28 +565,54 @@ import { renderEditorialHome } from "./home.js";
         fields.yearToFilter.setCustomValidity(invalidTo ? "Ingresá un año entre 1800 y 2199." : "");
         if (invalidFrom || invalidTo) {
           (invalidFrom ? fields.yearFromFilter : fields.yearToFilter).reportValidity();
-          return;
+          return false;
         }
-        collectionYearRange = from && to && Number(from) > Number(to)
+        const range = from && to && Number(from) > Number(to)
           ? { from: to, to: from }
           : { from, to };
+        if (collectionFilterDraft) collectionYearDraft = range;
+        else collectionYearRange = range;
         collectionFiltersChanged();
+        return true;
       }
 
       export function syncCollectionFilterControls() {
+        const target = collectionFilterDraft || collectionFilters;
+        const range = collectionYearDraft || collectionYearRange;
         document.querySelectorAll('[data-click="toggle-collection-filter"]').forEach((button) => {
-          const values = collectionFilters[button.dataset.filter];
+          const values = target[button.dataset.filter];
           const selected = values instanceof Set && Boolean(matchingFilterValue(values, button.dataset.value || ""));
           button.setAttribute("aria-pressed", String(selected));
         });
-        fields.yearFromFilter.value = collectionYearRange.from;
-        fields.yearToFilter.value = collectionYearRange.to;
-        const advancedKeys = ["source", "decade", "genre", "director", "record", "release_day"];
+        fields.yearFromFilter.value = range.from;
+        fields.yearToFilter.value = range.to;
+        const advancedKeys = COLLECTION_MULTI_FILTER_KEYS;
         const count = advancedKeys.reduce((total, key) => total + collectionFilters[key].size, 0)
           + (collectionYearRange.from || collectionYearRange.to ? 1 : 0);
         fields.advancedFilterCount.hidden = count === 0;
         fields.advancedFilterCount.textContent = String(count);
         fields.advancedFiltersMenu.classList.toggle("has-active-filters", count > 0);
+        const draftChips = document.getElementById("collectionDraftFilters");
+        draftChips.replaceChildren();
+        if (collectionFilterDraft) {
+          for (const key of COLLECTION_MULTI_FILTER_KEYS) {
+            for (const value of target[key]) {
+              const button = document.createElement("button");
+              button.type = "button";
+              button.textContent = `${filterValueLabel(key, value)} ×`;
+              button.setAttribute("aria-label", `Quitar de la selección: ${filterValueLabel(key, value)}`);
+              button.addEventListener("click", () => {
+                target[key].delete(value);
+                syncCollectionFilterControls();
+              });
+              draftChips.append(button);
+            }
+          }
+          const matches = filteredItems({ filters: target, range }).length;
+          document.getElementById("applyCollectionFilters").textContent = activeQuery
+            ? "Aplicar filtros" : `Mostrar ${matches} ${matches === 1 ? "obra" : "obras"}`;
+          document.getElementById("collectionFiltersHint").textContent = "La colección cambia al aplicar.";
+        }
       }
 
       export function filterSetMatchesValue(values, value) {
@@ -542,21 +624,21 @@ import { renderEditorialHome } from "./home.js";
         return asList(candidates).some((candidate) => matchingFilterValue(values, candidate));
       }
 
-      export function matchesYearFilters(item) {
-        const decades = collectionFilters.decade;
-        const hasRange = Boolean(collectionYearRange.from || collectionYearRange.to);
+      export function matchesYearFilters(item, filters = collectionFilters, range = collectionYearRange) {
+        const decades = filters.decade;
+        const hasRange = Boolean(range.from || range.to);
         if (!decades.size && !hasRange) return true;
         const year = numericYear(item.year);
         if (!year) return false;
         const decadeMatch = decades.size && matchingFilterValue(decades, String(Math.floor(year / 10) * 10));
         const rangeMatch = hasRange
-          && (!collectionYearRange.from || year >= Number(collectionYearRange.from))
-          && (!collectionYearRange.to || year <= Number(collectionYearRange.to));
+          && (!range.from || year >= Number(range.from))
+          && (!range.to || year <= Number(range.to));
         return Boolean(decadeMatch || rangeMatch);
       }
 
-      export function matchesReleaseDay(item) {
-        const days = collectionFilters.release_day;
+      export function matchesReleaseDay(item, filters = collectionFilters) {
+        const days = filters.release_day;
         if (!days.size) return true;
         return (Array.isArray(item.release_dates) ? item.release_dates : []).some((release) => {
           if (release?.precision !== "day") return false;
@@ -565,8 +647,8 @@ import { renderEditorialHome } from "./home.js";
         });
       }
 
-      export function matchesPersonalRecord(item) {
-        const records = collectionFilters.record;
+      export function matchesPersonalRecord(item, filters = collectionFilters) {
+        const records = filters.record;
         if (!records.size) return true;
         return (records.has("unrated") && normalizeRating(item.rating) === 0)
           || (records.has("unreviewed") && !String(item.review || "").trim());
@@ -639,24 +721,24 @@ import { renderEditorialHome } from "./home.js";
         lastCatalogGridKey = "";
       }
 
-      export function filteredItems({ includeQuery = true } = {}) {
+      export function filteredItems({ includeQuery = true, filters = collectionFilters, range = collectionYearRange } = {}) {
         const normalizedQuery = includeQuery ? normalizeText(activeQuery.trim()) : "";
         return items.filter((item) => {
           const searchText = catalogSearchIndex.get(item) || normalizeText(catalogSearchDocument(item));
           return (!normalizedQuery || matchesNormalizedSearchText(searchText, normalizedQuery))
             && (!duplicatesOnly || Number(item._duplicate_count || 0) > 0)
-            && filterSetMatchesValue(collectionFilters.status, item.status)
+            && filterSetMatchesValue(filters.status, item.status)
             && filterSetMatchesValue(
-              collectionFilters.availability,
+              filters.availability,
               isInCatalog(item.en_catalogo) ? "available" : "unavailable"
             )
-            && filterSetMatchesValue(collectionFilters.kind, item.kind)
-            && filterSetMatchesValue(collectionFilters.source, item.source)
-            && filterSetMatchesList(collectionFilters.genre, item.genres)
-            && filterSetMatchesList(collectionFilters.director, item.directors)
-            && matchesYearFilters(item)
-            && matchesReleaseDay(item)
-            && matchesPersonalRecord(item);
+            && filterSetMatchesValue(filters.kind, item.kind)
+            && filterSetMatchesValue(filters.source, item.source)
+            && filterSetMatchesList(filters.genre, item.genres)
+            && filterSetMatchesList(filters.director, item.directors)
+            && matchesYearFilters(item, filters, range)
+            && matchesReleaseDay(item, filters)
+            && matchesPersonalRecord(item, filters);
         });
       }
 
@@ -702,6 +784,14 @@ import { renderEditorialHome } from "./home.js";
       }
 
       export function clearFilters() {
+        if (collectionFilterDraft) {
+          collectionFilterDraft = emptyCollectionFilters();
+          collectionYearDraft = { from: "", to: "" };
+          fields.yearFromFilter.setCustomValidity("");
+          fields.yearToFilter.setCustomValidity("");
+          syncCollectionFilterControls();
+          return;
+        }
         resetCollectionFilters();
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true });
         render();

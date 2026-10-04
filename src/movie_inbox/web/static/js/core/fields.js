@@ -35,7 +35,6 @@ import { scannerQueue } from "../surfaces/inbox-scanner.js";
         privacyButton: document.querySelector("#privacyButton"),
         logoutButton: document.querySelector("#logoutButton"),
         searchConsole: document.querySelector(".search-console"),
-        collectionUtilityMenu: document.querySelector(".collection-view .utility-menu"),
         randomButton: document.querySelector("#randomButton"),
         randomCatalogOnly: document.querySelector("#randomCatalogOnly"),
         randomScopeLabel: document.querySelector("#randomScopeLabel"),

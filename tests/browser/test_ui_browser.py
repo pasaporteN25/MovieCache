@@ -745,9 +745,11 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(page.locator(".search-main").is_visible())
         self.assertNotIn("mode=", page.url)
 
+        page.locator("#openCollectionFilters").click()
         first_status = page.locator("#statusQuickFilters button").first
         first_status.click()
         selected_status = first_status.get_attribute("data-value")
+        page.locator("#applyCollectionFilters").click()
         self.assertIn(f"status={selected_status}", page.url)
 
         page.locator("#query").focus()
