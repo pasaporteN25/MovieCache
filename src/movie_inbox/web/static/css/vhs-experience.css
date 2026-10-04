@@ -175,7 +175,7 @@
 .vhs-editor-nav button { background: transparent; border: 1px solid transparent; border-radius: 3px; color: #d6e2de; font-size: 15px; font-weight: 400; min-height: 48px; padding: 12px; text-align: left; }
 .vhs-editor-nav button[aria-current] { background: #183338; border-color: #689d9d; color: #a9f0ef; }
 .vhs-editor-nav button:last-child { border-top-color: #40524f; margin-top: 40px; }
-.vhs-editor-workspace { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; min-width: 0; }
+.vhs-editor-workspace { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; min-width: 0; }
 .vhs-editor-heading { align-items: center; border-bottom: 1px solid #40524f; display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; padding: 16px 26px; }
 .vhs-editor-heading h2 { color: #f1eadb; font: 600 28px/1.15 "Barlow Condensed", sans-serif; margin: 0; overflow-wrap: anywhere; text-shadow: none; }
 .vhs-editor-heading p { color: #bdccca; font-size: 13px; margin: 5px 0 0; }

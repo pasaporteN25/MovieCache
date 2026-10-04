@@ -512,6 +512,8 @@ import { curationEmptyState, curationHistoryMode, curationThumb, duplicateSignal
           // queue on reload and the next one takes its place. Clearing it sent
           // the queue back to its first case.
           await loadCatalog();
+          // [X12 D] Whatever picked these works for merging can let go of them.
+          document.dispatchEvent(new CustomEvent("movie-inbox:merged"));
           setCurationFeedback("Entradas combinadas", "success", payload.operation);
           if (externalMerge) {
             setSelectedExistingIdForSearch(null);

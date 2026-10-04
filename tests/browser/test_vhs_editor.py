@@ -187,7 +187,7 @@ class VhsEditorTests(unittest.TestCase):
         page.locator('[data-metadata-field="directors"]').fill("Dirección lenta")
         with page.expect_request("**/api/personal"):
             page.locator("[data-editor-save]").click()
-        self.assertTrue(page.locator('[data-click="detail-next"]').is_disabled())
+        self.assertTrue(page.locator(".drawer-back").is_disabled())
         self.assertTrue(page.locator("#closeDetail").is_disabled())
         page.evaluate("""async () => {
             const detail = await import('/static/js/core/detail.js');
@@ -195,7 +195,7 @@ class VhsEditorTests(unittest.TestCase):
             detail.openDetail('akira');
             detail.closeDetail();
         }""")
-        self.assertEqual(page.locator(".vhs-editor-heading h2").inner_text(), "Heat")
+        self.assertEqual(page.locator(".drawer-title-main").text_content(), "Heat")
         self.assertFalse(page.locator("#unsavedDetailDialog").is_visible())
         pending[0].fulfill(json={"ok": True})
         page.wait_for_function(

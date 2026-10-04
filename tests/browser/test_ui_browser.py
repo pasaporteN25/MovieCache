@@ -867,13 +867,13 @@ class BrowserInterfaceTests(unittest.TestCase):
         date_control.locator('[data-click="home-date-yesterday"]').click()
         page.wait_for_function(
             "document.querySelector('.spotlight-selector-heading span')?.textContent.trim() "
-            "=== 'Ayer'"
+            "=== 'Ayer en cartel'"
         )
         # CSS uppercases the label, so read the page text like the date above.
         consulted_poster = page.locator(".home-consulted-poster")
         self.assertEqual(
             consulted_poster.locator(".spotlight-selector-heading").text_content(),
-            "En consulta",
+            "Tu selección",
         )
 
     def test_home_typography_is_local_scoped_and_works_with_csp(self) -> None:
@@ -3629,7 +3629,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         review.get_by_role("button", name="Abrir ficha guardada").click()
         page.wait_for_selector("#detailDrawer[open]")
-        self.assertIn("Heat", page.locator("#detailDrawer").inner_text())
+        self.assertEqual(page.locator("#detailDrawer .drawer-title-main").text_content(), "Heat")
         page.keyboard.press("Escape")
         count_before_dismiss = len(search_requests)
         review.get_by_role("button", name="Seguir buscando").click()

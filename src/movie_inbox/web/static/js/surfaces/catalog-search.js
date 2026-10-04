@@ -7,6 +7,7 @@ import { showView } from "../core/router.js";
 import { findLinkForItem } from "../core/search-bridge.js";
 import { CATALOG_PAGE_SIZE, SEARCH_PAGE_SIZE, items, selectedExistingIdForSearch, setSelectedExistingIdForSearch } from "../core/state.js";
 import { collectionModeCopy, collectionSearchMessage, collectionSearchMode, comparisonSearchMessage, filteredItems, hasActiveCollectionFilters, render, renderDatabaseMenu, setCatalogVisibleCount, setCollectionSearchMode, setRandomOrder, syncCollectionRoute } from "./catalog-grid.js";
+import { duplicateHint, mergeSelectionBar } from "./merge-selection.js";
 import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, localSearchResult, oneEditApart, searchResult, showDuplicateChoice } from "./catalog-search-cards.js";
 
       export let manualResults = [];
@@ -737,7 +738,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, l
         const empty = pending || localSearchState === "loading" ? "Buscando coincidencias…" : "No encontramos obras para esta búsqueda.";
         const more = rows.length > unifiedVisibleCount ? `<button class="load-more unified-load-more" type="button" data-click="show-more-manual">Cargar ${Math.min(SEARCH_PAGE_SIZE, rows.length - unifiedVisibleCount)} más · ${visible.length} de ${rows.length}</button>` : "";
         const attribution = externalSourcesAttempted.map((source) => externalSourceAttribution(source, manualResults.filter((result) => resultShelfSource(result) === source).map((result) => ({ result })))).join("");
-        fields.manualSearchResults.innerHTML = `${states ? `<details class="unified-sources"><summary>Fuentes consultadas${pending ? ` · ${pending} buscando` : ""}${failed ? ` · ${failed} incompletas` : ""}</summary><div>${states}</div></details>` : ""}${notices}<div class="unified-result-list" aria-label="Resultados ordenados por relevancia">${visible.length ? visible.map(({ result, index, local }) => local ? localSearchResult(result, index) : searchResult(result, index)).join("") : `<p class="search-source-empty" role="status">${empty}</p>`}</div>${more}${attribution}`;
+        fields.manualSearchResults.innerHTML = `${states ? `<details class="unified-sources"><summary>Fuentes consultadas${pending ? ` · ${pending} buscando` : ""}${failed ? ` · ${failed} incompletas` : ""}</summary><div>${states}</div></details>` : ""}${notices}${mergeSelectionBar()}${duplicateHint(visible.filter((row) => row.local).map((row) => row.result.id))}<div class="unified-result-list" aria-label="Resultados ordenados por relevancia">${visible.length ? visible.map(({ result, index, local }) => local ? localSearchResult(result, index) : searchResult(result, index)).join("") : `<p class="search-source-empty" role="status">${empty}</p>`}</div>${more}${attribution}`;
         const sourcesDetails = fields.manualSearchResults.querySelector(".unified-sources");
         if (sourcesDetails) sourcesDetails.open = sourcesOpen;
         if (focusAction) {

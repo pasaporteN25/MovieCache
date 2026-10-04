@@ -29,6 +29,16 @@ registrada; un cambio de fondo (no una aclaración) lo decide el owner.
 | Rama de desarrollo | `release/X.Y.Z` — vive mientras esa versión está abierta; ver "Versionado" abajo |
 | Versionado | `X.Y.Z`, tag anotado `vX.Y.Z` sobre el merge commit de cierre (`git tag -a vX.Y.Z -m vX.Y.Z`) |
 
+## Ramas y PRs — decisión 2026-10-04
+
+Sólo `feature/nombre-del-feature` y `release/x.x.x` para ramas nuevas. El trabajo
+individual de una versión abierta se concentra en su release; las features aisladas
+se fusionan en ella con merge commit. El PR de release compara esa release con `master`.
+Las instrucciones aplican a Claude y Codex (`CLAUDE.md` y `AGENTS.md`). La plantilla
+base es `.github/pull_request_template.md`: regla de ramas y espacio de descripción.
+Excepción temporal documentada en `AGENTS.md`: conservar el origen histórico del
+PR #3 como alias remoto de `release/0.11.0`, con idéntico commit, hasta cerrarlo.
+
 ## Convención de commits
 
 ```

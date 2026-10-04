@@ -7,6 +7,16 @@ Antes de trabajar, leé los contratos vigentes: `SDD.md`, `PRODUCT.md`, `DESIGN.
 `docs/roadmap.md`, `CHANGELOG.md` (`[Sin publicar]`), `tests/test_layering.py`.
 No son documentación decorativa.
 
+## Ramas y pull requests — decisión del owner, 2026-10-04
+
+Las directivas compartidas con Codex están en `AGENTS.md`. Ramas nuevas:
+`feature/nombre-del-feature` o `release/x.x.x`; preferir la release abierta para
+trabajo individual. No crear ramas `codex/`, `claude/` ni `feat/`. Las features
+entran en la release con merge commit; el PR de release va hacia `master`.
+Usar `.github/pull_request_template.md`, con la regla de ramas y una descripción.
+Para conservar el PR #3, su rama histórica es sólo un alias remoto sincronizado
+con `release/0.11.0`; no es una rama de trabajo. La excepción termina con ese PR.
+
 ## Comandos
 
 ```powershell

@@ -1,8 +1,9 @@
 import { cachedImageSrc } from "../core/card.js";
 import { availabilityCopy } from "../core/availability.js";
 import { fields } from "../core/fields.js";
-import { asList, displayTitle, escapeAttr, escapeHtml, firstListValue, hasExternalLink, isInCatalog, localFiles, meta, normalizeText, sourceLabel, titleSizeClass, titleSubtitle } from "../core/format.js";
+import { asList, displayTitle, escapeAttr, escapeHtml, firstListValue, hasExternalLink, isInCatalog, kindLabel, localFiles, meta, normalizeText, sourceLabel, titleSizeClass, titleSubtitle } from "../core/format.js";
 import { items, selectedExistingIdForSearch } from "../core/state.js";
+import { mergeSelectButton } from "./merge-selection.js";
 import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, completedExternalResults, externalResultKey, externalSearchController, manualResults, selectedManualIndex } from "./catalog-search.js";
 
       export function catalogMergeResult(item, index) {
@@ -70,10 +71,10 @@ import { EXTERNAL_SOURCE_LABELS, SEARCH_TIMEOUT_MS, completedExternalResults, ex
           ${resultMedia(title, item.page_image, index < 6)}
           <div class="result-body">
             <h3 class="${titleSizeClass(title)}" tabindex="-1">${escapeHtml(title)}</h3>
-            <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(firstListValue(item.directors))}</div>
+            <div class="meta">${meta(item.year)}${meta(kindLabel(item.kind))}${meta(firstListValue(item.directors))}</div>
             <div class="card-badges"><span class="pill good">En tu colección</span><span class="pill">${item.status === "watched" ? "Vista" : "Pendiente"}</span><span class="pill">${availabilityCopy(item).label}</span></div>
             ${searchDescription(summary, "catalog", item.id)}
-            <div class="result-actions"><button class="action-primary" type="button" data-click="open-detail-with-case-transition" data-id="${escapeAttr(item.id)}">Abrir VHS</button><button class="action-secondary" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Editar ficha</button></div>
+            <div class="result-actions"><button class="action-primary" type="button" data-click="open-detail-with-case-transition" data-id="${escapeAttr(item.id)}">Abrir VHS</button><button class="action-secondary" type="button" data-click="open-detail" data-id="${escapeAttr(item.id)}">Editar ficha</button>${mergeSelectButton(item)}</div>
           </div>
         </article>`;
       }

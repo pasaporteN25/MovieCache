@@ -22,6 +22,13 @@ foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 ## Resumen operativo
 
+**Corte de lectura vigente, 2026-10-04:** ver
+[`docs/release-0.11.0-status.md`](docs/release-0.11.0-status.md) para separar lo que
+ya está en `master`, lo implementado en 0.11.0 y lo pendiente. Las notas fechadas
+anteriores no reabren releases cerradas. Nuevo frente visual: opciones de controles
+de Colección en [`docs/briefs/collection-controls-v1.md`](docs/briefs/collection-controls-v1.md).
+Se elige una opción antes de implementar el rediseño.
+
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
 | — | [U4] | **Cerrada 2026-09-24.** Home integrada como una única consola, gate visual y de regresión en verde | — |

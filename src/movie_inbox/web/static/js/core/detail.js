@@ -4,7 +4,7 @@ import { EDITOR_SECTIONS, renderDetailEditor } from "./detail-editor.js";
 import { mountDetailContext } from "./detail-context.js";
 import { load, loadCatalog } from "./catalog-data.js";
 import { fields } from "./fields.js";
-import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, listText, localFilesText, normalizeRating } from "./format.js";
+import { asList, availabilityState, displayTitle, escapeAttr, escapeHtml, kindLabel, listText, localFilesText, normalizeRating } from "./format.js";
 import { apiFetch } from "./http.js";
 import { syncRoute } from "./router.js";
 import { findLinkForItem } from "./search-bridge.js";
@@ -349,20 +349,27 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           fields.detailNavigation.innerHTML = "";
           return;
         }
+        // [X12 E2] Moving between works belongs to the back cover; the editor
+        // only offers the way back to it.
+        fields.detailNavigation.innerHTML = `<button class="drawer-back" type="button" data-click="return-vhs-back" aria-label="Volver a la contratapa">← Contratapa</button>`;
+      }
+
+      // [X12 E2] Previous / next on the back cover: quiet arrows at the sides,
+      // brighter on hover or focus, and ←/→ from the keyboard.
+      export function backCoverArrows() {
         if (detailNavigationMode === "random") {
-          fields.detailNavigation.innerHTML = `
-            <span class="drawer-navigation-label">${escapeHtml(detailNavigationLabel)}</span>
-            <button class="drawer-navigation-random" type="button" data-click="detail-random">Otro al azar</button>
-          `;
-          return;
+          return `<nav class="vhs-side-nav" aria-label="Navegar obras"><button class="vhs-side-arrow is-next" type="button" data-click="detail-random" aria-label="Otra obra al azar"><span aria-hidden="true">›</span></button></nav>`;
         }
         const index = detailNavigationIds.indexOf(selectedDetailId);
         const total = detailNavigationIds.length;
-        fields.detailNavigation.innerHTML = `
-          <button type="button" data-click="detail-previous" aria-label="Abrir ficha anterior" ${index <= 0 ? "disabled" : ""}>← <span>Anterior</span></button>
-          <span class="drawer-navigation-counter">${escapeHtml(detailNavigationLabel)} · ${Math.max(index + 1, 1)} / ${Math.max(total, 1)}</span>
-          <button type="button" data-click="detail-next" aria-label="Abrir ficha siguiente" ${index < 0 || index >= total - 1 ? "disabled" : ""}><span>Siguiente</span> →</button>
-        `;
+        if (total < 2 || index < 0) return "";
+        const titleOf = (id) => displayTitle(items.find((entry) => entry.id === id) || {}) || "otra obra";
+        const previous = detailNavigationIds[index - 1];
+        const next = detailNavigationIds[index + 1];
+        return `<nav class="vhs-side-nav" aria-label="Navegar obras · ${escapeAttr(detailNavigationLabel)} ${index + 1} de ${total}">
+          ${previous ? `<button class="vhs-side-arrow is-previous" type="button" data-click="detail-previous" aria-label="Anterior: ${escapeAttr(titleOf(previous))}"><span aria-hidden="true">‹</span></button>` : ""}
+          ${next ? `<button class="vhs-side-arrow is-next" type="button" data-click="detail-next" aria-label="Siguiente: ${escapeAttr(titleOf(next))}"><span aria-hidden="true">›</span></button>` : ""}
+        </nav>`;
       }
 
       export function navigateDetail(offset) {
@@ -410,12 +417,17 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const shownTitle = displayTitle(item);
         const title = shownTitle || "Sin título";
         fields.detailDrawer.dataset.detailMode = detailPresentation;
-        fields.detailDrawerTitle.textContent = detailPresentation === "back-cover"
-          ? `Contratapa VHS // ${title}`
-          : "Ficha // lado B";
+        if (detailPresentation === "back-cover") {
+          fields.detailDrawerTitle.textContent = `Contratapa VHS // ${title}`;
+        } else {
+          // [X12 E1] One header for the editor: the work, its year and kind --
+          // no "Ficha // lado B", no breadcrumb, no second copy of the title.
+          const facts = [item.year, kindLabel(item.kind)].filter(Boolean).join(" · ");
+          fields.detailDrawerTitle.innerHTML = `<span class="drawer-title-main">${escapeHtml(title)}</span>${facts ? `<span class="drawer-title-facts">${escapeHtml(facts)}</span>` : ""}`;
+        }
         if (detailPresentation === "back-cover") {
           fields.detailNavigation.innerHTML = "";
-          fields.detailBody.innerHTML = renderBackCover(item, { editable: true });
+          fields.detailBody.innerHTML = renderBackCover(item, { editable: true }) + backCoverArrows();
           mountBackCoverSynopsis(fields.detailBody);
           clearDetailFeedback();
           return;

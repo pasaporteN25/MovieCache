@@ -367,3 +367,29 @@
   .duplicate-candidate-actions { display: grid; grid-template-columns: 1fr; }
   #collectionView .duplicate-candidate-actions button { width: 100%; }
 }
+
+/* [X12 D] Choosing saved works in a search to merge them, and the hint when
+   two of them are already known to be one work. Same counter tokens. */
+#collectionView .merge-selection-bar,
+#collectionView .merge-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--counter-line);
+  color: var(--counter-ink);
+  font-size: 14px;
+}
+#collectionView .merge-selection-bar { background: #101211; }
+#collectionView .merge-selection-bar > span,
+#collectionView .merge-hint > span { flex: 1 1 260px; min-width: 0; }
+#collectionView .merge-selection-bar strong { font-family: var(--counter-plaque-font); letter-spacing: .02em; }
+#collectionView .merge-hint { border-style: dashed; color: var(--counter-data); }
+#collectionView .merge-selection-bar button,
+#collectionView .merge-hint button { flex: 0 0 auto; width: auto; min-width: 0; padding-inline: 16px; }
+#collectionView .merge-select[aria-pressed="true"] {
+  border-color: var(--counter-data);
+  color: var(--counter-data);
+}

@@ -26,6 +26,19 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Cambiado
 
+- Los rótulos de las carteleras se centran sobre sus placas y usan la misma tipografía:
+  «Hoy/Ayer en cartel» para la programación y «Tu selección» para la obra consultada.
+- Los resultados guardados de búsqueda permiten seleccionar varias fichas y abrir el
+  comparador antes de unirlas; una pista muestra los duplicados ya detectados. La ficha
+  de edición reúne título, año y tipo en una cabecera y conserva el regreso a la contratapa.
+
+### Corregido
+
+- La ficha de edición importa el formateador de tipo que usa su nueva cabecera, evitando
+  un error al abrir una obra desde la revisión de coincidencias de búsqueda.
+
+### Cambiado
+
 - El id con el que la API de dispositivos (`/api/v1/`) nombra cada obra ya no depende de
   la posición de su fuente en la cuenta, sino de un id propio de esa fuente que se guarda
   en `instance.db` [X11]. Agregar, quitar, reordenar o mover un archivo de catálogo ya no
