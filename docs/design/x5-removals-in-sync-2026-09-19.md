@@ -132,6 +132,17 @@ guarda con el id que el teléfono ya conoce.
 para publicar el cliente Android (su v0.1.0). Cuando se haga, los registros de bajas, que
 guardan el id derivado, se recalculan o se dejan caducar.
 
+**Hecho el 2026-10-01, con un cambio de lugar decidido por el owner:** el id no va en el
+almacén de cada catálogo sino en `instance.db`, como columna `source_uid` de
+`catalog_sources` y `archived_catalog_sources` (esquema de instancia v24). Al implementarlo
+se vio que la aplicación no tiene ninguna operación para cambiar las fuentes de una cuenta
+(`serve` se niega a arrancar si no coinciden con las registradas), así que el id no
+necesita viajar con el archivo. Guardarlo junto a la fuente evita cambiar el contrato
+portable, crearlo al leer un catálogo viejo y detectar dos archivos copiados con el mismo
+id. Lo que se pierde: si una fuente se borra y se vuelve a registrar, sus obras cambian de
+id; las de las otras fuentes no. Los registros de bajas se dejan caducar: guardan un HMAC
+y no hay forma de recalcularlo.
+
 ## Cómo se parte
 
 1. **[X5.1]** Este diseño y la subdivisión.

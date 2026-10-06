@@ -31,7 +31,39 @@
               <span class="mobile-control-label" aria-hidden="true">×</span>
             </button>
           </div>
-          <div class="collection-filter-toolbar" aria-label="Filtros rápidos de la colección">
+          <div class="collection-filter-toolbar">
+            <button id="openCollectionFilters" type="button" aria-haspopup="dialog" aria-controls="advancedFiltersMenu">Filtros <span id="advancedFilterCount" class="filter-count" hidden></span></button>
+          </div>
+          <div class="search-secondary">
+            <div class="search-options">
+              <label class="source-toggle search-source-toggle">
+                <input id="externalSource" type="checkbox">
+                <span class="desktop-control-label">Buscar también en fuentes externas</span>
+                <span class="mobile-control-label">Fuentes externas</span>
+              </label>
+              <label class="source-toggle search-source-toggle">
+                <input id="searchByDirector" type="checkbox">
+                <span class="desktop-control-label">Buscar por dirección</span>
+                <span class="mobile-control-label">Por dirección</span>
+              </label>
+            </div>
+            <div id="activeFilters" class="active-filters" aria-live="polite" hidden></div>
+          </div>
+          <div id="searchContext" class="search-context" aria-live="polite" hidden>
+            <span id="searchContextText"></span>
+            <div class="search-context-actions">
+              <button id="cancelSearch" class="quiet-action" type="button" hidden>Cancelar búsqueda</button>
+              <button id="reviewPrevious" class="quiet-action review-step" type="button" hidden>Anterior</button>
+              <button id="reviewNext" class="quiet-action review-step" type="button" hidden>Siguiente</button>
+              <button id="backToCollection" class="quiet-action" type="button" hidden>Terminar comparación</button>
+            </div>
+          </div>
+        </section>
+
+        <dialog id="advancedFiltersMenu" class="collection-filters-dialog" aria-labelledby="collectionFiltersTitle">
+          <div class="collection-filters-shell">
+            <header class="collection-filters-heading"><div><h2 id="collectionFiltersTitle">Filtros</h2><p>Elegí cómo querés recorrer tu colección.</p></div><button id="closeCollectionFilters" type="button" aria-label="Cerrar sin aplicar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+            <div class="collection-filters-body">
             <div class="quick-filter-strip">
               <fieldset class="quick-filter-group">
                 <legend>Estado</legend>
@@ -46,20 +78,6 @@
                 <div id="kindQuickFilters" class="filter-segments"></div>
               </fieldset>
             </div>
-            <details id="advancedFiltersMenu" class="utility-menu advanced-filter-menu">
-              <summary>
-                Más filtros
-                <span id="advancedFilterCount" class="filter-count" hidden></span>
-              </summary>
-              <div class="utility-panel collection-filter-panel">
-                <section class="utility-section">
-                  <div class="utility-section-heading">
-                    <div>
-                      <span class="section-kicker">Afinar estantería</span>
-                      <h2>Filtros avanzados</h2>
-                    </div>
-                    <button id="clearFilters" class="text-action" type="button">Limpiar todo</button>
-                  </div>
                   <div class="advanced-filter-grid">
                     <label>
                       <span>Década</span>
@@ -105,46 +123,22 @@
                         <span class="sr-only">Año hasta</span>
                         <input id="yearToFilter" type="number" min="1800" max="2199" inputmode="numeric" placeholder="Hasta">
                       </label>
-                      <button id="applyYearRange" class="quiet-action" type="button">Aplicar</button>
+                      <button id="applyYearRange" class="quiet-action" type="button">Validar rango</button>
                     </div>
                   </div>
+              <div id="collectionDraftFilters" class="active-filters" aria-label="Selección de filtros"></div>
+            </div>
+            <footer class="collection-filters-footer"><p id="collectionFiltersHint" role="status">La colección cambia al aplicar.</p><div><button id="cancelCollectionFilters" type="button">Cancelar</button><button id="applyCollectionFilters" class="primary-action" type="button">Aplicar filtros</button></div><button id="clearFilters" class="text-action" type="button">Restablecer selección</button></footer>
+          </div>
+        </dialog>
+
+        <div class="collection-results-toolbar">
                   <div class="collection-sort-row">
                     <div class="collection-order-actions">
                       <button id="randomizeView" type="button">Mezclar vista</button>
                       <button id="resetOrder" class="quiet-action" type="button">Restablecer orden</button>
                     </div>
                   </div>
-                </section>
-              </div>
-            </details>
-          </div>
-          <div class="search-secondary">
-            <div class="search-options">
-              <label class="source-toggle search-source-toggle">
-                <input id="externalSource" type="checkbox">
-                <span class="desktop-control-label">Buscar también en fuentes externas</span>
-                <span class="mobile-control-label">Fuentes externas</span>
-              </label>
-              <label class="source-toggle search-source-toggle">
-                <input id="searchByDirector" type="checkbox">
-                <span class="desktop-control-label">Buscar por dirección</span>
-                <span class="mobile-control-label">Por dirección</span>
-              </label>
-            </div>
-            <div id="activeFilters" class="active-filters" aria-live="polite" hidden></div>
-          </div>
-          <div id="searchContext" class="search-context" aria-live="polite" hidden>
-            <span id="searchContextText"></span>
-            <div class="search-context-actions">
-              <button id="cancelSearch" class="quiet-action" type="button" hidden>Cancelar búsqueda</button>
-              <button id="reviewPrevious" class="quiet-action review-step" type="button" hidden>Anterior</button>
-              <button id="reviewNext" class="quiet-action review-step" type="button" hidden>Siguiente</button>
-              <button id="backToCollection" class="quiet-action" type="button" hidden>Terminar comparación</button>
-            </div>
-          </div>
-        </section>
-
-        <div class="collection-results-toolbar">
           <p id="catalogSummary" class="collection-result-summary" role="status"></p>
           <button id="externalResultsJump" type="button" data-click="collection-external-results" hidden>Resultados externos</button>
           <label class="collection-order-control">
@@ -179,11 +173,11 @@
             <section class="search-section external-results-section" id="externalSearchSection" aria-labelledby="externalSearchTitle" tabindex="-1">
               <div class="section-heading">
                 <div>
-                  <span class="section-kicker">Búsqueda ampliada</span>
                   <strong id="externalSearchTitle">Resultados externos</strong>
                 </div>
                 <div class="status-line" id="manualSearchStatus"></div>
               </div>
+              <div class="duplicate-review" id="duplicateReview" hidden></div>
               <div class="search-source-groups" id="manualSearchResults"></div>
             </section>
           </div>

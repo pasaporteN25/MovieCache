@@ -47,7 +47,7 @@ class CurationTests(unittest.TestCase):
         self.assertEqual(payload["counts"]["duplicates"], 1)
         self.assertEqual(len(duplicate_cases), 1)
         self.assertIn(
-            "Una ficha parece usar el título numérico como año heredado",
+            "Una ficha parece usar el título numérico como año heredado.",
             duplicate_cases[0]["evidence"],
         )
 

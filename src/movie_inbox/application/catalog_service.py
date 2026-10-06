@@ -18,7 +18,6 @@ from movie_inbox.domain.catalog import (
     metadata_source_record,
     normalize_date,
     normalize_item,
-    possible_duplicate_candidates,
     same_catalog_item,
     stable_id,
     title_match_key,
@@ -39,6 +38,7 @@ from movie_inbox.domain.metadata import (
 )
 from movie_inbox.domain.models import CatalogItem
 from movie_inbox.domain.normalization import normalize_bool, normalize_kind, normalize_rating
+from movie_inbox.domain.work_identity import possible_duplicate_candidates
 
 EDITABLE_METADATA_FIELDS = {
     "title",

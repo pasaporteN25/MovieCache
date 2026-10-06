@@ -1,5 +1,10 @@
 # Tareas — Movie Inbox
 
+Panel de filtros de Colección aprobado e implementado el 2026-10-04: ver
+[`collection-controls-v1`](docs/briefs/collection-controls-v1.md) y capturas de
+[la implementación v2](docs/design/collection-controls-v2/README.md). Conserva VHS,
+facetas múltiples e historial; edición en borrador con confirmación explícita.
+
 Tablero en Markdown, versionado en el repo. Columnas = estado (`Backlog` / `En curso` /
 `Hecho`). Dentro de `Backlog`, las tareas se agrupan por frente. Cada tarea tiene alcance
 de archivo/línea concreto, dependencias explícitas y un nivel de modelo sugerido —
@@ -21,6 +26,13 @@ cola: se documenta aca y se toma la siguiente accionable. Los conteos de errores
 foto diagnostica, no un criterio estable entre versiones de herramientas.
 
 ## Resumen operativo
+
+**Corte de lectura vigente, 2026-10-04:** ver
+[`docs/release-0.11.0-status.md`](docs/release-0.11.0-status.md) para separar lo que
+ya está en `master`, lo implementado en 0.11.0 y lo pendiente. Las notas fechadas
+anteriores no reabren releases cerradas. Nuevo frente visual: opciones de controles
+de Colección en [`docs/briefs/collection-controls-v1.md`](docs/briefs/collection-controls-v1.md).
+Se elige una opción antes de implementar el rediseño.
 
 | Orden | Tarea | Resultado esperado | Dependencia |
 | --- | --- | --- | --- |
@@ -533,7 +545,22 @@ Los números [A2.x] siguen valiendo allá, y la serie A continúa en ese reposit
 apareamiento, los borradores de dispositivo y las charadas; sus commits están listados en
 el tablero del cliente—, y lo que el cliente le pide a este repo, que sigue abajo.
 
-#### [X11] Un id durable por fuente, en lugar de su posición — *decidida el 2026-09-20; requisito para publicar el cliente Android*
+#### [X11] Un id durable por fuente, en lugar de su posición — **hecha el 2026-10-01** *(decidida el 2026-09-20; requisito para publicar el cliente Android)*
+
+- [x] **Hecho el 2026-10-01**, en `release/0.11.0`. Por decisión del owner de ese día, el id
+  vive en `instance.db` y no en el almacén de cada catálogo: columna `source_uid` en
+  `catalog_sources` y `archived_catalog_sources` (esquema de instancia v24). La migración da
+  un id a cada fuente existente; las altas lo crean en la misma transacción, y archivar o
+  restaurar un miembro lo conserva. El id del teléfono es
+  `HMAC(cuenta, source_uid, id de la obra)` (`web/device_ids.py`,
+  `_device_catalog_entries`). `SessionCatalog` rechaza con 503 una cuenta con una fuente
+  sin id o con dos fuentes que compartan uno. Los catálogos JSON y SQLite no cambian de
+  formato. Los registros de `device_removals` se dejan caducar. Motivo y costo, en la
+  sección 6 del diseño de [X5]. Pruebas: `SourceListChangesTests` (reordenar, quitar,
+  agregar y mover fuentes no cambia ningún id ajeno), `SessionCatalogSourceUidTests` y
+  `SourceUidMigrationTests` en `tests/test_device_sync_identity.py`. Falta del lado del
+  cliente: que el tablero de `movieIndexAndroid` lo registre en M2. Ese repo no se tocó
+  desde acá.
 
 Surge de evaluar la idea del owner en [X5]. El id que ve el teléfono incluye la posición de la
 fuente, así que quitar o reordenar una fuente cambia todos los ids (caso 17 de la matriz de
@@ -555,6 +582,85 @@ las obras. Detalle y comparación con la alternativa por obra en el diseño de [
   caduquen; y la primera derivación nueva cambia todos los ids una vez, así que conviene
   hacerla mientras no haya réplicas que conserven cambios pendientes. **Modelo sugerido**:
   Grande.
+
+#### [X12] Identidad de obras, Curaduría repensada y ficha más limpia — *abierta el 2026-10-01*
+
+El owner encontró dos «Kingdom of Heaven», una enlazada a Wikipedia en inglés y otra en
+español, que Curaduría nunca marcó. La causa era que había cinco reglas de identidad
+distintas, y la de Curaduría comparaba URLs literales y título+año, sin mirar Wikidata,
+TMDb ni MAL. El plan completo (fases A a E) está aprobado y se ejecuta por fases, con un
+commit por fase.
+
+- [x] **A. Una sola regla de identidad** (2026-10-01). Nuevo `domain/work_identity.py`:
+  `work_profile` y `compare_profiles` dan un veredicto `same`, `possible`, `conflict` o
+  `none`, con evidencia en castellano. Lo usan `decide_match`, Curaduría
+  (`annotate_duplicate_items`), `catalog_membership`, los candidatos al agregar y la
+  identidad de bibliotecas. Los ids de IMDb y FilmAffinity se comparan por id y no por
+  URL. Wikipedia se compara por idioma y artículo. Título sin año: «posible» sólo con
+  corroboración (dirección, duración ±3 min o el mismo archivo) y sin ids que se
+  contradigan. Se quitan los desambiguadores de Wikipedia del título. Gate de búsqueda:
+  32/32, precisión de auto-match 1.000. Diagnóstico multilingüe: PASS.
+- [x] **B. Completar identidades** (2026-10-01).
+  - `application/identity_resolution_service.py`: lotes de 50 artículos por idioma, más
+    el año desde Wikidata (P577). Sólo escribe campos vacíos y no bloqueados.
+  - Un artículo sin id se recuerda un mes en `identity_resolution_misses` (esquema de
+    instancia v25).
+  - Un corte de red nunca se registra como «sin id».
+  - Corre en segundo plano cada 300 s (`--identity-resolution-interval-seconds`). En
+    los tests está apagado, porque `ViewerConfig` arranca con 0.
+  - Botón «Completar identidades (N)» en Curaduría, que sólo toca el catálogo propio.
+  - `movie-inbox identity resolve`, que imprime sólo conteos.
+- [x] **C1. Que se entienda por qué** (2026-10-01). Cada caso dice «Misma obra» o
+  «Posible duplicado», y por qué: «Confirmada por un identificador externo» o «Mismo
+  título y mismo año». Los confirmados por id van primero. «Resolver duplicados claros»
+  ya no une casos «posibles» (invariante 3); test incluido.
+- [x] **C2. Foco después de unir** (2026-10-01). La selección no se borra: si el caso
+  seleccionado sale de la cola, toma su lugar el que queda en esa posición (el
+  siguiente). Si el foco estaba en la cola o en el caso, vuelve al seleccionado, y se
+  conserva el scroll. Verificado con Playwright.
+- [ ] **C. Curaduría, lo que falta:**
+  - búsqueda de referencia dentro del caso;
+  - dos copias o idiomas en la biblioteca;
+  - unir como partes;
+  - anime directo a Jikan.
+- [x] **D. Unir desde la búsqueda** (2026-10-02 / 2026-10-06). En los resultados de
+  búsqueda, cada ficha guardada tiene «Seleccionar para unir». Una barra «Comparar y unir
+  N» abre el comparador de grupo, y un aviso muestra las fichas visibles que ya son o
+  parecen la misma obra («Compararlas»). Verificado con Playwright en 1400 y 390 px. Queda
+  afuera la selección en la grilla de cajas: el flujo real (buscar el título y ver las dos
+  fichas) pasa por la búsqueda.
+- [x] **E. Ficha** (2026-10-06).
+  - E1: una sola cabecera (título limpio, «Año · Película», «← Contratapa», «Cerrar»).
+  - E2: anterior/siguiente sólo en la contratapa, con chevrons SVG discretos a 16 px de la
+    caja y ←/→.
+  - E3: calendario propio en español (`core/personal-controls.js`).
+  - E4: 10 estrellas (`radiogroup`).
+  - Mismos campos guardados. Lectura con estrellas chicas. Pruebas en
+    `tests/browser/test_vhs_editor.py`. Pasado por Impeccable: sólo avisos de color
+    heredados del archivo.
+
+#### [X13] Claves de API desde el menú — *decidida el 2026-10-01, después de X12*
+
+- **Decisión del owner:** el dueño puede cargar las claves (hoy, el token de TMDb) desde
+  un panel de administración. Se guardan en un **archivo aparte** con permisos 600, en el
+  directorio de datos y fuera de `instance.db`, para que un backup o una copia de la base
+  no lleve la clave. Al restaurar en otra máquina hay que volver a cargarla.
+- El campo nunca muestra el valor guardado (sólo «configurada · …a1b2»), y la app usa
+  la clave nueva sin reiniciar.
+- Si la clave viene de Docker (`*_FILE`), el panel muestra «la administra el servidor» y
+  no deja pisarla.
+- Sin HTTPS sólo se acepta desde la misma máquina, para que la clave no viaje en texto
+  plano por la red.
+
+#### [X14] HTTPS en la red de casa sin openssl — *decidida el 2026-10-01, después de X12*
+
+- `movie-inbox tls init --ip 192.168.x.x` genera el certificado autofirmado con el
+  `subjectAltName` correcto y permisos 600.
+- Variables en `compose.yaml` para activar `--ssl-certfile` / `--ssl-keyfile` sin editar
+  el `command`.
+- Ya existe: el proceso sirve TLS y deriva solo el pin de apareamiento
+  (`docs/deployment.md`, «HTTPS en la red local, sin dominio»). Lo que falta es no tener
+  que usar openssl a mano.
 
 #### [X8] La ficha web no debe deshacer lo que subió un teléfono
 
@@ -614,29 +720,12 @@ tablero, que es el que el frente visual lee: es la causa más probable de que no
 Cuándo y en qué orden se toman lo deciden el frente visual y el owner; lo que sigue es qué
 consumir y qué reglas no se pueden romper.
 
-- [ ] **La pantalla que genera el QR de apareamiento** (de [A2.1]). `POST
-  /api/device-pairing` devuelve el QR como `data:` URI junto con su contenido, que
-  conviene ofrecer también como texto para aparear a mano. **No va en `Administrar`**:
-  cada cuenta aparea su propio teléfono, así que tiene que estar al alcance de cualquier
-  cuenta. El ticket vive cinco minutos, y sin HTTPS configurado el endpoint responde
-  `pairing_not_configured`: la pantalla tiene que decirlo en vez de fallar muda.
 - [ ] **La pasada de revisión de dificultad de charadas** (de [G2]). Consume `GET
   /api/charades/review` y `POST /api/charades/difficulty`. La banda intermedia es casi
   todo el catálogo, así que esta revisión es el camino principal y no un plan B: "repartí
   estas obras en cuatro categorías", rápida y reanudable, no un formulario por obra
   (`docs/briefs/charades-v1.md`). Las pantallas de juego y el temporizador van en el
   teléfono, dentro de [A2.4].
-- [ ] **Teléfonos apareados: verlos y desconectarlos** (de [X4]). Consume `GET
-  /api/device-sessions` —`{"devices": [{id, device_name, created_at, last_seen_at,
-  expires_at}]}`, el más usado primero— y `DELETE /api/device-sessions/{id}`, que responde
-  `{"ok": true}` o 404 `device_not_found`. Va donde está la pantalla del QR, y como ella **no va
-  en `Administrar`**: cada cuenta ve y desconecta sólo los suyos, sea owner o miembro. Reglas
-  que no se pueden romper: el `id` sólo nombra al teléfono —no es una credencial, no se muestra
-  como si lo fuera, y no hay ninguna otra cosa de la sesión que mostrar—; desconectar es
-  inmediato e irreversible (el teléfono tiene que volver a aparearse con un QR nuevo), así que
-  pide confirmación con el nombre del teléfono; y la lista vacía es un estado normal, no un
-  error. `expires_at` es el vencimiento **si no se sincroniza**: se corre 30 días con cada
-  sincronización, así que no es una fecha para mostrar como "vence el ...".
 - **Bandeja en el teléfono** (de [MB2]): traspaso consolidado en **[MW1.4]**, al
   final de la cola a pedido del owner. La auditoría del 2026-09-07 es antecedente,
   no diagnóstico vigente; volver a medir antes de corregir.
@@ -711,6 +800,23 @@ no repite su auditoría como si fuera vigente. Plan: `home-evolution-backlog-202
 
 ## En curso
 
+### [U12] Mesa de búsqueda y revisión de coincidencias — v0.11.0
+
+Dirección aprobada 2026-10-01: filas compactas por fuente y comparación integrada
+en la búsqueda. [Brief](docs/briefs/search-workbench-v1.md). La primera entrega
+actualiza resultados externos y la decisión ante `possible_duplicate`, sin cambiar
+matching ni el comparador de campos.
+
+- [x] U12.1 Estructura de resultados externos y revisión de duplicados.
+- [x] U12.2 Gate de interacción, accesibilidad y responsive con datos descartables.
+- [x] U12.3 Revisión visual y cierre de esta entrega; la release sigue abierta.
+- [x] U12.4 Lista única local/externa por relevancia, paginación común y estados compactos.
+- [x] U12.5 Gate de la lista unificada en escritorio, móvil, historial y decisiones.
+
+Revisión aprobada el 2026-10-02: [brief de la lista unificada](docs/briefs/search-unified-v2.md).
+
+Las notas históricas de v0.9.0 que siguen debajo aún no se depuraron.
+
 [U4.2c] integrada en Home tras aprobación de [U4.2b]. Playlist ampliada sin scroll
 interno desktop, material continuo y aberturas con apoyo compartido. Comprobación
 con app real/datos desechables; revisión independiente aplicada. Aceptación
@@ -745,7 +851,7 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
 | Incluir Inicio nuevo [U4], U5, cartelera U6 y U7.5a ya integradas; sin nuevas épicas | Owner / frente visual | **Alcance actualizado** 2026-09-14: U8 completa fuera de 0.9.0. Cierre según `docs/design/v0-9-0-visual-closeout.md` |
 | Changelog: las entradas del trabajo visual desde la 0.8.0 | Frente visual | Pendiente |
 | Changelog: "Antes de actualizar" | Frente lógico | **Hecho** (2026-09-13) |
-| Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup | Owner, o el frente lógico con su autorización | Pendiente |
+| ~~Actualizar de 0.8.0 a 0.9.0 en Docker sobre una copia con backup~~ | Owner, o el frente lógico con su autorización | **Hecho** (2026-10-01): Docker ya corre la v0.10.0, que supera este upgrade |
 | El gate de `docs/release-checklist.md`, con el CI del PR en verde | Todos | Pendiente |
 | Último commit: versión `0.9.0`, changelog, `README.md`, `CLAUDE.md` y roadmap | Frente lógico | **Hecho** (2026-09-24). Gate automático confirmado verde sobre `fee5845` antes del commit: `scripts\check.ps1` completo (Ruff, mypy estricto, compileall, 1105 tests) y los 7 checks de CI del PR #1 (Linux, Windows, wheel, Chromium, Docker Compose, ruff/mypy, search quality gate). Falta la aceptación manual del owner (`docs/release-checklist.md` §2-7) antes de fusionar y taggear |
 | Fusionar con merge commit y etiquetar `v0.9.0` | Owner | Pendiente |
@@ -768,12 +874,37 @@ El gate es `docs/release-checklist.md`, y los pasos de cierre están en su secci
   sigue buscando `.spotlight-stage` en el CSS monolítico retirado. Se transfiere a
   U4.6b, que migra tests históricos; no cerrar V9.V3 hasta repetir suite verde.
 - [ ] **[V9.V4] Candidata y entrega.** Preparar commit revisado y actualizar PR con
-  autorización; CI del commit exacto y upgrade Docker 0.8.0 → 0.9.0 con copia,
-  backup y restauración. Luego cierre de versión/merge/tag por responsables V9.
+  autorización; CI del commit exacto y ~~upgrade Docker 0.8.0 → 0.9.0 con copia,
+  backup y restauración~~ (hecho 2026-10-01: Docker ya corre la v0.10.0). Luego cierre
+  de versión/merge/tag por responsables V9.
 
 Detalle y criterios: `docs/design/v0-9-0-visual-closeout.md`.
 
 ## Hecho
+
+### Cuenta y dispositivos (2026-10-05)
+
+- [x] **La pantalla que genera el QR de apareamiento** (de [A2.1]). `POST
+  /api/device-pairing` devuelve el QR como `data:` URI junto con su contenido, que
+  conviene ofrecer también como texto para aparear a mano. **No va en `Administrar`**:
+  cada cuenta aparea su propio teléfono, así que tiene que estar al alcance de cualquier
+  cuenta. El ticket vive cinco minutos, y sin HTTPS configurado el endpoint responde
+  `pairing_not_configured`: la pantalla tiene que decirlo en vez de fallar muda.
+  Cerrada 2026-10-05 en `8d57590`: UI y QA de cuenta/dispositivos en verde.
+
+- [x] **Teléfonos apareados: verlos y desconectarlos** (de [X4]). Consume `GET
+  /api/device-sessions` —`{"devices": [{id, device_name, created_at, last_seen_at,
+  expires_at}]}`, el más usado primero— y `DELETE /api/device-sessions/{id}`, que responde
+  `{"ok": true}` o 404 `device_not_found`. Va donde está la pantalla del QR, y como ella **no va
+  en `Administrar`**: cada cuenta ve y desconecta sólo los suyos, sea owner o miembro. Reglas
+  que no se pueden romper: el `id` sólo nombra al teléfono —no es una credencial, no se muestra
+  como si lo fuera, y no hay ninguna otra cosa de la sesión que mostrar—; desconectar es
+  inmediato e irreversible (el teléfono tiene que volver a aparearse con un QR nuevo), así que
+  pide confirmación con el nombre del teléfono; y la lista vacía es un estado normal, no un
+  error. `expires_at` es el vencimiento **si no se sincroniza**: se corre 30 días con cada
+  sincronización, así que no es una fecha para mostrar como "vence el ...".
+  Cerrada 2026-10-05 en `8d57590`: UI y QA de cuenta/dispositivos en verde.
+
 
 ### [U10] Colección — mostrador y portadas grandes (2026-09-28)
 

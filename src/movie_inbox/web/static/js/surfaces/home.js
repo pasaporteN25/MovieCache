@@ -372,7 +372,7 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
           : carouselPosterFallback;
         const selector = `<aside class="spotlight-selector" aria-label="Cartelera automática">
           <div class="spotlight-selector-heading">
-            <span>${escapeHtml(homeDatePeriodLabel(editorialHome.generated_for))}</span>
+            <span>${escapeHtml(homeDatePeriodLabel(editorialHome.generated_for) === "Archivo" ? "Del archivo" : `${homeDatePeriodLabel(editorialHome.generated_for)} en cartel`)}</span>
           </div>
           <div class="spotlight-poster-card">
             <button class="spotlight-poster-trigger" type="button" data-click="spotlight-select" data-index="${spotlightIndex}" aria-label="Seleccionar ${escapeAttr(carouselTitle)} de la cartelera"${featured.length > 1 ? ' aria-describedby="spotlight-navigation-help"' : ""}>
@@ -892,7 +892,7 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         const url = String(entry.item.page_image || "").trim();
         const fallback = `<span class="spotlight-poster-fallback"${url ? " hidden" : ""}><span>${escapeHtml(title)}<small>Sin portada</small></span></span>`;
         return `<aside class="spotlight-selector home-consulted-poster" aria-label="Cartelera de la obra consultada" data-consulted-key="${escapeAttr(selectedEntryKey)}" data-consulted-source="${escapeAttr(selectionSource)}">
-          <div class="spotlight-selector-heading"><span>En consulta</span></div>
+          <div class="spotlight-selector-heading"><span>Tu selección</span></div>
           <div class="spotlight-poster-card"><button type="button" class="spotlight-poster-trigger" data-home-focus="consultation-poster" ${homeConsultationAction(entry)} aria-label="Ver ficha de ${escapeAttr(title)}">
             ${url ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(url))}" alt="Portada de ${escapeAttr(title)}" loading="eager" decoding="async">` : ""}${fallback}
           </button></div>

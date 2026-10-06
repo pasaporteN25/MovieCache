@@ -1,0 +1,89 @@
+{
+  "home": [
+    {
+      "width": 1440,
+      "labels": [
+        {
+          "text": "Ayer en cartel",
+          "centerDelta": 0.0078125,
+          "textCenterDelta": 0.0078125,
+          "textFits": true,
+          "verticalCenterDelta": 0.5625
+        },
+        {
+          "text": "Tu selección",
+          "centerDelta": 0.0078125,
+          "textCenterDelta": 0.0078125,
+          "textFits": true,
+          "verticalCenterDelta": 0.5625
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "labels": [
+        {
+          "text": "Ayer en cartel",
+          "centerDelta": 0.0078125,
+          "textCenterDelta": 0,
+          "textFits": true,
+          "verticalCenterDelta": 0
+        },
+        {
+          "text": "Tu selección",
+          "centerDelta": 0.0078125,
+          "textCenterDelta": 0,
+          "textFits": true,
+          "verticalCenterDelta": 0
+        }
+      ]
+    }
+  ],
+  "options": [
+    {
+      "layout": "compact",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "layout": "compact",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "layout": "compact",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "layout": "visible",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "layout": "visible",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "layout": "visible",
+      "width": 320,
+      "overflow": false
+    },
+    {
+      "layout": "sidebar",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "layout": "sidebar",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "layout": "sidebar",
+      "width": 320,
+      "overflow": false
+    }
+  ]
+}

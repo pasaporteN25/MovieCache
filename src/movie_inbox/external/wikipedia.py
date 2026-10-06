@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from urllib.parse import quote, unquote, urlparse
@@ -16,6 +17,7 @@ from movie_inbox.domain.titles import (
     clean_whitespace,
     infer_kind_from_text,
     infer_year,
+    strip_wikipedia_disambiguator,
 )
 from movie_inbox.external.common import (
     dedupe_results,
@@ -227,13 +229,14 @@ def wikipedia_results_from_query(
         page_url = str(row.get("canonicalurl") or "") or (
             f"https://{language}.wikipedia.org/wiki/{quote(title.replace(' ', '_'), safe='')}"
         )
+        work_title = strip_wikipedia_disambiguator(title)
         results.append(
             {
                 "source": "wikipedia",
-                "title": title,
+                "title": work_title,
                 "original_title": "",
-                "spanish_title": title if language == "es" else "",
-                "english_title": title if language == "en" else "",
+                "spanish_title": work_title if language == "es" else "",
+                "english_title": work_title if language == "en" else "",
                 "alternative_titles": [],
                 "kind": kind or "pelicula",
                 "year": infer_year(title, extract),
@@ -313,6 +316,59 @@ def wikipedia_result_from_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_LANGUAGE_CODE = re.compile(r"^[a-z][a-z0-9-]{1,11}$")
+ARTICLE_ID_BATCH = 50
+
+
+def fetch_wikidata_ids_for_articles(language: str, titles: Sequence[str]) -> dict[str, str]:
+    """[X12 B] The Wikidata id of each article, keyed by the title as asked.
+
+    One request per fifty titles. Wikipedia answers under the title it settled
+    on -- normalised ("el_reino" -> "El reino") and through redirects -- so both
+    maps are followed back to the title the caller knows. An article with no id
+    is simply absent. A network failure raises: the caller must not read it as
+    "no id", or it would stop asking about articles that do have one.
+    """
+
+    code = str(language or "").strip().casefold()
+    if not _LANGUAGE_CODE.match(code):
+        raise ValueError(f"Invalid Wikipedia language: {language!r}")
+    found: dict[str, str] = {}
+    unique = list(dict.fromkeys(str(title).strip() for title in titles if str(title).strip()))
+    for start in range(0, len(unique), ARTICLE_ID_BATCH):
+        chunk = unique[start : start + ARTICLE_ID_BATCH]
+        raw = fetch_json(
+            f"https://{code}.wikipedia.org/w/api.php?action=query&format=json"
+            "&redirects=1&prop=pageprops&ppprop=wikibase_item&titles="
+            + quote("|".join(chunk), safe="|"),
+            timeout=8,
+        )
+        query = object_dict(raw.get("query"))
+        renamed: dict[str, str] = {}
+        for step in ("normalized", "redirects"):
+            for row in object_list(query.get(step)):
+                if isinstance(row, dict) and row.get("from") and row.get("to"):
+                    renamed[str(row["from"])] = str(row["to"])
+        ids_by_title: dict[str, str] = {}
+        pages = query.get("pages")
+        rows = pages.values() if isinstance(pages, dict) else object_list(pages)
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            entity = str(object_dict(row.get("pageprops")).get("wikibase_item") or "")
+            if re.fullmatch(r"Q[1-9]\d*", entity):
+                ids_by_title[str(row.get("title") or "")] = entity
+        for title in chunk:
+            final = title
+            for _ in range(4):
+                if final not in renamed:
+                    break
+                final = renamed[final]
+            if final in ids_by_title:
+                found[title] = ids_by_title[final]
+    return found
+
+
 def fetch_wikipedia_metadata(url: str) -> dict[str, Any]:
     parsed = urlparse(url)
     if external_source_name(url) != "wikipedia":
@@ -352,7 +408,8 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
     if not page:
         return {}
 
-    title = clean_title(str(page.get("title") or page_title))
+    article_title = clean_title(str(page.get("title") or page_title))
+    title = strip_wikipedia_disambiguator(article_title)
     description = clean_whitespace(str(page.get("description") or ""))
     intro, sections = _split_wikipedia_sections(str(page.get("extract") or ""))
     intro = clean_whitespace(intro)
@@ -371,7 +428,7 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
         "spanish_title": title if language == "es" else "",
         "english_title": title if language == "en" else "",
         "description": description,
-        "wikipedia_title": title,
+        "wikipedia_title": article_title,
         "wikidata_id": wikidata_id,
         "page_image": str(thumbnail.get("source") or ""),
         "wikipedia_extract": synopsis,
@@ -380,8 +437,9 @@ def fetch_wikipedia_metadata_action_api(language: str, page_title: str) -> dict[
     # infer_kind_from_text() only needs to see the intro -- feeding it the
     # synopsis/full article risks an unrelated later section (e.g. "a
     # television series adaptation was announced") outscoring the film
-    # markers that are reliably in the opening sentence.
-    metadata["kind"] = infer_kind_from_text(title, description, intro) or "pelicula"
+    # markers that are reliably in the opening sentence. The article title
+    # still carries its "(film)", which is exactly such a marker.
+    metadata["kind"] = infer_kind_from_text(article_title, description, intro) or "pelicula"
     metadata.update(fetch_wikidata_metadata(wikidata_id))
     return metadata
 

@@ -192,6 +192,14 @@ del owner y se integró en `e179d6b` con el efecto B. La galería/corrección co
 U7 y el sonido opcional U9 siguen pendientes; ver
 [`design/u7-u9-plan-2026-09-26.md`](design/u7-u9-plan-2026-09-26.md).
 
+### v0.11.0 — en desarrollo
+
+Primer frente [U12]: búsqueda externa como mesa de consulta del videoclub, con filas
+compactas unificadas por relevancia y revisión de posibles duplicados dentro de la búsqueda.
+Conserva el matching y el comparador detallado. Dirección, tareas y estados:
+[brief U12 actualizado](briefs/search-unified-v2.md). La versión sigue abierta para los demás
+componentes que se decidan rediseñar; todavía no tiene gate de cierre.
+
 ### Próximos incrementos propuestos
 
 - Ver el backlog vigente en [`tareas.md`](../tareas.md).
@@ -330,7 +338,8 @@ estado de cada uno en `tareas.md` antes de tomar el siguiente item.
    `movieIndexAndroid`**, con su propia hoja de ruta; aca queda la API que consume.
    **Requisito para publicar su v0.1.0: [X11]**, un id por fuente en lugar de su posicion
    (decidido el 2026-09-20), porque despues de publicar cambiar como se derivan los ids de
-   las obras obliga a re-descargar y deja huerfanos los cambios pendientes.
+   las obras obliga a re-descargar y deja huerfanos los cambios pendientes. **Hecho el
+   2026-10-01** en `release/0.11.0`: el id vive en `instance.db` (esquema v24).
 3. **Cerrado 2026-09-07.** [I1] Evaluar Radarr, Sonarr y Letterboxd: evaluacion hecha y
    construccion postergada por decision del owner (ADR-0006, ADR-0007 y ADR-0008).
 4. [M1] Investigar juegos y musica como verticales propias, nunca como simples valores

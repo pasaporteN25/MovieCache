@@ -290,9 +290,9 @@ class DetailContextTests(unittest.TestCase):
         pending = []
         page.route("**/api/ratings?item_id=heat", lambda route: pending.append(route))
         self.open_detail()
-        page.get_by_role("button", name="Abrir ficha siguiente").click()
+        page.evaluate("import('/static/js/core/detail.js').then(m => m.navigateDetail(1))")
         page.wait_for_function(
-            "document.querySelector('.vhs-editor-heading h2').textContent === 'Akira'"
+            "document.querySelector('.drawer-title-main').textContent === 'Akira'"
         )
         self.assertEqual(len(pending), 1)
         pending[0].fulfill(

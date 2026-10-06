@@ -59,6 +59,10 @@ class DeviceSessionRecord:
 class CatalogSource:
     path: str
     writable: bool = False
+    # [X11]: minted once when the source is registered and never derived from
+    # its path or position, so a paired phone's ids survive adding, removing or
+    # reordering the account's other sources.
+    uid: str = ""
 
 
 @dataclass(frozen=True)

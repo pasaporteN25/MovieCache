@@ -301,6 +301,12 @@ class CurationWorkflowService:
         for case in cases:
             if case["type"] != "duplicate" or case["status"] != "pending":
                 continue
+            if case.get("level") != "same":
+                # [X12] A "possible" case rests on a title plus corroboration
+                # (same director, similar runtime). That is a question for a
+                # person, never something to merge in bulk (invariant 3).
+                needs_review += 1
+                continue
             members = [
                 CatalogPointer(Path(member["source_file"]), member["id"])
                 for member in case.get("members", [])

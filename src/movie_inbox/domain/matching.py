@@ -7,15 +7,25 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any, TypedDict
 
-from movie_inbox.domain.catalog import (
-    external_urls,
-    themoviedb_media_reference,
-    title_match_keys_for_item,
-    title_similarity,
-)
-from movie_inbox.domain.metadata import normalize_external_positive_id
-from movie_inbox.domain.normalization import normalize_kind
+from movie_inbox.domain.catalog import external_urls, title_similarity
 from movie_inbox.domain.search_strategy import PRODUCTION_BASELINE, SearchStrategy
+from movie_inbox.domain.work_identity import (
+    anime_release_taxonomy_mismatch,
+    compare_profiles,
+    explicit_kind,
+    tmdb_media_type,
+    work_profile,
+)
+
+__all__ = [
+    "MatchDecision",
+    "RankedCandidate",
+    "candidate_score",
+    "decide_match",
+    "explicit_kind",
+    "find_strong_duplicate",
+    "rank_candidates",
+]
 
 
 @dataclass(frozen=True)
@@ -40,105 +50,44 @@ def decide_match(
     incoming: Mapping[str, Any],
     strategy: SearchStrategy = PRODUCTION_BASELINE,
 ) -> MatchDecision:
-    existing_tmdb_id = normalize_external_positive_id(existing.get("tmdb_id"))
-    incoming_tmdb_id = normalize_external_positive_id(incoming.get("tmdb_id"))
-    if existing_tmdb_id and incoming_tmdb_id:
-        if existing_tmdb_id != incoming_tmdb_id:
-            return MatchDecision(
-                False,
-                "tmdb_id_conflict",
-                1.0,
-                {
-                    "existing_tmdb_id": existing_tmdb_id,
-                    "incoming_tmdb_id": incoming_tmdb_id,
-                },
-            )
-        existing_tmdb_type = _tmdb_media_type(existing)
-        incoming_tmdb_type = _tmdb_media_type(incoming)
-        if existing_tmdb_type and incoming_tmdb_type and existing_tmdb_type != incoming_tmdb_type:
-            return MatchDecision(
-                False,
-                "tmdb_media_type_conflict",
-                1.0,
-                {
-                    "tmdb_id": existing_tmdb_id,
-                    "existing_media_type": existing_tmdb_type,
-                    "incoming_media_type": incoming_tmdb_type,
-                },
-            )
+    """Whether `incoming` may be taken as `existing` without asking anyone.
 
-    existing_mal_id = normalize_external_positive_id(existing.get("mal_id"))
-    incoming_mal_id = normalize_external_positive_id(incoming.get("mal_id"))
-    if existing_mal_id and incoming_mal_id and existing_mal_id != incoming_mal_id:
-        return MatchDecision(
-            False,
-            "mal_id_conflict",
-            1.0,
-            {"existing_mal_id": existing_mal_id, "incoming_mal_id": incoming_mal_id},
-        )
+    The identity question is answered by `work_identity` ([X12]); only a
+    ``same`` verdict is accepted. What this adds is the ranking score for
+    everything that is not accepted, which the search ranks results by.
+    """
 
-    if existing_tmdb_id and existing_tmdb_id == incoming_tmdb_id:
-        return MatchDecision(
-            True,
-            "shared_tmdb_id",
-            1.0,
-            {"tmdb_id": existing_tmdb_id, "media_type": _tmdb_media_type(existing)},
-        )
+    existing_profile = work_profile(existing)
+    incoming_profile = work_profile(incoming)
+    verdict = compare_profiles(existing_profile, incoming_profile)
+    if verdict.level == "conflict":
+        return MatchDecision(False, verdict.reason, 1.0, dict(verdict.details))
+    if verdict.reason == "conflicting_external_ids":
+        # A conflict overrides whatever the two otherwise share, and is
+        # reported as the conflict it is.
+        details = dict(verdict.details)
+        return MatchDecision(False, str(details.pop("conflict_reason")), 1.0, details)
+    if verdict.level == "same" and verdict.reason != "exact_title_year":
+        return MatchDecision(True, verdict.reason, 1.0, dict(verdict.details))
 
-    shared_urls = sorted(external_urls(dict(existing)) & external_urls(dict(incoming)))
-    if shared_urls:
-        return MatchDecision(True, "shared_external_url", 1.0, {"urls": shared_urls})
-
-    existing_wikidata = str(existing.get("wikidata_id") or "").strip().upper()
-    incoming_wikidata = str(incoming.get("wikidata_id") or "").strip().upper()
-    if existing_wikidata and existing_wikidata == incoming_wikidata:
-        return MatchDecision(True, "shared_wikidata_id", 1.0, {"wikidata_id": existing_wikidata})
-
-    if existing_mal_id and incoming_mal_id:
-        return MatchDecision(True, "shared_mal_id", 1.0, {"mal_id": existing_mal_id})
-
-    existing_titles = title_match_keys_for_item(dict(existing))
-    incoming_titles = title_match_keys_for_item(dict(incoming))
-    shared_titles = sorted(set(existing_titles) & set(incoming_titles))
-    existing_year = str(existing.get("year") or "").strip()
-    incoming_year = str(incoming.get("year") or "").strip()
-    existing_kind = explicit_kind(existing)
-    incoming_kind = explicit_kind(incoming)
-    kinds_compatible = not (existing_kind and incoming_kind) or existing_kind == incoming_kind
+    existing_titles = sorted(existing_profile.titles)
+    incoming_titles = sorted(incoming_profile.titles)
     score = candidate_score(
-        existing_titles, incoming_titles, existing_year, incoming_year, strategy
+        existing_titles,
+        incoming_titles,
+        existing_profile.year,
+        incoming_profile.year,
+        strategy,
     )
-    evidence = {
-        "shared_titles": shared_titles,
-        "existing_year": existing_year,
-        "incoming_year": incoming_year,
-        "existing_kind": existing_kind,
-        "incoming_kind": incoming_kind,
-    }
-
-    if (
-        shared_titles
-        and existing_year
-        and incoming_year
-        and existing_year == incoming_year
-        and kinds_compatible
-    ):
-        return MatchDecision(True, "exact_title_year", 1.0, evidence)
-    if shared_titles and (not existing_year or not incoming_year):
+    evidence = dict(verdict.details)
+    if verdict.level == "same":
+        return MatchDecision(True, verdict.reason, 1.0, evidence)
+    if verdict.reason == "exact_title_missing_year_corroborated":
+        # Corroboration proposes a review; for automatic matching a missing
+        # year is still a missing year.
         return MatchDecision(False, "exact_title_missing_year", score, evidence)
-    if shared_titles and existing_year != incoming_year:
-        return MatchDecision(False, "exact_title_year_mismatch", score, evidence)
-    if (
-        shared_titles
-        and existing_year
-        and incoming_year
-        and existing_year == incoming_year
-        and _anime_release_taxonomy_mismatch(existing_kind, incoming_kind)
-    ):
-        evidence["taxonomy_note"] = "anime_vs_release_format"
-        return MatchDecision(False, "exact_title_year_anime_kind_review", score, evidence)
-    if shared_titles and not kinds_compatible:
-        return MatchDecision(False, "exact_title_kind_mismatch", score, evidence)
+    if verdict.reason != "insufficient_evidence":
+        return MatchDecision(False, verdict.reason, score, evidence)
     if score >= strategy.similar_title_review_threshold:
         return MatchDecision(False, "similar_title_requires_review", score, evidence)
     return MatchDecision(False, "insufficient_evidence", score, evidence)
@@ -198,23 +147,7 @@ def candidate_score(
     return round(max(0.0, min(score, 1.0)), 3)
 
 
-def explicit_kind(item: Mapping[str, Any]) -> str:
-    raw = str(item.get("kind") or "").strip()
-    return normalize_kind(raw) if raw else ""
-
-
-def _anime_release_taxonomy_mismatch(left: str, right: str) -> bool:
-    return {left, right} in ({"anime", "pelicula"}, {"anime", "serie"})
-
-
-def _tmdb_media_type(item: Mapping[str, Any]) -> str:
-    for field in ("tmdb_url", "url"):
-        reference = themoviedb_media_reference(str(item.get(field) or ""))
-        if reference is not None:
-            return reference[0]
-    kind = explicit_kind(item)
-    if kind == "serie":
-        return "tv"
-    if kind in {"pelicula", "documental"}:
-        return "movie"
-    return ""
+# Kept importable from here: libraries and the scanner reach for them by this
+# path, and they now live with the rest of the identity rules.
+_tmdb_media_type = tmdb_media_type
+_anime_release_taxonomy_mismatch = anime_release_taxonomy_mismatch
