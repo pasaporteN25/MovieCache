@@ -246,3 +246,205 @@
   .collection-case-front, .collection-zoom-title, #collectionView .collection-case-label { transition: none; }
   .vhs-edit-sticker:hover { transform: rotate(-5deg); }
 }
+
+/* [X12 E1] The editor has one header: the work, its year and kind, the way back
+   to the back cover and Close. */
+.detail-drawer[data-detail-mode="dossier"] .drawer-top strong { letter-spacing: 0; text-transform: none; }
+.drawer-title-main {
+  color: #f1eadb;
+  display: block;
+  font: 600 24px/1.1 "Barlow Condensed", sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drawer-title-facts {
+  color: #bdccca;
+  display: block;
+  font: 400 13px/1.3 var(--font-label, sans-serif);
+  margin-top: 2px;
+}
+.drawer-navigation .drawer-back {
+  background: transparent;
+  border-color: #40524f;
+  color: #d6e2de;
+  font-weight: 400;
+}
+
+/* [X12 E2] Previous / next on the back cover: quiet chevrons beside the box,
+   a few pixels off its edges, that brighten on hover or keyboard focus. */
+.detail-drawer[data-detail-mode="back-cover"] .movie-dialog-surface {
+  --back-cover-box: min(660px, max(480px, calc((100dvh - 40px) * 0.621)), calc(100vw - 44px));
+}
+.vhs-side-nav { inset: 0; pointer-events: none; position: absolute; z-index: 2; }
+.vhs-side-arrow {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #e7bd6a;
+  display: flex;
+  height: 96px;
+  justify-content: center;
+  margin-top: -48px;
+  min-height: 0;
+  opacity: 0.32;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  top: 50%;
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+  width: 48px;
+}
+.vhs-side-arrow.is-previous { left: max(4px, calc(50% - var(--back-cover-box) / 2 - 64px)); }
+.vhs-side-arrow.is-next { right: max(4px, calc(50% - var(--back-cover-box) / 2 - 64px)); }
+.vhs-side-arrow:hover,
+.vhs-side-arrow:focus-visible { opacity: 0.92; }
+.vhs-side-arrow.is-previous:hover { transform: translateX(-3px); }
+.vhs-side-arrow.is-next:hover { transform: translateX(3px); }
+.vhs-side-arrow:focus-visible { outline: 2px solid #6feaff; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .vhs-side-arrow { transition: none; }
+  .vhs-side-arrow:hover { transform: none; }
+}
+
+/* [X12 E3] "Fecha vista": typed as dd/mm/aaaa or picked from a calendar in
+   Spanish that opens under the field. Selected day = cream label tape; today
+   carries a gold mark; days to come are out of reach. */
+.vhs-field-label { color: var(--ink, #f1eadb); display: block; font-size: 15px; margin-bottom: 6px; }
+.vhs-field-hint { color: var(--muted, #bdccca); display: block; font-size: 13px; margin-top: 6px; min-height: 17px; }
+.vhs-field-hint.is-error { color: #e7bd6a; }
+.vhs-date-field { position: relative; }
+.vhs-date-control { display: grid; grid-template-columns: minmax(0, 1fr) 48px; }
+.vhs-editor .personal-grid .vhs-date-control input.vhs-date-text { border-radius: 3px 0 0 3px; font-variant-numeric: tabular-nums; letter-spacing: .03em; }
+.vhs-date-text[aria-invalid="true"] { border-color: #e7bd6a !important; }
+.detail-drawer[data-detail-mode="dossier"] .vhs-date-toggle {
+  align-items: center;
+  background: #10282d;
+  border: 1px solid #6b827e;
+  border-left: 0;
+  border-radius: 0 3px 3px 0;
+  color: #d6e2de;
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0;
+  width: 48px;
+}
+.vhs-date-toggle:hover,
+.vhs-date-toggle[aria-expanded="true"] { background: #183338; color: #a9f0ef; }
+.vhs-icon { fill: none; height: 20px; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; width: 20px; }
+.vhs-calendar {
+  background: #0a1a1e;
+  border: 1px solid #6b827e;
+  border-radius: 4px;
+  box-shadow: 0 18px 40px #000a;
+  left: 0;
+  padding: 12px;
+  position: absolute;
+  top: calc(100% - 18px);
+  width: min(318px, 100%);
+  z-index: 30;
+}
+.vhs-calendar-head { align-items: center; display: grid; grid-template-columns: 40px 1fr 40px; margin-bottom: 8px; }
+.vhs-calendar-head strong {
+  color: var(--ink, #f1eadb);
+  font: 600 19px/1 "Barlow Condensed", sans-serif;
+  letter-spacing: .04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.detail-drawer[data-detail-mode="dossier"] .vhs-calendar-step {
+  align-items: center; background: transparent; border: 0; color: #d6e2de; display: flex;
+  height: 40px; justify-content: center; min-height: 40px; padding: 0; width: 40px;
+}
+.vhs-calendar-step:hover { color: #a9f0ef; }
+.vhs-week { display: grid; gap: 2px; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.vhs-weekdays abbr {
+  color: var(--muted, #bdccca);
+  font: 500 12px/28px "Barlow Condensed", sans-serif;
+  letter-spacing: .06em;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.vhs-week > span { display: block; }
+.detail-drawer[data-detail-mode="dossier"] .vhs-day {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--ink, #f1eadb);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+.vhs-day:hover { background: #183338; border-color: #40524f; }
+.vhs-day.is-outside { color: #7f908e; }
+.vhs-day.is-today::after {
+  background: #e7bd6a;
+  bottom: 5px;
+  content: "";
+  height: 2px;
+  left: 50%;
+  margin-left: -7px;
+  position: absolute;
+  width: 14px;
+}
+.detail-drawer[data-detail-mode="dossier"] .vhs-day.is-selected {
+  background: #dfcea9;
+  border-color: #dfcea9;
+  color: #171916;
+  font-weight: 700;
+}
+.vhs-day.is-selected.is-today::after { background: #171916; }
+.vhs-day[aria-disabled="true"] { color: #55615f; cursor: not-allowed; }
+.vhs-day[aria-disabled="true"]:hover { background: transparent; border-color: transparent; }
+.vhs-calendar-foot { border-top: 1px solid var(--line, #40524f); display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; }
+.detail-drawer[data-detail-mode="dossier"] .vhs-calendar-foot button {
+  background: #10282d; border: 1px solid #6b827e; border-radius: 3px; color: #e7eada;
+  font-size: 14px; min-height: 36px; padding: 6px 12px; width: auto;
+}
+.detail-drawer[data-detail-mode="dossier"] .vhs-calendar-foot .is-quiet { background: transparent; border-color: transparent; color: var(--muted, #bdccca); margin-left: auto; }
+
+/* [X12 E4] "Puntaje": ten stars in the gold the design system keeps for
+   ratings. Hover previews, arrows step, 1-9 jump, Supr clears. */
+.vhs-rating-row { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 14px; min-height: 44px; }
+.vhs-stars { display: flex; gap: 2px; }
+.detail-drawer[data-detail-mode="dossier"] .vhs-star {
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: #4d625f;
+  height: 32px;
+  min-height: 32px;
+  padding: 3px;
+  transition: transform 120ms ease-out;
+  width: 28px;
+}
+.vhs-star-icon { display: block; fill: currentColor; height: 100%; width: 100%; }
+.detail-drawer[data-detail-mode="dossier"] .vhs-star.is-on { color: #e7bd6a; }
+.vhs-star:hover { transform: translateY(-1px) scale(1.08); }
+.vhs-rating-value { color: var(--ink, #f1eadb); font: 600 22px/1 "Barlow Condensed", sans-serif; font-variant-numeric: tabular-nums; min-width: 4ch; }
+.vhs-rating-value small { color: var(--muted, #bdccca); font-size: 14px; font-weight: 400; margin-left: 1px; }
+.detail-drawer[data-detail-mode="dossier"] .vhs-rating-clear {
+  background: transparent; border: 0; color: var(--muted, #bdccca); font-size: 13px;
+  min-height: 28px; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; width: auto;
+}
+.vhs-stars-read { align-items: center; display: inline-flex; flex-wrap: nowrap; gap: 1px; vertical-align: middle; white-space: nowrap; }
+.vhs-stars-read .vhs-star-icon { color: #4d625f; height: 13px; width: 13px; }
+.vhs-stars-read .vhs-star-icon.is-on { color: #e7bd6a; }
+.vhs-back-cover .vhs-stars-read .vhs-star-icon { height: 10px; width: 10px; }
+.vhs-back-cover .vhs-stars-read-value { margin-left: 4px; }
+.vhs-stars-read-value { font-variant-numeric: tabular-nums; margin-left: 6px; white-space: nowrap; }
+@media (max-width: 420px) {
+  .detail-drawer[data-detail-mode="dossier"] .vhs-star { height: 30px; padding: 2px; width: 25px; }
+  .vhs-stars-read .vhs-star-icon { height: 11px; width: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vhs-star { transition: none; }
+  .vhs-star:hover { transform: none; }
+}
+.vhs-side-arrow .vhs-icon { height: 40px; stroke-width: 1.4; width: 40px; }

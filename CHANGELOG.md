@@ -37,6 +37,16 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 - Los resultados guardados de búsqueda permiten seleccionar varias fichas y abrir el
   comparador antes de unirlas; una pista muestra los duplicados ya detectados. La ficha
   de edición reúne título, año y tipo en una cabecera y conserva el regreso a la contratapa.
+- Anterior y siguiente pasan de la ficha de edición a la contratapa [X12]: flechas
+  discretas a los costados de la caja, que se iluminan con el mouse o el foco, y también
+  ←/→ del teclado.
+- «Fecha vista» tiene un calendario propio en español (semana desde el lunes, «Hoy»,
+  «Ayer» y «Limpiar», navegable con el teclado), y también se puede escribir como
+  30/09/2026. Las fechas que todavía no llegaron no se pueden elegir. El puntaje se marca
+  con 10 estrellas: pasar el mouse muestra cómo quedaría, las flechas suben y bajan, del
+  1 al 9 se elige directo y Supr lo quita. La contratapa y «Mi registro» lo muestran con
+  estrellas chicas y la fecha escrita completa. Se guarda igual que antes: `YYYY-MM-DD`
+  y un entero de 0 a 10.
 
 ### Corregido
 

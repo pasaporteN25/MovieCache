@@ -1,3 +1,4 @@
+import { datePickerField, longDate, mountPersonalControls, ratingStarsField, ratingStarsRead } from "./personal-controls.js";
 import { cachedImageSrc } from "./card.js";
 import { mountBackCoverSynopsis, renderBackCover } from "./back-cover.js";
 import { EDITOR_SECTIONS, renderDetailEditor } from "./detail-editor.js";
@@ -105,11 +106,11 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           <dl class="personal-read-grid">
             <div>
               <dt>Fecha vista</dt>
-              <dd>${escapeHtml(item.watched_at || "Sin fecha")}</dd>
+              <dd>${escapeHtml(longDate(item.watched_at) || item.watched_at || "Sin fecha")}</dd>
             </div>
             <div>
               <dt>Puntuación</dt>
-              <dd>${rating ? `${rating}/10` : "Sin puntuar"} ${personalVisibilityBadge("rating", privacy.rating)}</dd>
+              <dd>${ratingStarsRead(rating)} ${personalVisibilityBadge("rating", privacy.rating)}</dd>
             </div>
           </dl>
           <div class="personal-review-read">
@@ -122,9 +123,6 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       export function personalRecordEditor(item) {
         const rating = normalizeRating(item.rating);
         const privacy = item._privacy || {};
-        const ratingOptions = Array.from({ length: 11 }, (_, value) => (
-          `<option value="${value}" ${value === rating ? "selected" : ""}>${value ? `${value} / 10` : "Sin puntuar"}</option>`
-        )).join("");
         return `<div class="personal-record-editor" data-detail-form="personal" data-id="${escapeAttr(item.id)}">
           <div class="record-heading">
             <div>
@@ -134,16 +132,8 @@ import { editorialPersonalIds } from "../surfaces/home.js";
             <span class="status-line" data-personal-status role="status"></span>
           </div>
           <div class="personal-grid">
-            <label>
-              Fecha vista
-              <input name="watched_at" data-personal-watched-at type="date" value="${escapeAttr(item.watched_at || "")}">
-            </label>
-            <label>
-              Puntaje
-              <select name="rating" data-personal-rating>
-                ${ratingOptions}
-              </select>
-            </label>
+            ${datePickerField(item.watched_at || "")}
+            ${ratingStarsField(rating)}
             <label class="review-field">
               Mi reseña
               <textarea name="review" data-personal-review rows="6">${escapeHtml(item.review || "")}</textarea>
@@ -358,7 +348,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
       // brighter on hover or focus, and ←/→ from the keyboard.
       export function backCoverArrows() {
         if (detailNavigationMode === "random") {
-          return `<nav class="vhs-side-nav" aria-label="Navegar obras"><button class="vhs-side-arrow is-next" type="button" data-click="detail-random" aria-label="Otra obra al azar"><span aria-hidden="true">›</span></button></nav>`;
+          return `<nav class="vhs-side-nav" aria-label="Navegar obras"><button class="vhs-side-arrow is-next" type="button" data-click="detail-random" aria-label="Otra obra al azar"><svg class="vhs-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg></button></nav>`;
         }
         const index = detailNavigationIds.indexOf(selectedDetailId);
         const total = detailNavigationIds.length;
@@ -367,9 +357,24 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         const previous = detailNavigationIds[index - 1];
         const next = detailNavigationIds[index + 1];
         return `<nav class="vhs-side-nav" aria-label="Navegar obras · ${escapeAttr(detailNavigationLabel)} ${index + 1} de ${total}">
-          ${previous ? `<button class="vhs-side-arrow is-previous" type="button" data-click="detail-previous" aria-label="Anterior: ${escapeAttr(titleOf(previous))}"><span aria-hidden="true">‹</span></button>` : ""}
-          ${next ? `<button class="vhs-side-arrow is-next" type="button" data-click="detail-next" aria-label="Siguiente: ${escapeAttr(titleOf(next))}"><span aria-hidden="true">›</span></button>` : ""}
+          ${previous ? `<button class="vhs-side-arrow is-previous" type="button" data-click="detail-previous" aria-label="Anterior: ${escapeAttr(titleOf(previous))}"><svg class="vhs-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg></button>` : ""}
+          ${next ? `<button class="vhs-side-arrow is-next" type="button" data-click="detail-next" aria-label="Siguiente: ${escapeAttr(titleOf(next))}"><svg class="vhs-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg></button>` : ""}
         </nav>`;
+      }
+
+      // [X12 E2] ←/→ move between works while the back cover is open, unless the
+      // keys belong to a field or the reader is scrolling the synopsis with them.
+      export function handleBackCoverKeydown(event) {
+        if (detailPresentation !== "back-cover" || !selectedDetailId) return;
+        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        if (event.target.closest?.("input, textarea, select, [contenteditable]")) return;
+        const arrow = fields.detailBody.querySelector(
+          event.key === "ArrowLeft" ? ".vhs-side-arrow.is-previous" : ".vhs-side-arrow.is-next"
+        );
+        if (!arrow) return;
+        event.preventDefault();
+        arrow.click();
       }
 
       export function navigateDetail(offset) {
@@ -438,6 +443,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           personalRecordEditor, metadataEditorRow, availabilityPanel, detailLinks, drawerPoster
         });
         selectDetailSection(detailEditorSection, { focus: false });
+        mountPersonalControls(fields.detailBody);
         primeDetailForms();
         mountDetailContext(fields.detailBody.querySelector("[data-detail-context]"), item.id, fields.detailBody.querySelector("[data-detail-streaming-signal]"));
         syncDetailFeedback();
@@ -499,7 +505,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         if (!selectedDetailId) return;
         if (detailPresentation === "back-cover") editVhsDossier();
         selectDetailSection("personal");
-        requestAnimationFrame(() => fields.detailBody.querySelector("[data-personal-watched-at]")?.focus());
+        requestAnimationFrame(() => fields.detailBody.querySelector("[data-date-text]")?.focus());
       }
 
       export function cancelPersonalEdit() {

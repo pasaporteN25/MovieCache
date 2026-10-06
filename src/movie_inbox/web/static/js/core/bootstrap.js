@@ -3,7 +3,7 @@ import { handlePosterError, handlePosterLoad } from "./card.js";
 import { handleBackCoverImageError, handleBackCoverImageLoad } from "./back-cover-images.js";
 import { toggleBackCoverSynopsis } from "./back-cover.js";
 import { load, logout } from "./catalog-data.js";
-import { editVhsDossier, returnToVhsBack, saveEditorChanges, selectDetailSection, cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, findLinkForCatalog, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, saveDetailChanges, saveMetadata, savePersonal } from "./detail.js";
+import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, editVhsDossier, findLinkForCatalog, handleBackCoverKeydown, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, returnToVhsBack, saveDetailChanges, saveEditorChanges, saveMetadata, savePersonal, selectDetailSection } from "./detail.js";
 import { fields } from "./fields.js";
 import { localDateOffset, todayLocalDate } from "./format.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
@@ -316,6 +316,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.resetOrder.addEventListener("click", resetViewOrder);
       fields.showDuplicates.addEventListener("click", () => goToInbox("duplicate"));
       fields.closeDetail.addEventListener("click", closeDetail);
+      fields.detailDrawer.addEventListener("keydown", handleBackCoverKeydown);
       fields.detailDrawer.addEventListener("cancel", (event) => {
         event.preventDefault();
         closeDetail();

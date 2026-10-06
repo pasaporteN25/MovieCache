@@ -35,7 +35,7 @@ con ese prefijo. La release no está cerrada ni fusionada por esta consolidació
 | Orden | Frente | Próximo resultado |
 | --- | --- | --- |
 | 1 | Controles de Colección | Elegir opción y construir búsqueda/filtros/vacío coherentes |
-| 2 | X12 C/D/E | Completar Curaduría y validar unión desde grilla/búsqueda; cabecera, calendario y estrellas |
+| 2 | X12 C | D y E hechas el 2026-10-06; falta C3–C6: búsqueda de referencia en el caso, copias e idiomas, unir como partes, anime a Jikan |
 | 3 | X13 | Claves de API desde el menú |
 | 4 | X14 | Certificado local y configuración HTTPS sin OpenSSL manual |
 | Antes de M2 Android | Puente web/mobile | QR de apareamiento y lista/revocación de teléfonos |

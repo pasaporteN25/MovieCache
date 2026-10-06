@@ -1490,7 +1490,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         console = page.locator('.spotlight-preview[data-selection-source="shelf:spine-variants"]')
         console.get_by_role("button", name="Abrir ficha", exact=True).click()
         page.wait_for_selector("#detailDrawer[open]")
-        self.assertIn("pelicula", page.locator("#detailDrawer").inner_text().lower())
+        self.assertIn("película", page.locator("#detailDrawer").inner_text().lower())
 
     def test_home_shelf_furniture_has_four_bays_real_overflow_and_wheel_limits(self) -> None:
         page = self.page
@@ -2415,7 +2415,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator("#detailDrawer").get_attribute("data-detail-mode"), "dossier")
         self.assertEqual(page.locator("#detailDrawer .vhs-back-cover").count(), 0)
         self.assertEqual(
-            page.evaluate("document.activeElement.hasAttribute('data-personal-watched-at')"),
+            page.evaluate("document.activeElement.hasAttribute('data-date-text')"),
             True,
         )
 

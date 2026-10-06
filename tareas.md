@@ -623,12 +623,21 @@ commit por fase.
   - dos copias o idiomas en la biblioteca;
   - unir como partes;
   - anime directo a Jikan.
-- [ ] **D. Unir desde la grilla y la búsqueda**, con selección múltiple.
-- [ ] **E. Ficha:**
-  - cabecera única;
-  - flechas sutiles en la contratapa;
-  - calendario propio;
-  - 10 estrellas.
+- [x] **D. Unir desde la búsqueda** (2026-10-02 / 2026-10-06). En los resultados de
+  búsqueda, cada ficha guardada tiene «Seleccionar para unir». Una barra «Comparar y unir
+  N» abre el comparador de grupo, y un aviso muestra las fichas visibles que ya son o
+  parecen la misma obra («Compararlas»). Verificado con Playwright en 1400 y 390 px. Queda
+  afuera la selección en la grilla de cajas: el flujo real (buscar el título y ver las dos
+  fichas) pasa por la búsqueda.
+- [x] **E. Ficha** (2026-10-06).
+  - E1: una sola cabecera (título limpio, «Año · Película», «← Contratapa», «Cerrar»).
+  - E2: anterior/siguiente sólo en la contratapa, con chevrons SVG discretos a 16 px de la
+    caja y ←/→.
+  - E3: calendario propio en español (`core/personal-controls.js`).
+  - E4: 10 estrellas (`radiogroup`).
+  - Mismos campos guardados. Lectura con estrellas chicas. Pruebas en
+    `tests/browser/test_vhs_editor.py`. Pasado por Impeccable: sólo avisos de color
+    heredados del archivo.
 
 #### [X13] Claves de API desde el menú — *decidida el 2026-10-01, después de X12*
 
