@@ -1,3 +1,4 @@
+import { initializeDevices } from "../surfaces/account-devices.js";
 import { handlePosterError, handlePosterLoad } from "./card.js";
 import { handleBackCoverImageError, handleBackCoverImageLoad } from "./back-cover-images.js";
 import { toggleBackCoverSynopsis } from "./back-cover.js";
@@ -158,6 +159,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.adminButton.addEventListener("click", goToAdmin);
       fields.privacyButton.addEventListener("click", openPrivacyDialog);
       fields.logoutButton.addEventListener("click", logout);
+      initializeDevices();
       fields.createMemberButton.addEventListener("click", openMemberDialog);
       fields.createLibraryButton.addEventListener("click", () => openLibraryDialog());
       fields.catalogExportActions.addEventListener("click", downloadCatalogExport);

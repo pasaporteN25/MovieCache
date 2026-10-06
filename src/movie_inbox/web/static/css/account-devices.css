@@ -1,0 +1,23 @@
+.devices-dialog { width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+.devices-dialog .member-dialog-surface { max-height: inherit; overflow-y: auto; }
+.devices-dialog h2, .devices-dialog h3 { font-family: "Barlow Condensed", sans-serif; }
+.devices-dialog h2 { margin: 0; }
+.devices-body { padding: 0 24px 24px; }
+.devices-body p { max-width: 65ch; line-height: 1.5; }
+.devices-body button { min-height: 44px; width: auto; }
+.device-qr-panel { display: grid; grid-template-columns: 240px 1fr; gap: 24px; margin-block: 24px; align-items: center; }
+.device-qr-panel[hidden], .device-revoke-confirm[hidden] { display: none; }
+.device-qr-panel img { display: block; width: 240px; max-width: 100%; height: auto; background: white; }
+#deviceQrAccount { overflow-wrap: anywhere; }
+.devices-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 32px; }
+.devices-list { padding: 0; list-style: none; }
+.devices-list li { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--control-border); }
+.devices-list strong, .devices-list small { display: block; overflow-wrap: anywhere; }
+.devices-list small { margin-top: 6px; }
+.device-revoke-confirm { padding-block: 16px; }
+.device-revoke-confirm button { margin: 4px 8px 4px 0; }
+@media (max-width: 600px) {
+  .device-qr-panel { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
+  .device-qr-panel > div { width: 100%; }
+  .devices-body { padding-inline: 16px; }
+}
