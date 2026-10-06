@@ -4,6 +4,8 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+- Cuenta: QR para conectar Android, listado de dispositivos y revocacion con confirmacion.
+
 ### Antes de actualizar
 
 - **Hacé un backup: `instance.db` no vuelve atrás.** Pasa del esquema v23 al v25 apenas se
