@@ -18,6 +18,7 @@ class AccountDevicesTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         browser_fixtures.BrowserInterfaceTests.tearDownClass()
+
     setUp = browser_fixtures.BrowserInterfaceTests.setUp
     tearDown = browser_fixtures.BrowserInterfaceTests.tearDown
 
