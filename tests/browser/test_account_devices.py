@@ -11,8 +11,13 @@ from movie_inbox.infrastructure.qr_code import qr_data_uri
 
 
 class AccountDevicesTests(unittest.TestCase):
-    setUpClass = classmethod(browser_fixtures.BrowserInterfaceTests.setUpClass.__func__)
-    tearDownClass = classmethod(browser_fixtures.BrowserInterfaceTests.tearDownClass.__func__)
+    @classmethod
+    def setUpClass(cls) -> None:
+        browser_fixtures.BrowserInterfaceTests.setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        browser_fixtures.BrowserInterfaceTests.tearDownClass()
     setUp = browser_fixtures.BrowserInterfaceTests.setUp
     tearDown = browser_fixtures.BrowserInterfaceTests.tearDown
 
