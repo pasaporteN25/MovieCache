@@ -299,8 +299,9 @@ class HomeSearchTests(unittest.TestCase):
         # Escribiendo en otro campo de texto, `/` es un carácter más.
         page.locator("#catalogButton").click()
         page.wait_for_selector("#collectionView:not([hidden])")
-        page.locator("#query").focus()
-        page.keyboard.press("/")
+        # `press` sobre el locator enfoca el campo en el mismo paso, sin depender de que la
+        # vista de Colección termine de mover el foco por su cuenta.
+        page.locator("#query").press("/")
         self.assertEqual(page.locator("#query").input_value(), "/")
         self.assertTrue(page.locator("#collectionView").is_visible())
 
