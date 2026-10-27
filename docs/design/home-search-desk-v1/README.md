@@ -4,11 +4,11 @@ Evidencia de la entrega de Inicio con un único póster y un buscador integrado,
 
 Las capturas usan datos de prueba ilustrativos y afiches generados por el script; los resultados externos son simulados y no representan una biblioteca real. Se regeneran con `python docs/design/home-search-desk-v1/capture.py` (requiere `.[browser-test]` y `playwright install chromium`).
 
-| Ancho | Inicio en reposo | Búsqueda «Heat» (fila local activa) |
-| --- | --- | --- |
-| 390 px | [home-390.png](home-390.png) | [search-390.png](search-390.png) |
-| 1280 px | [home-1280.png](home-1280.png) | [search-1280.png](search-1280.png) |
-| 1440 px | [home-1440.png](home-1440.png) | [search-1440.png](search-1440.png) |
-| 1920 px | [home-1920.png](home-1920.png) | [search-1920.png](search-1920.png) |
+| Ancho | Inicio en reposo | Campo con foco (sugerencias) | Búsqueda «Heat» (fila local activa) |
+| --- | --- | --- | --- |
+| 390 px | [home-390.png](home-390.png) | [focus-390.png](focus-390.png) | [search-390.png](search-390.png) |
+| 1280 px | [home-1280.png](home-1280.png) | [focus-1280.png](focus-1280.png) | [search-1280.png](search-1280.png) |
+| 1440 px | [home-1440.png](home-1440.png) | [focus-1440.png](focus-1440.png) | [search-1440.png](search-1440.png) |
+| 1920 px | [home-1920.png](home-1920.png) | [focus-1920.png](focus-1920.png) | [search-1920.png](search-1920.png) |
 
 En las búsquedas se ven los tres estados de fila: «Ya la tenés», «Revisar» (coincidencia dudosa, nunca escribe) y «+ Pendiente». En 390 px el desplegable ocupa la pantalla y el póster se oculta mientras está abierto. Ninguna captura tiene scroll lateral.

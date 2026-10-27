@@ -88,14 +88,18 @@ def capture() -> None:
             page.evaluate("window.scrollTo(0, 0)")
             page.screenshot(path=str(base / f"home-{width}.png"), animations="disabled")
             field = page.locator("#homeSearchSlot input[role='combobox']")
+            page.evaluate("localStorage.setItem('movie-inbox:recent-searches:' + (window.__user || ''), '[]')")
             field.focus()
+            page.wait_for_selector("#homeSearchSlot [role='listbox'] [role='option']")
+            page.evaluate("window.scrollTo(0, 0)")
+            page.screenshot(path=str(base / f"focus-{width}.png"), animations="disabled")
             field.fill("Heat")
             page.wait_for_function("document.querySelectorAll('#homeSearchSlot .hs-external').length === 3")
             page.keyboard.press("ArrowDown")
             page.evaluate("window.scrollTo(0, 0)")
             page.screenshot(path=str(base / f"search-{width}.png"), animations="disabled")
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
-            shots += 2
+            shots += 3
         print(json.dumps({"screenshots": shots, "overflow": False}))
     finally:
         case.tearDown()
