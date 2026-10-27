@@ -68,8 +68,7 @@ test('IP1 carousel, autoplay and day tabs are gone from the module and the marku
   const {api,fields} = await setup();
   assert.doesNotMatch(source,/HOME_AUTOPLAY_INTERVAL_MS|setInterval|syncHomeAutoplay|ensureCarousel|homeDateControlMarkup/);
   assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="spotlight-select"|home-date-|spotlight-date|spotlight-playlist|home-programming-return/);
-  // bootstrap.js todavía los importa hasta T5: siguen exportados, pero inertes.
-  for (const name of ['tickHomeAutoplay','selectSpotlight','selectPlaylistEntry','moveSpotlightSelector','movePlaylistSelection']) assert.equal(api[name](),name === 'tickHomeAutoplay' ? false : undefined,name);
+  for (const name of ['tickHomeAutoplay','handleHomeVisibilityChange','selectSpotlight','selectPlaylistEntry','moveSpotlightSelector','movePlaylistSelection']) assert.equal(name in api,false,name);
   assert.deepEqual(Array.from(Object.keys(api.getHomePlaybackState())).sort(),['activeShelfId','playlistSource','selectedEntryKey','selectedItemId','selectionSource']);
   const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
   assert.match(html,/<div id="homeSearchSlot" class="home-search-slot"><\/div>/);
@@ -509,4 +508,71 @@ test('U5 failed day request preserves consultation and retry can succeed',async(
   assert.equal(api.editorialHome.generated_for,'2026-09-09');
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
   assert.equal(fields.homeFeedback.hidden,true);
+});
+
+function fakeSearch(){
+  const calls={mount:[],suggestions:[],empty:[],focus:0};
+  const handle={setSuggestions:list=>calls.suggestions.push(list),setEmptyCatalog:value=>calls.empty.push(value),focus(){calls.focus+=1;}};
+  return {calls,mountHomeSearch:(slot,options)=>{calls.mount.push(options);return handle;}};
+}
+
+test('IP2 el buscador se monta una sola vez y los datos nuevos sólo refrescan sugerencias',async()=>{
+  const fake=fakeSearch();
+  const {api,data} = await setup({mountHomeSearch:fake.mountHomeSearch,currentIdentity:{user:{username:'ana'}}});
+  api.renderEditorialHome();
+  assert.equal(fake.calls.mount.length,1);
+  assert.equal(fake.calls.mount[0].username,'ana');
+  assert.equal(fake.calls.mount[0].emptyCatalog,false);
+  assert.deepEqual(Array.from(fake.calls.mount[0].suggestions,e=>e.key),Array.from(api.homeSuggestions(),e=>e.key));
+  api.setEditorialHome({...data,featured:[],sections:[]});
+  api.renderEditorialHome();
+  api.renderEditorialHome();
+  assert.equal(fake.calls.mount.length,1,'no se vuelve a montar: perdería el foco');
+  assert.equal(fake.calls.suggestions.length,2);
+  assert.equal(fake.calls.suggestions.at(-1).length,0);
+  assert.equal(fake.calls.empty.at(-1),true);
+});
+
+test('IP2 onPreview, onExpand y onOpenItem se enganchan a Inicio, al router y a la ficha',async()=>{
+  const fake=fakeSearch();
+  const expanded=[],opened=[];
+  const {api} = await setup({mountHomeSearch:fake.mountHomeSearch,goToCollectionAddWithQuery:q=>expanded.push(q),openDetail:id=>opened.push(id)});
+  api.renderEditorialHome();
+  const options=fake.calls.mount[0];
+  options.onPreview({id:'memory-b',title:'Recuerdo B',year:'2000'});
+  assert.equal(api.getHomePlaybackState().selectionSource,'preview');
+  options.onPreview(null);
+  assert.equal(api.getHomePlaybackState().selectionSource,'daily');
+  options.onExpand('alien');
+  options.onOpenItem('memory-a');
+  assert.equal(JSON.stringify(expanded),'["alien"]');
+  assert.equal(JSON.stringify(opened),'["memory-a"]');
+});
+
+test('IP2 focusHomeSearch enfoca el campo y vuelve a Inicio sin foco de título si hace falta',async()=>{
+  const fake=fakeSearch();
+  const homes=[];
+  const {api,fields} = await setup({mountHomeSearch:fake.mountHomeSearch,currentView:'catalog',goHome:o=>homes.push(o)});
+  fields.homeView.hidden=true;
+  assert.equal(api.focusHomeSearch(),true);
+  assert.equal(JSON.stringify(homes),'[{"focusHeading":false}]');
+  assert.equal(fake.calls.focus,1);
+});
+
+test('IP2 en Inicio focusHomeSearch no navega',async()=>{
+  const fake=fakeSearch();
+  const homes=[];
+  const {api,fields} = await setup({mountHomeSearch:fake.mountHomeSearch,currentView:'home',goHome:o=>homes.push(o)});
+  fields.homeView.hidden=false;
+  api.focusHomeSearch();
+  assert.equal(homes.length,0);
+  assert.equal(fake.calls.focus,1);
+});
+
+test('IP2 catálogo vacío: el buscador reemplaza el llamado principal y quedan Importar y Club',async()=>{
+  const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
+  const empty=html.slice(html.indexOf('id="homeEmpty"'));
+  assert.doesNotMatch(empty,/home-empty-catalog/);
+  assert.match(empty,/data-click="home-empty-import"/);
+  assert.match(empty,/data-click="home-empty-club"/);
 });

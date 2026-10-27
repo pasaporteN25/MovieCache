@@ -92,10 +92,13 @@ function fakeDom() {
     setAttribute(k, v) { this.attrs[k] = v; }, removeAttribute(k) { delete this.attrs[k]; }, focus() {} };
   const panel = { innerHTML: '', hidden: true, listeners: {}, addEventListener(t, f) { this.listeners[t] = f; }, querySelector() { return null; } };
   const status = { textContent: '' };
+  const closeButton = { listeners: {}, addEventListener(t, f) { this.listeners[t] = f; } };
+  const root = { dataset: {}, querySelector: (sel) => (sel === '[data-close]' ? closeButton : null) };
+  const label = { textContent: '' };
   const container = { _html: '', listeners: {}, addEventListener(t, f) { this.listeners[t] = f; }, contains: () => false,
     set innerHTML(v) { this._html = v; }, get innerHTML() { return this._html; },
-    querySelector(sel) { return sel === '.hs-input' ? input : sel === '.hs-panel' ? panel : sel === '.hs-status' ? status : null; } };
-  return { container, input, panel, status };
+    querySelector(sel) { return sel === '.hs-input' ? input : sel === '.hs-panel' ? panel : sel === '.hs-status' ? status : sel === '.hs-root' ? root : sel === '.hs-label' ? label : null; } };
+  return { container, input, panel, status, root, label, closeButton };
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const key = (dom, k) => { let prevented = false; dom.input.listeners.keydown({ key: key.k = k, preventDefault() { prevented = true; } }); return prevented; };
@@ -247,4 +250,30 @@ test('una consulta que es URL rotula el grupo externo con la fuente', async () =
   type(h.dom, 'https://www.imdb.com/title/tt0133093/'); await wait(80);
   assert.match(h.dom.panel.innerHTML, /Enlace de IMDb/);
   assert.ok(h.calls.some((c) => c.url.includes('external=true')));
+});
+
+test('isTextEntryTarget: `/` no roba el foco a campos de texto pero sí a botones y casillas', () => {
+  const el = (tagName, extra = {}) => ({ nodeType: 1, tagName, ...extra });
+  assert.equal(S.isTextEntryTarget(el('INPUT', { type: 'text' })), true);
+  assert.equal(S.isTextEntryTarget(el('INPUT', { type: 'search' })), true);
+  assert.equal(S.isTextEntryTarget(el('TEXTAREA')), true);
+  assert.equal(S.isTextEntryTarget(el('SELECT')), true);
+  assert.equal(S.isTextEntryTarget(el('DIV', { isContentEditable: true })), true);
+  assert.equal(S.isTextEntryTarget(el('INPUT', { type: 'checkbox' })), false);
+  assert.equal(S.isTextEntryTarget(el('BUTTON')), false);
+  assert.equal(S.isTextEntryTarget({ nodeType: 9 }), false);
+  assert.equal(S.isTextEntryTarget(null), false);
+});
+
+test('el desplegable marca data-open en la raíz, «Cerrar» lo cierra y setEmptyCatalog cambia la etiqueta', async () => {
+  const h = harness(() => json({ catalog: { results: [] } }), { suggestions: [{ title: 'Sugerida', year: '2001', id: 'S1' }] });
+  h.dom.input.listeners.focus();
+  assert.equal(h.dom.root.dataset.open, 'true');
+  h.dom.closeButton.listeners.click();
+  assert.equal(h.dom.root.dataset.open, 'false');
+  assert.equal(h.events.previews.at(-1), null, 'el póster vuelve a la sugerencia');
+  h.handle.setEmptyCatalog(true);
+  assert.match(h.dom.label.textContent, /primera película/);
+  h.handle.setEmptyCatalog(false);
+  assert.match(h.dom.label.textContent, /Buscar una película/);
 });

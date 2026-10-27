@@ -6,7 +6,7 @@
 .hs-input::placeholder { color: var(--text-placeholder); }
 .hs-input:focus-visible { outline: var(--focus-ring); outline-offset: 2px; border-color: var(--teal); }
 .hs-panel { box-sizing: border-box; max-width: 100%; max-height: min(60vh, 520px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
-  background: var(--surface-panel); border: 1px solid var(--line); border-radius: var(--radius-result); padding: 6px; display: grid; gap: 6px; }
+  background: var(--surface-panel); border: 1px solid var(--line); border-radius: var(--radius-result); padding: 6px; display: grid; align-content: start; gap: 6px; }
 .hs-panel[hidden] { display: none; }
 .hs-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
 .hs-group-label { font-family: var(--font-label); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
@@ -32,8 +32,25 @@
 .hs-warning, .hs-empty { margin: 0; padding: 6px 10px; font-size: 0.85rem; color: var(--text-secondary); overflow-wrap: anywhere; }
 .hs-warning { color: var(--text-gold-soft); }
 .hs-status { margin: 0; min-height: 1.2em; font-size: 0.8rem; color: var(--text-secondary); }
+/* Cabecera del campo: etiqueta y, sólo en móvil con el desplegable abierto, «Cerrar». */
+.hs-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.hs-label { flex: 1 1 0; min-width: 0; }
+.hs-close { display: none; width: auto; min-width: 0; font: inherit; font-size: 0.85rem; color: var(--text-primary); background: var(--surface-control); border: 1px solid var(--control-border); border-radius: var(--radius-control); min-height: 44px; padding: 0 14px; cursor: pointer; }
 @media (max-width: 860px) {
-  .hs-panel { max-height: 70vh; }
+  .hs-root, .hs-input { width: 100%; }
   .hs-row { min-height: 48px; }
+  /* Con el desplegable abierto el buscador ocupa la pantalla y el póster se oculta. */
+  .hs-root[data-open="true"] { position: fixed; inset: 0; z-index: 200; box-sizing: border-box; width: auto; padding: 12px 12px 0;
+    grid-template-rows: auto auto minmax(0, 1fr) auto; background: var(--surface-app); }
+  /* <main> (z-index: 1) y .spotlight-layout (isolation: isolate) forman contextos de apilado:
+     suben mientras el overlay está abierto para quedar sobre la cabecera, la navegación
+     inferior y los estantes. */
+  main:has(.hs-root[data-open="true"]) { z-index: 300; }
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) { z-index: 300; }
+  .hs-root[data-open="true"] .hs-close { display: inline-block; flex: 0 0 auto; }
+  .hs-root[data-open="true"] .hs-panel { max-height: none; min-height: 0; }
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .home-consulted-poster,
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .home-desk-note,
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .spotlight-preview { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .hs-root * { transition: none !important; animation: none !important; } }

@@ -1,15 +1,16 @@
 import { cachedImageSrc, posterVariant } from "../core/card.js";
 import { editorialRevision, loadCatalog, setEditorialRevision } from "../core/catalog-data.js";
-import { detailLinks, drawerPoster, factsPanel } from "../core/detail.js";
+import { detailLinks, drawerPoster, factsPanel, openDetail } from "../core/detail.js";
 import { fields } from "../core/fields.js";
 import { availabilityState, displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localDateOffset, todayLocalDate } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
-import { goToClub, routeValuesForView, showView, syncRoute } from "../core/router.js";
-import { clubMode, setClubMode } from "../core/state.js";
+import { goHome, goToClub, goToCollectionAddWithQuery, routeValuesForView, showView, syncRoute } from "../core/router.js";
+import { clubMode, currentIdentity, currentView, setClubMode } from "../core/state.js";
 import { applyCollectionFilterDescriptor, render, resetCollectionFilters, setLastEditorialRenderRevision } from "./catalog-grid.js";
 import { clearManualSearch } from "./catalog-search.js";
 import { closeSharedDetail, openCollection } from "./club.js";
 import { homeRandomBay, homeRandomEntry } from "./home-random.js";
+import { mountHomeSearch } from "./home-search.js";
 
       export let editorialHome = { generated_for: "", featured: [], hero: null, sections: [], warnings: [] };
 
@@ -121,16 +122,6 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
       export function getHomePlaybackState() {
         return { playlistSource, selectedItemId, selectedEntryKey, selectionSource, activeShelfId };
       }
-
-      // IP1: el carrusel, el autoplay y la tabla de programación se retiraron.
-      // bootstrap.js (fuera del alcance de T3) todavía los importa y los enlaza:
-      // quedan como no-ops hasta que T5 los quite de allí.
-      export function tickHomeAutoplay() { return false; }
-      export function handleHomeVisibilityChange() {}
-      export function selectSpotlight() {}
-      export function selectPlaylistEntry() {}
-      export function moveSpotlightSelector() {}
-      export function movePlaylistSelection() {}
 
       export async function goToHomeCollection(collectionId) {
         setClubMode("collections");
@@ -263,10 +254,46 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         };
       }
 
+      // Buscador de Inicio (IP2). Se monta una sola vez en #homeSearchSlot: los datos nuevos
+      // sólo refrescan sus sugerencias, así que escribir o tener el foco no se interrumpe.
+      let homeSearch = null;
+
+      export function ensureHomeSearch(emptyCatalog = false) {
+        if (homeSearch) {
+          homeSearch.setSuggestions?.(homeSuggestions());
+          homeSearch.setEmptyCatalog?.(emptyCatalog);
+          return homeSearch;
+        }
+        const slot = fields.homeSearchSlot;
+        if (!slot) return null;
+        homeSearch = mountHomeSearch(slot, {
+          username: currentIdentity?.user?.username || "",
+          suggestions: homeSuggestions(),
+          emptyCatalog,
+          onPreview: previewHomeEntry,
+          // C4: Ampliar abre Colección en modo Agregar con la consulta; Atrás vuelve a Inicio.
+          onExpand: (query) => goToCollectionAddWithQuery(query),
+          onOpenItem: (id) => openDetail(id),
+          onAdded: () => { Promise.resolve(loadCatalog()).catch(() => {}); }
+        }) || null;
+        return homeSearch;
+      }
+
+      // `/` y «Buscar» en Inicio. Desde otra vista (o con una ficha abierta) se vuelve a
+      // Inicio sin mover el foco a su título, y el foco queda en el campo.
+      export function focusHomeSearch() {
+        const needsHome = currentView !== "home" || fields.homeView.hidden;
+        if (needsHome) goHome({ focusHeading: false });
+        const search = ensureHomeSearch(!fields.homeEmpty.hidden);
+        search?.focus();
+        return Boolean(search);
+      }
+
       export function renderEditorialHome() {
         renderEditorialHero();
         renderEditorialSections();
         const hasSections = editorialHome.sections.some((section) => section.items?.length);
+        ensureHomeSearch(!(editorialHome.featured.length || hasSections));
         fields.homeEmpty.hidden = Boolean(editorialHome.featured.length || hasSections);
         fields.homeVideothequeHeading.hidden = !hasSections;
         fields.homeFurniture.hidden = !hasSections;

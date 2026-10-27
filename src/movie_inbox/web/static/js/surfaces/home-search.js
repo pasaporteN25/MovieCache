@@ -108,24 +108,40 @@ function thumb(image) {
     : `<span class="hs-thumb hs-thumb-empty" aria-hidden="true"></span>`;
 }
 
+// `/` enfoca el buscador salvo que el foco ya esté escribiendo en otro campo.
+export function isTextEntryTarget(target) {
+  if (!target || target.nodeType === 9) return false;
+  if (target.isContentEditable) return true;
+  const tag = String(target.tagName || "").toLowerCase();
+  if (tag === "textarea" || tag === "select") return true;
+  if (tag !== "input") return false;
+  const type = String(target.type || "text").toLowerCase();
+  return !["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"].includes(type);
+}
+
 let mountCounter = 0;
 
 export function mountHomeSearch(container, options = {}) {
   const {
     onPreview = () => {}, onExpand = () => {}, onOpenItem = () => {}, onAdded = () => {},
-    suggestions = [], username = "", emptyCatalog = false,
+    suggestions = [], username = "",
     fetcher = apiFetch,
     recents = createRecentSearches(username),
     debounce = {}
   } = options;
   const localDelay = debounce.local ?? LOCAL_DEBOUNCE_MS;
   const externalDelay = debounce.external ?? EXTERNAL_DEBOUNCE_MS;
+  let emptyCatalog = Boolean(options.emptyCatalog);
   const uid = `hs${++mountCounter}`;
+  const labelText = () => (emptyCatalog ? "Buscá la primera película que querés recordar" : "Buscar una película, serie o persona");
   let suggestionList = Array.isArray(suggestions) ? suggestions : [];
 
   container.innerHTML = `
-    <div class="hs-root">
-      <label class="hs-label" for="${uid}-input">${emptyCatalog ? "Buscá la primera película que querés recordar" : "Buscar una película, serie o persona"}</label>
+    <div class="hs-root" data-open="false">
+      <div class="hs-bar">
+        <label class="hs-label" for="${uid}-input">${labelText()}</label>
+        <button type="button" class="hs-close" data-close>Cerrar</button>
+      </div>
       <input id="${uid}-input" class="hs-input" type="search" role="combobox" autocomplete="off" spellcheck="false"
         aria-autocomplete="list" aria-expanded="false" aria-controls="${uid}-list" placeholder="Título, año o pegá un enlace">
       <div id="${uid}-list" class="hs-panel" role="listbox" aria-label="Resultados de búsqueda" hidden></div>
@@ -134,6 +150,8 @@ export function mountHomeSearch(container, options = {}) {
   const input = container.querySelector(".hs-input");
   const panel = container.querySelector(".hs-panel");
   const status = container.querySelector(".hs-status");
+  const root = container.querySelector(".hs-root");
+  const label = container.querySelector(".hs-label");
 
   let rows = [];
   let active = -1;
@@ -224,6 +242,7 @@ export function mountHomeSearch(container, options = {}) {
     const visible = open && (rows.length > 0 || parts.length > 0);
     panel.hidden = !visible;
     input.setAttribute("aria-expanded", String(visible));
+    root.dataset.open = String(visible);
     if (active >= rows.length) active = -1;
     if (active >= 0 && rows[active]) input.setAttribute("aria-activedescendant", rows[active].id);
     else input.removeAttribute("aria-activedescendant");
@@ -418,6 +437,7 @@ export function mountHomeSearch(container, options = {}) {
     const rowEl = event.target.closest?.("[data-index]");
     if (rowEl) activate(rows[Number(rowEl.dataset.index)]);
   });
+  root.querySelector("[data-close]").addEventListener("click", () => close(true));
   container.addEventListener("focusout", (event) => {
     if (event.relatedTarget && container.contains(event.relatedTarget)) return;
     if (open) { open = false; active = -1; render(); }
@@ -427,6 +447,13 @@ export function mountHomeSearch(container, options = {}) {
     input,
     focus() { input.focus(); },
     close: () => close(true),
+    setEmptyCatalog(value) {
+      const next = Boolean(value);
+      if (next === emptyCatalog) return;
+      emptyCatalog = next;
+      label.textContent = labelText();
+      if (open) render();
+    },
     setSuggestions(list) { suggestionList = Array.isArray(list) ? list : []; if (open) render(); },
     destroy() { abortAll(); container.innerHTML = ""; }
   };
