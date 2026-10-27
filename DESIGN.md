@@ -563,6 +563,27 @@ Los bordes son finos, violetas o cyan según contexto. Las barras laterales de c
 - **Don't** ocultar disponibilidad, intención de ver y memoria personal detrás de metadata externa.
 
 
+## Inicio como mostrador de búsqueda (IP1/IP2) — 2026-10-27
+
+Implementado, sobre el mundo existente de Home (sin rediseño de paleta):
+
+- Dos columnas en escritorio: `#homeSearchSlot` (buscador) y `#homeConsultation` (un
+  único póster con consola breve debajo). Se quitaron el carrusel izquierdo, el
+  autoplay, la tabla de programación y los controles Hoy/Ayer; el estante VHS queda en
+  la mitad inferior sin cambios. El encabezado del póster dice «Sugerencia», «Resultado»
+  o «Tu selección».
+- Buscador con patrón combobox (`aria-expanded`, `aria-activedescendant`, grupos con
+  nombre, `role="status"` para conteos). Vacío: «Recientes» (5, borrables, en
+  `localStorage`) y «Sugerencias» (3 a 5). Escribiendo: «En tu colección» y «Para
+  agregar» (3 externos desde 3 caracteres). Estados por fila: «Ya la tenés», «+ Pendiente»,
+  «Revisar». Flechas mueven el póster, Escape lo devuelve a la sugerencia, `/` enfoca.
+- Móvil (≤860 px): campo a ancho completo; con el desplegable abierto ocupa la pantalla
+  y el póster se oculta. Sin scroll lateral a 320 px.
+- Catálogo vacío: el buscador reemplaza el llamado principal; «Importar lista» y
+  «Explorar Club» quedan como acciones secundarias.
+- Pendiente: en reposo queda un hueco oscuro bajo el campo (≈270 px). Evidencia en
+  `docs/design/home-search-desk-v1/`.
+
 ## Caja y editor VHS — 2026-09-29
 
 Dirección aprobada: caja negra gastada, cinta de papel crema y título con fibrón.

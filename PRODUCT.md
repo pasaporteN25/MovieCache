@@ -110,12 +110,14 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   omitiendo el cache reproducible y conservando catalogos, cuentas, privacidad,
   colecciones e inventario. La programacion pertenece al host y detiene brevemente la
   aplicacion para obtener un estado coherente de SQLite.
-- `Inicio` ofrece una programacion editorial diaria, estable y explicable. Su cartelera
-  principal propone entre una y cuatro obras disponibles con sinopsis y seleccion
-  manual; las secciones pueden reunir pendientes
-  disponibles, obras faltantes de colecciones seguidas, recuerdos personales por
-  completar y rutas por director, genero o decada. La seleccion usa exclusivamente
-  datos locales, evita repetir obras y no reemplaza la accion separada `Random`.
+- `Inicio` es un mostrador de busqueda: a la izquierda un buscador con desplegable
+  (recientes y sugerencias con el campo vacio; `En tu coleccion` y `Para agregar` al
+  escribir) y a la derecha un unico poster que sigue a la fila resaltada. Desde el
+  desplegable solo se agrega lo exacto (`+ Pendiente`); una coincidencia dudosa pasa a
+  `Revisar` y nunca escribe, y una obra ya presente abre la ficha local. Enter sin fila
+  amplia a `Coleccion` en modo agregar con la consulta. La programacion editorial diaria
+  sigue existiendo pero solo alimenta las sugerencias (usa exclusivamente datos locales,
+  evita repetir obras y no reemplaza la accion separada `Random`).
 - La cartelera conserva para cada usuario su seleccion destacada de hoy y ayer. Cambiar
   de jornada reemplaza la misma marquesina; no duplica obras ni altera el catalogo.
   Las efemerides se presentan al final de la programacion editorial por su menor densidad.

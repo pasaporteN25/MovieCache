@@ -17,6 +17,12 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
+- Inicio es ahora un mostrador de búsqueda [IP1/IP2]: un buscador con desplegable
+  (recientes, sugerencias, «En tu colección» y «Para agregar») y un único póster que
+  sigue la fila resaltada; se quitaron el carrusel, el autoplay y la tabla de
+  programación. `/api/search` acepta `membership=true` y marca cada resultado como
+  presente, a revisar o faltante; desde Inicio sólo se agrega lo exacto. Pegar un enlace
+  de IMDb, FilmAffinity o Jikan devuelve un único resultado. `/` enfoca el buscador.
 - Las fichas que sólo tienen un enlace a Wikipedia reciben su id de Wikidata, y el año
   si les falta [X12]. Es lo que permite reconocer la misma obra en dos idiomas. El
   servidor lo hace solo y despacio, 50 fichas cada 5 minutos
