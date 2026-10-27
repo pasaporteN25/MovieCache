@@ -3616,3 +3616,32 @@ directamente de una sinopsis más completa. 6 tests en
 2026-08-19, commit `85ed572`.
 
 *(mover acá con fecha y commit al cerrar)*
+
+### Frente: Inicio, búsqueda de alta y Club por personas (análisis 2026-10-21)
+
+**Estado:** IP1 e IP2 con dirección elegida el 2026-10-26 (concepto B, mostrador con un
+solo póster), sin implementar. IP3 a IP6 siguen pendientes de decisión del owner.
+Análisis: [`docs/analisis/inicio-busqueda-club-personas-2026-10-21.md`](docs/analisis/inicio-busqueda-club-personas-2026-10-21.md).
+Brief de IP1/IP2: [`docs/briefs/home-search-desk-v1.md`](docs/briefs/home-search-desk-v1.md); reemplaza §2.1 y §2.2 del análisis.
+Prefijo `[IP]` (Inicio y Personas). IP1 e IP2 no dependen del modelo de personas.
+
+- [ ] **[IP1] Inicio como mostrador con un solo póster.** Cierre: sin carrusel izquierdo, sin autoplay y sin tabla de programación tipo Winamp; buscador a la izquierda y un único póster a la derecha (sugerencia del día, Al azar U8 y consultas de Club/VHS); estante VHS en la mitad inferior; la programación diaria queda sólo como fuente de sugerencias y las instantáneas de Hoy/Ayer se conservan sin migrar; PRODUCT.md y DESIGN.md actualizados; pruebas JS y de navegador de Inicio actualizadas y en verde.
+- [ ] **[IP2] Buscador de Inicio con desplegable y ampliación.** Cierre: con foco y campo vacío muestra recientes (5, borrables) y sugerencias (3 a 5); al escribir agrupa «En tu colección» y «Para agregar» (3 externos, desde 3 caracteres) usando el endpoint de U12, sin matching propio; estados «Ya la tenés», «+ Pendiente» (sólo exacta, sin duplicados posibles) y «Revisar» (nunca agrega desde Inicio); el póster sigue la fila resaltada; Enter sin selección amplía a `?view=catalog&mode=add&q=` y Atrás vuelve con la consulta; pegar un enlace reconocido devuelve un único resultado por id; `/` enfoca el buscador; pruebas de navegador de esos casos y revisión visual a 390/1280/1440/1920.
+- [ ] **[IP3] Modelo de persona por QID de Wikidata (backend).** Cierre: `instance.db` v26 con `people` y `derived_person_id`/`role`; los homónimos devuelven varios candidatos sin elegir; `domain/matching.py` sigue sin personas (prueba AST).
+- [ ] **[IP4] Filmografía como colección de Club.** Cierre: crear, seguir y refrescar sin mover ids de ítem; pertenencia por `catalog_membership`, nunca por créditos; payload sin `en_catalogo`, `_availability`, creador ni seguidores.
+- [ ] **[IP5] UI de personas (Obra | Persona, elección de homónimo, tarjeta en Club).** Cierre: prueba de navegador con dos homónimos que obligan a elegir, y mismo QID que reusa la colección existente.
+- [ ] **[IP6] Bajas, API v1 y Charadas.** Cierre: prueba de que dejar de seguir no toca el catálogo, `en_catalogo` ni las copias (casos a–d); `kind`/`person` en el OpenAPI; Charadas excluye personas; el backup incluye `people`.
+
+Decisiones del owner del 2026-10-26: se quita el carrusel izquierdo y queda sólo «Tu
+selección»; la tabla de programación desaparece (ya no aplica la propuesta de 12 obras);
+en reposo, recientes y sugerencias arriba y el estante VHS en la mitad inferior; desde el
+desplegable sólo se agrega lo exacto.
+
+Abiertas en IP2, no bloquean (ver brief): dónde se guardan los recientes (servidor por
+usuario o `localStorage`), costo de fuentes externas mientras se escribe, y rol de los
+botones «Buscar»/«Agregar» de la cabecera global.
+
+Preguntas del owner que bloquean:
+
+- (bloquea IP3) ¿Quién agrega personas: cualquier miembro o sólo el owner? ¿Se oculta quién la agregó?
+- (bloquea IP3) ¿Wikidata (QID) es la única identidad de persona, con TMDb vinculado sólo vía P4985?
