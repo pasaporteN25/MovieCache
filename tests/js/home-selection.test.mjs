@@ -46,58 +46,61 @@ async function setup(overrides = {}) {
   return {api,fields,data,document,window};
 }
 
-test('U5 deliberate VHS selection programs the shelf; autoplay changes only the daily poster',async()=>{
+test('U5 deliberate VHS selection consults its work; the daily suggestion stays independent',async()=>{
   const {api,fields} = await setup();
-  const before = api.getHomePlaybackState();
+  assert.match(fields.spotlightStage.innerHTML,/<h3 id="spotlight-selected-title">Diaria A<\/h3>/);
+  assert.match(fields.spotlightStage.innerHTML,/<span>Sugerencia<\/span>/);
   api.selectHomeShelfEntry('memory','memory-b');
   let state = api.getHomePlaybackState();
   assert.equal(state.selectionSource,'shelf:memory');
   assert.equal(state.selectedEntryKey,'memory-b');
   assert.equal(state.playlistSource,'shelf:memory');
-  assert.equal(state.carouselItemId,before.carouselItemId);
   assert.match(fields.spotlightStage.innerHTML,/<h3 id="spotlight-selected-title">Recuerdo B<\/h3>/);
-  assert.match(fields.spotlightStage.innerHTML,/data-entry-key="memory-b"[^>]+tabindex="0" aria-selected="true"/);
-  assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-playlist-entry="daily-a"/);
-  for(let index=0;index<3;index++) assert.equal(api.tickHomeAutoplay(),true);
-  state = api.getHomePlaybackState();
-  assert.notEqual(state.carouselItemId,before.carouselItemId);
-  assert.equal(state.selectedEntryKey,'memory-b');
-  assert.equal(state.selectionSource,'shelf:memory');
-  assert.equal(state.playlistSource,'shelf:memory');
+  assert.match(fields.spotlightStage.innerHTML,/<span>Tu selección<\/span>/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-playlist-entry|spotlight-playlist|spotlight-table-wrap/);
   api.returnHomeProgramming();
-  api.selectPlaylistEntry('daily-b');
   assert.equal(api.getHomePlaybackState().selectionSource,'daily');
-  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-b');
-  assert.match(fields.spotlightStage.innerHTML,/<h3 id="spotlight-selected-title">Diaria B<\/h3>/);
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
+  assert.match(fields.spotlightStage.innerHTML,/<h3 id="spotlight-selected-title">Diaria A<\/h3>/);
+});
+
+test('IP1 carousel, autoplay and day tabs are gone from the module and the markup',async()=>{
+  const {api,fields} = await setup();
+  assert.doesNotMatch(source,/HOME_AUTOPLAY_INTERVAL_MS|setInterval|syncHomeAutoplay|ensureCarousel|homeDateControlMarkup/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="spotlight-select"|home-date-|spotlight-date|spotlight-playlist|home-programming-return/);
+  // bootstrap.js todavía los importa hasta T5: siguen exportados, pero inertes.
+  for (const name of ['tickHomeAutoplay','selectSpotlight','selectPlaylistEntry','moveSpotlightSelector','movePlaylistSelection']) assert.equal(api[name](),name === 'tickHomeAutoplay' ? false : undefined,name);
+  assert.deepEqual(Array.from(Object.keys(api.getHomePlaybackState())).sort(),['activeShelfId','playlistSource','selectedEntryKey','selectedItemId','selectionSource']);
+  const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
+  assert.match(html,/<div id="homeSearchSlot" class="home-search-slot"><\/div>/);
+  assert.match(html,/id="homeConsultation"/);
+  assert.doesNotMatch(html,/homeDate|home-date|spotlight-date|spotlight-viewport|home-loading-rows/);
 });
 
 test('source-qualified keys preserve Club provenance and omit personal edit action',async()=>{
   const {api,fields} = await setup();
   api.selectHomeShelfEntry('club','daily-a');
-  api.tickHomeAutoplay();
   assert.match(fields.spotlightStage.innerHTML,/>Obra del Club<\/h3>/);
   assert.match(fields.spotlightStage.innerHTML,/data-click="open-home-collection-detail" data-key="daily-a"/);
   assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
-  assert.match(fields.spotlightStage.innerHTML,/data-playlist-entry="daily-a"[^>]+aria-selected="true"/);
   api.openHomeCollectionDetail('daily-a','shelf:club');
   assert.match(fields.sharedDetailBody.innerHTML,/>Obra del Club<\/h2>/);
   api.returnHomeProgramming();
-  api.selectPlaylistEntry('daily-a');
   assert.match(fields.spotlightStage.innerHTML,/>Diaria A<\/h3>/);
   assert.match(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
 });
 
-test('explicit programming and day/poster selection retain their intentional reset semantics',async()=>{
+test('explicit shelf and day changes retain their intentional reset semantics',async()=>{
   const {api,data} = await setup();
   api.selectHomeShelfEntry('memory','memory-b');
   api.activateHomeShelf('memory');
   assert.equal(api.getHomePlaybackState().playlistSource,'shelf:memory');
-  api.selectPlaylistEntry('memory-a');
-  assert.equal(api.getHomePlaybackState().selectionSource,'shelf:memory');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
+  api.selectHomeShelfEntry('memory','memory-a');
   assert.equal(api.homeShelfSelections.get('memory'),0);
-  api.selectSpotlight(1);
+  api.returnHomeProgramming();
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
-  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-b');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
   api.selectHomeShelfEntry('memory','memory-b');
   api.applyEditorialFeaturedDate('2026-09-09',{featured:[data.featured[1]]});
   assert.equal(api.getHomePlaybackState().selectionSource,'daily');
@@ -115,35 +118,27 @@ test('invalid or removed selection and empty daily list do not produce stale det
   data.featured=[];
   api.selectHomeShelfEntry('memory','memory-a');
   assert.match(fields.spotlightStage.innerHTML,/>Recuerdo A<\/h3>/);
-  assert.doesNotMatch(fields.spotlightStage.innerHTML,/No hay obras en esta fuente/);
   api.setEditorialHome({...data,sections:[]});
   api.renderEditorialHero();
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'');
   assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
+  assert.match(fields.spotlightStage.innerHTML,/home-desk-note/);
 });
 
-test('keyboard handles fallback entry keys and autoplay still respects visibility/reduced motion',async()=>{
-  const {api,data,document,window} = await setup();
+test('keyboard handles fallback entry keys on the shelf',async()=>{
+  const {api,data} = await setup();
   delete data.sections[0].items[1].key;
   let prevented = false;
   api.moveHomeShelf({key:'ArrowRight',preventDefault(){prevented=true;},
     target:{closest:()=>({dataset:{sectionId:'memory',entryIndex:'0'}})}});
   assert.equal(prevented,true);
   assert.equal(api.getHomePlaybackState().selectedItemId,'memory-b');
-  document.visibilityState='hidden';
-  assert.equal(api.tickHomeAutoplay(),false);
-  document.visibilityState='visible';
-  document.querySelector=()=>({open:true});
-  assert.equal(api.tickHomeAutoplay(),false);
-  document.querySelector=()=>null;
-  window.matchMedia=()=>({matches:true});
-  assert.equal(api.tickHomeAutoplay(),false);
 });
 
-test('autoplay restores focused console action after rerender without changing the consulted entry',async()=>{
+test('a rerender restores the focused console action without changing the consulted entry',async()=>{
   const {api,fields,document} = await setup();
   api.selectHomeShelfEntry('memory','memory-b');
-  const oldAction = {dataset:{click:'edit-home-shelf-entry'}};
+  const oldAction = {dataset:{click:'edit-home-shelf-entry',homeFocus:'consultation-edit'}};
   document.activeElement=oldAction;
   let replaced=false;
   let markup=fields.spotlightStage.innerHTML;
@@ -152,11 +147,22 @@ test('autoplay restores focused console action after rerender without changing t
   });
   fields.spotlightStage.contains=element=>element===oldAction && !replaced;
   let restored=false;
-  fields.spotlightStage.querySelector=selector=>selector==='[data-click="edit-home-shelf-entry"]'
+  fields.spotlightStage.querySelector=selector=>selector==='[data-home-focus="consultation-edit"]'
     ? {focus:()=>{restored=true;}} : null;
-  assert.equal(api.tickHomeAutoplay(),true);
+  api.renderEditorialHero();
   assert.equal(restored,true);
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
+});
+
+test('the render never rewrites the search slot: it writes inside #homeConsultation only',async()=>{
+  const {api,fields} = await setup();
+  const host=Object.assign({},fields.spotlightStage,{innerHTML:'',contains:()=>false,querySelector:()=>null});
+  fields.spotlightStage.querySelector=selector=>selector==='#homeConsultation'?host:null;
+  const stageBefore=fields.spotlightStage.innerHTML;
+  api.selectHomeShelfEntry('memory','memory-b');
+  assert.match(host.innerHTML,/>Recuerdo B<\/h3>/);
+  assert.equal(fields.spotlightStage.innerHTML,stageBefore);
+  assert.doesNotMatch(host.innerHTML,/homeSearchSlot/);
 });
 
 test('the single console carries summary, credits, facts and category navigation without duplicate images',async()=>{
@@ -193,15 +199,13 @@ test('missing information stays honest and the retired host is absent from produ
   assert.match(html,/id="homeSelectionAnnouncement"[^>]*aria-live="polite"/);
 });
 
-test('consulted poster follows source-qualified selection, not independent autoplay',async()=>{
+test('consulted poster follows source-qualified selection',async()=>{
   const {api,fields,data} = await setup();
   data.sections[0].items[1].item.page_image='/memory.jpg';
   api.selectHomeShelfEntry('memory','memory-b');
   let poster = api.homeConsultedPoster(data.sections[0].items[1]);
   assert.match(poster,/data-consulted-source="shelf:memory"/);
   assert.match(poster,/src="\/memory.jpg"/);
-  api.tickHomeAutoplay();
-  assert.equal(api.homeConsultedPoster(data.sections[0].items[1]),poster);
   api.selectHomeShelfEntry('club','daily-a');
   poster = api.homeConsultedPoster(data.sections[1].items[0]);
   assert.match(poster,/data-click="open-home-collection-detail" data-key="daily-a" data-source="shelf:club"/);
@@ -212,7 +216,7 @@ test('consulted poster follows source-qualified selection, not independent autop
   assert.equal((fields.spotlightStage.innerHTML.match(/class="spotlight-preview"/g)||[]).length,1);
 });
 
-test('summary remains open across selection, autoplay and day changes; a new catalog starts collapsed',async()=>{
+test('summary remains open across selection and day changes; a new catalog starts collapsed',async()=>{
   const {api,fields,data} = await setup();
   const toggle = {setAttribute(name,value){this[name]=value;}};
   const body = {setAttribute(name,value){this[name]=value;},inert:true};
@@ -223,7 +227,7 @@ test('summary remains open across selection, autoplay and day changes; a new cat
   assert.equal(toggle['aria-expanded'],'true');
   assert.equal(body.inert,false);
   api.selectHomeShelfEntry('memory','memory-b');
-  api.tickHomeAutoplay();
+  api.previewHomeEntry({id:'x',title:'Resultado X'});
   assert.match(fields.spotlightStage.innerHTML,/data-summary-open="true"/);
   assert.match(fields.spotlightStage.innerHTML,/aria-hidden="false">\s*<div class="home-console-disclosure-clip"/);
   api.applyEditorialFeaturedDate('2026-09-09',{featured:[data.featured[0]]});
@@ -231,7 +235,7 @@ test('summary remains open across selection, autoplay and day changes; a new cat
   api.toggleHomeSummary();
   assert.equal(body.inert,true);
   assert.equal(body['aria-hidden'],'true');
-  api.selectPlaylistEntry('daily-a');
+  api.returnHomeProgramming();
   assert.match(fields.spotlightStage.innerHTML,/aria-hidden="true" inert/);
   api.toggleHomeSummary();
   api.setEditorialHome(data);
@@ -266,7 +270,94 @@ test('quick consultation uses source-qualified detail and never mistakes editori
   assert.doesNotMatch(html,/data-click="edit-home-shelf-entry"/);
 });
 
-test('U5 source/count/return are honest for 0, 1, 6, 20 and 100 editorial entries',async()=>{
+test('C3 previewHomeEntry shows a local work in the poster and null returns to the daily suggestion',async()=>{
+  const {api,fields,data}=await setup();
+  data.featured[0].item.page_image='/dia.jpg';
+  api.previewHomeEntry({key:'memory-b',item:{id:'memory-b',title:'Recuerdo B',year:'2000',page_image:'/b.jpg'},origin:{kind:'catalog'}});
+  let state=api.getHomePlaybackState();
+  assert.equal(state.selectionSource,'preview');
+  assert.equal(state.selectedEntryKey,'memory-b');
+  assert.equal(state.selectedItemId,'memory-b');
+  let html=fields.spotlightStage.innerHTML;
+  assert.match(html,/<span>Resultado<\/span>/);
+  assert.match(html,/>Recuerdo B<\/h3>/);
+  assert.match(html,/src="\/b.jpg"/);
+  assert.match(html,/data-click="open-detail-with-case-transition" data-id="memory-b"/);
+  assert.equal(fields.homeSelectionAnnouncement.textContent,'Consulta: Recuerdo B');
+  api.previewHomeEntry(null);
+  state=api.getHomePlaybackState();
+  assert.equal(state.selectionSource,'daily');
+  assert.equal(state.selectedEntryKey,'daily-a');
+  assert.match(fields.spotlightStage.innerHTML,/>Diaria A<\/h3>/);
+  assert.match(fields.spotlightStage.innerHTML,/src="\/dia.jpg"/);
+});
+
+test('C3 a flat external result has no local record: static poster, no detail, no personal state',async()=>{
+  const {api,fields}=await setup();
+  api.previewHomeEntry({title:'Película externa',year:'1999',page_image:'/ext.jpg',_membership:{state:'missing',item_id:null}});
+  const html=fields.spotlightStage.innerHTML;
+  assert.match(html,/>Película externa<\/h3>/);
+  assert.match(html,/src="\/ext.jpg"/);
+  assert.match(html,/spotlight-poster-trigger is-static/);
+  assert.doesNotMatch(html,/open-detail-with-case-transition|open-home-collection-detail|edit-home-shelf-entry|consultation-view/);
+  assert.doesNotMatch(html,/Disponible|Pendiente|Vista|Estado resumido/);
+  assert.match(html,/Resultado de búsqueda/);
+  // Una flat con item_id local sí es una obra del archivo.
+  api.previewHomeEntry({title:'Ya la tengo',item_id:'memory-a'});
+  assert.match(fields.spotlightStage.innerHTML,/data-click="open-detail-with-case-transition" data-id="memory-a"/);
+  assert.equal(api.getHomePlaybackState().selectedItemId,'memory-a');
+  api.previewHomeEntry({});
+  assert.equal(api.getHomePlaybackState().selectionSource,'daily');
+});
+
+test('C3 previewHomeEntry(null) without an active preview keeps a VHS chosen by hand; a preview clears the VHS mark',async()=>{
+  const {api,fields}=await setup();
+  api.selectHomeShelfEntry('memory','memory-b');
+  api.previewHomeEntry(null);
+  assert.equal(api.getHomePlaybackState().selectionSource,'shelf:memory');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
+  api.previewHomeEntry({id:'zzz',title:'Otra'});
+  assert.equal(api.getHomePlaybackState().selectionSource,'preview');
+  assert.doesNotMatch(fields.homeSections.innerHTML,/data-vhs-state="selected"/);
+  api.previewHomeEntry(null);
+  assert.equal(api.getHomePlaybackState().playlistSource,'daily');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
+});
+
+test('C3 a preview survives day refresh only until the programming is replaced',async()=>{
+  const {api,data}=await setup();
+  api.previewHomeEntry({id:'zzz',title:'Otra'});
+  api.setEditorialHome(data);
+  assert.equal(api.getHomePlaybackState().selectionSource,'daily');
+  api.renderEditorialHero();
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
+});
+
+test('homeSuggestions orders available daily first, then followed-collection gaps, without repeats',async()=>{
+  const {api,data}=await setup();
+  const entry=(key,title,origin='catalog',en_catalogo=false,id=key)=>({key,item:{id,title,year:'2001',en_catalogo},origin:{kind:origin}});
+  api.setEditorialHome({...data,
+    featured:[entry('f1','No disponible'),entry('f2','Disponible 1','catalog',true),entry('f3','Disponible 2','catalog',true)],
+    sections:[
+      {id:'a',title:'A',items:[entry('c1','Falta 1','collection'),entry('f2','Disponible 1','catalog',true),entry('s1','Estante 1')]},
+      {id:'b',title:'B',items:[entry('c2','Falta 2','collection'),entry('c1','Falta 1','collection')]}]});
+  assert.deepEqual(Array.from(api.homeSuggestions(),e=>e.item.title),['Disponible 1','Disponible 2','Falta 1','Falta 2','No disponible']);
+  assert.deepEqual(Array.from(api.homeSuggestions(3),e=>e.item.title),['Disponible 1','Disponible 2','Falta 1']);
+  assert.equal(api.homeSuggestions(99).length,5);
+  assert.equal(api.homeSuggestions(0).length,0);
+  // Una obra de catálogo y otra del Club con el mismo id no se confunden.
+  api.setEditorialHome({...data,featured:[entry('x','Local','catalog',true,'7')],sections:[{id:'a',title:'A',items:[entry('y','Del Club','collection',false,'7')]}]});
+  assert.deepEqual(Array.from(api.homeSuggestions(),e=>e.item.title),['Local','Del Club']);
+  api.setEditorialHome({...data,featured:[],sections:[]});
+  assert.equal(api.homeSuggestions().length,0);
+});
+
+test('homeSuggestions fills from the whole program when too little is available',async()=>{
+  const {api}=await setup();
+  assert.deepEqual(Array.from(api.homeSuggestions(),e=>e.item.title),['Obra del Club','Diaria A','Diaria B','Recuerdo A','Recuerdo B']);
+});
+
+test('U5 shelf selection is honest for 0, 1, 6, 20 and 100 editorial entries',async()=>{
   for (const count of [0,1,6,20,100]) {
     const {api,fields}=await setup();
     const data=sourceFixture(count);
@@ -275,17 +366,12 @@ test('U5 source/count/return are honest for 0, 1, 6, 20 and 100 editorial entrie
     assert.equal(api.activateHomeShelf('sample'),count>0);
     if (count>0) {
       api.selectHomeShelfEntry('sample',`shared-${count-1}`);
-      const html=fields.spotlightStage.innerHTML;
-      assert.equal((html.match(/data-playlist-entry=/g)||[]).length,count);
-      assert.match(html,new RegExp(`data-playlist-count>${count} ${count===1?'obra':'obras'}<`));
-      assert.match(html,/Selección del estante/);
-      assert.match(html,new RegExp(`data-long-list="${count > 6}"`));
-      assert.match(html,/Volver a programación/);
+      assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-playlist-entry=|spotlight-playlist/);
+      assert.match(fields.homeSections.innerHTML,new RegExp(`${count} ${count===1?'título':'títulos'}`));
       assert.equal(api.getHomePlaybackState().selectedEntryKey,`shared-${count-1}`);
     }
     api.returnHomeProgramming();
-    assert.match(fields.spotlightStage.innerHTML,/Cartelera de hoy/);
-    assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="home-programming-return"/);
+    assert.match(fields.spotlightStage.innerHTML,/<span>Sugerencia<\/span>/);
     api.selectHomeShelfEntry('club','shared-0');
     assert.equal(api.getHomePlaybackState().selectionSource,'shelf:club');
     assert.match(fields.spotlightStage.innerHTML,/>Club 1<\/h3>/);
@@ -293,22 +379,22 @@ test('U5 source/count/return are honest for 0, 1, 6, 20 and 100 editorial entrie
   }
 });
 
-test('U5 return preserves the daily poster and same-day control returns from a shelf',async()=>{
+test('U5 returning to programming focuses the poster only when asked and keeps the daily suggestion',async()=>{
   const {api,fields}=await setup();
-  api.tickHomeAutoplay();
-  const poster=api.getHomePlaybackState().carouselItemId;
   api.selectHomeShelfEntry('memory','memory-b');
   let focused=false;
-  fields.spotlightStage.querySelector=selector=>selector.includes('aria-pressed="true"') ? {focus(){focused=true;}} : null;
+  fields.spotlightStage.querySelector=selector=>selector==='[data-home-focus="consultation-poster"]' ? {focus(){focused=true;}} : null;
+  api.returnHomeProgramming();
+  assert.equal(focused,false);
+  api.selectHomeShelfEntry('memory','memory-b');
   api.returnHomeProgramming(true);
   assert.equal(focused,true);
-  assert.equal(api.getHomePlaybackState().carouselItemId,poster);
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
   api.activateHomeShelf('memory');
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
   await api.loadEditorialFeaturedDate('2026-09-10');
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
-  assert.equal(api.getHomePlaybackState().carouselItemId,poster);
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
 });
 
 test('U5 passive Tab does not select, and each shelf has a semantic plaque and roving stop',async()=>{
@@ -325,20 +411,19 @@ test('U5 passive Tab does not select, and each shelf has a semantic plaque and r
   assert.match(fields.homeSections.innerHTML,/data-click="home-shelf-activate" data-section-id="memory" aria-pressed="true"/);
 });
 
-test('U5 removed source recovers to daily; emptied source retains honest count and return',async()=>{
+test('U5 removed source recovers to the daily suggestion; an emptied source shows the empty desk',async()=>{
   const {api,data,fields}=await setup();
   api.selectHomeShelfEntry('memory','memory-b');
   data.sections[0].items=[];
   api.renderEditorialHero();
   assert.equal(api.getHomePlaybackState().playlistSource,'shelf:memory');
-  assert.match(fields.spotlightStage.innerHTML,/data-playlist-count>0 obras/);
-  assert.match(fields.spotlightStage.innerHTML,/No hay obras en esta fuente/);
   assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
+  assert.match(fields.spotlightStage.innerHTML,/home-desk-note/);
   data.sections.splice(0,1);
   api.renderEditorialHero();
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
-  assert.match(fields.homeSelectionAnnouncement.textContent,/Volvimos a programación/);
+  assert.match(fields.homeSelectionAnnouncement.textContent,/Volvimos a la sugerencia del día/);
 });
 
 test('U5 shelf memory survives reordering and falls back after removal',async()=>{
@@ -357,61 +442,30 @@ test('U5 shelf memory survives reordering and falls back after removal',async()=
 
 test('U5 local alignment never calls scrollIntoView or crosses a source boundary',async()=>{
   const {api,fields}=await setup();
-  const table={scrollTop:0,getBoundingClientRect:()=>({top:0,bottom:100})};
-  const row={getBoundingClientRect:()=>({top:180,bottom:200}),scrollIntoView(){assert.fail('document scroll');}};
   const spine={getBoundingClientRect:()=>({left:150,right:200}),closest:()=>null,scrollIntoView(){assert.fail('document scroll');}};
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?table:selector.startsWith('[data-playlist-entry]')?row:null;
   fields.homeSections.getBoundingClientRect=()=>({left:0,right:100});
   fields.homeSections.querySelector=selector=>{
     assert.match(selector,/data-section-id="club"/);
     return spine;
   };
   api.selectHomeShelfEntry('club','daily-a');
-  assert.equal(table.scrollTop,100);
   assert.equal(fields.homeSections.scrollLeft,100);
 });
 
-test('U5 long-list alignment keeps the focused row below sticky column headings',async()=>{
-  const {api,fields}=await setup();
-  const table={scrollTop:150,dataset:{playlistSourceId:'shelf:memory'},
-    getBoundingClientRect:()=>({top:20,bottom:286}),
-    querySelector:()=>({getBoundingClientRect:()=>({height:38})})};
-  const row={getBoundingClientRect:()=>({top:30,bottom:68})};
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?table:selector.startsWith('[data-playlist-entry]')?row:null;
-  api.selectHomeShelfEntry('memory','memory-b');
-  assert.equal(table.scrollTop,122);
-});
-
-test('U5 autoplay preserves local scrolling but changing source resets it',async()=>{
-  const {api,fields}=await setup();
-  api.selectHomeShelfEntry('memory','memory-b');
-  const oldTable={scrollTop:240,scrollLeft:12,dataset:{playlistSourceId:'shelf:memory'}};
-  const nextTable={scrollTop:0,scrollLeft:0};
-  let replaced=false,markup=fields.spotlightStage.innerHTML;
-  Object.defineProperty(fields.spotlightStage,'innerHTML',{get:()=>markup,set:value=>{markup=value;replaced=true;}});
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?(replaced?nextTable:oldTable):null;
-  api.tickHomeAutoplay();
-  assert.equal(nextTable.scrollTop,240);
-  assert.equal(nextTable.scrollLeft,12);
-  replaced=false;
-  api.selectHomeShelfEntry('club','daily-a');
-  assert.equal(nextTable.scrollTop,0);
-  assert.equal(nextTable.scrollLeft,0);
-});
-
-test('U5 resizing keeps a focused row visible without changing selection or moving focus',async()=>{
+test('U5 resizing keeps a focused spine visible without changing selection or moving focus',async()=>{
   const {api,fields,document}=await setup();
   api.selectHomeShelfEntry('memory','memory-b');
-  const table={scrollTop:100,getBoundingClientRect:()=>({top:0,bottom:100})};
-  const row={getBoundingClientRect:()=>({top:140,bottom:178}),focus(){assert.fail('resize should not refocus');}};
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?table:selector.startsWith('[data-playlist-entry]')?row:null;
+  const spine={getBoundingClientRect:()=>({left:-30,right:20}),closest:()=>null,focus(){assert.fail('resize should not refocus');}};
+  fields.homeSections.getBoundingClientRect=()=>({left:0,right:100});
+  fields.homeSections.querySelector=()=>spine;
+  fields.homeSections.scrollLeft=50;
   document.activeElement={matches:()=>true};
   api.handleHomeResize();
-  assert.equal(table.scrollTop,178);
+  assert.equal(fields.homeSections.scrollLeft,20);
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
   document.activeElement={matches:()=>false};
   api.handleHomeResize();
-  assert.equal(table.scrollTop,178);
+  assert.equal(fields.homeSections.scrollLeft,20);
 });
 
 test('U5 a delayed day response cannot replace a newer deliberate shelf selection',async()=>{

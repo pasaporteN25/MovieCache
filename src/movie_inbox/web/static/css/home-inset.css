@@ -12,7 +12,6 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 #homeView .spotlight { position: relative; margin-bottom: 8px; }
 #homeView .spotlight-bar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 #homeView .spotlight-bar:has(:focus-visible) { position: relative; width: auto; height: auto; clip-path: none; padding: 10px 24px; }
-#homeView .spotlight-bar .spotlight-date-control-mobile { display: none; }
 #homeView .home-shelf-tape { min-height: 0; min-width: 0; }
 #homeView .home-feedback { margin: 12px 24px; padding: 12px; color: #efce92; background: #05151d; }
 #homeView .home-feedback button { margin-left: 12px; }
@@ -21,12 +20,6 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 #homeView .home-loading-status strong { color: #f0ddba; font: 400 20px/1.3 var(--font-home-plaque); }
 #homeView .home-loading-status > span { font-size: 12px; color: #a4cdd0; }
 #homeView .home-loading-status::before { content: ''; position: absolute; left: 12px; top: 21px; width: 6px; height: 6px; border-radius: 50%; background: #edc382; animation: home-loading-signal 1.8s ease-in-out infinite; }
-#homeView .home-loading-rows { display: grid; grid-template-rows: repeat(6, minmax(38px,1fr)); }
-#homeView .home-loading-rows > span { display: flex; align-items: center; gap: 24px; min-height: 38px; padding: 12px; border-bottom: 1px solid #16323a; }
-#homeView .home-loading-rows > span::before { content: ''; width: 12px; height: 8px; background: #67563b; }
-#homeView .home-loading-rows > span::after { content: ''; width: 42%; height: 8px; background: #25414a; }
-#homeView .home-loading-rows > span:nth-child(2n)::after { width: 62%; }
-#homeView .home-loading-rows > span:nth-child(3n)::after { width: 32%; }
 #homeView .home-loading-summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 100px; padding: 16px; }
 #homeView .home-loading-summary > div { display: grid; gap: 12px; width: min(45%,300px); }
 #homeView .home-loading-summary span { display: block; height: 12px; background: #25414a; }
@@ -45,7 +38,7 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 @media(prefers-reduced-motion:reduce) { #homeView .home-loading-status::before { animation: none; } }
 @media(forced-colors:active) {
   #homeView :is(.home-loading-poster, .home-loading-plaque, .home-loading-tapes > span) { border-color: CanvasText; }
-  #homeView .home-loading-rows > span::after, #homeView .home-loading-summary span { background: GrayText; }
+  #homeView .home-loading-summary span { background: GrayText; }
 }
 #homeView button,
 #homeView select { font: inherit; color: inherit; }
@@ -56,7 +49,7 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 #homeView .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 #homeView select { padding: 7px 10px; background: #06121a; border: 1px solid #9f8258; max-width: 100%; }
 #homeView .spotlight-ambience { display: none; }
-#homeView .spotlight-layout { --home-poster-width: clamp(206px,13.6vw,274px); display: grid; grid-template-columns: var(--home-poster-width) minmax(0,1fr) var(--home-poster-width); gap: 16px; min-height: 484px; align-items: start; align-content: start; }
+#homeView .spotlight-layout { --home-poster-width: clamp(206px,13.6vw,274px); display: grid; grid-template-columns: minmax(0,1fr) var(--home-poster-width); gap: 16px; min-height: 484px; align-items: start; align-content: start; }
 #homeView .spotlight-selector { position: relative; min-width: 0; width: 100%; aspect-ratio: 274/436; align-self: start; background: #020d13; }
 #homeView .spotlight-selector::before { content: ''; position: absolute; inset: 0; background: url('/static/img/poster-marquee-frame-v1.png') center / 100% 107.4% no-repeat; pointer-events: none; box-shadow: inset 5px 5px 10px #000c, inset -5px -2px 6px #000c; }
 #homeView .spotlight-selector-heading { position: absolute; z-index: 2; top: 2.2%; left: 17%; width: 66%; height: 8%; display: grid; place-items: center; text-align: center; }
@@ -65,48 +58,21 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 #homeView .spotlight-poster-trigger { width: 100%; height: 100%; border: 0; padding: 0; background: #030809; display: block; }
 #homeView .spotlight-poster { width: 100%; height: 100%; object-fit: contain; display: block; }
 #homeView .spotlight-poster-fallback { display: grid; place-items: center; height: 100%; color: #dac499; background: #07131a; }
+/* Mostrador: buscador a la izquierda, un solo póster a la derecha y la consola debajo.
+   #homeConsultation se reescribe en cada consulta; el buscador (#homeSearchSlot) no. */
+#homeView .home-consultation { display: contents; }
+#homeView .home-search-slot { grid-column: 1; grid-row: 1; min-width: 0; align-self: stretch; }
+#homeView .home-search-slot:empty { min-height: 160px; border: 1px solid #28505b; background: #020d13; box-shadow: inset 0 6px 14px #000a; }
+#homeView .home-consulted-poster { grid-column: 2; grid-row: 1; }
+#homeView .spotlight-preview { grid-row: 2; }
+#homeView .spotlight-poster-trigger.is-static { cursor: default; }
+#homeView .home-desk-note { grid-column: 2; grid-row: 1; align-self: center; display: grid; gap: 8px; padding: 16px; border: 1px solid #28505b; background: #020d13; }
+#homeView .home-desk-note strong { font: 400 20px/1.3 var(--font-home-plaque); color: #f0ddba; }
+#homeView .home-desk-note span { font-size: 12px; color: #a4cdd0; }
+#homeView .home-loading-hero .home-loading-status { grid-column: 1; grid-row: 1; align-self: start; z-index: 1; }
 #homeView .home-consulted-poster .spotlight-poster-fallback { padding: 12px; text-align: center; font-size: 13px; line-height: 1.5; overflow: auto; }
 #homeView .home-consulted-poster .spotlight-poster-fallback small { display: block; margin-top: 12px; color: #aac8cb; }
-#homeView .spotlight-viewport { min-width: 0; min-height: 0; align-self: stretch; display: grid; grid-template-rows: auto minmax(0,1fr); background: #020d13; }
-#homeView .spotlight-playlist-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 8px 10px; border-bottom: 1px solid #28505b; font-size: 10px; }
-#homeView .spotlight-playlist-source { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 12px; min-width: 0; flex: 1 1 210px; }
-#homeView .spotlight-playlist-source > span { grid-column: 1 / -1; }
-#homeView .spotlight-playlist-source strong { overflow-wrap: anywhere; }
-#homeView .spotlight-playlist-source small { font-size: 10px; color: #a4cdd0; white-space: nowrap; }
-#homeView .spotlight-playlist-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 6px 16px; margin-left: auto; }
-#homeView .home-programming-return { width: auto; min-height: 30px; padding: 4px 0; border: 0; background: none; color: #efd09b; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
-#homeView .home-programming-return:hover { color: #ffe7ba; }
-#homeView .spotlight-playlist-source > span,
-#homeView .spotlight-date-control-label { color: #9cafb2; text-transform: uppercase; }
-#homeView .spotlight-playlist-source strong { color: #9de4e8; text-transform: uppercase; font-weight: 400; }
-#homeView .spotlight-date-control { display: flex; align-items: center; gap: 9px; }
-#homeView .spotlight-date-tabs { display: flex; gap: 4px; }
-#homeView .spotlight-date-tabs button { padding: 4px 9px; border: 1px solid #615744; background: #101b1e; color: #e9cb96; }
-#homeView .spotlight-date-tabs [aria-pressed=true] { background: #d6b174; color: #17130d; }
-#homeView .spotlight-date { display: none; }
-#homeView .spotlight-table-wrap { min-width: 0; overflow: auto; }
 /* Extended payloads scroll within the display; editorial six-row lists stay whole. */
-#homeView .spotlight-table-wrap[data-long-list="true"] { block-size: max(266px, calc(var(--home-poster-width) * 1.59124 - 72px)); overscroll-behavior-y: contain; scrollbar-width: thin; scrollbar-color: #a08760 #061019; }
-#homeView .spotlight-table-wrap[data-long-list="true"] .spotlight-playlist { height: auto; }
-#homeView .spotlight-playlist thead th { position: sticky; top: 0; z-index: 1; background: #020d13; box-shadow: inset 0 -1px #28505b; }
-#homeView .spotlight-playlist { border-collapse: collapse; width: 100%; height: 100%; min-width: 0; table-layout: fixed; font-size: 12px; }
-#homeView .spotlight-playlist th { font-size: 10px; text-align: left; text-transform: uppercase; color: #85d3dc; }
-#homeView .spotlight-playlist td,
-#homeView .spotlight-playlist th { height: 38px; padding: 9px 10px; border-bottom: 1px solid #16323a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#homeView .spotlight-playlist th:first-child { width: 38px; }
-#homeView .spotlight-playlist th:nth-child(2) { width: auto; }
-#homeView .spotlight-playlist th:nth-child(3) { width: 18%; }
-#homeView .spotlight-playlist th:nth-child(4) { width: 60px; }
-#homeView .spotlight-playlist th:nth-child(5) { width: 86px; }
-#homeView .spotlight-playlist th:nth-child(7) { width: 84px; }
-#homeView .playlist-entry { cursor: pointer; }
-#homeView .playlist-entry.is-selected { background: #431a32; color: #ffe1ef; }
-#homeView .playlist-entry.is-on-air:not(.is-selected) { background: #1c211d; }
-#homeView .playlist-entry:hover { background: #12303a; }
-#homeView .playlist-entry:focus-visible { outline-offset: -3px; }
-#homeView .playlist-index { color: #edc382; }
-#homeView .playlist-entry.is-selected .playlist-position { display: none; }
-#homeView .playlist-entry.is-selected .playlist-index::before { content: '▸'; color: #ff87bc; }
 /* One consultation surface spans both poster roles within the same aperture. */
 #homeView .spotlight-preview { grid-column: 1 / -1; min-width: 0; border-top: 1px solid #b8945e; }
 #homeView .home-console-header { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 16px 32px; padding: 16px; }
@@ -185,23 +151,17 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 #homeView .home-shelf-navigation { min-height: 38px; }
 #homeView .home-shelf-scroll-control { min-height: 34px; }
 #homeView .home-videotheque-heading { padding-top: 8px; }
-@media(max-width:1600px) and (min-width:861px) {
-  #homeView .spotlight-playlist :is(th,td):nth-child(3),#homeView .spotlight-playlist :is(th,td):nth-child(6),#homeView .spotlight-playlist :is(th,td):nth-child(7) { display: none; }
-}
 @media(max-width:1100px) and (min-width:861px) {
   #homeView .spotlight-layout { --home-poster-width: 160px; min-height: 0; }
-  #homeView .spotlight-playlist :is(th,td):nth-child(5) { display: none; }
 }
 @media(max-width:860px) {
-  #homeView .spotlight-layout { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px 8px; height: auto; min-height: 0; }
+  #homeView .spotlight-layout { grid-template-columns: minmax(0,1fr); gap: 16px 8px; height: auto; min-height: 0; }
   #homeView .spotlight-selector { width: min(100%,214px); justify-self: center; }
-  #homeView .home-consulted-poster { grid-column: 2; grid-row: 1; }
+  #homeView .home-search-slot { grid-column: 1; grid-row: 1; }
+  #homeView .home-consulted-poster { grid-column: 1; grid-row: 2; }
+  #homeView .spotlight-preview { grid-row: 3; }
+  #homeView .home-desk-note { grid-column: 1; grid-row: 2; }
   #homeView .spotlight-selector-heading span { font-size: 12px; }
-  #homeView .spotlight-viewport { grid-column: 1 / -1; grid-row: 2; display: block; }
-  #homeView .spotlight-playlist { height: auto; }
-  #homeView .spotlight-table-wrap[data-long-list="true"] { block-size: 266px; }
-  #homeView .spotlight-playlist :is(th,td):nth-child(3),#homeView .spotlight-playlist :is(th,td):nth-child(n+5) { display: none; }
-  #homeView .spotlight-playlist-head { gap: 8px; padding-inline: 4px; }
   #homeView .home-console-header { grid-template-columns: minmax(0,1fr); gap: 12px; padding: 16px 0; }
   #homeView .spotlight-copy h3 { font-size: 25px; }
   #homeView .spotlight-preview-actions { justify-content: space-between; gap: 12px; }
