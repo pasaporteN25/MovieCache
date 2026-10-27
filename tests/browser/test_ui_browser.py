@@ -3311,10 +3311,12 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         search = page.locator("#curationQueueSearch")
         search.fill("akira")
+        page.wait_for_function("document.querySelectorAll('.curation-queue-item').length === 1")
         self.assertEqual(page.locator(".curation-queue-item").count(), 1)
         self.assertIn("Ákira", page.locator(".curation-queue-item").inner_text())
 
         search.fill("")
+        page.wait_for_function("document.querySelectorAll('.curation-queue-item').length === 2")
         self.assertEqual(page.locator(".curation-queue-item").count(), 2)
         selected_before = page.locator(".curation-queue-item.selected").get_attribute(
             "data-curation-case"
