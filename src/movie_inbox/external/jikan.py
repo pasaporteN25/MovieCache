@@ -29,6 +29,15 @@ class JikanAdapter:
             return []
         if intent.source and intent.source != self.name:
             return []
+        if intent.source == self.name:
+            # [IP] A pasted MyAnimeList address resolves to that anime only; the
+            # slug is not a title to search for, and manga pages are not anime.
+            mal_id = jikan_anime_id(intent.canonical_url)
+            if not mal_id:
+                return []
+            row = fetch_json(f"{JIKAN_API_BASE_URL}/anime/{mal_id}/full")
+            parsed = jikan_anime_result(row.get("data"))
+            return [parsed] if parsed is not None and parsed["mal_id"] == mal_id else []
         lookup = intent.title or query.strip()
         if not lookup:
             return []
