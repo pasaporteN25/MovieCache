@@ -563,6 +563,44 @@ Los bordes son finos, violetas o cyan según contexto. Las barras laterales de c
 - **Don't** ocultar disponibilidad, intención de ver y memoria personal detrás de metadata externa.
 
 
+## Inicio como mostrador de búsqueda (IP1/IP2/IP3) — 2026-10-27
+
+Implementado, sobre el mundo existente de Home (sin rediseño de paleta):
+
+- Dos columnas en escritorio: `#homeSearchSlot` (buscador y panel de sección) y
+  `#homeConsultation` (un único póster). Se quitaron el carrusel izquierdo, el autoplay,
+  la tabla de programación, los controles Hoy/Ayer y, en IP3, la consola inferior
+  (título, metadatos, Acceso/Estado, Resumen, «Abrir ficha», «Editar mi ficha»). El
+  estante VHS queda debajo sin cambios. El encabezado del póster dice «Sugerencia»,
+  «Resultado» o «Tu selección».
+- El póster de una obra local o del Club es un botón que abre su ficha (nombre accesible
+  «Ver ficha de <título>»; `#homeSelectionAnnouncement` anuncia «Consulta: <título>»). El de un
+  resultado externo es estático. Sinopsis, créditos y «Editar mi ficha» se alcanzan desde la ficha.
+- **Cartelera +20 %:** el ancho del póster pasa de `clamp(206px, 13.6vw, 274px)` a
+  `clamp(248px, 16.3vw, 328px)` (1280 px: 206 → 248; 1920 px: 261 → 313); entre 861 y
+  1100 px de 160 a 192 px; en móvil de `min(100%, 214px)` a `min(100%, 256px)`. La
+  proporción 274:436 no cambia. Se quitó el `min-height: 484px` del mostrador, que
+  existía para alojar la consola: ahora lo fija el póster (a 1280 px, 395 px de alto).
+- **Sección seleccionada:** al elegir un VHS (`selectionSource` `shelf:<id>`) la placa del
+  estante y el lomo se resaltan con el rosa de los lomos elegidos (`#e980b3`: aro de 2 px
+  y resplandor, sin paleta nueva; `data-selected="true"` en la bahía). Bajo el campo, un
+  panel compacto muestra «Sección seleccionada», el título, «N títulos», «Ver colección»
+  si la sección tiene `action` y «Volver a la sugerencia». «Al azar» usa el mismo panel
+  sin «Ver colección». En la sugerencia del día muestra una línea de contexto; un
+  resultado de búsqueda no lo muestra. El panel (`#homeSectionPanel`) es hermano del
+  montaje del buscador (`#homeSearchMount`): reescribirlo nunca toca el campo ni su foco.
+- Buscador con patrón combobox (`aria-expanded`, `aria-activedescendant`, grupos con
+  nombre, `role="status"` para conteos). Vacío: «Recientes» (5, borrables, en
+  `localStorage`) y «Sugerencias» (3 a 5). Escribiendo: «En tu colección» y «Para
+  agregar» (3 externos desde 3 caracteres). Estados por fila: «Ya la tenés», «+ Pendiente»,
+  «Revisar». Flechas mueven el póster, Escape lo devuelve a la sugerencia, `/` enfoca.
+- Móvil (≤860 px): campo a ancho completo; con el desplegable abierto ocupa la pantalla,
+  el póster y el panel se ocultan. En escritorio el panel se oculta mientras el desplegable
+  está abierto. Sin scroll lateral a 320 px.
+- Catálogo vacío: el buscador reemplaza el llamado principal; «Importar lista» y
+  «Explorar Club» quedan como acciones secundarias.
+- Evidencia en `docs/design/home-search-desk-v1/` (incluye `section-*.png`, con un VHS elegido).
+
 ## Caja y editor VHS — 2026-09-29
 
 Dirección aprobada: caja negra gastada, cinta de papel crema y título con fibrón.

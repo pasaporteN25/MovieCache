@@ -76,5 +76,4 @@ body:has(#homeView:not([hidden])) main {
   #homeView .spotlight-layout::after,
   #homeView .spotlight-empty::after,
   #homeView .home-empty-state::after { background: Canvas; }
-  #homeView .playlist-entry.is-selected { outline: 2px solid Highlight; outline-offset: -2px; }
 }

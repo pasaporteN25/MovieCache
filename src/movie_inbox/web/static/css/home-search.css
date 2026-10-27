@@ -1,0 +1,55 @@
+/* Buscador de Inicio (IP1/IP2). Usa los tokens globales; sin scroll lateral a 320 px. */
+.hs-root { position: relative; display: grid; gap: 8px; min-width: 0; max-width: 100%; font-family: var(--font-body); color: var(--text-primary); }
+.hs-label { font-family: var(--font-label); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-field-label); overflow-wrap: anywhere; }
+.hs-input { width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 14px; font: inherit; font-size: 1.1rem; color: var(--text-primary);
+  background: var(--surface-control); border: 2px solid var(--control-border); border-radius: var(--radius-control); }
+.hs-input::placeholder { color: var(--text-placeholder); }
+.hs-input:focus-visible { outline: var(--focus-ring); outline-offset: 2px; border-color: var(--teal); }
+.hs-panel { box-sizing: border-box; max-width: 100%; max-height: min(60vh, 520px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+  background: var(--surface-panel); border: 1px solid var(--line); border-radius: var(--radius-result); padding: 6px; display: grid; align-content: start; gap: 6px; }
+.hs-panel[hidden] { display: none; }
+.hs-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
+.hs-group-label { font-family: var(--font-label); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.hs-clear, .hs-remove { font: inherit; color: var(--text-secondary); background: none; border: 0; cursor: pointer; padding: 4px 8px; min-height: 32px; border-radius: var(--radius-control); }
+.hs-clear { font-size: 0.8rem; text-decoration: underline; }
+.hs-clear:hover, .hs-remove:hover { color: var(--text-primary); }
+.hs-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px; border-radius: var(--radius-control); cursor: pointer; min-width: 0; }
+.hs-row:hover { background: var(--surface-quiet); }
+.hs-row[aria-selected="true"] { background: var(--surface-shade); outline: 2px solid var(--teal); outline-offset: -2px; }
+.hs-text { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; overflow-wrap: anywhere; }
+.hs-meta, .hs-source { font-size: 0.8rem; color: var(--text-secondary); }
+.hs-source { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-cyan-soft); }
+.hs-note { flex-basis: 100%; font-size: 0.8rem; color: var(--text-danger-soft); }
+.hs-thumb { flex: 0 0 auto; width: 32px; height: 48px; object-fit: cover; border-radius: var(--radius-control); background: var(--surface-deep); }
+.hs-thumb-empty { display: inline-block; border: 1px solid var(--line); }
+.hs-state { flex: 0 0 auto; font-family: var(--font-label); font-size: 0.75rem; padding: 4px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-control); color: var(--text-soft); white-space: nowrap; }
+.hs-state-missing { color: var(--on-accent); background: var(--teal); border-color: var(--teal); font-weight: 700; }
+.hs-state-review { color: var(--text-gold-soft); border-color: var(--gold); }
+.hs-state-added, .hs-state-existing, .hs-state-present { color: var(--text-cyan-soft); }
+.hs-state-error { color: var(--text-danger-soft); border-color: var(--danger-border); }
+.hs-footer { border-top: 1px solid var(--line); padding-top: 4px; }
+.hs-expand { font-weight: 700; color: var(--text-highlight); }
+.hs-warning, .hs-empty { margin: 0; padding: 6px 10px; font-size: 0.85rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+.hs-warning { color: var(--text-gold-soft); }
+.hs-status { margin: 0; min-height: 1.2em; font-size: 0.8rem; color: var(--text-secondary); }
+/* Cabecera del campo: etiqueta y, sólo en móvil con el desplegable abierto, «Cerrar». */
+.hs-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.hs-label { flex: 1 1 0; min-width: 0; }
+.hs-close { display: none; width: auto; min-width: 0; font: inherit; font-size: 0.85rem; color: var(--text-primary); background: var(--surface-control); border: 1px solid var(--control-border); border-radius: var(--radius-control); min-height: 44px; padding: 0 14px; cursor: pointer; }
+@media (max-width: 860px) {
+  .hs-root, .hs-input { width: 100%; }
+  .hs-row { min-height: 48px; }
+  /* Con el desplegable abierto el buscador ocupa la pantalla y el póster se oculta. */
+  .hs-root[data-open="true"] { position: fixed; inset: 0; z-index: 200; box-sizing: border-box; width: auto; padding: 12px 12px 0;
+    grid-template-rows: auto auto minmax(0, 1fr) auto; background: var(--surface-app); }
+  /* <main> (z-index: 1) y .spotlight-layout (isolation: isolate) forman contextos de apilado:
+     suben mientras el overlay está abierto para quedar sobre la cabecera, la navegación
+     inferior y los estantes. */
+  main:has(.hs-root[data-open="true"]) { z-index: 300; }
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) { z-index: 300; }
+  .hs-root[data-open="true"] .hs-close { display: inline-block; flex: 0 0 auto; }
+  .hs-root[data-open="true"] .hs-panel { max-height: none; min-height: 0; }
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .home-consulted-poster,
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .home-desk-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .hs-root * { transition: none !important; animation: none !important; } }

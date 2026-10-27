@@ -57,6 +57,10 @@ class VhsEditorTests(unittest.TestCase):
                 page.screenshot(path=str(Path(evidence_dir) / f"synopsis-closed-{width}.png"))
             button.focus()
             page.keyboard.press("Enter")
+            page.wait_for_function(
+                "document.querySelector('.vhs-back-cover-read-more')"
+                ".getAttribute('aria-expanded') === 'true'"
+            )
             self.assertEqual(button.get_attribute("aria-expanded"), "true")
             self.assertEqual(button.inner_text(), "Leer menos")
             self.assertEqual(paragraph.evaluate("el => el.clientHeight"), collapsed["full"])
@@ -64,6 +68,10 @@ class VhsEditorTests(unittest.TestCase):
                 page.screenshot(path=str(Path(evidence_dir) / f"synopsis-open-{width}.png"))
             button.scroll_into_view_if_needed()
             page.keyboard.press("Enter")
+            page.wait_for_function(
+                "document.querySelector('.vhs-back-cover-read-more')"
+                ".getAttribute('aria-expanded') === 'false'"
+            )
             self.assertEqual(button.get_attribute("aria-expanded"), "false")
             self.assertTrue(button.evaluate("el => el === document.activeElement"))
             self.assertEqual(paragraph.evaluate("el => el.clientHeight"), collapsed["height"])

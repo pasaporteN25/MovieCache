@@ -1,15 +1,16 @@
 import { cachedImageSrc, posterVariant } from "../core/card.js";
 import { editorialRevision, loadCatalog, setEditorialRevision } from "../core/catalog-data.js";
-import { detailLinks, drawerPoster, factsPanel } from "../core/detail.js";
+import { detailLinks, drawerPoster, factsPanel, openDetail } from "../core/detail.js";
 import { fields } from "../core/fields.js";
 import { availabilityState, displayTitle, escapeAttr, escapeHtml, firstListValue, listText, localDateOffset, todayLocalDate } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
-import { goToClub, routeValuesForView, showView, syncRoute } from "../core/router.js";
-import { clubMode, setClubMode } from "../core/state.js";
+import { goHome, goToClub, goToCollectionAddWithQuery, routeValuesForView, showView, syncRoute } from "../core/router.js";
+import { clubMode, currentIdentity, currentView, setClubMode } from "../core/state.js";
 import { applyCollectionFilterDescriptor, render, resetCollectionFilters, setLastEditorialRenderRevision } from "./catalog-grid.js";
 import { clearManualSearch } from "./catalog-search.js";
 import { closeSharedDetail, openCollection } from "./club.js";
 import { homeRandomBay, homeRandomEntry } from "./home-random.js";
+import { mountHomeSearch } from "./home-search.js";
 
       export let editorialHome = { generated_for: "", featured: [], hero: null, sections: [], warnings: [] };
 
@@ -23,22 +24,17 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
       export const homeShelfSelections = new Map();
       const homeShelfSelectionKeys = new Map();
 
-      // Compatibility: spotlightIndex remains the position of the item on air.
-      // It no longer represents the row/preview selection.
-      export let spotlightIndex = 0;
-
-      export let carouselItemId = "";
       export let playlistSource = "daily";
       export let selectedItemId = "";
       export let selectedEntryKey = "";
-      // The consulted entry can belong to a shelf outside the programmed playlist.
+      // La obra consultada puede venir de un estante, del azar o del buscador.
       // Keep its source as well as its key: catalog and Club IDs can overlap.
+      // "daily" (sugerencia del día), "shelf:<id>", "random" o "preview" (buscador).
       export let selectionSource = "daily";
-      let homeAutoplayTimer = 0;
+      // Entrada que el buscador previsualiza (C3). Vive sólo mientras selectionSource === "preview".
+      let previewEntry = null;
       let homeDateRequestId = 0;
       let homeDateRequestPending = false;
-      let homeSummaryExpanded = false;
-      const HOME_AUTOPLAY_INTERVAL_MS = 6500;
       const HOME_SHELF_BAY_LIMIT = 4;
       const HOME_MOBILE_MEDIA = "(max-width: 860px)";
 
@@ -53,12 +49,10 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         activeHomeSectionId = "";
         activeShelfId = "";
         playlistSource = "daily";
-        carouselItemId = "";
         selectedItemId = "";
         selectedEntryKey = "";
         selectionSource = "daily";
-        spotlightIndex = 0;
-        homeSummaryExpanded = false;
+        previewEntry = null;
         if (fields.homeSelectionAnnouncement) fields.homeSelectionAnnouncement.textContent = "";
       }
 
@@ -83,37 +77,19 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         return index < 0 ? 0 : index;
       }
 
-      function homeDurationLabel(item) {
-        const value = item?.duration_minutes ?? item?.duration ?? item?.runtime ?? "";
-        const text = String(value).trim();
-        if (!text) return "—";
-        return /\bmin(?:uto)?s?\b/i.test(text) ? text : `${text} min`;
-      }
-
       function playlistEntries(source = playlistSource) {
         if (source === "daily" || !source) return editorialHome.featured || [];
-        // The random result is a consultation source only; the table never shows it.
+        // Al azar y el buscador son fuentes de consulta: nunca forman una lista visible.
         if (source === "random") {
           const entry = homeRandomEntry();
           return entry ? [entry] : [];
         }
+        if (source === "preview") return previewEntry ? [previewEntry] : [];
         if (source.startsWith("shelf:")) {
           const shelfId = source.slice(6);
           return editorialHome.sections.find((section, index) => homeSectionId(section, index) === shelfId)?.items || [];
         }
         return editorialHome.featured || [];
-      }
-
-      function playlistSourceLabel(source = playlistSource) {
-        if (source === "daily" || !source) return `Cartelera de ${homeDatePeriodLabel(editorialHome.generated_for).toLowerCase()}`;
-        const shelfId = source.startsWith("shelf:") ? source.slice(6) : source;
-        const section = editorialHome.sections.find((candidate, index) => homeSectionId(candidate, index) === shelfId);
-        return section?.title || "Estantería activa";
-      }
-
-      function currentPlaylistIndex(entries = playlistEntries()) {
-        if (selectionSource !== playlistSource) return -1;
-        return entries.findIndex((entry, index) => entryKey(entry, index) === selectedEntryKey);
       }
 
       function ensureHomeSelection(entries = playlistEntries()) {
@@ -134,52 +110,8 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         return entries[0];
       }
 
-      function ensureCarousel(entries = editorialHome.featured || []) {
-        if (!entries.length) {
-          carouselItemId = "";
-          spotlightIndex = 0;
-          return null;
-        }
-        let index = entries.findIndex((entry, candidateIndex) => entryKey(entry, candidateIndex) === carouselItemId);
-        if (index < 0) index = Math.max(0, Math.min(entries.length - 1, spotlightIndex));
-        spotlightIndex = index;
-        carouselItemId = entryKey(entries[index], index);
-        return entries[index];
-      }
-
       export function getHomePlaybackState() {
-        return { carouselItemId, playlistSource, selectedItemId, selectedEntryKey, selectionSource, activeShelfId, spotlightIndex };
-      }
-
-      export function tickHomeAutoplay() {
-        if (typeof document !== "undefined" && document.visibilityState === "hidden") return false;
-        if (fields.homeView?.hidden) return false;
-        // Keep dialog openers connected, including the consulted Club poster.
-        if (document.querySelector?.("dialog[open]")) return false;
-        if (fields.spotlightStage?.querySelector(".spotlight-poster-trigger:focus")) return false;
-        if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return false;
-        const featured = editorialHome.featured || [];
-        if (featured.length < 2) return false;
-        ensureCarousel(featured);
-        const currentIndex = featured.findIndex((entry, index) => entryKey(entry, index) === carouselItemId);
-        spotlightIndex = (Math.max(0, currentIndex) + 1) % featured.length;
-        carouselItemId = entryKey(featured[spotlightIndex], spotlightIndex);
-        renderEditorialHero();
-        return true;
-      }
-
-      function syncHomeAutoplay() {
-        if (homeAutoplayTimer) {
-          window.clearInterval(homeAutoplayTimer);
-          homeAutoplayTimer = 0;
-        }
-        if (typeof window === "undefined" || typeof document === "undefined") return;
-        if (document.visibilityState === "hidden" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-        homeAutoplayTimer = window.setInterval(tickHomeAutoplay, HOME_AUTOPLAY_INTERVAL_MS);
-      }
-
-      export function handleHomeVisibilityChange() {
-        syncHomeAutoplay();
+        return { playlistSource, selectedItemId, selectedEntryKey, selectionSource, activeShelfId };
       }
 
       export async function goToHomeCollection(collectionId) {
@@ -313,15 +245,50 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         };
       }
 
+      // Buscador de Inicio (IP2). Se monta una sola vez en #homeSearchMount (dentro de #homeSearchSlot): los datos nuevos
+      // sólo refrescan sus sugerencias, así que escribir o tener el foco no se interrumpe.
+      let homeSearch = null;
+
+      export function ensureHomeSearch(emptyCatalog = false) {
+        if (homeSearch) {
+          homeSearch.setSuggestions?.(homeSuggestions());
+          homeSearch.setEmptyCatalog?.(emptyCatalog);
+          return homeSearch;
+        }
+        const slot = fields.homeSearchMount;
+        if (!slot) return null;
+        homeSearch = mountHomeSearch(slot, {
+          username: currentIdentity?.user?.username || "",
+          suggestions: homeSuggestions(),
+          emptyCatalog,
+          onPreview: previewHomeEntry,
+          // C4: Ampliar abre Colección en modo Agregar con la consulta; Atrás vuelve a Inicio.
+          onExpand: (query) => goToCollectionAddWithQuery(query),
+          onOpenItem: (id) => openDetail(id),
+          onAdded: () => { Promise.resolve(loadCatalog()).catch(() => {}); }
+        }) || null;
+        return homeSearch;
+      }
+
+      // `/` y «Buscar» en Inicio. Desde otra vista (o con una ficha abierta) se vuelve a
+      // Inicio sin mover el foco a su título, y el foco queda en el campo.
+      export function focusHomeSearch() {
+        const needsHome = currentView !== "home" || fields.homeView.hidden;
+        if (needsHome) goHome({ focusHeading: false });
+        const search = ensureHomeSearch(!fields.homeEmpty.hidden);
+        search?.focus();
+        return Boolean(search);
+      }
+
       export function renderEditorialHome() {
         renderEditorialHero();
         renderEditorialSections();
         const hasSections = editorialHome.sections.some((section) => section.items?.length);
+        ensureHomeSearch(!(editorialHome.featured.length || hasSections));
         fields.homeEmpty.hidden = Boolean(editorialHome.featured.length || hasSections);
         fields.homeVideothequeHeading.hidden = !hasSections;
         fields.homeFurniture.hidden = !hasSections;
         fields.homeSections.hidden = !hasSections;
-        syncHomeDateControl();
         const collectionsUnavailable = editorialHome.warnings.includes("collections_unavailable");
         const historyUnavailable = editorialHome.warnings.includes("home_history_unavailable");
         fields.homeFeedback.hidden = !(collectionsUnavailable || historyUnavailable);
@@ -330,236 +297,116 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
           : historyUnavailable
             ? `No pudimos guardar el historial de la cartelera. Las recomendaciones de hoy siguen disponibles. <button type="button" data-click="refresh-home">Reintentar</button>`
             : "";
-        syncHomeAutoplay();
+      }
+
+      // El mostrador es una sola pieza: el buscador (#homeSearchSlot) vive fuera de la
+      // zona que se reescribe. Sólo se renderiza el póster consultado y su consola.
+      function consultationHost() {
+        return fields.spotlightStage.querySelector?.("#homeConsultation") || fields.spotlightStage;
       }
 
       export function renderEditorialHero() {
-        const activeElement = fields.spotlightStage?.contains(document.activeElement) ? document.activeElement : null;
-        const focusIndex = activeElement?.dataset?.index || "";
-        const focusEntryKey = activeElement?.dataset?.entryKey || "";
-        const focusAction = activeElement?.dataset?.click || "";
+        const host = consultationHost();
+        const activeElement = host.contains(document.activeElement) ? document.activeElement : null;
         const focusSurface = activeElement?.dataset?.homeFocus || "";
-        const oldTable = fields.spotlightStage?.querySelector(".spotlight-table-wrap");
-        const tableScrollTop = oldTable?.scrollTop || 0;
-        const tableScrollLeft = oldTable?.scrollLeft || 0;
-        const featured = editorialHome.featured || [];
-        const carouselEntry = ensureCarousel(featured);
         if (playlistSource.startsWith("shelf:") && !homeSectionById(playlistSource.slice(6))) {
           playlistSource = "daily";
           selectionSource = "daily";
           selectedEntryKey = "";
-          fields.homeSelectionAnnouncement.textContent = "El estante ya no está disponible. Volvimos a programación.";
+          fields.homeSelectionAnnouncement.textContent = "El estante ya no está disponible. Volvimos a la sugerencia del día.";
         }
-        const sourceEntries = playlistEntries();
-        const selectedEntry = ensureHomeSelection(sourceEntries);
-        fields.spotlightStage.classList.toggle("is-empty", !carouselEntry?.item && !selectedEntry?.item);
-        if (!carouselEntry?.item && !selectedEntry?.item && playlistSource === "daily") {
-          fields.spotlightStage.innerHTML = `<div class="spotlight-empty">
-            ${homeDateControlMarkup()}
+        const selectedEntry = ensureHomeSelection(playlistEntries());
+        fields.spotlightStage.classList.toggle("is-empty", !selectedEntry?.item);
+        renderHomeSectionPanel();
+        fields.spotlightStage.querySelector?.(".spotlight-layout")?.classList.remove("home-loading-hero");
+        if (!selectedEntry?.item) {
+          host.innerHTML = `<div class="home-desk-note">
             <strong>La pantalla espera una obra disponible</strong>
-            <span>Vinculá un archivo o declará una obra disponible para encabezar la cartelera del día.</span>
+            <span>Vinculá un archivo o declará una obra disponible para que Inicio te sugiera qué ver.</span>
           </div>`;
-          if (activeElement) focusHomeProgrammingControl();
           return;
         }
-        const carouselItem = carouselEntry?.item || {};
-        const carouselTitle = displayTitle(carouselItem) || "Sin título";
-        const carouselPoster = String(carouselItem.page_image || "").trim();
-        const sourceLabel = playlistSourceLabel();
-        const carouselPosterFallback = `<div class="spotlight-poster-fallback poster-${posterVariant(carouselItem.id || carouselTitle)}" aria-hidden="true"${carouselPoster ? " hidden" : ""}><span>Sin portada</span></div>`;
-        const posterMarkup = carouselPoster
-          ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(carouselPoster))}" alt="Portada de ${escapeAttr(carouselTitle)}" loading="eager" fetchpriority="high" decoding="async">${carouselPosterFallback}`
-          : carouselPosterFallback;
-        const selector = `<aside class="spotlight-selector" aria-label="Cartelera automática">
-          <div class="spotlight-selector-heading">
-            <span>${escapeHtml(homeDatePeriodLabel(editorialHome.generated_for) === "Archivo" ? "Del archivo" : `${homeDatePeriodLabel(editorialHome.generated_for)} en cartel`)}</span>
-          </div>
-          <div class="spotlight-poster-card">
-            <button class="spotlight-poster-trigger" type="button" data-click="spotlight-select" data-index="${spotlightIndex}" aria-label="Seleccionar ${escapeAttr(carouselTitle)} de la cartelera"${featured.length > 1 ? ' aria-describedby="spotlight-navigation-help"' : ""}>
-              ${posterMarkup}
-            </button>
-          </div>
-          ${featured.length > 1 ? `<span id="spotlight-navigation-help" class="sr-only">Recomendación ${spotlightIndex + 1} de ${featured.length}. Usá las flechas para cambiar de portada, Inicio o Fin para ir a los extremos y Enter para seleccionar. La rotación se pausa mientras la portada tiene el foco.</span>` : ""}
-        </aside>`;
-        const selectedPlaylistIndex = currentPlaylistIndex(sourceEntries);
-        const tableRows = sourceEntries.map((entry, index) => {
-          const item = entry?.item || {};
-          const key = entryKey(entry, index);
-          const itemId = entryItemId(entry);
-          const selected = index === selectedPlaylistIndex;
-          const onAir = key === carouselItemId && playlistSource === "daily";
-          const genres = listText(item.genres, 2) || "—";
-          const directors = listText(item.directors, 2) || "—";
-          const duration = homeDurationLabel(item);
-          return `<tr role="row" class="playlist-entry${selected ? " is-selected" : ""}${onAir ? " is-on-air" : ""}" data-playlist-entry="${escapeAttr(key)}" data-entry-key="${escapeAttr(key)}" data-item-id="${escapeAttr(itemId)}" data-entry-index="${index}" data-click="playlist-select" tabindex="${index === Math.max(0, selectedPlaylistIndex) ? "0" : "-1"}" aria-selected="${selected}" aria-label="${escapeAttr(`${displayTitle(item) || "Sin título"}. Dirección: ${directors}. ${item.year || "Año desconocido"}. ${item.kind || "Película"}. ${genres}. ${duration}`)}">
-            <td class="playlist-index"><span class="playlist-position">${String(index + 1).padStart(2, "0")}</span></td>
-            <td class="playlist-title">${escapeHtml(displayTitle(item) || "Sin título")}</td>
-            <td class="playlist-director">${escapeHtml(directors)}</td>
-            <td>${escapeHtml(item.year || "—")}</td>
-            <td>${escapeHtml(item.kind || "película")}</td>
-            <td>${escapeHtml(genres)}</td>
-            <td>${escapeHtml(duration)}</td>
-          </tr>`;
-        }).join("");
-        fields.spotlightStage.innerHTML = `<div class="spotlight-layout">
-          ${selector}
-          <div class="spotlight-viewport">
-            <div class="spotlight-playlist-head">
-              <div class="spotlight-playlist-source"><span>${playlistSource === "daily" ? "Programación" : "Selección del estante"}</span><strong data-playlist-source>${escapeHtml(sourceLabel)}</strong><small data-playlist-count>${sourceEntries.length} ${sourceEntries.length === 1 ? "obra" : "obras"}</small></div>
-              <div class="spotlight-playlist-controls">
-                ${playlistSource !== "daily" ? '<button type="button" class="home-programming-return" data-click="home-programming-return" data-home-focus="programming-return">Volver a programación</button>' : ""}
-                ${homeDateControlMarkup()}
-              </div>
-            </div>
-            <div class="spotlight-table-wrap" data-playlist-source-id="${escapeAttr(playlistSource)}" data-long-list="${sourceEntries.length > 6}">
-              <table class="spotlight-playlist" data-row-count="${Math.min(sourceEntries.length, 6)}" role="grid" aria-label="Playlist de ${escapeAttr(sourceLabel)}">
-                <thead><tr><th scope="col">#</th><th scope="col">Título</th><th scope="col">Director</th><th scope="col">Año</th><th scope="col">Tipo</th><th scope="col">Géneros</th><th scope="col">Duración</th></tr></thead>
-                <tbody>${tableRows || `<tr><td colspan="7" class="playlist-empty">No hay obras en esta fuente.</td></tr>`}</tbody>
-              </table>
-            </div>
-          </div>
-          ${homeConsultedPoster(selectedEntry)}
-          ${homeSelectionPreview(selectedEntry)}
-        </div>`;
-        const nextTable = fields.spotlightStage.querySelector(".spotlight-table-wrap");
-        if (nextTable) {
-          const sameSource = oldTable?.dataset?.playlistSourceId === playlistSource;
-          nextTable.scrollTop = sameSource ? tableScrollTop : 0;
-          nextTable.scrollLeft = sameSource ? tableScrollLeft : 0;
-        }
-        if (activeElement && fields.spotlightStage.contains(activeElement) === false) {
-          const focusTarget = focusSurface
-            ? fields.spotlightStage.querySelector(`[data-home-focus="${CSS.escape(focusSurface)}"]`)
-            : focusEntryKey
-            ? oldTable?.dataset?.playlistSourceId === playlistSource
-              ? fields.spotlightStage.querySelector(`[data-playlist-entry][data-entry-key="${CSS.escape(focusEntryKey)}"]`)
-              : null
-            : focusIndex
-              ? fields.spotlightStage.querySelector(`[data-click="${CSS.escape(focusAction || "spotlight-select")}"][data-index="${CSS.escape(focusIndex)}"]`)
-              : focusAction
-                ? fields.spotlightStage.querySelector(`[data-click="${CSS.escape(focusAction)}"]`)
-                : null;
-          if (focusTarget) focusTarget.focus({ preventScroll: true });
-          else if (focusEntryKey && oldTable?.dataset?.playlistSourceId === playlistSource) {
-            const nextSelection = fields.spotlightStage.querySelector('[data-playlist-entry][aria-selected="true"]')
-              || fields.spotlightStage.querySelector('[data-click="home-programming-return"]');
-            if (nextSelection) nextSelection.focus({ preventScroll: true });
-            else focusHomeProgrammingControl();
-          } else focusHomeProgrammingControl();
+        host.innerHTML = homeConsultedPoster(selectedEntry);
+        if (activeElement && host.contains(activeElement) === false) {
+          const target = focusSurface ? host.querySelector(`[data-home-focus="${CSS.escape(focusSurface)}"]`) : null;
+          (target || host.querySelector('[data-home-focus="consultation-poster"]'))?.focus({ preventScroll: true });
         }
       }
 
-      function focusHomeProgrammingControl() {
-        fields.spotlightStage.querySelector('[data-click="home-date-today"][aria-pressed="true"], [data-click="home-date-yesterday"][aria-pressed="true"]')?.focus({ preventScroll: true });
-      }
-
+      // Vuelve a la sugerencia del día y suelta cualquier selección de estante, azar o búsqueda.
       export function returnHomeProgramming(restoreFocus = false) {
         cancelPendingHomeDate();
         playlistSource = "daily";
         selectionSource = "daily";
         selectedEntryKey = "";
         selectedItemId = "";
+        previewEntry = null;
         renderEditorialHero();
         renderEditorialSections();
-        const table = fields.spotlightStage.querySelector(".spotlight-table-wrap");
-        if (table) table.scrollTop = 0;
         announceHomeSelection();
-        if (restoreFocus) fields.spotlightStage.querySelector('[data-click="home-date-today"][aria-pressed="true"], [data-click="home-date-yesterday"][aria-pressed="true"]')?.focus({ preventScroll: true });
+        if (restoreFocus) consultationHost().querySelector('[data-home-focus="consultation-poster"]')?.focus({ preventScroll: true });
       }
 
-      export function selectSpotlight(index, restoreFocus = false) {
-        if (!editorialHome.featured.length) return;
+      // C3: el buscador consulta en el póster sin tocar estantes ni programación.
+      // Acepta la forma editorial ({ key, item, origin }) o una plana
+      // ({ id | item_id, title, year, page_image, ... }); sin id local la obra es externa.
+      function normalizePreviewEntry(entry) {
+        if (!entry || typeof entry !== "object") return null;
+        if (entry.item && typeof entry.item === "object") {
+          const id = entryItemId(entry);
+          return { ...entry, key: String(entry.key || id || `preview-${displayTitle(entry.item)}`), origin: entry.origin || { kind: id ? "catalog" : "external" } };
+        }
+        const id = String(entry.id || entry.item_id || entry._membership?.item_id || "");
+        const item = { ...entry, id, page_image: entry.page_image || entry.image || entry.poster || "" };
+        const title = displayTitle(item);
+        if (!title && !id) return null;
+        return {
+          key: String(id || `preview-${title}-${item.year || ""}`),
+          item,
+          origin: { kind: id ? "catalog" : "external" }
+        };
+      }
+
+      export function previewHomeEntry(entry) {
+        const normalized = normalizePreviewEntry(entry);
+        if (!normalized) {
+          // Sin búsqueda activa no hay nada que soltar: no pisa un VHS elegido a mano.
+          if (selectionSource === "preview") returnHomeProgramming();
+          return;
+        }
         cancelPendingHomeDate();
-        playlistSource = "daily";
-        selectionSource = "daily";
-        activeHomeSectionId = nonEmptyHomeSections().length ? activeHomeSectionId : "";
-        spotlightIndex = Math.max(0, Math.min(editorialHome.featured.length - 1, index));
-        const entry = editorialHome.featured[spotlightIndex];
-        carouselItemId = entryKey(entry, spotlightIndex);
-        selectedEntryKey = carouselItemId;
-        selectedItemId = entryItemId(entry);
-        renderEditorialSections();
+        const leavingShelf = selectionSource !== "preview" && selectionSource !== "daily";
+        previewEntry = normalized;
+        selectionSource = "preview";
+        selectedEntryKey = normalized.key;
+        selectedItemId = entryItemId(normalized);
+        // Los lomos conservan su marca sólo mientras siguen siendo la consulta.
+        if (leavingShelf) renderEditorialSections();
         renderEditorialHero();
         announceHomeSelection();
-        if (restoreFocus) {
-          fields.spotlightStage.querySelector(".spotlight-poster-trigger")?.focus({ preventScroll: true });
-        }
       }
 
-      export function setCarouselItem(index, restoreFocus = false) {
-        const featured = editorialHome.featured || [];
-        if (!featured.length) return;
-        const requestedIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
-        spotlightIndex = ((requestedIndex % featured.length) + featured.length) % featured.length;
-        carouselItemId = entryKey(featured[spotlightIndex], spotlightIndex);
-        renderEditorialHero();
-        if (restoreFocus) {
-          fields.spotlightStage.querySelector(".spotlight-poster-trigger")?.focus({ preventScroll: true });
-        }
-      }
-
-      export function moveSpotlightSelector(event) {
-        if (!event.target.closest("[data-click='spotlight-select']")) return;
-        const count = editorialHome.featured.length;
-        if (!count) return;
-        const offsets = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
-        if (event.key === "Home") {
-          event.preventDefault();
-          setCarouselItem(0, true);
-          return;
-        }
-        if (event.key === "End") {
-          event.preventDefault();
-          setCarouselItem(count - 1, true);
-          return;
-        }
-        if (!(event.key in offsets)) return;
-        event.preventDefault();
-        setCarouselItem((spotlightIndex + offsets[event.key] + count) % count, true);
-      }
-
-      export function movePlaylistSelection(event) {
-        if (event.ctrlKey || event.metaKey || event.altKey) return;
-        const control = event.target.closest("[data-playlist-entry]");
-        if (!control) return;
-        const entries = playlistEntries();
-        if (!entries.length) return;
-        const current = Number(control.dataset.entryIndex || 0);
-        let next = current;
-        if (event.key === "Home") next = 0;
-        else if (event.key === "End") next = entries.length - 1;
-        else if (event.key === "ArrowDown") next = Math.min(entries.length - 1, current + 1);
-        else if (event.key === "ArrowUp") next = Math.max(0, current - 1);
-        else if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          selectPlaylistEntry(control.dataset.entryKey || "", true, true);
-          return;
-        } else return;
-        event.preventDefault();
-        selectPlaylistEntry(entryKey(entries[next], next), true);
-      }
-
-      export function selectPlaylistEntry(key, restoreFocus = false, focusPreview = false) {
-        const entries = playlistEntries();
-        const index = entries.findIndex((entry, candidateIndex) => entryKey(entry, candidateIndex) === key);
-        if (index < 0) return;
-        cancelPendingHomeDate();
-        const entry = entries[index];
-        selectionSource = playlistSource;
-        selectedEntryKey = entryKey(entry, index);
-        selectedItemId = entryItemId(entry);
-        if (playlistSource.startsWith("shelf:")) {
-          const shelfId = playlistSource.slice(6);
-          rememberShelfEntry(shelfId, entries, index);
-        }
-        renderEditorialSections();
-        renderEditorialHero();
-        announceHomeSelection();
-        alignHomePlaylistAndShelf({ focusRow: restoreFocus && !focusPreview });
-        if (restoreFocus) {
-          if (focusPreview) fields.spotlightStage.querySelector(".spotlight-preview-action")?.focus({ preventScroll: true });
-          else fields.spotlightStage.querySelector(`[data-playlist-entry][data-entry-key="${CSS.escape(selectedEntryKey)}"]`)?.focus({ preventScroll: true });
-        }
+      // Entre 3 y 5 obras para el campo vacío: primero lo disponible del día, después lo
+      // que falta de las colecciones seguidas y, si no alcanza, el resto de lo que ya llegó.
+      export function homeSuggestions(limit = 5) {
+        const max = Math.max(0, Math.min(5, Math.floor(Number(limit)) || 0));
+        const featured = (editorialHome.featured || []).filter((entry) => entry?.item);
+        const sectionEntries = (editorialHome.sections || []).flatMap((section) => (section.items || []).filter((entry) => entry?.item));
+        const seen = new Set();
+        const picked = [];
+        const take = (entry) => {
+          if (picked.length >= max) return;
+          const item = entry.item;
+          const identity = item.id ? `${entry.origin?.kind || "catalog"}:${item.id}` : `titulo:${displayTitle(item)}:${item.year || ""}`;
+          if (seen.has(identity)) return;
+          seen.add(identity);
+          picked.push(entry);
+        };
+        featured.filter((entry) => entry.origin?.kind !== "collection" && availabilityState(entry.item).effective).forEach(take);
+        [...featured, ...sectionEntries].filter((entry) => entry.origin?.kind === "collection").forEach(take);
+        featured.forEach(take);
+        sectionEntries.forEach(take);
+        return picked;
       }
 
       export function selectHomeShelfEntry(sectionId, key, restoreFocus = false) {
@@ -580,7 +427,7 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         renderEditorialSections();
         renderEditorialHero();
         announceHomeSelection();
-        alignHomePlaylistAndShelf();
+        alignHomeShelf();
         if (restoreFocus) {
           const selectedSpine = fields.homeSections.querySelector(`[data-click="home-shelf-select"][data-section-id="${CSS.escape(sectionId)}"][data-entry-index="${index}"]`);
           selectedSpine?.focus({ preventScroll: true });
@@ -651,7 +498,7 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
           const plaque = sectionId && fields.homeSections.querySelector(`[data-click="home-shelf-activate"][data-section-id="${CSS.escape(sectionId)}"]`);
           if (randomSpine || sameSpine || plaque) (randomSpine || sameSpine || plaque).focus({ preventScroll: true });
           else if (ids.length) fields.homeSections.focus({ preventScroll: true });
-          else focusHomeProgrammingControl();
+          else fields.spotlightStage.querySelector?.('[data-home-focus="consultation-poster"]')?.focus({ preventScroll: true });
         }
         syncHomeFurnitureControls();
         requestAnimationFrame(syncHomeFurnitureControls);
@@ -700,7 +547,7 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         rememberShelfEntry(sectionId, entries, index);
         renderEditorialSections();
         renderEditorialHero();
-        alignHomePlaylistAndShelf();
+        alignHomeShelf();
         if (restoreFocus) fields.homeSections.querySelector(`[data-click="home-shelf-activate"][data-section-id="${CSS.escape(sectionId)}"]`)?.focus({ preventScroll: true });
         announceHomeSelection();
         return true;
@@ -713,22 +560,14 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         activateHomeShelf(bay.dataset.homeSection || "", true);
       }
 
-      function alignHomePlaylistAndShelf({ focusRow = false, focusSpine = false, focusBay = false } = {}) {
+      function alignHomeShelf({ focusSpine = false, focusBay = false } = {}) {
         const key = selectedEntryKey;
         if (!key) return;
-        const row = fields.spotlightStage?.querySelector(`[data-playlist-entry][data-entry-key="${CSS.escape(key)}"]`);
         const shelfId = selectionSource.startsWith("shelf:") ? selectionSource.slice(6) : "";
         const spine = shelfId ? fields.homeSections?.querySelector(`[data-click="home-shelf-select"][data-section-id="${CSS.escape(shelfId)}"][data-entry-key="${CSS.escape(key)}"]`) : null;
         const bay = spine?.closest(".home-shelf-bay");
-        // Scroll only the local wells. scrollIntoView also scrolls the document,
-        // pulling the focused VHS away whenever the upper table is offscreen.
-        const table = fields.spotlightStage?.querySelector(".spotlight-table-wrap");
-        if (row && table?.getBoundingClientRect) {
-          const bounds = table.getBoundingClientRect(), item = row.getBoundingClientRect();
-          const headerHeight = table.querySelector?.("thead")?.getBoundingClientRect().height || 0;
-          if (item.top < bounds.top + headerHeight) table.scrollTop += item.top - bounds.top - headerHeight;
-          else if (item.bottom > bounds.bottom) table.scrollTop += item.bottom - bounds.bottom;
-        }
+        // Sólo se desplaza el estante local. scrollIntoView también movería el documento
+        // y alejaría el lomo enfocado.
         const rail = typeof window !== "undefined" && window.matchMedia?.(HOME_MOBILE_MEDIA).matches
           ? spine?.closest(".home-shelf-rail") : fields.homeSections;
         if (spine && rail?.getBoundingClientRect) {
@@ -736,15 +575,14 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
           if (item.left < bounds.left) rail.scrollLeft += item.left - bounds.left;
           else if (item.right > bounds.right) rail.scrollLeft += item.right - bounds.right;
         }
-        if (focusRow) row?.focus({ preventScroll: true });
-        else if (focusSpine) spine?.focus({ preventScroll: true });
+        if (focusSpine) spine?.focus({ preventScroll: true });
         else if (focusBay) bay?.focus({ preventScroll: true });
       }
 
       export function handleHomeResize() {
         syncHomeFurnitureControls();
-        if (document.activeElement?.matches?.('[data-playlist-entry], [data-click="home-shelf-select"]')) {
-          alignHomePlaylistAndShelf();
+        if (document.activeElement?.matches?.('[data-click="home-shelf-select"]')) {
+          alignHomeShelf();
         }
       }
 
@@ -804,10 +642,9 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         const entries = Array.isArray(section.items) ? section.items : [];
         const sectionId = homeSectionId(section, sectionIndex);
         const countLabel = `${entries.length} ${entries.length === 1 ? "título" : "títulos"}`;
-        // The shelf keeps its own selection, independent of whatever the
-        // winamp-style playlist above is currently showing.
+        // El estante conserva su propia selección, independiente del póster consultado.
         const selectedIndex = rememberedShelfIndex(sectionId, entries);
-        return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
+        return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" data-selected="${selectionSource === `shelf:${sectionId}`}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
           <h2 id="home-section-${escapeAttr(sectionId)}" class="home-shelf-heading"><button type="button" class="sr-only home-shelf-bay-plaque" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}" aria-pressed="${playlistSource === `shelf:${sectionId}`}" title="${escapeAttr(section.title || "Selección")}"><span>${escapeHtml(section.title || "Selección")}</span><small>${escapeHtml(countLabel)}</small></button></h2>
           <div class="home-shelf-rail" role="group" aria-label="Opciones de ${escapeAttr(section.title || "la estantería")}">
             ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, selectionSource === `shelf:${sectionId}` && entryKey(entry, index) === selectedEntryKey, index === selectedIndex)).join("")}
@@ -880,10 +717,19 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         </button>`;
       }
 
+      // Una obra externa (sin id local) se previsualiza pero no tiene ficha que abrir.
+      function homeEntryIsExternal(entry) {
+        return entry?.origin?.kind === "external";
+      }
+
       function homeConsultationAction(entry) {
         return entry.origin?.kind === "collection"
           ? `data-click="open-home-collection-detail" data-key="${escapeAttr(selectedEntryKey)}" data-source="${escapeAttr(selectionSource)}"`
           : `data-click="open-detail-with-case-transition" data-id="${escapeAttr(entry.item.id || "")}"`;
+      }
+
+      function homePosterHeading() {
+        return selectionSource === "daily" ? "Sugerencia" : selectionSource === "preview" ? "Resultado" : "Tu selección";
       }
 
       export function homeConsultedPoster(entry) {
@@ -891,91 +737,57 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         const title = displayTitle(entry.item) || "Sin título";
         const url = String(entry.item.page_image || "").trim();
         const fallback = `<span class="spotlight-poster-fallback"${url ? " hidden" : ""}><span>${escapeHtml(title)}<small>Sin portada</small></span></span>`;
-        return `<aside class="spotlight-selector home-consulted-poster" aria-label="Cartelera de la obra consultada" data-consulted-key="${escapeAttr(selectedEntryKey)}" data-consulted-source="${escapeAttr(selectionSource)}">
-          <div class="spotlight-selector-heading"><span>Tu selección</span></div>
-          <div class="spotlight-poster-card"><button type="button" class="spotlight-poster-trigger" data-home-focus="consultation-poster" ${homeConsultationAction(entry)} aria-label="Ver ficha de ${escapeAttr(title)}">
-            ${url ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(url))}" alt="Portada de ${escapeAttr(title)}" loading="eager" decoding="async">` : ""}${fallback}
-          </button></div>
+        const picture = `${url ? `<img class="spotlight-poster" data-spotlight-image src="${escapeAttr(cachedImageSrc(url))}" alt="Portada de ${escapeAttr(title)}" loading="eager" decoding="async">` : ""}${fallback}`;
+        const frame = homeEntryIsExternal(entry)
+          ? `<div class="spotlight-poster-trigger is-static" data-home-focus="consultation-poster">${picture}</div>`
+          : `<button type="button" class="spotlight-poster-trigger" data-home-focus="consultation-poster" ${homeConsultationAction(entry)} aria-label="Ver ficha de ${escapeAttr(title)}">${picture}</button>`;
+        return `<aside class="spotlight-selector home-consulted-poster" aria-label="Póster de la obra consultada" data-consulted-key="${escapeAttr(selectedEntryKey)}" data-consulted-source="${escapeAttr(selectionSource)}">
+          <div class="spotlight-selector-heading"><span>${homePosterHeading()}</span></div>
+          <div class="spotlight-poster-card">${frame}</div>
         </aside>`;
       }
 
-      function homeFurnitureFact(label, value) {
-        return `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeAttr(value)}">${escapeHtml(value)}</dd></div>`;
-      }
-
-      // El resumen se abre sin reconstruir la cartelera ni mover el foco.
-      // Su estado pertenece a la consulta, no a una película en particular.
-      export function toggleHomeSummary() {
-        const preview = fields.spotlightStage.querySelector(".spotlight-preview");
-        const toggle = preview?.querySelector('[data-click="home-summary-toggle"]');
-        const body = preview?.querySelector("#homeSelectionSummary");
-        if (!toggle || !body) return;
-        homeSummaryExpanded = !homeSummaryExpanded;
-        preview.dataset.summaryOpen = String(homeSummaryExpanded);
-        toggle.setAttribute("aria-expanded", String(homeSummaryExpanded));
-        body.setAttribute("aria-hidden", String(!homeSummaryExpanded));
-        body.inert = !homeSummaryExpanded;
-      }
-
-      // La barra mantiene identidad, estados y acceso a la ficha siempre visibles.
-      // Sinopsis, créditos y edición se consultan en el despliegue, sin repetir imágenes.
-      export function homeSelectionPreview(entry) {
-        if (!entry?.item) return "";
-        const item = entry.item;
-        const origin = entry.origin || {};
+      // Panel «Sección seleccionada» (bajo el campo de búsqueda). Vive en #homeSectionPanel,
+      // hermano del montaje del buscador: reescribirlo nunca toca el campo ni su foco.
+      // Con el desplegable abierto el CSS lo oculta. Un resultado de búsqueda no lo muestra.
+      export function homeSectionPanelMarkup() {
+        const exit = '<button type="button" class="home-section-panel-exit" data-click="home-programming-return" data-home-focus="section-exit">Volver a la sugerencia</button>';
+        if (selectionSource === "daily") {
+          return `<p class="home-section-panel-kicker">Sugerencia del día</p>
+            <p class="home-section-panel-note">Una obra para hoy, elegida de tu archivo. Tocá un lomo de la videoteca para consultar otra, o buscá arriba.</p>`;
+        }
+        if (selectionSource === "random") {
+          return `<p class="home-section-panel-kicker">Sección seleccionada</p>
+            <h3 class="home-section-panel-title" id="homeSectionPanelTitle">Al azar</h3>
+            <p class="home-section-panel-count">Una obra sorteada de tu catálogo</p>
+            <div class="home-section-panel-actions">${exit}</div>`;
+        }
         const sectionId = selectionSource.startsWith("shelf:") ? selectionSource.slice(6) : "";
         const section = sectionId ? homeSectionById(sectionId) : null;
-        const title = displayTitle(item) || "Sin título";
-        const summary = String(item.description || item.wikipedia_extract || "").trim();
-        const contextLabel = origin.kind === "collection"
-          ? `En ${origin.collection_title || "una colección seguida"}`
-          : selectionSource === "random" ? "Al azar" : section?.title || "Cartelera del día";
-        const categoryAction = section?.action?.kind
-          ? `<button class="home-furniture-category-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(section.action.label || "Ver colección")}</button>`
+        if (!section) return "";
+        const count = Array.isArray(section.items) ? section.items.length : 0;
+        const action = section.action?.kind
+          ? `<button type="button" class="home-section-panel-action" data-click="home-section-action" data-home-focus="section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(section.action.label || "Ver colección")}</button>`
           : "";
-        const duration = homeDurationLabel(item);
-        const metadata = [item.year, item.kind, firstListValue(item.genres), duration === "—" ? "" : duration]
-          .filter(Boolean).join(" · ") || "Ficha por completar";
-        const credits = [["Dirección", listText(item.directors, 2)], ["Guion", listText(item.writers, 2)], ["Reparto", listText(item.cast, 3)]]
-          .filter(([, value]) => value);
-        const available = availabilityState(item).effective;
-        const watched = item.status === "watched";
-        const viewAction = `<button class="spotlight-preview-action" type="button" data-home-focus="consultation-view" ${homeConsultationAction(entry)}>${origin.kind === "collection" ? "Ver ficha del Club" : "Abrir ficha"}<span aria-hidden="true">→</span></button>`;
-        const editAction = origin.kind === "catalog"
-          ? `<button class="home-console-edit" type="button" data-home-focus="consultation-edit" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>` : "";
-        return `<aside class="spotlight-preview" aria-labelledby="spotlight-selected-title" data-summary-open="${homeSummaryExpanded}" data-selection-source="${escapeAttr(selectionSource)}" data-selected-entry-key="${escapeAttr(selectedEntryKey)}" data-selected-item-id="${escapeAttr(selectedItemId)}">
-          <div class="home-console-header">
-            <div class="spotlight-copy">
-              <h3 id="spotlight-selected-title">${escapeHtml(title)}</h3>
-              <div class="home-console-meta">
-                <span class="spotlight-metadata">${escapeHtml(metadata)}</span>
-                <dl class="spotlight-preview-facts" aria-label="Estado resumido">
-                  <div data-fact="access" data-state="${available ? "on" : "off"}"><dt>Acceso</dt><dd>${available ? "Disponible" : "No disponible"}</dd></div>
-                  <div data-fact="status" data-state="${watched ? "on" : "off"}"><dt>Estado</dt><dd>${watched ? "Vista" : "Pendiente"}</dd></div>
-                </dl>
-              </div>
-            </div>
-            <div class="spotlight-preview-actions">
-              <button class="home-console-toggle" type="button" data-click="home-summary-toggle" data-home-focus="consultation-summary" aria-expanded="${homeSummaryExpanded}" aria-controls="homeSelectionSummary">Resumen<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-              ${viewAction}
-            </div>
-          </div>
-          <div id="homeSelectionSummary" class="home-console-disclosure" aria-hidden="${!homeSummaryExpanded}"${homeSummaryExpanded ? "" : " inert"}>
-            <div class="home-console-disclosure-clip">
-              <div class="home-console-body">
-                <section class="spotlight-copy home-console-synopsis" aria-label="Sinopsis">
-                  <span class="home-console-label">Sinopsis</span>
-                  <p>${escapeHtml(summary || "Todavía no hay una sinopsis para esta obra.")}</p>
-                  <div class="home-console-heading"><strong>${escapeHtml(contextLabel)}</strong>${categoryAction}</div>
-                </section>
-                ${credits.length || editAction ? `<section class="home-console-details" aria-label="Créditos y edición">
-                  ${credits.length ? `<dl class="home-furniture-credits">${credits.map(([label, value]) => homeFurnitureFact(label, value)).join("")}</dl>` : ""}
-                  ${editAction}
-                </section>` : ""}
-              </div>
-            </div>
-          </div>
-        </aside>`;
+        return `<p class="home-section-panel-kicker">Sección seleccionada</p>
+          <h3 class="home-section-panel-title" id="homeSectionPanelTitle">${escapeHtml(section.title || "Selección")}</h3>
+          <p class="home-section-panel-count">${count} ${count === 1 ? "título" : "títulos"}</p>
+          <div class="home-section-panel-actions">${action}${exit}</div>`;
+      }
+
+      function renderHomeSectionPanel() {
+        const panel = fields.homeSectionPanel;
+        if (!panel) return;
+        const activeElement = panel.contains?.(document.activeElement) ? document.activeElement : null;
+        const focusSurface = activeElement?.dataset?.homeFocus || "";
+        const markup = selectionSource === "preview" || !selectedEntryKey ? "" : homeSectionPanelMarkup();
+        panel.dataset.source = selectionSource.startsWith("shelf:") ? "shelf" : selectionSource;
+        panel.hidden = !markup;
+        if (panel.innerHTML !== markup) panel.innerHTML = markup;
+        if (activeElement && markup) {
+          const target = focusSurface ? panel.querySelector?.(`[data-home-focus="${CSS.escape(focusSurface)}"]`) : null;
+          (target || panel.querySelector?.("button"))?.focus?.({ preventScroll: true });
+        }
       }
 
       function announceHomeSelection() {
@@ -1022,20 +834,6 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         return "Archivo";
       }
 
-      function homeDateControlMarkup() {
-        const selected = editorialHome.generated_for || todayLocalDate();
-        const todaySelected = selected === todayLocalDate();
-        const yesterdaySelected = selected === localDateOffset(-1);
-        return `<div class="spotlight-date-control spotlight-date-control-desktop" data-home-date-control>
-          <span class="spotlight-date-control-label">Programación</span>
-          <div class="spotlight-date-tabs" role="group" aria-label="Día de las recomendaciones">
-            <button type="button" data-click="home-date-today" aria-pressed="${todaySelected}"${homeDateRequestPending ? " disabled" : ""}>Hoy</button>
-            <button type="button" data-click="home-date-yesterday" aria-pressed="${yesterdaySelected}"${homeDateRequestPending ? " disabled" : ""}>Ayer</button>
-          </div>
-          <time class="spotlight-date" data-home-date-label datetime="${escapeAttr(selected)}">${escapeHtml(homeDateLabel(selected))}</time>
-        </div>`;
-      }
-
       export function rememberEditorialFeatured(payload) {
         const date = String(payload?.generated_for || "");
         if (!date) return;
@@ -1045,33 +843,12 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         });
       }
 
-      export function syncHomeDateControl() {
-        const selected = editorialHome.generated_for || todayLocalDate();
-        document.querySelectorAll('[data-click="home-date-today"]').forEach((button) => {
-          button.setAttribute("aria-pressed", String(selected === todayLocalDate()));
-        });
-        document.querySelectorAll('[data-click="home-date-yesterday"]').forEach((button) => {
-          button.setAttribute("aria-pressed", String(selected === localDateOffset(-1)));
-        });
-        document.querySelectorAll("#homeDate, [data-home-date-label]").forEach((time) => {
-          time.dateTime = selected;
-          time.textContent = homeDateLabel(selected);
-        });
-      }
-
-      function setHomeDateControlsDisabled(disabled) {
-        document.querySelectorAll('[data-click="home-date-today"], [data-click="home-date-yesterday"]').forEach((button) => {
-          button.disabled = disabled;
-        });
-      }
-
       // A newer explicit navigation wins over an in-flight day lookup. The
       // request may finish, but must not replace its selection or error state.
       function cancelPendingHomeDate() {
         homeDateRequestId += 1;
         if (!homeDateRequestPending) return;
         homeDateRequestPending = false;
-        setHomeDateControlsDisabled(false);
         fields.spotlight.setAttribute("aria-busy", "false");
         fields.homeFeedback.hidden = true;
         fields.homeFeedback.textContent = "";
@@ -1090,11 +867,9 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         selectionSource = "daily";
         selectedEntryKey = "";
         selectedItemId = "";
-        spotlightIndex = 0;
-        carouselItemId = "";
+        previewEntry = null;
         renderEditorialSections();
         renderEditorialHero();
-        syncHomeDateControl();
         announceHomeSelection();
       }
 
@@ -1115,11 +890,7 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
           return;
         }
         const isYesterday = requestedDate === localDateOffset(-1);
-        const originalFocus = document.activeElement;
-        const focusAction = originalFocus?.dataset?.click;
-        const restoreDateFocus = focusAction === "home-date-today" || focusAction === "home-date-yesterday";
         homeDateRequestPending = true;
-        setHomeDateControlsDisabled(true);
         fields.spotlight.setAttribute("aria-busy", "true");
         fields.homeFeedback.hidden = false;
         fields.homeFeedback.textContent = isYesterday
@@ -1144,13 +915,7 @@ import { homeRandomBay, homeRandomEntry } from "./home-random.js";
         } finally {
           if (requestId === homeDateRequestId) {
             homeDateRequestPending = false;
-            setHomeDateControlsDisabled(false);
             fields.spotlight.setAttribute("aria-busy", "false");
-            // Disabling the initiating button can drop focus to body. Restore
-            // only in that case; never steal focus from another user action.
-            if (restoreDateFocus && (document.activeElement === document.body || document.activeElement === originalFocus)) {
-              fields.spotlightStage.querySelector(`[data-click="${focusAction}"]`)?.focus({ preventScroll: true });
-            }
           }
         }
       }

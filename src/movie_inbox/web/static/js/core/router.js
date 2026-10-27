@@ -17,11 +17,11 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         "q", ...COLLECTION_MULTI_FILTER_KEYS, "year_from", "year_to", "sort", "duplicates", "external", "mode", "link_id", "candidate_source", "candidate_ref"
       ];
 
-      export function goHome() {
+      export function goHome(options = {}) {
         closeDetail({ restoreFocus: false, updateHistory: false });
         clearManualSearch({ focus: false, updateHistory: false, resetExternal: true, forceModeChange: true });
         render();
-        showView("home", { updateHistory: false, focus: true });
+        showView("home", { updateHistory: false, focus: options.focusHeading !== false });
         syncRoute(routeValuesForView("home"), "push");
       }
 
@@ -50,9 +50,17 @@ import { loadScannerQueue } from "../surfaces/inbox-scanner.js";
         requestAnimationFrame(() => fields.query.focus());
       }
 
-      export function goToCollectionAdd() {
-        const fromShelf = currentView === "catalog" && ["browse", "search"].includes(collectionSearchMode);
-        const query = fromShelf ? fields.query.value.trim() : "";
+      // `seedQuery` (C4 del buscador de Inicio) abre Agregar con esa consulta ya corrida.
+      // Entra con push desde Inicio, así que Atrás vuelve a Inicio y no a Colección.
+      // Se pasa como cadena: los controladores de click reciben un evento, no una consulta.
+      export function goToCollectionAddWithQuery(seedQuery) {
+        goToCollectionAdd(String(seedQuery ?? "").trim());
+      }
+
+      export function goToCollectionAdd(seedQuery = null) {
+        const seeded = typeof seedQuery === "string";
+        const fromShelf = !seeded && currentView === "catalog" && ["browse", "search"].includes(collectionSearchMode);
+        const query = seeded ? seedQuery : fromShelf ? fields.query.value.trim() : "";
         if (fromShelf) syncCollectionRoute("replace");
         const collectionReturn = fromShelf
           ? { url: window.location.href, state: history.state?.collection || {} }

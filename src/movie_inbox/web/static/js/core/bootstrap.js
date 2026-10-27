@@ -3,9 +3,8 @@ import { handlePosterError, handlePosterLoad } from "./card.js";
 import { handleBackCoverImageError, handleBackCoverImageLoad } from "./back-cover-images.js";
 import { toggleBackCoverSynopsis } from "./back-cover.js";
 import { load, logout } from "./catalog-data.js";
-import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, editVhsDossier, findLinkForCatalog, handleBackCoverKeydown, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, returnToVhsBack, saveDetailChanges, saveEditorChanges, saveMetadata, savePersonal, selectDetailSection } from "./detail.js";
+import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, editVhsDossier, findLinkForCatalog, handleBackCoverKeydown, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, returnToVhsBack, saveDetailChanges, saveEditorChanges, saveMetadata, savePersonal, selectDetailSection } from "./detail.js";
 import { fields } from "./fields.js";
-import { localDateOffset, todayLocalDate } from "./format.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
 import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionAdd, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, returnToCollection, setInboxMode } from "./router.js";
 import { CATALOG_PAGE_SIZE, currentView, inboxMode } from "./state.js";
@@ -17,11 +16,28 @@ import { initializeCollectionFilterPanel, addCollectionFilterSelection, applyCol
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, dismissDuplicateReview, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, renderManualResults, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { clearMergeSelection, mergeItems, mergeSelected, toggleMergeSelection } from "../surfaces/merge-selection.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
-import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, handleHomeVisibilityChange, loadEditorialFeaturedDate, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, movePlaylistSelection, moveSpotlightSelector, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, selectPlaylistEntry, selectSpotlight, syncHomeFurnitureControls, tickHomeAutoplay, toggleHomeSummary } from "../surfaces/home.js";
+import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, focusHomeSearch, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, syncHomeFurnitureControls } from "../surfaces/home.js";
+import { isTextEntryTarget } from "../surfaces/home-search.js";
 import { drawHomeRandom, includeUnavailableInHomeRandom, syncHomeRandomScope } from "../surfaces/home-random.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, resolveIdentities, searchCurationQueue } from "../surfaces/inbox-curation.js";
 import { analyzeImportSource, applySelectedImport, changeImportFile, changeImportSelection, handleImportClick, refreshImportMapping, toggleVisibleImportItems } from "../surfaces/inbox-imports.js";
 import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory, handleScannerReviewAction, loadScannerQueue, moveScannerQueueSelection, scannerHistoryMode, searchScannerQueue, selectScannerQueueItem } from "../surfaces/inbox-scanner.js";
+
+      // En Inicio «Buscar» enfoca el buscador del mostrador; en el resto de las vistas
+      // sigue abriendo la búsqueda de Colección.
+      function runSearchCommand() {
+        if (currentView === "home" && !fields.homeView.hidden && focusHomeSearch()) return;
+        goToCollectionSearch();
+      }
+
+      // `/` lleva al buscador de Inicio desde cualquier vista (volviendo a Inicio si hace
+      // falta), salvo que el foco ya esté en un campo de texto o haya un diálogo abierto.
+      function handleSearchShortcut(event) {
+        if (event.key !== "/" || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (isTextEntryTarget(event.target) || document.querySelector("dialog[open]")) return;
+        if (!focusHomeSearch()) return;
+        event.preventDefault();
+      }
 
       // On Home the header command reveals the random VHS instead of opening a dossier
       // (owner decision, 2026-09-13); elsewhere it keeps opening a random dossier.
@@ -57,19 +73,12 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "add-home-collection-item": () => addHomeCollectionItem(target.dataset.collectionId || "", id, target),
           "open-home-collection": () => goToHomeCollection(target.dataset.collectionId || id),
           "home-section-action": () => activateHomeSection(target.dataset.sectionId || ""),
-          "spotlight-select": () => selectSpotlight(Number(target.dataset.index || 0), true),
-          "playlist-select": () => selectPlaylistEntry(target.dataset.entryKey || "", false),
-          "home-summary-toggle": toggleHomeSummary,
           "home-shelf-select": () => selectHomeShelfEntry(target.dataset.sectionId || "", target.dataset.entryKey || "", true),
           "home-category-select": () => selectHomeCategory(target.dataset.sectionId || "", true),
           "home-shelf-scroll": () => scrollHomeFurniture(target.dataset.direction || "next"),
           "home-shelf-activate": () => activateHomeShelf(target.dataset.sectionId || "", true),
           "home-programming-return": () => returnHomeProgramming(true),
-          "edit-home-shelf-entry": () => openDetailForPersonalEdit(target, id),
           "open-detail-with-case-transition": () => openDetailWithCaseTransition(target, id),
-          "home-date-today": () => loadEditorialFeaturedDate(todayLocalDate()),
-          "home-date-yesterday": () => loadEditorialFeaturedDate(localDateOffset(-1)),
-          "home-empty-catalog": goToCollectionRoot,
           "home-empty-import": goToImports,
           "home-empty-club": goToClub,
           "refresh-home": refreshEditorialHome,
@@ -79,7 +88,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "home-random-draw": () => drawHomeRandom({ focusSpine: true }),
           "home-random-include-all": includeUnavailableInHomeRandom,
           "home-random-collection": goToCollectionRoot,
-          "menu-search": () => { target.closest("details")?.removeAttribute("open"); goToCollectionSearch(); },
+          "menu-search": () => { target.closest("details")?.removeAttribute("open"); runSearchCommand(); },
           "menu-add": () => { target.closest("details")?.removeAttribute("open"); goToCollectionAdd(); },
           "toggle-watched": () => runDetailAwareAction(target, () => toggleWatched(event, id, target.dataset.status || "to_watch")),
           "focus-personal": editPersonalRecord,
@@ -141,8 +150,6 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       // --- wiring: reproduced verbatim from the original app.js bootstrap ---
       document.querySelector("#refresh").addEventListener("click", refreshAdminData);
       fields.searchButton.addEventListener("click", () => runSearch());
-      fields.spotlightStage.addEventListener("keydown", moveSpotlightSelector);
-      fields.spotlightStage.addEventListener("keydown", movePlaylistSelection);
       fields.homeShelfCategories.addEventListener("keydown", moveHomeCategorySelector);
       fields.homeSections.addEventListener("keydown", moveHomeShelf);
       fields.homeSections.addEventListener("keydown", moveHomeFurniture);
@@ -154,7 +161,7 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       fields.catalogButton.addEventListener("click", goToCollectionRoot);
       fields.inboxButton.addEventListener("click", () => goToInbox());
       fields.clubButton.addEventListener("click", goToClub);
-      fields.headerSearchButton.addEventListener("click", goToCollectionSearch);
+      fields.headerSearchButton.addEventListener("click", runSearchCommand);
       fields.headerAddButton.addEventListener("click", goToCollectionAdd);
       fields.adminButton.addEventListener("click", goToAdmin);
       fields.privacyButton.addEventListener("click", openPrivacyDialog);
@@ -368,8 +375,8 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
         if (event.key === "Escape") clearManualSearch();
       });
       document.addEventListener("visibilitychange", handleVisibilityChange);
-      document.addEventListener("visibilitychange", handleHomeVisibilityChange);
       document.addEventListener("keydown", handleKeyboardModality, true);
+      document.addEventListener("keydown", handleSearchShortcut);
       document.addEventListener("pointerdown", handlePointerModality, true);
       window.addEventListener("beforeunload", handleBeforeUnload);
       window.addEventListener("popstate", restoreRoute);
@@ -395,5 +402,4 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
       window.openDetail = openDetail;
       window.closeDetail = closeDetail;
       window.openSearchDescription = openSearchDescription;
-      window.tickHomeAutoplay = tickHomeAutoplay;
       window.getHomePlaybackState = getHomePlaybackState;

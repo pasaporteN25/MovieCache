@@ -1571,9 +1571,18 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b'id="memberList"', body)
         self.assertIn(b'id="memberDialog"', body)
         self.assertIn(b'id="temporaryPasswordDialog"', body)
-        self.assertIn(b'id="homeDate"', body)
-        self.assertIn(b'id="homeDateToday"', body)
-        self.assertIn(b'id="homeDateYesterday"', body)
+        # IP1: el mostrador reserva el hueco del buscador y ya no trae el control Hoy/Ayer.
+        self.assertIn(b'id="homeSearchSlot"', body)
+        # IP3: el campo se monta en su propio contenedor y el panel de sección es su hermano,
+        # de modo que reescribirlo nunca toca el buscador. La consola inferior ya no existe.
+        self.assertIn(b'id="homeSearchMount"', body)
+        self.assertIn(b'id="homeSectionPanel"', body)
+        self.assertNotIn(b"spotlight-preview", body)
+        self.assertNotIn(b"home-loading-summary", body)
+        self.assertIn(b'id="homeConsultation"', body)
+        self.assertNotIn(b'id="homeDate"', body)
+        self.assertNotIn(b'id="homeDateToday"', body)
+        self.assertNotIn(b'id="homeDateYesterday"', body)
         self.assertIn(b'id="homeSections"', body)
         self.assertIn(b'id="homeFeedback"', body)
         self.assertIn(b'id="activeFilters"', body)
@@ -1664,6 +1673,9 @@ class ViewerHttpTests(unittest.TestCase):
         self.assertIn(b".drawer-accordion", css)
         # U4.6b: css/home.css, which held .spotlight-stage, is no longer imported.
         self.assertIn(b"#homeView .spotlight-layout", css)
+        self.assertIn(b"#homeView .home-section-panel", css)
+        self.assertNotIn(b".spotlight-preview", css)
+        self.assertNotIn(b".home-console-", css)
         self.assertIn(b".detail-drawer[open]", css)
         self.assertIn(b".personal-record-read", css)
         self.assertIn(b".drawer-navigation", css)

@@ -91,7 +91,10 @@ class HomeRandomTests(unittest.TestCase):
         self.assertIn("Elegir una obra", tape.get_attribute("aria-label"))
         # Not an editorial section: the shelf count stays at the real shelves.
         self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "1")
-        source_before = page.locator("[data-playlist-source]").text_content()
+        # IP1: ya no hay tabla de programación; la fuente programada es el estado de Inicio.
+        source_before = page.evaluate("window.getHomePlaybackState().playlistSource")
+        daily_key_before = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
+        self.assertEqual(page.locator("[data-playlist-source], [data-playlist-entry]").count(), 0)
 
         tape.click()
         self.assertEqual(self.spine_state(), "busy")
@@ -102,17 +105,27 @@ class HomeRandomTests(unittest.TestCase):
         self.wait_for_result()
         first_title = page.locator(".home-random-tape .vhs-spine-title").text_content()
         self.assertEqual(self.spine_state(), "available")
-        self.assertEqual(page.locator(".spotlight-preview h3").text_content(), first_title)
-        self.assertEqual(page.locator(".home-console-heading strong").text_content(), "Al azar")
+        fixture.wait_for_consulted_title(page, first_title)
+        # IP3: el panel bajo el buscador nombra la sección «Al azar» y ofrece la salida.
+        panel = page.locator("#homeSectionPanel")
+        self.assertEqual(panel.get_attribute("data-source"), "random")
+        self.assertEqual(panel.locator("#homeSectionPanelTitle").text_content(), "Al azar")
+        self.assertEqual(page.locator("[data-home-random]").get_attribute("data-selected"), "true")
         self.assertTrue(
             (
                 page.locator(".home-consulted-poster").get_attribute("data-consulted-key") or ""
             ).startswith("random:")
         )
-        # The draw never opens the dossier and never reprograms the table.
+        # The draw never opens the dossier and never reprograms the daily suggestion.
         self.assertEqual(page.locator("dialog[open]").count(), 0)
-        self.assertEqual(page.locator("[data-playlist-source]").text_content(), source_before)
-        self.assertEqual(page.locator('[data-playlist-entry][aria-selected="true"]').count(), 0)
+        state = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(state["playlistSource"], source_before)
+        self.assertEqual(state["selectionSource"], "random")
+        self.assertNotEqual(state["selectedEntryKey"], daily_key_before)
+        self.assertEqual(
+            page.locator(".home-consulted-poster .spotlight-selector-heading").text_content(),
+            "Tu selección",
+        )
         self.assertEqual(
             page.locator("#homeSelectionAnnouncement").text_content(),
             f"Al azar: {first_title}, {'1995' if first_title == 'Heat' else '1988'}. Disponible.",
@@ -126,9 +139,9 @@ class HomeRandomTests(unittest.TestCase):
         self.wait_for_result()
         second_title = page.locator(".home-random-tape .vhs-spine-title").text_content()
         self.assertNotEqual(second_title, first_title)
-        self.assertEqual(page.locator(".spotlight-preview h3").text_content(), second_title)
+        fixture.wait_for_consulted_title(page, second_title)
 
-        page.locator('.spotlight-preview [data-home-focus="consultation-view"]').click()
+        page.locator('.home-consulted-poster [data-home-focus="consultation-poster"]').click()
         page.wait_for_selector("#detailDrawer[open]")
         self.assertEqual(
             page.locator("#detailDrawerTitle").text_content(), f"Contratapa VHS // {second_title}"
@@ -152,12 +165,12 @@ class HomeRandomTests(unittest.TestCase):
         self.assertIn("no disponible", tape.get_attribute("aria-label"))
         self.assertEqual(tape.locator(".home-random-mark").get_attribute("aria-hidden"), "true")
         self.assertEqual(tape.locator(".vhs-spine-title").text_content(), "Cinta perdida")
-        self.assertEqual(page.locator(".spotlight-preview h3").text_content(), "Cinta perdida")
+        fixture.wait_for_consulted_title(page, "Cinta perdida")
 
         # Narrowing the preference keeps the consultation and explains the scope.
         self.set_only_available(True)
         self.assertEqual(self.spine_state(), "out-of-scope")
-        self.assertEqual(page.locator(".spotlight-preview h3").text_content(), "Cinta perdida")
+        fixture.wait_for_consulted_title(page, "Cinta perdida")
         page.locator(".home-random-note").get_by_text("Elegir otra").click()
         self.assertEqual(self.spine_state(), "out-of-scope")
         self.assertIn(
@@ -172,7 +185,7 @@ class HomeRandomTests(unittest.TestCase):
         self.assertEqual(self.spine_state(), "available")
         self.assertEqual(page.locator("dialog[open]").count(), 0)
         spine_title = page.locator(".home-random-tape .vhs-spine-title").text_content()
-        self.assertEqual(page.locator(".spotlight-preview h3").text_content(), spine_title)
+        fixture.wait_for_consulted_title(page, spine_title)
         # The terminal bay is brought into the shelf's view.
         self.assertTrue(
             page.locator("[data-home-random]").evaluate(

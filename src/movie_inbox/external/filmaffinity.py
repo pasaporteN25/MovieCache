@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from movie_inbox.domain.catalog import external_source_name
 from movie_inbox.domain.search import parse_search_query
@@ -18,6 +18,8 @@ from movie_inbox.external.query_variants import (
     with_alias_identity,
 )
 
+_FILM_PATH = re.compile(r"^/([a-z]{2})/film(\d+)\.html$", flags=re.IGNORECASE)
+
 
 class FilmAffinityAdapter:
     name = "filmaffinity"
@@ -25,6 +27,8 @@ class FilmAffinityAdapter:
 
     def search(self, query: str) -> list[dict[str, Any]]:
         intent = parse_search_query(query)
+        if intent.source == self.name:
+            return self._from_pasted_url(intent.canonical_url)
         if intent.source:
             return []
         search_text = intent.title or intent.director_query or query
@@ -46,6 +50,18 @@ class FilmAffinityAdapter:
             if not needs_alias_retry(intent, annotated):
                 return annotated
         return results
+
+    def _from_pasted_url(self, canonical: str) -> list[dict[str, Any]]:
+        """[IP] A pasted film address resolves to that film only, never a listing."""
+        match = _FILM_PATH.match(urlparse(canonical).path)
+        if not match:
+            return []
+        page_url = f"https://www.filmaffinity.com/{match.group(1)}/film{match.group(2)}.html"
+        single = _result_from_film_page(fetch_text(page_url))
+        if single is None:
+            return []
+        single["url"] = page_url
+        return [single]
 
     def _fetch(self, text: str, timeout: float = 8.0) -> list[dict[str, Any]]:
         body = fetch_text(

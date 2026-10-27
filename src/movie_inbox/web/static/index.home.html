@@ -10,38 +10,25 @@
               <div class="spotlight-ambience" aria-hidden="true"></div>
               <div class="spotlight-bar">
                 <div>
-                  <span class="eyebrow">Programación personal</span>
-                  <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Cartelera disponible</h2>
-                </div>
-                <div class="spotlight-date-control spotlight-date-control-mobile" data-home-date-control>
-                  <div class="spotlight-date-tabs" role="group" aria-label="Día de las recomendaciones">
-                    <button id="homeDateToday" type="button" data-click="home-date-today" aria-pressed="true">Hoy</button>
-                    <button id="homeDateYesterday" type="button" data-click="home-date-yesterday" aria-pressed="false">Ayer</button>
-                  </div>
-                  <time id="homeDate" class="spotlight-date"></time>
+                  <span class="eyebrow">Mostrador</span>
+                  <h2 id="spotlightTitle" class="view-focus-target" tabindex="-1">Buscar y consultar</h2>
                 </div>
               </div>
               <div id="spotlightStage" class="spotlight-stage" aria-live="off">
                 <div class="spotlight-layout home-loading-hero">
-                  <div class="spotlight-selector" aria-hidden="true">
-                    <div class="spotlight-selector-heading"><span>Hoy</span></div>
-                    <div class="spotlight-poster-card home-loading-poster"></div>
+                  <div id="homeSearchSlot" class="home-search-slot">
+                    <div id="homeSearchMount" class="home-search-mount"></div>
+                    <section id="homeSectionPanel" class="home-section-panel" aria-label="Sección seleccionada" hidden></section>
                   </div>
-                  <div class="spotlight-viewport home-loading-playlist">
+                  <div id="homeConsultation" class="home-consultation">
                     <div class="home-loading-status" role="status">
                       <strong>Preparando tu videoteca</strong>
-                      <span>Cargando cartelera y estantes…</span>
+                      <span>Cargando sugerencia y estantes…</span>
                     </div>
-                    <div class="home-loading-rows" aria-hidden="true">
-                      <span></span><span></span><span></span><span></span><span></span><span></span>
+                    <div class="spotlight-selector home-consulted-poster" aria-hidden="true">
+                      <div class="spotlight-selector-heading"><span>Sugerencia</span></div>
+                      <div class="spotlight-poster-card home-loading-poster"></div>
                     </div>
-                  </div>
-                  <div class="spotlight-selector home-consulted-poster" aria-hidden="true">
-                    <div class="spotlight-selector-heading"><span>En consulta</span></div>
-                    <div class="spotlight-poster-card home-loading-poster"></div>
-                  </div>
-                  <div class="spotlight-preview home-loading-summary" aria-hidden="true">
-                    <div><span></span><span></span></div><span></span>
                   </div>
                 </div>
               </div>
@@ -74,10 +61,9 @@
               <div>
                 <span class="section-kicker">Tu archivo empieza acá</span>
                 <h2>Prepará tu primera cartelera</h2>
-                <p>Agregá obras, importá una lista o seguí una colección para construir una programación personal.</p>
+                <p>Empezá por el buscador de arriba, o importá una lista o seguí una colección para construir una programación personal.</p>
               </div>
               <div class="home-empty-actions">
-                <button type="button" data-click="home-empty-catalog">Abrir colección</button>
                 <button class="quiet-action" type="button" data-click="home-empty-import">Importar lista</button>
                 <button class="quiet-action" type="button" data-click="home-empty-club">Explorar Club</button>
               </div>

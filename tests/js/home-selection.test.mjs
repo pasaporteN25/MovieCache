@@ -46,58 +46,61 @@ async function setup(overrides = {}) {
   return {api,fields,data,document,window};
 }
 
-test('U5 deliberate VHS selection programs the shelf; autoplay changes only the daily poster',async()=>{
+test('U5 deliberate VHS selection consults its work; the daily suggestion stays independent',async()=>{
   const {api,fields} = await setup();
-  const before = api.getHomePlaybackState();
+  assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Diaria A"/);
+  assert.match(fields.spotlightStage.innerHTML,/<span>Sugerencia<\/span>/);
   api.selectHomeShelfEntry('memory','memory-b');
   let state = api.getHomePlaybackState();
   assert.equal(state.selectionSource,'shelf:memory');
   assert.equal(state.selectedEntryKey,'memory-b');
   assert.equal(state.playlistSource,'shelf:memory');
-  assert.equal(state.carouselItemId,before.carouselItemId);
-  assert.match(fields.spotlightStage.innerHTML,/<h3 id="spotlight-selected-title">Recuerdo B<\/h3>/);
-  assert.match(fields.spotlightStage.innerHTML,/data-entry-key="memory-b"[^>]+tabindex="0" aria-selected="true"/);
-  assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-playlist-entry="daily-a"/);
-  for(let index=0;index<3;index++) assert.equal(api.tickHomeAutoplay(),true);
-  state = api.getHomePlaybackState();
-  assert.notEqual(state.carouselItemId,before.carouselItemId);
-  assert.equal(state.selectedEntryKey,'memory-b');
-  assert.equal(state.selectionSource,'shelf:memory');
-  assert.equal(state.playlistSource,'shelf:memory');
+  assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Recuerdo B"/);
+  assert.match(fields.spotlightStage.innerHTML,/<span>Tu selección<\/span>/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-playlist-entry|spotlight-playlist|spotlight-table-wrap/);
   api.returnHomeProgramming();
-  api.selectPlaylistEntry('daily-b');
   assert.equal(api.getHomePlaybackState().selectionSource,'daily');
-  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-b');
-  assert.match(fields.spotlightStage.innerHTML,/<h3 id="spotlight-selected-title">Diaria B<\/h3>/);
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
+  assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Diaria A"/);
+});
+
+test('IP1 carousel, autoplay and day tabs are gone from the module and the markup',async()=>{
+  const {api,fields} = await setup();
+  assert.doesNotMatch(source,/HOME_AUTOPLAY_INTERVAL_MS|setInterval|syncHomeAutoplay|ensureCarousel|homeDateControlMarkup/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="spotlight-select"|home-date-|spotlight-date|spotlight-playlist|home-programming-return/);
+  for (const name of ['tickHomeAutoplay','handleHomeVisibilityChange','selectSpotlight','selectPlaylistEntry','moveSpotlightSelector','movePlaylistSelection']) assert.equal(name in api,false,name);
+  assert.deepEqual(Array.from(Object.keys(api.getHomePlaybackState())).sort(),['activeShelfId','playlistSource','selectedEntryKey','selectedItemId','selectionSource']);
+  const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
+  assert.match(html,/<div id="homeSearchSlot" class="home-search-slot">\s*<div id="homeSearchMount" class="home-search-mount"><\/div>/);
+  assert.match(html,/id="homeConsultation"/);
+  assert.doesNotMatch(html,/homeDate|home-date|spotlight-date|spotlight-viewport|home-loading-rows/);
 });
 
 test('source-qualified keys preserve Club provenance and omit personal edit action',async()=>{
   const {api,fields} = await setup();
   api.selectHomeShelfEntry('club','daily-a');
-  api.tickHomeAutoplay();
-  assert.match(fields.spotlightStage.innerHTML,/>Obra del Club<\/h3>/);
+  assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Obra del Club"/);
   assert.match(fields.spotlightStage.innerHTML,/data-click="open-home-collection-detail" data-key="daily-a"/);
   assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
-  assert.match(fields.spotlightStage.innerHTML,/data-playlist-entry="daily-a"[^>]+aria-selected="true"/);
   api.openHomeCollectionDetail('daily-a','shelf:club');
   assert.match(fields.sharedDetailBody.innerHTML,/>Obra del Club<\/h2>/);
   api.returnHomeProgramming();
-  api.selectPlaylistEntry('daily-a');
-  assert.match(fields.spotlightStage.innerHTML,/>Diaria A<\/h3>/);
-  assert.match(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
+  assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Diaria A"/);
+  // IP3: «Editar mi ficha» ya no vive en el mostrador: se alcanza desde la ficha.
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/edit-home-shelf-entry/);
 });
 
-test('explicit programming and day/poster selection retain their intentional reset semantics',async()=>{
+test('explicit shelf and day changes retain their intentional reset semantics',async()=>{
   const {api,data} = await setup();
   api.selectHomeShelfEntry('memory','memory-b');
   api.activateHomeShelf('memory');
   assert.equal(api.getHomePlaybackState().playlistSource,'shelf:memory');
-  api.selectPlaylistEntry('memory-a');
-  assert.equal(api.getHomePlaybackState().selectionSource,'shelf:memory');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
+  api.selectHomeShelfEntry('memory','memory-a');
   assert.equal(api.homeShelfSelections.get('memory'),0);
-  api.selectSpotlight(1);
+  api.returnHomeProgramming();
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
-  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-b');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
   api.selectHomeShelfEntry('memory','memory-b');
   api.applyEditorialFeaturedDate('2026-09-09',{featured:[data.featured[1]]});
   assert.equal(api.getHomePlaybackState().selectionSource,'daily');
@@ -114,36 +117,28 @@ test('invalid or removed selection and empty daily list do not produce stale det
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-a');
   data.featured=[];
   api.selectHomeShelfEntry('memory','memory-a');
-  assert.match(fields.spotlightStage.innerHTML,/>Recuerdo A<\/h3>/);
-  assert.doesNotMatch(fields.spotlightStage.innerHTML,/No hay obras en esta fuente/);
+  assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Recuerdo A"/);
   api.setEditorialHome({...data,sections:[]});
   api.renderEditorialHero();
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'');
   assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
+  assert.match(fields.spotlightStage.innerHTML,/home-desk-note/);
 });
 
-test('keyboard handles fallback entry keys and autoplay still respects visibility/reduced motion',async()=>{
-  const {api,data,document,window} = await setup();
+test('keyboard handles fallback entry keys on the shelf',async()=>{
+  const {api,data} = await setup();
   delete data.sections[0].items[1].key;
   let prevented = false;
   api.moveHomeShelf({key:'ArrowRight',preventDefault(){prevented=true;},
     target:{closest:()=>({dataset:{sectionId:'memory',entryIndex:'0'}})}});
   assert.equal(prevented,true);
   assert.equal(api.getHomePlaybackState().selectedItemId,'memory-b');
-  document.visibilityState='hidden';
-  assert.equal(api.tickHomeAutoplay(),false);
-  document.visibilityState='visible';
-  document.querySelector=()=>({open:true});
-  assert.equal(api.tickHomeAutoplay(),false);
-  document.querySelector=()=>null;
-  window.matchMedia=()=>({matches:true});
-  assert.equal(api.tickHomeAutoplay(),false);
 });
 
-test('autoplay restores focused console action after rerender without changing the consulted entry',async()=>{
+test('a rerender restores the focused poster without changing the consulted entry',async()=>{
   const {api,fields,document} = await setup();
   api.selectHomeShelfEntry('memory','memory-b');
-  const oldAction = {dataset:{click:'edit-home-shelf-entry'}};
+  const oldAction = {dataset:{click:'open-detail-with-case-transition',homeFocus:'consultation-poster'}};
   document.activeElement=oldAction;
   let replaced=false;
   let markup=fields.spotlightStage.innerHTML;
@@ -152,27 +147,37 @@ test('autoplay restores focused console action after rerender without changing t
   });
   fields.spotlightStage.contains=element=>element===oldAction && !replaced;
   let restored=false;
-  fields.spotlightStage.querySelector=selector=>selector==='[data-click="edit-home-shelf-entry"]'
+  fields.spotlightStage.querySelector=selector=>selector==='[data-home-focus="consultation-poster"]'
     ? {focus:()=>{restored=true;}} : null;
-  assert.equal(api.tickHomeAutoplay(),true);
+  api.renderEditorialHero();
   assert.equal(restored,true);
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
 });
 
-test('the single console carries summary, credits, facts and category navigation without duplicate images',async()=>{
+test('the render never rewrites the search slot: it writes inside #homeConsultation only',async()=>{
+  const {api,fields} = await setup();
+  const host=Object.assign({},fields.spotlightStage,{innerHTML:'',contains:()=>false,querySelector:()=>null});
+  fields.spotlightStage.querySelector=selector=>selector==='#homeConsultation'?host:null;
+  const stageBefore=fields.spotlightStage.innerHTML;
+  api.selectHomeShelfEntry('memory','memory-b');
+  assert.match(host.innerHTML,/aria-label="Ver ficha de Recuerdo B"/);
+  assert.equal(fields.spotlightStage.innerHTML,stageBefore);
+  assert.doesNotMatch(host.innerHTML,/homeSearchSlot/);
+});
+
+test('IP3 no hay consola inferior: el mostrador es el póster y el nombre de la obra sigue accesible',async()=>{
   const {api,data,fields} = await setup();
   data.sections[0].action={kind:'catalog',label:'Ver colección'};
   Object.assign(data.sections[0].items[1].item,{
-    description:'Una sinopsis de muestra',directors:['Dirección'],writers:['Guion'],
-    cast:['Reparto'],duration_minutes:104,backdrop_image:'/panorama.jpg',page_image:'/portada.jpg'
+    description:'Una sinopsis de muestra',directors:['Dirección'],duration_minutes:104,page_image:'/portada.jpg'
   });
   api.selectHomeShelfEntry('memory','memory-b');
   const html=fields.spotlightStage.innerHTML;
-  assert.equal((html.match(/class="spotlight-preview"/g)||[]).length,1);
-  for(const text of ['Una sinopsis de muestra','Dirección','Guion','Reparto','104 min','/portada.jpg']) assert.ok(html.includes(text),text);
-  assert.doesNotMatch(api.homeSelectionPreview(data.sections[0].items[1]),/<img|panorama.jpg|portada.jpg/);
-  assert.match(html,/data-click="home-section-action" data-section-id="memory"/);
-  assert.doesNotMatch(html,/home-shelf-preview|spotlight-signal|spotlight-preview-cover/);
+  assert.doesNotMatch(html,/spotlight-preview|home-console|homeSelectionSummary|home-summary-toggle|Estado resumido|Abrir ficha|Editar mi ficha/);
+  assert.doesNotMatch(html,/Una sinopsis de muestra|Dirección|104 min|<h3/);
+  assert.match(html,/aria-label="Ver ficha de Recuerdo B"/);
+  assert.match(html,/alt="Portada de Recuerdo B"/);
+  for (const name of ['homeSelectionPreview','toggleHomeSummary']) assert.equal(name in api,false,name);
   assert.equal(fields.homeSelectionAnnouncement.textContent,'Consulta: Recuerdo B');
   api.activateHomeShelf('memory');
   assert.equal(fields.homeSelectionAnnouncement.textContent,'Consulta: Recuerdo B');
@@ -182,26 +187,111 @@ test('the single console carries summary, credits, facts and category navigation
   assert.equal(fields.homeSelectionAnnouncement.textContent,'');
 });
 
-test('missing information stays honest and the retired host is absent from production HTML',async()=>{
-  const {api,fields} = await setup();
-  assert.match(fields.spotlightStage.innerHTML,/Todavía no hay una sinopsis/);
-  assert.match(fields.spotlightStage.innerHTML,/Sin portada/);
-  assert.doesNotMatch(fields.spotlightStage.innerHTML,/Créditos por completar|data-image-count/);
-  assert.equal(api.homeSelectionPreview(null),'');
-  const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
-  assert.doesNotMatch(html,/id="homeShelfPreview"/);
-  assert.match(html,/id="homeSelectionAnnouncement"[^>]*aria-live="polite"/);
+test('IP3 elegir un lomo muestra el panel de sección con título, cantidad y «Ver colección»',async()=>{
+  const {api,data,fields} = await setup();
+  data.sections[0].action={kind:'catalog',label:'Ver colección'};
+  assert.equal(fields.homeSectionPanel.innerHTML.includes('Sugerencia del día'),true);
+  assert.equal(fields.homeSectionPanel.dataset.source,'daily');
+  assert.doesNotMatch(fields.homeSectionPanel.innerHTML,/home-programming-return/);
+  api.selectHomeShelfEntry('memory','memory-b');
+  const panel=fields.homeSectionPanel;
+  assert.equal(panel.hidden,false);
+  assert.equal(panel.dataset.source,'shelf');
+  assert.match(panel.innerHTML,/Sección seleccionada/);
+  assert.match(panel.innerHTML,/id="homeSectionPanelTitle">Memoria<\/h3>/);
+  assert.match(panel.innerHTML,/2 títulos/);
+  assert.match(panel.innerHTML,/data-click="home-section-action" data-home-focus="section-action" data-section-id="memory">Ver colección/);
+  assert.match(panel.innerHTML,/data-click="home-programming-return"[^>]*>Volver a la sugerencia/);
+  // La sección resaltada y el lomo elegido se marcan en el estante.
+  assert.match(fields.homeSections.innerHTML,/data-home-section="memory"[^>]*data-selected="true"/);
+  assert.match(fields.homeSections.innerHTML,/data-home-section="club"[^>]*data-selected="false"/);
+  assert.match(fields.homeSections.innerHTML,/data-vhs-state="selected"[^>]*aria-pressed="true"/);
+  // Una sección sin acción no ofrece «Ver colección» y cuenta en singular.
+  api.selectHomeShelfEntry('club','daily-a');
+  assert.match(panel.innerHTML,/>Club<\/h3>/);
+  assert.match(panel.innerHTML,/1 título</);
+  assert.doesNotMatch(panel.innerHTML,/home-section-action/);
 });
 
-test('consulted poster follows source-qualified selection, not independent autoplay',async()=>{
+test('IP3 el botón de salida del panel vuelve a la sugerencia y suelta el resalte',async()=>{
+  const {api,fields} = await setup();
+  api.selectHomeShelfEntry('memory','memory-b');
+  assert.match(fields.homeSectionPanel.innerHTML,/home-programming-return/);
+  api.returnHomeProgramming(true);
+  const state=api.getHomePlaybackState();
+  assert.equal(state.selectionSource,'daily');
+  assert.equal(state.selectedEntryKey,'daily-a');
+  assert.equal(fields.homeSectionPanel.dataset.source,'daily');
+  assert.doesNotMatch(fields.homeSectionPanel.innerHTML,/home-programming-return|Volver a la sugerencia/);
+  assert.doesNotMatch(fields.homeSections.innerHTML,/data-selected="true"/);
+  assert.doesNotMatch(fields.homeSections.innerHTML,/data-vhs-state="selected"/);
+});
+
+test('IP3 Al azar muestra su panel con salida; un resultado de búsqueda y un catálogo vacío lo ocultan',async()=>{
+  let drawn=null;
+  const {api,fields,data} = await setup({homeRandomEntry:()=>drawn,homeRandomBay:()=>''});
+  drawn={key:'random:memory-a',item:data.sections[0].items[0].item,origin:{kind:'catalog'},reason:{label:'Al azar'}};
+  api.selectHomeRandomResult(drawn);
+  const panel=fields.homeSectionPanel;
+  assert.equal(panel.dataset.source,'random');
+  assert.match(panel.innerHTML,/id="homeSectionPanelTitle">Al azar<\/h3>/);
+  assert.match(panel.innerHTML,/data-click="home-programming-return"/);
+  assert.doesNotMatch(panel.innerHTML,/home-section-action/);
+  api.previewHomeEntry({id:'zzz',title:'Otra'});
+  assert.equal(panel.hidden,true);
+  assert.equal(panel.innerHTML,'');
+  api.previewHomeEntry(null);
+  assert.equal(panel.dataset.source,'daily');
+  assert.equal(panel.hidden,false);
+  api.setEditorialHome({...data,featured:[],sections:[]});
+  api.renderEditorialHero();
+  assert.equal(panel.hidden,true);
+});
+
+test('IP3 reescribir el panel nunca toca el campo: sólo escribe en #homeSectionPanel',async()=>{
+  const fake=fakeSearch();
+  const {api,fields} = await setup({mountHomeSearch:fake.mountHomeSearch});
+  api.renderEditorialHome();
+  const slotBefore=fields.homeSearchSlot.innerHTML, mountBefore=fields.homeSearchMount.innerHTML;
+  api.selectHomeShelfEntry('memory','memory-b');
+  api.returnHomeProgramming();
+  api.selectHomeShelfEntry('club','daily-a');
+  assert.equal(fields.homeSearchSlot.innerHTML,slotBefore);
+  assert.equal(fields.homeSearchMount.innerHTML,mountBefore);
+  assert.equal(fake.calls.mount.length,1);
+  assert.equal(fake.calls.focus,0,'el panel no pide el foco del campo');
+});
+
+test('IP3 el panel conserva el foco de su botón al reescribirse',async()=>{
+  const {api,fields,document} = await setup();
+  api.selectHomeShelfEntry('memory','memory-b');
+  const old={dataset:{homeFocus:'section-exit'}};
+  document.activeElement=old;
+  const panel=fields.homeSectionPanel;
+  panel.contains=node=>node===old;
+  let focused=false;
+  panel.querySelector=selector=>selector==='[data-home-focus="section-exit"]' ? {focus:()=>{focused=true;}} : null;
+  api.selectHomeShelfEntry('memory','memory-a');
+  assert.equal(focused,true);
+});
+
+test('missing information stays honest and the retired host is absent from production HTML',async()=>{
+  const {fields} = await setup();
+  assert.match(fields.spotlightStage.innerHTML,/Sin portada/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/Créditos por completar|data-image-count|Todavía no hay una sinopsis/);
+  const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
+  assert.doesNotMatch(html,/id="homeShelfPreview"|spotlight-preview|home-loading-summary/);
+  assert.match(html,/id="homeSelectionAnnouncement"[^>]*aria-live="polite"/);
+  assert.match(html,/<div id="homeSearchMount" class="home-search-mount"><\/div>\s*<section id="homeSectionPanel"[^>]*aria-label="Sección seleccionada"[^>]*hidden>/);
+});
+
+test('consulted poster follows source-qualified selection',async()=>{
   const {api,fields,data} = await setup();
   data.sections[0].items[1].item.page_image='/memory.jpg';
   api.selectHomeShelfEntry('memory','memory-b');
   let poster = api.homeConsultedPoster(data.sections[0].items[1]);
   assert.match(poster,/data-consulted-source="shelf:memory"/);
   assert.match(poster,/src="\/memory.jpg"/);
-  api.tickHomeAutoplay();
-  assert.equal(api.homeConsultedPoster(data.sections[0].items[1]),poster);
   api.selectHomeShelfEntry('club','daily-a');
   poster = api.homeConsultedPoster(data.sections[1].items[0]);
   assert.match(poster,/data-click="open-home-collection-detail" data-key="daily-a" data-source="shelf:club"/);
@@ -209,38 +299,11 @@ test('consulted poster follows source-qualified selection, not independent autop
   assert.match(poster,/Obra del Club/);
   assert.match(poster,/Sin portada/);
   assert.equal(api.homeConsultedPoster(null),'');
-  assert.equal((fields.spotlightStage.innerHTML.match(/class="spotlight-preview"/g)||[]).length,1);
-});
-
-test('summary remains open across selection, autoplay and day changes; a new catalog starts collapsed',async()=>{
-  const {api,fields,data} = await setup();
-  const toggle = {setAttribute(name,value){this[name]=value;}};
-  const body = {setAttribute(name,value){this[name]=value;},inert:true};
-  const preview = {dataset:{},querySelector:selector=>selector==='#homeSelectionSummary' ? body : toggle};
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-preview' ? preview : null;
-  assert.match(fields.spotlightStage.innerHTML,/aria-expanded="false"/);
-  api.toggleHomeSummary();
-  assert.equal(toggle['aria-expanded'],'true');
-  assert.equal(body.inert,false);
-  api.selectHomeShelfEntry('memory','memory-b');
-  api.tickHomeAutoplay();
-  assert.match(fields.spotlightStage.innerHTML,/data-summary-open="true"/);
-  assert.match(fields.spotlightStage.innerHTML,/aria-hidden="false">\s*<div class="home-console-disclosure-clip"/);
-  api.applyEditorialFeaturedDate('2026-09-09',{featured:[data.featured[0]]});
-  assert.match(fields.spotlightStage.innerHTML,/data-summary-open="true"/);
-  api.toggleHomeSummary();
-  assert.equal(body.inert,true);
-  assert.equal(body['aria-hidden'],'true');
-  api.selectPlaylistEntry('daily-a');
-  assert.match(fields.spotlightStage.innerHTML,/aria-hidden="true" inert/);
-  api.toggleHomeSummary();
-  api.setEditorialHome(data);
-  api.renderEditorialHero();
-  assert.match(fields.spotlightStage.innerHTML,/data-summary-open="false"/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/spotlight-preview/);
 });
 
 test('rerender restores the originating home surface when poster and console share an action',async()=>{
-  for (const surface of ['consultation-poster','consultation-view','consultation-summary','consultation-edit']) {
+  for (const surface of ['consultation-poster']) {
     const {api,fields,document}=await setup();
     const oldAction={dataset:{click:'open-detail-with-case-transition',homeFocus:surface}};
     document.activeElement=oldAction;
@@ -253,20 +316,106 @@ test('rerender restores the originating home surface when poster and console sha
   }
 });
 
-test('quick consultation uses source-qualified detail and never mistakes editorial reasons for synopsis',async()=>{
+test('el póster abre la ficha con la fuente calificada y no confunde razones editoriales con sinopsis',async()=>{
   const {api,fields,data}=await setup();
   data.sections[0].items[1].reason={detail:'Disponible por tu biblioteca'};
   api.selectHomeShelfEntry('memory','memory-b');
-  assert.match(fields.spotlightStage.innerHTML,/data-home-focus="consultation-view" data-click="open-detail-with-case-transition"/);
-  assert.match(fields.spotlightStage.innerHTML,/Todavía no hay una sinopsis/);
-  assert.doesNotMatch(api.homeSelectionPreview(data.sections[0].items[1]),/Disponible por tu biblioteca/);
+  assert.match(fields.spotlightStage.innerHTML,/data-home-focus="consultation-poster" data-click="open-detail-with-case-transition" data-id="memory-b"/);
+  assert.doesNotMatch(fields.spotlightStage.innerHTML,/Disponible por tu biblioteca|sinopsis/);
   api.selectHomeShelfEntry('club','daily-a');
   const html=fields.spotlightStage.innerHTML;
-  assert.match(html,/data-home-focus="consultation-view" data-click="open-home-collection-detail" data-key="daily-a" data-source="shelf:club"/);
+  assert.match(html,/data-home-focus="consultation-poster" data-click="open-home-collection-detail" data-key="daily-a" data-source="shelf:club"/);
   assert.doesNotMatch(html,/data-click="edit-home-shelf-entry"/);
 });
 
-test('U5 source/count/return are honest for 0, 1, 6, 20 and 100 editorial entries',async()=>{
+test('C3 previewHomeEntry shows a local work in the poster and null returns to the daily suggestion',async()=>{
+  const {api,fields,data}=await setup();
+  data.featured[0].item.page_image='/dia.jpg';
+  api.previewHomeEntry({key:'memory-b',item:{id:'memory-b',title:'Recuerdo B',year:'2000',page_image:'/b.jpg'},origin:{kind:'catalog'}});
+  let state=api.getHomePlaybackState();
+  assert.equal(state.selectionSource,'preview');
+  assert.equal(state.selectedEntryKey,'memory-b');
+  assert.equal(state.selectedItemId,'memory-b');
+  let html=fields.spotlightStage.innerHTML;
+  assert.match(html,/<span>Resultado<\/span>/);
+  assert.match(html,/aria-label="Ver ficha de Recuerdo B"/);
+  assert.match(html,/src="\/b.jpg"/);
+  assert.match(html,/data-click="open-detail-with-case-transition" data-id="memory-b"/);
+  assert.equal(fields.homeSelectionAnnouncement.textContent,'Consulta: Recuerdo B');
+  api.previewHomeEntry(null);
+  state=api.getHomePlaybackState();
+  assert.equal(state.selectionSource,'daily');
+  assert.equal(state.selectedEntryKey,'daily-a');
+  assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Diaria A"/);
+  assert.match(fields.spotlightStage.innerHTML,/src="\/dia.jpg"/);
+});
+
+test('C3 a flat external result has no local record: static poster, no detail, no personal state',async()=>{
+  const {api,fields}=await setup();
+  api.previewHomeEntry({title:'Película externa',year:'1999',page_image:'/ext.jpg',_membership:{state:'missing',item_id:null}});
+  const html=fields.spotlightStage.innerHTML;
+  assert.match(html,/alt="Portada de Película externa"/);
+  assert.match(html,/src="\/ext.jpg"/);
+  assert.match(html,/spotlight-poster-trigger is-static/);
+  assert.doesNotMatch(html,/open-detail-with-case-transition|open-home-collection-detail|edit-home-shelf-entry/);
+  assert.doesNotMatch(html,/Disponible|Pendiente|Vista|Estado resumido/);
+  assert.match(html,/<span>Resultado<\/span>/);
+  // Una flat con item_id local sí es una obra del archivo.
+  api.previewHomeEntry({title:'Ya la tengo',item_id:'memory-a'});
+  assert.match(fields.spotlightStage.innerHTML,/data-click="open-detail-with-case-transition" data-id="memory-a"/);
+  assert.equal(api.getHomePlaybackState().selectedItemId,'memory-a');
+  api.previewHomeEntry({});
+  assert.equal(api.getHomePlaybackState().selectionSource,'daily');
+});
+
+test('C3 previewHomeEntry(null) without an active preview keeps a VHS chosen by hand; a preview clears the VHS mark',async()=>{
+  const {api,fields}=await setup();
+  api.selectHomeShelfEntry('memory','memory-b');
+  api.previewHomeEntry(null);
+  assert.equal(api.getHomePlaybackState().selectionSource,'shelf:memory');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
+  api.previewHomeEntry({id:'zzz',title:'Otra'});
+  assert.equal(api.getHomePlaybackState().selectionSource,'preview');
+  assert.doesNotMatch(fields.homeSections.innerHTML,/data-vhs-state="selected"/);
+  api.previewHomeEntry(null);
+  assert.equal(api.getHomePlaybackState().playlistSource,'daily');
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
+});
+
+test('C3 a preview survives day refresh only until the programming is replaced',async()=>{
+  const {api,data}=await setup();
+  api.previewHomeEntry({id:'zzz',title:'Otra'});
+  api.setEditorialHome(data);
+  assert.equal(api.getHomePlaybackState().selectionSource,'daily');
+  api.renderEditorialHero();
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
+});
+
+test('homeSuggestions orders available daily first, then followed-collection gaps, without repeats',async()=>{
+  const {api,data}=await setup();
+  const entry=(key,title,origin='catalog',en_catalogo=false,id=key)=>({key,item:{id,title,year:'2001',en_catalogo},origin:{kind:origin}});
+  api.setEditorialHome({...data,
+    featured:[entry('f1','No disponible'),entry('f2','Disponible 1','catalog',true),entry('f3','Disponible 2','catalog',true)],
+    sections:[
+      {id:'a',title:'A',items:[entry('c1','Falta 1','collection'),entry('f2','Disponible 1','catalog',true),entry('s1','Estante 1')]},
+      {id:'b',title:'B',items:[entry('c2','Falta 2','collection'),entry('c1','Falta 1','collection')]}]});
+  assert.deepEqual(Array.from(api.homeSuggestions(),e=>e.item.title),['Disponible 1','Disponible 2','Falta 1','Falta 2','No disponible']);
+  assert.deepEqual(Array.from(api.homeSuggestions(3),e=>e.item.title),['Disponible 1','Disponible 2','Falta 1']);
+  assert.equal(api.homeSuggestions(99).length,5);
+  assert.equal(api.homeSuggestions(0).length,0);
+  // Una obra de catálogo y otra del Club con el mismo id no se confunden.
+  api.setEditorialHome({...data,featured:[entry('x','Local','catalog',true,'7')],sections:[{id:'a',title:'A',items:[entry('y','Del Club','collection',false,'7')]}]});
+  assert.deepEqual(Array.from(api.homeSuggestions(),e=>e.item.title),['Local','Del Club']);
+  api.setEditorialHome({...data,featured:[],sections:[]});
+  assert.equal(api.homeSuggestions().length,0);
+});
+
+test('homeSuggestions fills from the whole program when too little is available',async()=>{
+  const {api}=await setup();
+  assert.deepEqual(Array.from(api.homeSuggestions(),e=>e.item.title),['Obra del Club','Diaria A','Diaria B','Recuerdo A','Recuerdo B']);
+});
+
+test('U5 shelf selection is honest for 0, 1, 6, 20 and 100 editorial entries',async()=>{
   for (const count of [0,1,6,20,100]) {
     const {api,fields}=await setup();
     const data=sourceFixture(count);
@@ -275,40 +424,35 @@ test('U5 source/count/return are honest for 0, 1, 6, 20 and 100 editorial entrie
     assert.equal(api.activateHomeShelf('sample'),count>0);
     if (count>0) {
       api.selectHomeShelfEntry('sample',`shared-${count-1}`);
-      const html=fields.spotlightStage.innerHTML;
-      assert.equal((html.match(/data-playlist-entry=/g)||[]).length,count);
-      assert.match(html,new RegExp(`data-playlist-count>${count} ${count===1?'obra':'obras'}<`));
-      assert.match(html,/Selección del estante/);
-      assert.match(html,new RegExp(`data-long-list="${count > 6}"`));
-      assert.match(html,/Volver a programación/);
+      assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-playlist-entry=|spotlight-playlist/);
+      assert.match(fields.homeSections.innerHTML,new RegExp(`${count} ${count===1?'título':'títulos'}`));
       assert.equal(api.getHomePlaybackState().selectedEntryKey,`shared-${count-1}`);
     }
     api.returnHomeProgramming();
-    assert.match(fields.spotlightStage.innerHTML,/Cartelera de hoy/);
-    assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="home-programming-return"/);
+    assert.match(fields.spotlightStage.innerHTML,/<span>Sugerencia<\/span>/);
     api.selectHomeShelfEntry('club','shared-0');
     assert.equal(api.getHomePlaybackState().selectionSource,'shelf:club');
-    assert.match(fields.spotlightStage.innerHTML,/>Club 1<\/h3>/);
+    assert.match(fields.spotlightStage.innerHTML,/aria-label="Ver ficha de Club 1"/);
     assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
   }
 });
 
-test('U5 return preserves the daily poster and same-day control returns from a shelf',async()=>{
+test('U5 returning to programming focuses the poster only when asked and keeps the daily suggestion',async()=>{
   const {api,fields}=await setup();
-  api.tickHomeAutoplay();
-  const poster=api.getHomePlaybackState().carouselItemId;
   api.selectHomeShelfEntry('memory','memory-b');
   let focused=false;
-  fields.spotlightStage.querySelector=selector=>selector.includes('aria-pressed="true"') ? {focus(){focused=true;}} : null;
+  fields.spotlightStage.querySelector=selector=>selector==='[data-home-focus="consultation-poster"]' ? {focus(){focused=true;}} : null;
+  api.returnHomeProgramming();
+  assert.equal(focused,false);
+  api.selectHomeShelfEntry('memory','memory-b');
   api.returnHomeProgramming(true);
   assert.equal(focused,true);
-  assert.equal(api.getHomePlaybackState().carouselItemId,poster);
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
   api.activateHomeShelf('memory');
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
   await api.loadEditorialFeaturedDate('2026-09-10');
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
-  assert.equal(api.getHomePlaybackState().carouselItemId,poster);
+  assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
 });
 
 test('U5 passive Tab does not select, and each shelf has a semantic plaque and roving stop',async()=>{
@@ -325,20 +469,19 @@ test('U5 passive Tab does not select, and each shelf has a semantic plaque and r
   assert.match(fields.homeSections.innerHTML,/data-click="home-shelf-activate" data-section-id="memory" aria-pressed="true"/);
 });
 
-test('U5 removed source recovers to daily; emptied source retains honest count and return',async()=>{
+test('U5 removed source recovers to the daily suggestion; an emptied source shows the empty desk',async()=>{
   const {api,data,fields}=await setup();
   api.selectHomeShelfEntry('memory','memory-b');
   data.sections[0].items=[];
   api.renderEditorialHero();
   assert.equal(api.getHomePlaybackState().playlistSource,'shelf:memory');
-  assert.match(fields.spotlightStage.innerHTML,/data-playlist-count>0 obras/);
-  assert.match(fields.spotlightStage.innerHTML,/No hay obras en esta fuente/);
   assert.doesNotMatch(fields.spotlightStage.innerHTML,/data-click="edit-home-shelf-entry"/);
+  assert.match(fields.spotlightStage.innerHTML,/home-desk-note/);
   data.sections.splice(0,1);
   api.renderEditorialHero();
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'daily-a');
-  assert.match(fields.homeSelectionAnnouncement.textContent,/Volvimos a programación/);
+  assert.match(fields.homeSelectionAnnouncement.textContent,/Volvimos a la sugerencia del día/);
 });
 
 test('U5 shelf memory survives reordering and falls back after removal',async()=>{
@@ -357,61 +500,30 @@ test('U5 shelf memory survives reordering and falls back after removal',async()=
 
 test('U5 local alignment never calls scrollIntoView or crosses a source boundary',async()=>{
   const {api,fields}=await setup();
-  const table={scrollTop:0,getBoundingClientRect:()=>({top:0,bottom:100})};
-  const row={getBoundingClientRect:()=>({top:180,bottom:200}),scrollIntoView(){assert.fail('document scroll');}};
   const spine={getBoundingClientRect:()=>({left:150,right:200}),closest:()=>null,scrollIntoView(){assert.fail('document scroll');}};
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?table:selector.startsWith('[data-playlist-entry]')?row:null;
   fields.homeSections.getBoundingClientRect=()=>({left:0,right:100});
   fields.homeSections.querySelector=selector=>{
     assert.match(selector,/data-section-id="club"/);
     return spine;
   };
   api.selectHomeShelfEntry('club','daily-a');
-  assert.equal(table.scrollTop,100);
   assert.equal(fields.homeSections.scrollLeft,100);
 });
 
-test('U5 long-list alignment keeps the focused row below sticky column headings',async()=>{
-  const {api,fields}=await setup();
-  const table={scrollTop:150,dataset:{playlistSourceId:'shelf:memory'},
-    getBoundingClientRect:()=>({top:20,bottom:286}),
-    querySelector:()=>({getBoundingClientRect:()=>({height:38})})};
-  const row={getBoundingClientRect:()=>({top:30,bottom:68})};
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?table:selector.startsWith('[data-playlist-entry]')?row:null;
-  api.selectHomeShelfEntry('memory','memory-b');
-  assert.equal(table.scrollTop,122);
-});
-
-test('U5 autoplay preserves local scrolling but changing source resets it',async()=>{
-  const {api,fields}=await setup();
-  api.selectHomeShelfEntry('memory','memory-b');
-  const oldTable={scrollTop:240,scrollLeft:12,dataset:{playlistSourceId:'shelf:memory'}};
-  const nextTable={scrollTop:0,scrollLeft:0};
-  let replaced=false,markup=fields.spotlightStage.innerHTML;
-  Object.defineProperty(fields.spotlightStage,'innerHTML',{get:()=>markup,set:value=>{markup=value;replaced=true;}});
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?(replaced?nextTable:oldTable):null;
-  api.tickHomeAutoplay();
-  assert.equal(nextTable.scrollTop,240);
-  assert.equal(nextTable.scrollLeft,12);
-  replaced=false;
-  api.selectHomeShelfEntry('club','daily-a');
-  assert.equal(nextTable.scrollTop,0);
-  assert.equal(nextTable.scrollLeft,0);
-});
-
-test('U5 resizing keeps a focused row visible without changing selection or moving focus',async()=>{
+test('U5 resizing keeps a focused spine visible without changing selection or moving focus',async()=>{
   const {api,fields,document}=await setup();
   api.selectHomeShelfEntry('memory','memory-b');
-  const table={scrollTop:100,getBoundingClientRect:()=>({top:0,bottom:100})};
-  const row={getBoundingClientRect:()=>({top:140,bottom:178}),focus(){assert.fail('resize should not refocus');}};
-  fields.spotlightStage.querySelector=selector=>selector==='.spotlight-table-wrap'?table:selector.startsWith('[data-playlist-entry]')?row:null;
+  const spine={getBoundingClientRect:()=>({left:-30,right:20}),closest:()=>null,focus(){assert.fail('resize should not refocus');}};
+  fields.homeSections.getBoundingClientRect=()=>({left:0,right:100});
+  fields.homeSections.querySelector=()=>spine;
+  fields.homeSections.scrollLeft=50;
   document.activeElement={matches:()=>true};
   api.handleHomeResize();
-  assert.equal(table.scrollTop,178);
+  assert.equal(fields.homeSections.scrollLeft,20);
   assert.equal(api.getHomePlaybackState().selectedEntryKey,'memory-b');
   document.activeElement={matches:()=>false};
   api.handleHomeResize();
-  assert.equal(table.scrollTop,178);
+  assert.equal(fields.homeSections.scrollLeft,20);
 });
 
 test('U5 a delayed day response cannot replace a newer deliberate shelf selection',async()=>{
@@ -455,4 +567,71 @@ test('U5 failed day request preserves consultation and retry can succeed',async(
   assert.equal(api.editorialHome.generated_for,'2026-09-09');
   assert.equal(api.getHomePlaybackState().playlistSource,'daily');
   assert.equal(fields.homeFeedback.hidden,true);
+});
+
+function fakeSearch(){
+  const calls={mount:[],suggestions:[],empty:[],focus:0};
+  const handle={setSuggestions:list=>calls.suggestions.push(list),setEmptyCatalog:value=>calls.empty.push(value),focus(){calls.focus+=1;}};
+  return {calls,mountHomeSearch:(slot,options)=>{calls.mount.push(options);return handle;}};
+}
+
+test('IP2 el buscador se monta una sola vez y los datos nuevos sólo refrescan sugerencias',async()=>{
+  const fake=fakeSearch();
+  const {api,data} = await setup({mountHomeSearch:fake.mountHomeSearch,currentIdentity:{user:{username:'ana'}}});
+  api.renderEditorialHome();
+  assert.equal(fake.calls.mount.length,1);
+  assert.equal(fake.calls.mount[0].username,'ana');
+  assert.equal(fake.calls.mount[0].emptyCatalog,false);
+  assert.deepEqual(Array.from(fake.calls.mount[0].suggestions,e=>e.key),Array.from(api.homeSuggestions(),e=>e.key));
+  api.setEditorialHome({...data,featured:[],sections:[]});
+  api.renderEditorialHome();
+  api.renderEditorialHome();
+  assert.equal(fake.calls.mount.length,1,'no se vuelve a montar: perdería el foco');
+  assert.equal(fake.calls.suggestions.length,2);
+  assert.equal(fake.calls.suggestions.at(-1).length,0);
+  assert.equal(fake.calls.empty.at(-1),true);
+});
+
+test('IP2 onPreview, onExpand y onOpenItem se enganchan a Inicio, al router y a la ficha',async()=>{
+  const fake=fakeSearch();
+  const expanded=[],opened=[];
+  const {api} = await setup({mountHomeSearch:fake.mountHomeSearch,goToCollectionAddWithQuery:q=>expanded.push(q),openDetail:id=>opened.push(id)});
+  api.renderEditorialHome();
+  const options=fake.calls.mount[0];
+  options.onPreview({id:'memory-b',title:'Recuerdo B',year:'2000'});
+  assert.equal(api.getHomePlaybackState().selectionSource,'preview');
+  options.onPreview(null);
+  assert.equal(api.getHomePlaybackState().selectionSource,'daily');
+  options.onExpand('alien');
+  options.onOpenItem('memory-a');
+  assert.equal(JSON.stringify(expanded),'["alien"]');
+  assert.equal(JSON.stringify(opened),'["memory-a"]');
+});
+
+test('IP2 focusHomeSearch enfoca el campo y vuelve a Inicio sin foco de título si hace falta',async()=>{
+  const fake=fakeSearch();
+  const homes=[];
+  const {api,fields} = await setup({mountHomeSearch:fake.mountHomeSearch,currentView:'catalog',goHome:o=>homes.push(o)});
+  fields.homeView.hidden=true;
+  assert.equal(api.focusHomeSearch(),true);
+  assert.equal(JSON.stringify(homes),'[{"focusHeading":false}]');
+  assert.equal(fake.calls.focus,1);
+});
+
+test('IP2 en Inicio focusHomeSearch no navega',async()=>{
+  const fake=fakeSearch();
+  const homes=[];
+  const {api,fields} = await setup({mountHomeSearch:fake.mountHomeSearch,currentView:'home',goHome:o=>homes.push(o)});
+  fields.homeView.hidden=false;
+  api.focusHomeSearch();
+  assert.equal(homes.length,0);
+  assert.equal(fake.calls.focus,1);
+});
+
+test('IP2 catálogo vacío: el buscador reemplaza el llamado principal y quedan Importar y Club',async()=>{
+  const html=await readFile(new URL('../../src/movie_inbox/web/static/index.home.html',import.meta.url),'utf8');
+  const empty=html.slice(html.indexOf('id="homeEmpty"'));
+  assert.doesNotMatch(empty,/home-empty-catalog/);
+  assert.match(empty,/data-click="home-empty-import"/);
+  assert.match(empty,/data-click="home-empty-club"/);
 });

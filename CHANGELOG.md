@@ -17,6 +17,16 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ### Agregado
 
+- Inicio es ahora un mostrador de búsqueda [IP1/IP2/IP3]: un buscador con desplegable
+  (recientes, sugerencias, «En tu colección» y «Para agregar») y un único póster, un 20 %
+  más grande, que sigue la fila resaltada; se quitaron el carrusel, el autoplay, la tabla
+  de programación y la consola inferior (título, resumen, «Abrir ficha», «Editar mi
+  ficha»): el póster abre la ficha, donde viven la sinopsis y la edición. Al elegir un
+  VHS la placa y el lomo se resaltan y, bajo el buscador, un panel «Sección seleccionada»
+  muestra el título, la cantidad de títulos y «Ver colección», con «Volver a la
+  sugerencia» para salir; no mueve el foco del campo. `/api/search` acepta `membership=true` y marca cada resultado como
+  presente, a revisar o faltante; desde Inicio sólo se agrega lo exacto. Pegar un enlace
+  de IMDb, FilmAffinity o Jikan devuelve un único resultado. `/` enfoca el buscador.
 - Las fichas que sólo tienen un enlace a Wikipedia reciben su id de Wikidata, y el año
   si les falta [X12]. Es lo que permite reconocer la misma obra en dos idiomas. El
   servidor lo hace solo y despacio, 50 fichas cada 5 minutos

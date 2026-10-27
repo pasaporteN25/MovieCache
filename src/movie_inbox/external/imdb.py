@@ -31,6 +31,8 @@ class ImdbAdapter:
         intent = parse_search_query(query)
         if intent.source and intent.source != self.name:
             return []
+        if intent.source == self.name and not imdb_id_from_text(intent.canonical_url):
+            return []
         lookup = intent.external_id or intent.title or intent.director_query or query
         key = search_key(lookup).replace(" ", "_")
         if not key:
@@ -68,6 +70,11 @@ class ImdbAdapter:
                     "page_image": str(image.get("imageUrl") or ""),
                 }
             )
+        if intent.source == self.name:
+            # [IP] A pasted title address names one work: keep only that id,
+            # with the canonical URL, and skip the Wikidata bridge.
+            wanted = imdb_id_from_text(intent.canonical_url)
+            return [r for r in results if imdb_id_from_text(str(r["url"])) == wanted][:1]
         is_empty = not results
         needs_bridge = not intent.external_id and (
             is_empty

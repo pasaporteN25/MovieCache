@@ -85,11 +85,6 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         openDetail(id, { ...options, context: detailContextForTrigger(target) });
       }
 
-      export function openDetailForPersonalEdit(target, id) {
-        openDetail(id, { context: detailContextForTrigger(target) });
-        editPersonalRecord();
-      }
-
       export function personalRecordPanel(item) {
         if (detailPersonalEditing) return personalRecordEditor(item);
         const rating = normalizeRating(item.rating);
@@ -257,7 +252,7 @@ import { editorialPersonalIds } from "../surfaces/home.js";
         if (updateHistory && !fields.collectionView.hidden && !selectedDetailId) {
           syncCollectionRoute("replace", { focusCardId: id });
         }
-        detailReturnFocus = (activeElement?.dataset?.click?.startsWith("open-detail") || activeElement?.dataset?.click === "edit-home-shelf-entry")
+        detailReturnFocus = activeElement?.dataset?.click?.startsWith("open-detail")
           ? activeElement
           : activeElement?.closest?.(".dvd-card") ? activeElement : null;
         detailReturnCardId = id;
@@ -300,9 +295,9 @@ import { editorialPersonalIds } from "../surfaces/home.js";
           if (updateHistory) syncRoute({ movie: "" }, "replace");
           const currentCard = [...document.querySelectorAll(".dvd-card")]
             .find((card) => card.dataset.id === detailReturnCardId);
-          // Home autoplay replaces the console while a detail dialog is open.
-          const currentHomeAction = detailReturnFocus?.closest?.(".spotlight-preview, .home-consulted-poster")
-            ? [...document.querySelectorAll(".spotlight-preview [data-click], .home-consulted-poster [data-click]")].find((action) =>
+          // Home rewrites the consulted poster while a detail dialog is open.
+          const currentHomeAction = detailReturnFocus?.closest?.(".home-consulted-poster")
+            ? [...document.querySelectorAll(".home-consulted-poster [data-click]")].find((action) =>
               action.dataset.id === detailReturnCardId && action.dataset.click === detailReturnFocus.dataset.click
               && action.dataset.homeFocus === detailReturnFocus.dataset.homeFocus)
             : null;
