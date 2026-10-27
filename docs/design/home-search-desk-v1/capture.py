@@ -1,4 +1,4 @@
-"""Captura el mostrador de Inicio (IP1/IP2) con datos descartables e ilustrativos.
+"""Captura el mostrador de Inicio (IP1/IP2/IP3) con datos descartables e ilustrativos.
 
 Uso, desde la raíz del repositorio y con `.[browser-test]` instalado:
     python docs/design/home-search-desk-v1/capture.py
@@ -55,7 +55,8 @@ def capture() -> None:
 
             payload["home"]["featured"] = [entry(index, "daily") for index in range(4)]
             payload["home"]["sections"] = [
-                {"id": "available", "title": "Disponible esta noche", "items": [entry(i, "disp") for i in range(8)]},
+                {"id": "available", "title": "Disponible esta noche",
+                 "action": {"kind": "catalog", "label": "Ver colección", "filters": {}}, "items": [entry(i, "disp") for i in range(8)]},
                 {"id": "memory", "title": "Tu archivo pide memoria", "items": [entry(i + 2, "mem") for i in range(6)]},
             ]
             route.fulfill(response=response, json=payload)
@@ -99,7 +100,17 @@ def capture() -> None:
             page.evaluate("window.scrollTo(0, 0)")
             page.screenshot(path=str(base / f"search-{width}.png"), animations="disabled")
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
-            shots += 3
+            # IP3: un lomo elegido enciende su placa y su lomo y abre el panel de sección.
+            page.goto(case.base_url)
+            wait_for_app_ready(page)
+            page.evaluate("document.fonts.ready")
+            page.locator('[data-home-section="available"] .home-shelf-tape').nth(2).click()
+            page.wait_for_function("document.querySelector('#homeSectionPanel').dataset.source === 'shelf'")
+            page.wait_for_function("document.querySelector('.home-consulted-poster img')?.complete")
+            page.evaluate("window.scrollTo(0, 0)")
+            page.screenshot(path=str(base / f"section-{width}.png"), animations="disabled")
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
+            shots += 4
         print(json.dumps({"screenshots": shots, "overflow": False}))
     finally:
         case.tearDown()

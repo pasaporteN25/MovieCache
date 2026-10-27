@@ -3,7 +3,7 @@ import { handlePosterError, handlePosterLoad } from "./card.js";
 import { handleBackCoverImageError, handleBackCoverImageLoad } from "./back-cover-images.js";
 import { toggleBackCoverSynopsis } from "./back-cover.js";
 import { load, logout } from "./catalog-data.js";
-import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, editVhsDossier, findLinkForCatalog, handleBackCoverKeydown, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailForPersonalEdit, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, returnToVhsBack, saveDetailChanges, saveEditorChanges, saveMetadata, savePersonal, selectDetailSection } from "./detail.js";
+import { cancelPersonalEdit, closeDetail, deleteCatalogItem, discardDetailChanges, editPersonalRecord, editVhsDossier, findLinkForCatalog, handleBackCoverKeydown, handleBeforeUnload, handleDetailFormMutation, hasUnsavedDetailChanges, keepEditingDetail, navigateDetail, openAnotherRandomDetail, openDetail, openDetailFromTrigger, openDetailWithCaseTransition, openRandomDetail, requestDetailTransition, returnToVhsBack, saveDetailChanges, saveEditorChanges, saveMetadata, savePersonal, selectDetailSection } from "./detail.js";
 import { fields } from "./fields.js";
 import { changeMergeChoice, changeMergeSurvivor, closeMergeComparator, mergeSearchResult, renderMergeComparator, retryMergeComparison, submitReviewedMerge } from "./merge.js";
 import { changeInboxMode, goHome, goToAdmin, goToClub, goToCollectionAdd, goToCollectionRoot, goToCollectionSearch, goToImports, goToInbox, restoreRoute, returnToCollection, setInboxMode } from "./router.js";
@@ -16,7 +16,7 @@ import { initializeCollectionFilterPanel, addCollectionFilterSelection, applyCol
 import { addSearchResult, cancelExternalSearch, clearManualSearch, closeDescriptionDialog, dismissDuplicateReview, forceAddSearchResult, nextWikiReview, openSearchDescription, prepareManualMerge, previousWikiReview, renderManualResults, restoreDescriptionFocus, retryExternalSource, runSearch, showMoreCatalogResults, showMoreManualResults } from "../surfaces/catalog-search.js";
 import { clearMergeSelection, mergeItems, mergeSelected, toggleMergeSelection } from "../surfaces/merge-selection.js";
 import { addCollectionItems, addMissingCollectionItems, addSelectedCollectionItems, changeClubMode, changeCollectionSelection, closeCollectionDetail, closeSharedDetail, loadClub, openCollection, openSharedDetail, selectClubCatalog, showMoreClubItems, toggleCollectionFollow, toggleMissingCollectionSelection } from "../surfaces/club.js";
-import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, focusHomeSearch, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, syncHomeFurnitureControls, toggleHomeSummary } from "../surfaces/home.js";
+import { activateHomeSection, activateHomeShelf, addHomeCollectionItem, focusHomeSearch, getHomePlaybackState, goToHomeCollection, handleHomeFurnitureWheel, handleHomeResize, moveHomeCategorySelector, moveHomeFurniture, moveHomeShelf, moveHomeShelfBay, openHomeCollectionDetail, refreshEditorialHome, returnHomeProgramming, scrollHomeFurniture, selectHomeCategory, selectHomeShelfEntry, syncHomeFurnitureControls } from "../surfaces/home.js";
 import { isTextEntryTarget } from "../surfaces/home-search.js";
 import { drawHomeRandom, includeUnavailableInHomeRandom, syncHomeRandomScope } from "../surfaces/home-random.js";
 import { autoResolveDuplicates, changeCurationHistoryMode, clearCurationHistory, curationHistoryMode, handleCurationClick, loadCurationQueue, moveCurationQueueSelection, resolveIdentities, searchCurationQueue } from "../surfaces/inbox-curation.js";
@@ -73,13 +73,11 @@ import { changeScannerHistoryMode, changeScannerQueueFilter, clearScannerHistory
           "add-home-collection-item": () => addHomeCollectionItem(target.dataset.collectionId || "", id, target),
           "open-home-collection": () => goToHomeCollection(target.dataset.collectionId || id),
           "home-section-action": () => activateHomeSection(target.dataset.sectionId || ""),
-          "home-summary-toggle": toggleHomeSummary,
           "home-shelf-select": () => selectHomeShelfEntry(target.dataset.sectionId || "", target.dataset.entryKey || "", true),
           "home-category-select": () => selectHomeCategory(target.dataset.sectionId || "", true),
           "home-shelf-scroll": () => scrollHomeFurniture(target.dataset.direction || "next"),
           "home-shelf-activate": () => activateHomeShelf(target.dataset.sectionId || "", true),
           "home-programming-return": () => returnHomeProgramming(true),
-          "edit-home-shelf-entry": () => openDetailForPersonalEdit(target, id),
           "open-detail-with-case-transition": () => openDetailWithCaseTransition(target, id),
           "home-empty-import": goToImports,
           "home-empty-club": goToClub,

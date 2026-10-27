@@ -107,7 +107,8 @@
 #homeView .home-shelf-tape.vhs-spine[data-vhs-state="selected"] {
   border-color: #e980b3;
   box-shadow: inset -5px 0 3px rgb(0 0 0 / 90%),
-    inset 2px 0 1px rgb(233 128 179 / 65%), 2px 3px 2px rgb(0 0 0 / 90%);
+    inset 2px 0 1px rgb(233 128 179 / 65%), 2px 3px 2px rgb(0 0 0 / 90%),
+    0 0 0 2px rgb(233 128 179 / 80%), 0 0 16px rgb(233 128 179 / 45%);
   color: #ffe0a2;
   transform: none;
 }

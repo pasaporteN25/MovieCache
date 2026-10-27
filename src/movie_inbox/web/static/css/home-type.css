@@ -81,9 +81,7 @@
   .home-furniture-display,
   .home-furniture-display *,
   .home-furniture-format-panel,
-  .home-furniture-format-panel *,
-  .spotlight-preview,
-  .spotlight-preview *
+  .home-furniture-format-panel *
 ) {
   font-family: var(--font-home-data);
   font-weight: 400;

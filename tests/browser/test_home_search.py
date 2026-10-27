@@ -270,7 +270,7 @@ class HomeSearchTests(unittest.TestCase):
         page.keyboard.press("ArrowDown")
         self.assertEqual(poster.get_attribute("data-consulted-key"), "akira")
         self.assertEqual(poster.locator(".spotlight-selector-heading").text_content(), "Resultado")
-        self.assertEqual(page.locator("#spotlight-selected-title").text_content(), "Akira")
+        fixture.wait_for_consulted_title(page, "Akira")
 
         page.keyboard.press("Escape")
         self.assertEqual(poster.get_attribute("data-consulted-key"), suggested_key)
@@ -299,8 +299,12 @@ class HomeSearchTests(unittest.TestCase):
         # Escribiendo en otro campo de texto, `/` es un carácter más.
         page.locator("#catalogButton").click()
         page.wait_for_selector("#collectionView:not([hidden])")
-        # `press` sobre el locator enfoca el campo en el mismo paso, sin depender de que la
-        # vista de Colección termine de mover el foco por su cuenta.
+        # La vista de Colección mueve el foco a su título al abrirse: se espera a que termine
+        # para que no le quite el foco al campo después. `press` enfoca y escribe en un paso.
+        page.wait_for_function(
+            "document.activeElement?.closest('#collectionView') "
+            "&& document.activeElement.classList.contains('view-focus-target')"
+        )
         page.locator("#query").press("/")
         self.assertEqual(page.locator("#query").input_value(), "/")
         self.assertTrue(page.locator("#collectionView").is_visible())

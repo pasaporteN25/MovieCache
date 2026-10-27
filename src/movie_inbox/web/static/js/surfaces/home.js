@@ -35,7 +35,6 @@ import { mountHomeSearch } from "./home-search.js";
       let previewEntry = null;
       let homeDateRequestId = 0;
       let homeDateRequestPending = false;
-      let homeSummaryExpanded = false;
       const HOME_SHELF_BAY_LIMIT = 4;
       const HOME_MOBILE_MEDIA = "(max-width: 860px)";
 
@@ -54,7 +53,6 @@ import { mountHomeSearch } from "./home-search.js";
         selectedEntryKey = "";
         selectionSource = "daily";
         previewEntry = null;
-        homeSummaryExpanded = false;
         if (fields.homeSelectionAnnouncement) fields.homeSelectionAnnouncement.textContent = "";
       }
 
@@ -77,13 +75,6 @@ import { mountHomeSearch } from "./home-search.js";
         // Removed entries resolve to the first valid work, never an unrelated
         // work that happens to have inherited the old numerical position.
         return index < 0 ? 0 : index;
-      }
-
-      function homeDurationLabel(item) {
-        const value = item?.duration_minutes ?? item?.duration ?? item?.runtime ?? "";
-        const text = String(value).trim();
-        if (!text) return "—";
-        return /\bmin(?:uto)?s?\b/i.test(text) ? text : `${text} min`;
       }
 
       function playlistEntries(source = playlistSource) {
@@ -254,7 +245,7 @@ import { mountHomeSearch } from "./home-search.js";
         };
       }
 
-      // Buscador de Inicio (IP2). Se monta una sola vez en #homeSearchSlot: los datos nuevos
+      // Buscador de Inicio (IP2). Se monta una sola vez en #homeSearchMount (dentro de #homeSearchSlot): los datos nuevos
       // sólo refrescan sus sugerencias, así que escribir o tener el foco no se interrumpe.
       let homeSearch = null;
 
@@ -264,7 +255,7 @@ import { mountHomeSearch } from "./home-search.js";
           homeSearch.setEmptyCatalog?.(emptyCatalog);
           return homeSearch;
         }
-        const slot = fields.homeSearchSlot;
+        const slot = fields.homeSearchMount;
         if (!slot) return null;
         homeSearch = mountHomeSearch(slot, {
           username: currentIdentity?.user?.username || "",
@@ -326,6 +317,7 @@ import { mountHomeSearch } from "./home-search.js";
         }
         const selectedEntry = ensureHomeSelection(playlistEntries());
         fields.spotlightStage.classList.toggle("is-empty", !selectedEntry?.item);
+        renderHomeSectionPanel();
         fields.spotlightStage.querySelector?.(".spotlight-layout")?.classList.remove("home-loading-hero");
         if (!selectedEntry?.item) {
           host.innerHTML = `<div class="home-desk-note">
@@ -334,7 +326,7 @@ import { mountHomeSearch } from "./home-search.js";
           </div>`;
           return;
         }
-        host.innerHTML = `${homeConsultedPoster(selectedEntry)}${homeSelectionPreview(selectedEntry)}`;
+        host.innerHTML = homeConsultedPoster(selectedEntry);
         if (activeElement && host.contains(activeElement) === false) {
           const target = focusSurface ? host.querySelector(`[data-home-focus="${CSS.escape(focusSurface)}"]`) : null;
           (target || host.querySelector('[data-home-focus="consultation-poster"]'))?.focus({ preventScroll: true });
@@ -652,7 +644,7 @@ import { mountHomeSearch } from "./home-search.js";
         const countLabel = `${entries.length} ${entries.length === 1 ? "título" : "títulos"}`;
         // El estante conserva su propia selección, independiente del póster consultado.
         const selectedIndex = rememberedShelfIndex(sectionId, entries);
-        return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
+        return `<section class="home-program home-shelf-bay" data-home-section="${escapeAttr(sectionId)}" data-bay-index="${sectionIndex}" data-active="${active}" data-selected="${selectionSource === `shelf:${sectionId}`}" aria-labelledby="home-section-${escapeAttr(sectionId)}">
           <h2 id="home-section-${escapeAttr(sectionId)}" class="home-shelf-heading"><button type="button" class="sr-only home-shelf-bay-plaque" data-click="home-shelf-activate" data-section-id="${escapeAttr(sectionId)}" aria-pressed="${playlistSource === `shelf:${sectionId}`}" title="${escapeAttr(section.title || "Selección")}"><span>${escapeHtml(section.title || "Selección")}</span><small>${escapeHtml(countLabel)}</small></button></h2>
           <div class="home-shelf-rail" role="group" aria-label="Opciones de ${escapeAttr(section.title || "la estantería")}">
             ${entries.map((entry, index) => homeShelfTape(entry, index, sectionId, selectionSource === `shelf:${sectionId}` && entryKey(entry, index) === selectedEntryKey, index === selectedIndex)).join("")}
@@ -755,86 +747,47 @@ import { mountHomeSearch } from "./home-search.js";
         </aside>`;
       }
 
-      function homeFurnitureFact(label, value) {
-        return `<div><dt>${escapeHtml(label)}</dt><dd title="${escapeAttr(value)}">${escapeHtml(value)}</dd></div>`;
-      }
-
-      // El resumen se abre sin reconstruir la cartelera ni mover el foco.
-      // Su estado pertenece a la consulta, no a una película en particular.
-      export function toggleHomeSummary() {
-        const preview = fields.spotlightStage.querySelector(".spotlight-preview");
-        const toggle = preview?.querySelector('[data-click="home-summary-toggle"]');
-        const body = preview?.querySelector("#homeSelectionSummary");
-        if (!toggle || !body) return;
-        homeSummaryExpanded = !homeSummaryExpanded;
-        preview.dataset.summaryOpen = String(homeSummaryExpanded);
-        toggle.setAttribute("aria-expanded", String(homeSummaryExpanded));
-        body.setAttribute("aria-hidden", String(!homeSummaryExpanded));
-        body.inert = !homeSummaryExpanded;
-      }
-
-      // La barra mantiene identidad, estados y acceso a la ficha siempre visibles.
-      // Sinopsis, créditos y edición se consultan en el despliegue, sin repetir imágenes.
-      export function homeSelectionPreview(entry) {
-        if (!entry?.item) return "";
-        const item = entry.item;
-        const origin = entry.origin || {};
+      // Panel «Sección seleccionada» (bajo el campo de búsqueda). Vive en #homeSectionPanel,
+      // hermano del montaje del buscador: reescribirlo nunca toca el campo ni su foco.
+      // Con el desplegable abierto el CSS lo oculta. Un resultado de búsqueda no lo muestra.
+      export function homeSectionPanelMarkup() {
+        const exit = '<button type="button" class="home-section-panel-exit" data-click="home-programming-return" data-home-focus="section-exit">Volver a la sugerencia</button>';
+        if (selectionSource === "daily") {
+          return `<p class="home-section-panel-kicker">Sugerencia del día</p>
+            <p class="home-section-panel-note">Una obra para hoy, elegida de tu archivo. Tocá un lomo de la videoteca para consultar otra, o buscá arriba.</p>`;
+        }
+        if (selectionSource === "random") {
+          return `<p class="home-section-panel-kicker">Sección seleccionada</p>
+            <h3 class="home-section-panel-title" id="homeSectionPanelTitle">Al azar</h3>
+            <p class="home-section-panel-count">Una obra sorteada de tu catálogo</p>
+            <div class="home-section-panel-actions">${exit}</div>`;
+        }
         const sectionId = selectionSource.startsWith("shelf:") ? selectionSource.slice(6) : "";
         const section = sectionId ? homeSectionById(sectionId) : null;
-        const title = displayTitle(item) || "Sin título";
-        const summary = String(item.description || item.wikipedia_extract || "").trim();
-        const external = homeEntryIsExternal(entry);
-        const contextLabel = origin.kind === "collection"
-          ? `En ${origin.collection_title || "una colección seguida"}`
-          : external ? "Resultado de búsqueda"
-          : selectionSource === "preview" ? "Resultado de tu archivo"
-          : selectionSource === "random" ? "Al azar" : section?.title || "Sugerencia del día";
-        const categoryAction = section?.action?.kind
-          ? `<button class="home-furniture-category-action" type="button" data-click="home-section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(section.action.label || "Ver colección")}</button>`
+        if (!section) return "";
+        const count = Array.isArray(section.items) ? section.items.length : 0;
+        const action = section.action?.kind
+          ? `<button type="button" class="home-section-panel-action" data-click="home-section-action" data-home-focus="section-action" data-section-id="${escapeAttr(sectionId)}">${escapeHtml(section.action.label || "Ver colección")}</button>`
           : "";
-        const duration = homeDurationLabel(item);
-        const metadata = [item.year, item.kind, firstListValue(item.genres), duration === "—" ? "" : duration]
-          .filter(Boolean).join(" · ") || "Ficha por completar";
-        const credits = [["Dirección", listText(item.directors, 2)], ["Guion", listText(item.writers, 2)], ["Reparto", listText(item.cast, 3)]]
-          .filter(([, value]) => value);
-        const available = availabilityState(item).effective;
-        const watched = item.status === "watched";
-        const viewAction = external ? "" : `<button class="spotlight-preview-action" type="button" data-home-focus="consultation-view" ${homeConsultationAction(entry)}>${origin.kind === "collection" ? "Ver ficha del Club" : "Abrir ficha"}<span aria-hidden="true">→</span></button>`;
-        const editAction = origin.kind === "catalog"
-          ? `<button class="home-console-edit" type="button" data-home-focus="consultation-edit" data-click="edit-home-shelf-entry" data-id="${escapeAttr(item.id || "")}">Editar mi ficha</button>` : "";
-        return `<aside class="spotlight-preview" aria-labelledby="spotlight-selected-title" data-summary-open="${homeSummaryExpanded}" data-selection-source="${escapeAttr(selectionSource)}" data-selected-entry-key="${escapeAttr(selectedEntryKey)}" data-selected-item-id="${escapeAttr(selectedItemId)}">
-          <div class="home-console-header">
-            <div class="spotlight-copy">
-              <h3 id="spotlight-selected-title">${escapeHtml(title)}</h3>
-              <div class="home-console-meta">
-                <span class="spotlight-metadata">${escapeHtml(metadata)}</span>
-                ${external ? "" : `<dl class="spotlight-preview-facts" aria-label="Estado resumido">
-                  <div data-fact="access" data-state="${available ? "on" : "off"}"><dt>Acceso</dt><dd>${available ? "Disponible" : "No disponible"}</dd></div>
-                  <div data-fact="status" data-state="${watched ? "on" : "off"}"><dt>Estado</dt><dd>${watched ? "Vista" : "Pendiente"}</dd></div>
-                </dl>`}
-              </div>
-            </div>
-            <div class="spotlight-preview-actions">
-              <button class="home-console-toggle" type="button" data-click="home-summary-toggle" data-home-focus="consultation-summary" aria-expanded="${homeSummaryExpanded}" aria-controls="homeSelectionSummary">Resumen<svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path d="m3 6 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-              ${viewAction}
-            </div>
-          </div>
-          <div id="homeSelectionSummary" class="home-console-disclosure" aria-hidden="${!homeSummaryExpanded}"${homeSummaryExpanded ? "" : " inert"}>
-            <div class="home-console-disclosure-clip">
-              <div class="home-console-body">
-                <section class="spotlight-copy home-console-synopsis" aria-label="Sinopsis">
-                  <span class="home-console-label">Sinopsis</span>
-                  <p>${escapeHtml(summary || "Todavía no hay una sinopsis para esta obra.")}</p>
-                  <div class="home-console-heading"><strong>${escapeHtml(contextLabel)}</strong>${categoryAction}</div>
-                </section>
-                ${credits.length || editAction ? `<section class="home-console-details" aria-label="Créditos y edición">
-                  ${credits.length ? `<dl class="home-furniture-credits">${credits.map(([label, value]) => homeFurnitureFact(label, value)).join("")}</dl>` : ""}
-                  ${editAction}
-                </section>` : ""}
-              </div>
-            </div>
-          </div>
-        </aside>`;
+        return `<p class="home-section-panel-kicker">Sección seleccionada</p>
+          <h3 class="home-section-panel-title" id="homeSectionPanelTitle">${escapeHtml(section.title || "Selección")}</h3>
+          <p class="home-section-panel-count">${count} ${count === 1 ? "título" : "títulos"}</p>
+          <div class="home-section-panel-actions">${action}${exit}</div>`;
+      }
+
+      function renderHomeSectionPanel() {
+        const panel = fields.homeSectionPanel;
+        if (!panel) return;
+        const activeElement = panel.contains?.(document.activeElement) ? document.activeElement : null;
+        const focusSurface = activeElement?.dataset?.homeFocus || "";
+        const markup = selectionSource === "preview" || !selectedEntryKey ? "" : homeSectionPanelMarkup();
+        panel.dataset.source = selectionSource.startsWith("shelf:") ? "shelf" : selectionSource;
+        panel.hidden = !markup;
+        if (panel.innerHTML !== markup) panel.innerHTML = markup;
+        if (activeElement && markup) {
+          const target = focusSurface ? panel.querySelector?.(`[data-home-focus="${CSS.escape(focusSurface)}"]`) : null;
+          (target || panel.querySelector?.("button"))?.focus?.({ preventScroll: true });
+        }
       }
 
       function announceHomeSelection() {

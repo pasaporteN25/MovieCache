@@ -88,7 +88,7 @@ export function homeRandomBay(selected = false) {
   const titleLength = Array.from(copy.title).length;
   const lengthClass = titleLength <= 22 ? "short" : titleLength <= 36 ? "long" : "xlong";
   const vhsState = selected && ["available", "unavailable", "out-of-scope"].includes(state) ? "selected" : "closed";
-  return `<section class="home-program home-random-bay" data-home-random data-random-state="${state}" aria-labelledby="home-random-title">
+  return `<section class="home-program home-random-bay" data-home-random data-selected="${vhsState === "selected"}" data-random-state="${state}" aria-labelledby="home-random-title">
     <h2 id="home-random-title" class="home-shelf-heading"><span class="home-random-plaque"><span>Al azar</span><small>${escapeHtml(scopeLabel())}</small></span></h2>
     <div class="home-random-rail">
       <button class="home-shelf-tape vhs-spine home-random-tape" type="button" data-click="home-random-draw" data-vhs-state="${vhsState}" data-random-state="${state}" data-title-length="${lengthClass}" aria-label="${escapeAttr(copy.label)}"${state === "busy" ? ' aria-busy="true"' : ""}>

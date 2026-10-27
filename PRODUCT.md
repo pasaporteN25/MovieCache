@@ -112,7 +112,10 @@ el catalogo propio sigue siendo la autoridad y permanece bajo control del usuari
   aplicacion para obtener un estado coherente de SQLite.
 - `Inicio` es un mostrador de busqueda: a la izquierda un buscador con desplegable
   (recientes y sugerencias con el campo vacio; `En tu coleccion` y `Para agregar` al
-  escribir) y a la derecha un unico poster que sigue a la fila resaltada. Desde el
+  escribir) y a la derecha un unico poster que sigue a la fila resaltada y abre la ficha
+  (no hay consola inferior: sinopsis y edicion se alcanzan desde la ficha). Al elegir un
+  VHS, un panel `Seccion seleccionada` bajo el campo ofrece `Ver coleccion` y
+  `Volver a la sugerencia`. Desde el
   desplegable solo se agrega lo exacto (`+ Pendiente`); una coincidencia dudosa pasa a
   `Revisar` y nunca escribe, y una obra ya presente abre la ficha local. Enter sin fila
   amplia a `Coleccion` en modo agregar con la consulta. La programacion editorial diaria

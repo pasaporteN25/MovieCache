@@ -50,7 +50,6 @@
   .hs-root[data-open="true"] .hs-close { display: inline-block; flex: 0 0 auto; }
   .hs-root[data-open="true"] .hs-panel { max-height: none; min-height: 0; }
   #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .home-consulted-poster,
-  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .home-desk-note,
-  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .spotlight-preview { display: none; }
+  #homeView .spotlight-layout:has(.hs-root[data-open="true"]) .home-desk-note { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .hs-root * { transition: none !important; animation: none !important; } }
