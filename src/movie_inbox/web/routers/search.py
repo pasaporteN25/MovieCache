@@ -10,15 +10,21 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from movie_inbox.application.catalog_service import classify_incoming
 from movie_inbox.application.search_service import (
     group_external_results,
     rank_catalog_candidates,
     search_catalog_items,
 )
+from movie_inbox.domain.catalog import normalize_item
 from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.domain.search import external_result_score, parse_search_query
 from movie_inbox.infrastructure.external_catalog import external_sources_snapshot
-from movie_inbox.web.catalog_api import enrich_selected_result, search_sources
+from movie_inbox.web.catalog_api import (
+    enrich_selected_result,
+    item_from_search_result,
+    search_sources,
+)
 from movie_inbox.web.dependencies import (
     authorized_json,
     require_ready_identity,
@@ -29,6 +35,21 @@ from movie_inbox.web.dependencies import (
 router = APIRouter()
 
 
+def result_membership(rows: list[dict[str, Any]], result: dict[str, Any]) -> dict[str, Any]:
+    """[IP] Si un resultado externo ya está en la colección. Sólo lee, sin red."""
+
+    try:
+        incoming = normalize_item(item_from_search_result(result))
+    except ValueError:
+        return {"state": "missing", "item_id": None}
+    verdict, extra = classify_incoming(rows, incoming)
+    if verdict in {"duplicate", "strong_match"}:
+        return {"state": "present", "item_id": extra.get("existing_id") or None}
+    if verdict == "possible_duplicate":
+        return {"state": "review", "item_id": None}
+    return {"state": "missing", "item_id": None}
+
+
 @router.get("/api/search", dependencies=[Depends(require_token)])
 def search(
     request: Request,
@@ -36,6 +57,7 @@ def search(
     source: str = "all",
     external: bool = True,
     catalog: bool = True,
+    membership: bool = False,
     identity: AuthenticatedIdentity = Depends(require_ready_identity),
 ) -> JSONResponse:
     catalog_results: list[dict[str, Any]] = []
@@ -56,6 +78,10 @@ def search(
         # discovery label is applied once, from the query itself.
         for result in results:
             result["_search"].update(reason="director_match", matched_field="director")
+    if membership:
+        _, _, member_rows = session_catalog_rows(request, identity)
+        for result in results:
+            result["_membership"] = result_membership(member_rows, result)
     source_groups = group_external_results(results)
     print(
         f"[catalog-viewer] search query={q!r} source={source} "

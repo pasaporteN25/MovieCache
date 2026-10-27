@@ -137,6 +137,45 @@ def _stale_personal_fields(item: Mapping[str, Any], base: Mapping[str, Any]) -> 
     ]
 
 
+def classify_incoming(
+    items: Sequence[Mapping[str, Any]],
+    incoming: Mapping[str, Any],
+    *,
+    strong: bool = True,
+) -> tuple[str, dict[str, Any]]:
+    """Cómo se ubica `incoming` frente a `items`, sin escribir nada.
+
+    Es la clasificación que usa `CatalogService.append_item` y que reutiliza la
+    búsqueda para marcar la pertenencia de un resultado externo. No agrega reglas
+    de matching: sólo ordena las que ya existen. Devuelve `(veredicto, extra)`:
+
+    - `duplicate`: mismo id o algún enlace externo compartido
+      (`extra["existing_id"]` es la primera obra que coincide).
+    - `strong_match`: una única obra acepta el match (`extra["existing_id"]`);
+      sólo se evalúa con `strong=True`.
+    - `possible_duplicate`: hay candidatas para revisar (`extra["candidates"]`,
+      hasta 5).
+    - `new`: ninguna de las anteriores.
+    """
+
+    item_urls = external_urls(incoming)
+    for existing in items:
+        if incoming.get("id") == existing.get("id") or (
+            item_urls and item_urls & external_urls(existing)
+        ):
+            return "duplicate", {"existing_id": existing.get("id")}
+    if strong:
+        strong_matches = [
+            existing for existing in items if decide_match(existing, incoming).accepted
+        ]
+        if len(strong_matches) == 1:
+            return "strong_match", {"existing_id": strong_matches[0].get("id")}
+    candidates = possible_duplicate_candidates(items, incoming)
+    if candidates:
+        return "possible_duplicate", {"candidates": candidates[:5]}
+    return "new", {}
+
+
 class CatalogService:
     def __init__(self, repository: CatalogRepository) -> None:
         self.repository = repository
@@ -156,21 +195,13 @@ class CatalogService:
             if action == "merge":
                 merged = merge_into_existing(items, normalized, target_id)
                 return merged, (merged, "merged" if merged else "merge_target_not_found", {})
-            item_urls = external_urls(normalized)
-            if any(
-                normalized.id == existing.id or (item_urls and item_urls & external_urls(existing))
-                for existing in items
-            ):
+            verdict, extra = classify_incoming(items, normalized, strong=action == "check")
+            if verdict == "duplicate":
                 return False, (False, "duplicate", {})
-            if action == "check":
-                strong_matches = [
-                    existing for existing in items if decide_match(existing, normalized).accepted
-                ]
-                if len(strong_matches) == 1:
-                    return False, (False, "strong_match", {"existing_id": strong_matches[0].id})
-            candidates = possible_duplicate_candidates(items, normalized)
-            if action == "check" and candidates:
-                return False, (False, "possible_duplicate", {"candidates": candidates[:5]})
+            if verdict == "strong_match":
+                return False, (False, "strong_match", extra)
+            if verdict == "possible_duplicate" and action == "check":
+                return False, (False, "possible_duplicate", extra)
             items.insert(0, normalized)
             return True, (True, "added", {})
 
