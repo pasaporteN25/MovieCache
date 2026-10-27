@@ -206,8 +206,11 @@ export function mountHomeSearch(container, options = {}) {
         <button type="button" class="hs-remove" tabindex="-1" data-remove="${escapeHtml(row.text)}" aria-label="Quitar ${escapeHtml(row.text)} de recientes">×</button></div>`;
     }
     if (row.kind === "suggestion") {
+      // Las sugerencias llegan como entradas editoriales ({ key, item, origin }) o ya planas.
       const e = row.entry;
-      return `<div ${base}>${thumb(e.image)}<span class="hs-text"><strong>${escapeHtml(e.title)}</strong>${e.year ? ` <span class="hs-meta">${escapeHtml(e.year)}</span>` : ""}</span></div>`;
+      const item = e.item || e;
+      const year = e.year || item.year;
+      return `<div ${base}>${thumb(e.image || imageOf(item))}<span class="hs-text"><strong>${escapeHtml(e.title || titleOf(item))}</strong>${year ? ` <span class="hs-meta">${escapeHtml(year)}</span>` : ""}</span></div>`;
     }
     if (row.kind === "local") {
       const i = row.item;

@@ -518,11 +518,11 @@ class BrowserInterfaceTests(unittest.TestCase):
             )
 
             playback_before = touch_page.evaluate("window.getHomePlaybackState()")
-            self.assertFalse(touch_page.evaluate("window.tickHomeAutoplay()"))
-            self.assertEqual(
-                touch_page.evaluate("window.getHomePlaybackState().carouselItemId"),
-                playback_before["carouselItemId"],
-            )
+            # IP1: Inicio ya no rota solo. Con movimiento reducido (y sin él) la
+            # consulta no cambia sin que la persona elija.
+            self.assertTrue(touch_page.evaluate("typeof window.tickHomeAutoplay === 'undefined'"))
+            touch_page.wait_for_timeout(300)
+            self.assertEqual(touch_page.evaluate("window.getHomePlaybackState()"), playback_before)
 
             furniture = touch_page.get_by_role("region", name="Videoteca")
             self.assertTrue(furniture.is_visible())
@@ -597,7 +597,13 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(page.locator("#homeEmpty").is_visible())
         self.assertTrue(page.locator("#homeFurniture").is_hidden())
         self.assertTrue(page.locator("#homeShelfCategories").is_hidden())
-        self.assertEqual(page.locator("#homeEmpty button").count(), 3)
+        # IP2: el buscador reemplaza el llamado principal; quedan dos acciones secundarias.
+        self.assertTrue(page.locator("#homeSearchSlot input[role='combobox']").is_visible())
+        self.assertEqual(
+            page.locator("#homeEmpty button").all_inner_texts(),
+            ["Importar lista", "Explorar Club"],
+        )
+        self.assertEqual(page.locator('#homeEmpty [data-click="home-empty-open"]').count(), 0)
 
     def test_home_single_category_long_content_and_broken_posters_remain_contained(
         self,
@@ -656,18 +662,17 @@ class BrowserInterfaceTests(unittest.TestCase):
             brand_metrics,
         )
 
-        selected_row = page.locator("[data-playlist-entry]")
-        self.assertIn(long_title, selected_row.get_attribute("aria-label"))
-        self.assertIn(long_genre, selected_row.get_attribute("aria-label"))
+        # IP1: la sugerencia del día es un único póster con su consola; el título largo y el
+        # género largo se leen ahí y en el nombre accesible del lomo, sin desbordar.
+        daily_console = page.locator('.spotlight-preview[data-selection-source="daily"]')
+        self.assertEqual(
+            daily_console.locator("#spotlight-selected-title").inner_text(), long_title
+        )
+        self.assertIn(long_genre, daily_console.locator(".spotlight-metadata").inner_text())
         self.assertIn(
             long_title,
             page.locator("[data-home-section] .home-shelf-tape").get_attribute("aria-label"),
         )
-
-        # U4.6b: the console and the consulted poster exist once a spine is chosen.
-        page.locator(".home-shelf-tape").first.click()
-        console = page.locator('.spotlight-preview[data-selection-source="shelf:r7b-single"]')
-        console.wait_for()
 
         # Let the browser's real network failures settle before replaying load/error
         # events. Otherwise a late error from example.invalid can race the synthetic
@@ -677,11 +682,15 @@ class BrowserInterfaceTests(unittest.TestCase):
                 const images = [...document.querySelectorAll('img')].filter(
                     image => (image.getAttribute('src') || '').includes('r7b-broken-poster')
                 );
-                return images.length >= 2 && images.every(image => image.hidden === true);
+                return images.length >= 1 && images.every(image => image.hidden === true);
             }"""
         )
 
-        marquee = page.locator(".spotlight-selector:not(.home-consulted-poster)")
+        self.assertEqual(page.locator(".spotlight-selector").count(), 1)
+        marquee = page.locator(".spotlight-selector")
+        self.assertEqual(
+            marquee.locator(".spotlight-selector-heading").text_content(), "Sugerencia"
+        )
         marquee_image = marquee.locator("[data-spotlight-image]")
         marquee_fallback = marquee.locator(".spotlight-poster-trigger > .spotlight-poster-fallback")
         marquee_image.dispatch_event("load")
@@ -691,7 +700,16 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(marquee_fallback.is_visible())
         self.assertIn("sin portada", marquee_fallback.inner_text().casefold())
 
+        # U4.6b: elegir un lomo reemplaza la consulta en el mismo póster y la misma consola.
+        page.locator(".home-shelf-tape").first.click()
+        console = page.locator('.spotlight-preview[data-selection-source="shelf:r7b-single"]')
+        console.wait_for()
+        self.assertEqual(page.locator(".spotlight-selector").count(), 1)
+
         consulted = page.locator(".home-consulted-poster")
+        self.assertEqual(
+            consulted.locator(".spotlight-selector-heading").text_content(), "Tu selección"
+        )
         consulted_image = consulted.locator("[data-spotlight-image]")
         consulted_fallback = consulted.locator(".spotlight-poster-fallback")
         consulted_image.dispatch_event("load")
@@ -719,18 +737,28 @@ class BrowserInterfaceTests(unittest.TestCase):
         page = self.page
         self._open_and_wait_for_catalog(page)
 
+        # IP2: en Inicio «Buscar» enfoca el campo del mostrador y no cambia de vista.
         click_desktop_menu_action(page, "search")
-        page.wait_for_selector("#collectionView:not([hidden])")
-        page.wait_for_function("document.activeElement.id === 'query'")
-
-        page.locator(".brand-home").click()
-        page.wait_for_selector("#homeView:not([hidden])")
-        page.wait_for_function("document.querySelector('#stats').textContent.includes('2 obras')")
+        page.wait_for_function(
+            "document.activeElement.matches('#homeSearchSlot input[role=\"combobox\"]')"
+        )
+        self.assertTrue(page.locator("#homeView").is_visible())
+        self.assertTrue(page.locator("#collectionView").is_hidden())
 
         click_desktop_menu_action(page, "add")
         page.wait_for_selector("#collectionView:not([hidden])")
         page.wait_for_function("document.activeElement.id === 'query'")
         self.assertEqual(page.locator("#collectionView").get_attribute("data-search-mode"), "add")
+
+        # Fuera de Inicio, «Buscar» sigue abriendo la búsqueda de Colección.
+        page.locator(".brand-home").click()
+        page.wait_for_selector("#homeView:not([hidden])")
+        page.wait_for_function("document.querySelector('#stats').textContent.includes('2 obras')")
+        page.locator("#catalogButton").click()
+        page.wait_for_selector("#collectionView:not([hidden])")
+        click_desktop_menu_action(page, "search")
+        page.wait_for_function("document.activeElement.id === 'query'")
+        self.assertTrue(page.locator("#collectionView").is_visible())
 
     def test_collection_task_modes_and_history(self) -> None:
         page = self.page
@@ -839,44 +867,51 @@ class BrowserInterfaceTests(unittest.TestCase):
         for width, height in ((1280, 720), (1440, 900), (1920, 1080)):
             page.set_viewport_size({"width": width, "height": height})
             metrics = page.evaluate(probe)
-            self.assertEqual(metrics["rowCount"], 6)
-            self.assertLessEqual(metrics["localTableScroll"], 1)
-            self.assertFalse(metrics["rowsOverlapConsole"])
+            # IP1: sin tabla de programación; buscador a la izquierda, un único póster
+            # a la derecha y la consola debajo, sin solapes ni scroll lateral.
+            self.assertEqual(metrics["retiredCount"], 0)
             self.assertLessEqual(metrics["overflow"], 1)
-            self.assertEqual(metrics["posterCount"], 2)
-            self.assertAlmostEqual(metrics["posterWidthDifference"], 0, delta=1)
+            self.assertEqual(metrics["posterCount"], 1)
+            self.assertEqual(metrics["searchFieldCount"], 1)
+            self.assertTrue(metrics["searchBesidePoster"], metrics)
+            self.assertFalse(metrics["searchOverlapsPoster"], metrics)
+            self.assertTrue(metrics["deskAboveConsole"], metrics)
             self.assertAlmostEqual(metrics["consoleWidthDifference"], 0, delta=1)
         self.assertEqual(
-            page.locator("#spotlightTitle").inner_text().strip().casefold(), "cartelera disponible"
+            page.locator("#spotlightTitle").inner_text().strip().casefold(), "buscar y consultar"
         )
         self.assertTrue(page.locator(".spotlight-ambience").is_hidden())
         self.assertEqual(page.locator(".spotlight-preview-signal").count(), 0)
         self.assertEqual(page.locator(".spotlight-selector-options").count(), 0)
-        for selector in page.locator(".spotlight-selector").all():
-            heading = selector.locator(".spotlight-selector-heading")
-            bounds = selector.bounding_box()
-            label = heading.bounding_box()
-            self.assertAlmostEqual(
-                label["x"] + label["width"] / 2, bounds["x"] + bounds["width"] / 2, delta=1
-            )
-            self.assertEqual(
-                selector.locator(".spotlight-poster").evaluate(
-                    "node => getComputedStyle(node).objectFit"
-                ),
-                "contain",
-            )
-        date_control = page.locator(".spotlight-playlist-head")
-        date_control.locator('[data-click="home-date-yesterday"]').click()
+        selector = page.locator(".spotlight-selector")
+        heading = selector.locator(".spotlight-selector-heading")
+        bounds = selector.bounding_box()
+        label = heading.bounding_box()
+        self.assertAlmostEqual(
+            label["x"] + label["width"] / 2, bounds["x"] + bounds["width"] / 2, delta=1
+        )
+        self.assertEqual(
+            selector.locator(".spotlight-poster").evaluate(
+                "node => getComputedStyle(node).objectFit"
+            ),
+            "contain",
+        )
+        # La sugerencia del día es la primera obra programada; elegir un lomo la reemplaza
+        # en el mismo póster, y los controles Hoy/Ayer ya no existen.
+        self.assertEqual(heading.text_content(), "Sugerencia")
+        self.assertEqual(page.locator("#spotlight-selected-title").inner_text(), "Cartelera 1")
+        self.assertEqual(
+            page.locator(
+                '[data-click^="home-date-"], #homeDateStatus, .spotlight-playlist-head'
+            ).count(),
+            0,
+        )
+        page.locator(".home-shelf-tape").first.click()
         page.wait_for_function(
             "document.querySelector('.spotlight-selector-heading span')?.textContent.trim() "
-            "=== 'Ayer en cartel'"
+            "=== 'Tu selección'"
         )
-        # CSS uppercases the label, so read the page text like the date above.
-        consulted_poster = page.locator(".home-consulted-poster")
-        self.assertEqual(
-            consulted_poster.locator(".spotlight-selector-heading").text_content(),
-            "Tu selección",
-        )
+        self.assertEqual(page.locator(".spotlight-selector").count(), 1)
 
     def test_home_typography_is_local_scoped_and_works_with_csp(self) -> None:
         # Fresh context: exercise the real CSP, not the shared bypass used by other tests.
@@ -1057,71 +1092,66 @@ class BrowserInterfaceTests(unittest.TestCase):
 
         page.route("**/api/items?*", add_second_featured)
         self._open_and_wait_for_catalog(page)
-        selector = page.locator('[data-click="spotlight-select"]')
+        # IP1: ya no hay puntos ni selector de recomendaciones. El póster es uno solo, con un
+        # único botón hacia la ficha, y las sugerencias se recorren con el teclado desde el
+        # campo de búsqueda (combobox).
         self.assertEqual(page.locator(".spotlight-selector-option").count(), 0)
-        self.assertEqual(page.locator(".spotlight-selector button").count(), 2)
-        self.assertEqual(selector.get_attribute("aria-describedby"), "spotlight-navigation-help")
+        self.assertEqual(page.locator('[data-click="spotlight-select"]').count(), 0)
+        self.assertEqual(page.locator("#spotlight-navigation-help").count(), 0)
+        self.assertEqual(page.locator(".spotlight-selector button").count(), 1)
         self.assertEqual(page.locator(".spotlight-signal-wave").count(), 0)
+        poster = page.locator(".home-consulted-poster")
+        self.assertEqual(poster.locator(".spotlight-selector-heading").text_content(), "Sugerencia")
+        self.assertEqual(poster.get_attribute("data-consulted-key"), "browser-selector-heat")
 
-        selector.focus()
+        field = page.locator("#homeSearchSlot input[role='combobox']")
+        field.focus()
+        rows = page.locator("#homeSearchSlot [role='option']")
+        self.assertEqual(field.get_attribute("aria-expanded"), "true")
+        self.assertEqual(rows.count(), 2)
         selected_before = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
         page.keyboard.press("ArrowDown")
-
-        self.assertEqual(page.evaluate("document.activeElement.dataset.index"), "1")
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-select")
-        self.assertIn(
-            "Recomendación 2 de 2", page.locator("#spotlight-navigation-help").inner_text()
-        )
+        self.assertEqual(rows.nth(0).get_attribute("aria-selected"), "true")
         self.assertEqual(
-            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_before
+            field.get_attribute("aria-activedescendant"), rows.nth(0).get_attribute("id")
         )
-        self.assertFalse(page.evaluate("window.tickHomeAutoplay()"))
-        self.assertEqual(selector.get_attribute("data-index"), "1")
-        for key, expected in (
-            ("ArrowRight", "0"),
-            ("ArrowLeft", "1"),
-            ("Home", "0"),
-            ("End", "1"),
-            ("ArrowUp", "0"),
-        ):
+        self.assertEqual(poster.get_attribute("data-consulted-key"), selected_before)
+        page.keyboard.press("ArrowDown")
+        self.assertEqual(
+            field.get_attribute("aria-activedescendant"), rows.nth(1).get_attribute("id")
+        )
+        self.assertEqual(poster.get_attribute("data-consulted-key"), "browser-selector-alternate")
+        self.assertEqual(poster.locator(".spotlight-selector-heading").text_content(), "Resultado")
+        for key, expected in (("ArrowDown", 0), ("ArrowUp", 1), ("ArrowUp", 0)):
             page.keyboard.press(key)
-            self.assertEqual(page.evaluate("document.activeElement.dataset.index"), expected)
-        page.keyboard.press("End")
-        page.keyboard.press("Enter")
-        self.assertEqual(
-            page.evaluate("window.getHomePlaybackState().selectedEntryKey"),
-            "browser-selector-alternate",
-        )
+            self.assertEqual(
+                field.get_attribute("aria-activedescendant"), rows.nth(expected).get_attribute("id")
+            )
+        # El foco no sale del campo mientras se recorre la lista.
+        self.assertEqual(page.evaluate("document.activeElement.getAttribute('role')"), "combobox")
+        page.keyboard.press("ArrowDown")
+        page.keyboard.press("Escape")
+        self.assertEqual(poster.get_attribute("data-consulted-key"), "browser-selector-heat")
+        self.assertEqual(poster.locator(".spotlight-selector-heading").text_content(), "Sugerencia")
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectionSource"), "daily")
 
-        page.keyboard.press("Tab")
-        self.assertIn(
-            page.evaluate("document.activeElement.dataset.click"),
-            {
-                "spotlight-select",
-                "playlist-select",
-                "home-date-today",
-                "home-date-yesterday",
-            },
-        )
-        self.assertTrue(page.evaluate("window.tickHomeAutoplay()"))
-        page.locator("[data-playlist-entry]").nth(1).click()
-        self.assertEqual(
-            page.locator(".home-consulted-poster").get_attribute("data-consulted-key"),
-            "browser-selector-alternate",
-        )
-        page.locator("[data-playlist-entry]").nth(0).click()
-        self.assertEqual(
-            page.locator(".home-consulted-poster").get_attribute("data-consulted-key"),
-            "browser-selector-heat",
-        )
+        # El póster sigue siendo operable por teclado y lleva a la ficha.
+        page.locator(
+            '.spotlight-poster-trigger[data-click="open-detail-with-case-transition"]'
+        ).focus()
+        page.keyboard.press("Enter")
+        page.wait_for_selector("#detailDrawer[open]")
+        page.keyboard.press("Escape")
+        page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
+
         page.set_viewport_size({"width": 390, "height": 844})
-        self.assertFalse(page.locator(".spotlight-date-control-mobile").is_visible())
-        self.assertTrue(page.locator(".spotlight-date-control-desktop").is_visible())
+        self.assertEqual(page.locator(".spotlight-selector").count(), 1)
+        self.assertTrue(field.is_visible())
         self.assertFalse(
             page.evaluate("document.documentElement.scrollWidth > window.innerWidth + 1")
         )
 
-    def test_home_playlist_columns_and_autoplay_keep_manual_selection_and_focus(self) -> None:
+    def test_home_suggestions_cap_and_manual_selection_survive_without_autoplay(self) -> None:
         page = self.page
 
         def add_playlist_features(route) -> None:
@@ -1153,70 +1183,52 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.route("**/api/items?*", add_playlist_features)
         self._open_and_wait_for_catalog(page)
 
+        # IP1: la tabla de programación (columnas, índice, fila «en el aire») se retiró.
+        # Con seis obras programadas, el campo vacío ofrece como máximo cinco sugerencias,
+        # en el orden del día, con título y año legibles.
+        self.assertEqual(page.locator("[data-playlist-entry], .spotlight-playlist").count(), 0)
+        field = page.locator("#homeSearchSlot input[role='combobox']")
+        field.focus()
+        rows = page.locator("#homeSearchSlot .hs-suggestion")
+        self.assertEqual(rows.count(), 5)
         self.assertEqual(
-            [
-                value.casefold()
-                for value in page.locator(".spotlight-playlist thead th").all_inner_texts()
-            ],
-            ["#", "título", "director", "año", "tipo", "géneros", "duración"],
+            [text.split("\n")[0].strip() for text in rows.all_inner_texts()],
+            ["Heat", "Akira", "Videodrome", "Paris, Texas", "Possession"],
         )
-        rows = page.locator("[data-playlist-entry]")
-        self.assertEqual(rows.count(), 6)
-        self.assertEqual(rows.nth(0).locator(".playlist-director").inner_text(), "Director 1")
-        self.assertEqual(rows.nth(0).locator(".playlist-index").inner_text(), "")
-        self.assertEqual(rows.nth(1).locator(".playlist-index").inner_text(), "02")
-        self.assertEqual(
-            rows.nth(0)
-            .locator(".playlist-index")
-            .evaluate("element => getComputedStyle(element, '::before').content"),
-            '"▸"',
-        )
-        rows.nth(1).click()
-        selected_key = rows.nth(1).get_attribute("data-entry-key")
-        rows.nth(1).focus()
+        self.assertIn("1982", rows.nth(1).inner_text())
+
+        # Elegir una sugerencia con el teclado la consulta en el póster y nada la cambia sola.
+        page.keyboard.press("ArrowDown")
+        page.keyboard.press("ArrowDown")
+        poster = page.locator(".home-consulted-poster")
+        self.assertEqual(poster.get_attribute("data-consulted-key"), "playlist-1")
         before = page.evaluate("window.getHomePlaybackState()")
-        self.assertEqual(before["selectedEntryKey"], selected_key)
-        page.evaluate("window.tickHomeAutoplay()")
-        after = page.evaluate("window.getHomePlaybackState()")
-        self.assertEqual(after["selectedEntryKey"], selected_key)
-        self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), selected_key)
-        self.assertEqual(
-            page.locator("[data-playlist-entry].is-selected").get_attribute("data-entry-key"),
-            selected_key,
-        )
-        self.assertEqual(page.locator("[data-playlist-entry].is-on-air").count(), 1)
+        self.assertEqual(before["selectedEntryKey"], "playlist-1")
+        self.assertEqual(before["selectionSource"], "preview")
+        self.assertTrue(page.evaluate("typeof window.tickHomeAutoplay === 'undefined'"))
+        page.wait_for_timeout(600)
+        self.assertEqual(page.evaluate("window.getHomePlaybackState()"), before)
+        self.assertEqual(poster.get_attribute("data-consulted-key"), "playlist-1")
+        self.assertEqual(page.evaluate("document.activeElement.getAttribute('role')"), "combobox")
 
         page.keyboard.press("Enter")
-        self.assertEqual(
-            page.evaluate("document.activeElement.dataset.click"),
-            "open-detail-with-case-transition",
-        )
-
-        self.assertEqual(
-            page.locator('[data-click="spotlight-prev"], [data-click="spotlight-next"]').count(), 0
-        )
-        page.locator('[data-click="spotlight-select"]').focus()
-        page.keyboard.press("End")
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().spotlightIndex"), 5)
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "spotlight-select")
-        self.assertEqual(
-            page.evaluate("window.getHomePlaybackState().selectedEntryKey"), selected_key
-        )
+        page.wait_for_selector("#detailDrawer[open]")
+        self.assertEqual(page.evaluate("document.activeElement.id"), "closeDetail")
+        page.locator("#closeDetail").click()
+        page.wait_for_selector("#detailDrawer:not([open])", state="hidden")
 
         page.locator("#catalogButton").click()
         page.wait_for_selector("#collectionView:not([hidden])")
-        hidden_before = page.evaluate("window.getHomePlaybackState().carouselItemId")
-        self.assertFalse(page.evaluate("window.tickHomeAutoplay()"))
-        self.assertEqual(
-            page.evaluate("window.getHomePlaybackState().carouselItemId"), hidden_before
-        )
+        page.wait_for_timeout(300)
+        hidden_state = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(hidden_state["selectedEntryKey"], before["selectedEntryKey"])
 
         page.goto(BrowserInterfaceTests.base_url)
         page.wait_for_selector("#homeView:not([hidden])")
         page.set_viewport_size({"width": 1280, "height": 720})
-        # U4.6b: measure Home once it is drawn. Right after it shows, the playlist rows and
+        # U4.6b: measure Home once it is drawn. Right after it shows, the search desk and
         # the console are still missing and the page reads 218 px shorter than it is.
-        page.wait_for_selector("[data-playlist-entry]")
+        page.wait_for_selector("#homeSearchSlot input[role='combobox']")
         page.wait_for_selector(".spotlight-preview")
         home_metrics = """() => ({
             viewport: window.innerHeight,
@@ -1273,7 +1285,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.wait_for_selector("#homeView:not([hidden])")
         open_menu()
         page.locator('[data-click="menu-search"]').click()
-        page.wait_for_selector("#collectionView:not([hidden])")
+        # En Inicio «Buscar» enfoca el campo del mostrador (IP2) y el menú se cierra igual.
+        page.wait_for_function(
+            "document.activeElement.matches('#homeSearchSlot input[role=\"combobox\"]')"
+        )
         self.assertIsNone(page.locator("#systemMenu").get_attribute("open"))
 
         page.goto(BrowserInterfaceTests.base_url)
@@ -1706,16 +1721,19 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(preview.locator(".home-console-header").bounding_box(), header_before)
         self.assertEqual(view.bounding_box(), action_before)
 
-        # A different row and the daily poster can update without collapsing consultation.
-        rows = page.locator("[data-playlist-entry]")
-        next_row = rows.nth(1)
-        next_key = next_row.get_attribute("data-entry-key")
-        next_row.click()
-        self.assertEqual(preview.get_attribute("data-selected-entry-key"), next_key)
+        # Consultar otra obra desde el buscador no colapsa el resumen abierto.
+        page.locator("#homeSearchSlot input[role='combobox']").focus()
+        page.keyboard.press("ArrowDown")
+        page.keyboard.press("ArrowDown")
+        next_key = preview.get_attribute("data-selected-entry-key")
+        self.assertNotEqual(next_key, selected_before)
+        self.assertEqual(preview.get_attribute("data-selection-source"), "preview")
         self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
         page.emulate_media(reduced_motion="no-preference")
         toggle.focus()
-        self.assertTrue(page.evaluate("window.tickHomeAutoplay()"))
+        # Sin autoplay: ni el tiempo ni el movimiento permitido cambian la consulta ni el foco.
+        self.assertTrue(page.evaluate("typeof window.tickHomeAutoplay === 'undefined'"))
+        page.wait_for_timeout(600)
         self.assertEqual(preview.get_attribute("data-selected-entry-key"), next_key)
         self.assertEqual(toggle.get_attribute("aria-expanded"), "true")
         self.assertEqual(
@@ -1784,11 +1802,14 @@ class BrowserInterfaceTests(unittest.TestCase):
                 self.assertLessEqual(metrics["overflow"], 1, metrics)
                 self.assertEqual(metrics["consoleCount"], 1, metrics)
                 self.assertEqual(metrics["retiredConsoleCount"], 0, metrics)
-                self.assertEqual(metrics["posterCount"], 2, metrics)
-                self.assertLessEqual(metrics["posterWidthDifference"], 1, metrics)
+                # IP1: un único póster junto al buscador, y la consola debajo de ambos.
+                self.assertEqual(metrics["posterCount"], 1, metrics)
+                self.assertEqual(metrics["searchFieldCount"], 1, metrics)
+                self.assertEqual(metrics["retiredCount"], 0, metrics)
+                self.assertTrue(metrics["searchBesidePoster"], metrics)
+                self.assertFalse(metrics["searchOverlapsPoster"], metrics)
+                self.assertTrue(metrics["deskAboveConsole"], metrics)
                 self.assertLessEqual(metrics["consoleWidthDifference"], 1, metrics)
-                self.assertFalse(metrics["rowsOverlapConsole"], metrics)
-                self.assertLessEqual(metrics["localTableScroll"], 1, metrics)
                 self.assertEqual(metrics["imageCount"], 0, metrics)
         preview = page.locator(".spotlight-preview")
         self.assertEqual(preview.locator(".spotlight-preview-actions button").count(), 2)
@@ -1880,7 +1901,18 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(state["selectedEntryKey"], "memory-heat")
         self.assertEqual(state["selectedItemId"], "memory-heat-item")
         self.assertEqual(state["selectionSource"], "shelf:memory")
-        self.assertEqual(state["carouselItemId"], initial_state["carouselItemId"])
+        # IP1: ya no hay carrusel; el estado de reproducción sólo describe la consulta.
+        self.assertEqual(
+            sorted(state),
+            [
+                "activeShelfId",
+                "playlistSource",
+                "selectedEntryKey",
+                "selectedItemId",
+                "selectionSource",
+            ],
+        )
+        self.assertEqual(initial_state["selectionSource"], "daily")
         self.assertEqual(page.locator("#spotlight-selected-title").text_content(), "Heat recordada")
         self.assertEqual(
             page.locator('[data-home-section="memory"]').get_attribute("data-active"),
@@ -1908,14 +1940,23 @@ class BrowserInterfaceTests(unittest.TestCase):
             ).get_attribute("data-entry-key"),
             "memory-heat",
         )
+        # La lista de la consulta son los lomos del estante: un solo seleccionado y un solo
+        # punto de entrada por teclado.
         self.assertEqual(
-            page.locator("[data-playlist-entry]").evaluate_all(
+            memory_spines.evaluate_all(
                 "elements => elements.map(element => element.dataset.entryKey)"
             ),
             ["memory-akira", "memory-heat", *[f"memory-extra-{i}" for i in range(12)]],
         )
-        self.assertEqual(page.locator('[data-playlist-entry][aria-selected="true"]').count(), 1)
-        self.assertEqual(page.locator('[data-playlist-entry][tabindex="0"]').count(), 1)
+        self.assertEqual(
+            page.locator(
+                '[data-home-section="memory"] .home-shelf-tape[aria-pressed="true"]'
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            page.locator('[data-home-section="memory"] .home-shelf-tape[tabindex="0"]').count(), 1
+        )
         self.assertEqual(page.evaluate("document.activeElement.dataset.entryKey"), "memory-heat")
 
         # Enter on a spine in a different bay follows the same state transition.
@@ -1963,7 +2004,9 @@ class BrowserInterfaceTests(unittest.TestCase):
             "memory-heat",
         )
 
-        selected_row = page.locator("[data-playlist-entry].is-selected")
+        selected_row = page.locator(
+            '[data-home-section="memory"] .home-shelf-tape[data-vhs-state="selected"]'
+        )
         selected_row.focus()
         page_scroll_before = page.evaluate("window.scrollY")
         page.keyboard.press("Home")
@@ -1978,10 +2021,6 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.wait_for_timeout(350)
         self.assertEqual(
             page.evaluate("document.activeElement.dataset.entryKey"), "memory-extra-11"
-        )
-        self.assertEqual(
-            page.locator("[data-playlist-entry].is-selected").get_attribute("data-entry-key"),
-            "memory-extra-11",
         )
         selected_spine = page.locator(
             '[data-home-section="memory"] .home-shelf-tape[data-vhs-state="selected"]'
@@ -2074,7 +2113,14 @@ class BrowserInterfaceTests(unittest.TestCase):
                 self._open_and_wait_for_catalog(page)
                 if not count:
                     self.assertEqual(page.locator('[data-home-section="sample"]').count(), 0)
-                    self.assertEqual(page.locator("[data-playlist-entry]").count(), 2)
+                    # Sin estante, la sugerencia del día sigue siendo la consulta y el campo
+                    # vacío ofrece las obras programadas (2 del día + 1 de la colección).
+                    self.assertEqual(
+                        page.locator(".home-consulted-poster").get_attribute("data-consulted-key"),
+                        "shared-0",
+                    )
+                    page.locator("#homeSearchSlot input[role='combobox']").focus()
+                    self.assertEqual(page.locator("#homeSearchSlot .hs-suggestion").count(), 3)
                     continue
                 plaque = page.locator(
                     '[data-click="home-shelf-activate"][data-section-id="sample"]'
@@ -2087,11 +2133,14 @@ class BrowserInterfaceTests(unittest.TestCase):
                     page.evaluate("document.activeElement.dataset.click"), "home-shelf-select"
                 )
                 page.keyboard.press("Space")
-                self.assertEqual(page.locator("[data-playlist-entry]").count(), count)
+                sample_spines = page.locator('[data-home-section="sample"] .home-shelf-tape')
+                self.assertEqual(sample_spines.count(), count)
                 self.assertEqual(
                     page.evaluate("document.activeElement.dataset.entryKey"), "sample-0"
                 )
-                page.locator('[data-playlist-entry][aria-selected="true"]').focus()
+                page.locator(
+                    '[data-home-section="sample"] .home-shelf-tape[aria-pressed="true"]'
+                ).focus()
                 scroll_before = page.evaluate("window.scrollY")
                 page.keyboard.press("End")
                 self.assertEqual(
@@ -2101,13 +2150,15 @@ class BrowserInterfaceTests(unittest.TestCase):
                 metrics = page.evaluate(
                     Path(__file__).with_name("home_list_metrics.js").read_text(encoding="utf-8")
                 )
-                self.assertTrue(metrics["selectedVisible"], metrics)
-                self.assertEqual(metrics["extended"], str(count > 6).lower())
-                self.assertFalse(metrics["windowOverlapsConsole"], metrics)
+                self.assertEqual(metrics["consultedKey"], f"sample-{count - 1}", metrics)
+                self.assertEqual(metrics["posterHeading"], "Tu selección", metrics)
+                self.assertEqual(metrics["consoleCount"], 1, metrics)
+                self.assertFalse(metrics["deskOverlapsConsole"], metrics)
+                self.assertFalse(metrics["searchOverlapsPoster"], metrics)
                 self.assertLessEqual(metrics["overflow"], 1, metrics)
                 announcement = page.locator("#homeSelectionAnnouncement").inner_text()
                 selected = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
-                page.evaluate("window.tickHomeAutoplay()")
+                page.wait_for_timeout(300)
                 self.assertEqual(
                     page.locator("#homeSelectionAnnouncement").inner_text(), announcement
                 )
@@ -2121,11 +2172,9 @@ class BrowserInterfaceTests(unittest.TestCase):
                     home.editorialHome.sections[0].items = [];
                     home.renderEditorialHome();
                 }""")
-                self.assertEqual(page.locator("[data-playlist-count]").inner_text(), "0 obras")
                 self.assertEqual(page.locator(".spotlight-preview").count(), 0)
-                self.assertEqual(
-                    page.evaluate("document.activeElement.dataset.click"), "home-programming-return"
-                )
+                self.assertEqual(page.locator(".home-desk-note").count(), 1)
+                self.assertEqual(page.locator('[data-home-section="sample"]').count(), 0)
                 page.evaluate("""async () => {
                     const home = await import('/static/js/surfaces/home.js');
                     home.editorialHome.sections.shift();
@@ -2134,13 +2183,14 @@ class BrowserInterfaceTests(unittest.TestCase):
                 self.assertEqual(
                     page.evaluate("window.getHomePlaybackState().playlistSource"), "daily"
                 )
-                self.assertEqual(page.locator("[data-playlist-entry]").count(), 2)
-                self.assertIn(
-                    "Volvimos a programación",
-                    page.locator("#homeSelectionAnnouncement").inner_text(),
-                )
+                self.assertEqual(page.locator(".home-desk-note").count(), 0)
                 self.assertEqual(
-                    page.evaluate("document.activeElement.dataset.click"), "home-date-today"
+                    page.locator(".home-consulted-poster").get_attribute("data-consulted-source"),
+                    "daily",
+                )
+                self.assertIn(
+                    "Volvimos a la sugerencia del día",
+                    page.locator("#homeSelectionAnnouncement").inner_text(),
                 )
 
     def test_u5_club_collision_dialog_focus_and_single_announcement(self) -> None:
@@ -2184,12 +2234,17 @@ class BrowserInterfaceTests(unittest.TestCase):
             self.assertEqual(
                 page.locator("#sharedDetailDialog").get_by_text("Editar mi ficha").count(), 0
             )
-            self.assertFalse(page.evaluate("window.tickHomeAutoplay()"))
+            self.assertTrue(page.evaluate("typeof window.tickHomeAutoplay === 'undefined'"))
             page.keyboard.press("Escape")
             page.locator("#sharedDetailDialog").wait_for(state="hidden")
             self.assertEqual(page.evaluate("document.activeElement.dataset.homeFocus"), surface)
-        page.locator('[data-click="home-programming-return"]').click()
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "home-date-today")
+        # Elegir una obra propia del catálogo vuelve a ofrecer la edición de la ficha, y la
+        # consulta anterior (del Club) no deja acciones colgadas.
+        page.locator('[data-home-section="sample"] .home-shelf-tape').first.click()
+        self.assertEqual(
+            page.locator(".home-consulted-poster").get_attribute("data-consulted-source"),
+            "shelf:sample",
+        )
         self.assertEqual(
             page.locator('.spotlight-preview [data-click="edit-home-shelf-entry"]').count(), 1
         )
@@ -2212,48 +2267,55 @@ class BrowserInterfaceTests(unittest.TestCase):
             page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "sample-0"
         )
         page.locator('[data-home-section="club"] .home-shelf-tape').click()
-        page.locator('[data-playlist-entry][aria-selected="true"]').focus()
+        page.locator('[data-home-section="club"] .home-shelf-tape[aria-pressed="true"]').focus()
         page.evaluate("""async () => {
             const home = await import('/static/js/surfaces/home.js');
             home.editorialHome.sections.pop();
             home.renderEditorialHome();
         }""")
-        self.assertEqual(page.evaluate("document.activeElement.dataset.click"), "home-date-today")
+        # Sin el lomo del Club, el foco queda en el mueble y nunca en otro origen.
+        self.assertEqual(page.evaluate("document.activeElement.id"), "homeSections")
         self.assertEqual(page.evaluate("window.getHomePlaybackState().selectionSource"), "daily")
+        self.assertEqual(
+            page.locator(".home-consulted-poster").get_attribute("data-consulted-source"), "daily"
+        )
 
-    def test_u5_day_failure_retry_focus_and_cached_return(self) -> None:
+    def test_u5_refresh_failure_retry_keeps_selection_and_typed_query(self) -> None:
+        # IP1 retiró Hoy/Ayer: lo que queda del recorrido de «día» es la actualización de la
+        # programación. Una falla no pierde la consulta ni lo escrito; el reintento sí repone.
         page = self.page
         self._install_u5_source_fixture()
         self._open_and_wait_for_catalog(page)
         page.locator('[data-home-section="sample"] .home-shelf-tape').nth(1).click()
+        field = page.locator("#homeSearchSlot input[role='combobox']")
+        field.fill("hea")
+        page.evaluate("""async () => {
+            const home = await import('/static/js/surfaces/home.js');
+            home.editorialHome.warnings = ["collections_unavailable"];
+            home.renderEditorialHome();
+        }""")
         page.route(
             "**/api/home?*", lambda route: route.fulfill(status=503, json={"reason": "offline"})
         )
-        yesterday = page.locator(
-            '#spotlightStage .spotlight-date-tabs [data-click="home-date-yesterday"]'
+        retry = page.locator("#homeFeedback button")
+        retry.click()
+        page.wait_for_function(
+            "document.querySelector('#homeFeedback').textContent.includes('No pudimos actualizar')"
         )
-        yesterday.click()
-        page.locator("#homeFeedback button").wait_for(state="visible")
         self.assertEqual(
             page.evaluate("window.getHomePlaybackState().selectedEntryKey"), "sample-1"
         )
-        self.assertEqual(
-            page.evaluate("document.activeElement.dataset.click"), "home-date-yesterday"
-        )
+        self.assertEqual(field.input_value(), "hea")
         page.unroute("**/api/home?*")
-        page.locator("#homeFeedback button").click()
+        retry.click()
         page.wait_for_function(
-            "document.querySelector('#spotlight').getAttribute('aria-busy') === 'false' "
+            "document.querySelector('#homeView').getAttribute('aria-busy') === 'false' "
             "&& document.querySelector('#homeFeedback').hidden"
         )
         self.assertEqual(page.evaluate("window.getHomePlaybackState().playlistSource"), "daily")
-        self.assertEqual(yesterday.get_attribute("aria-pressed"), "true")
-        page.locator('[data-home-section="sample"] .home-shelf-tape').nth(1).click()
-        yesterday.click()
-        self.assertEqual(page.evaluate("window.getHomePlaybackState().playlistSource"), "daily")
-        self.assertEqual(
-            page.evaluate("document.activeElement.dataset.click"), "home-date-yesterday"
-        )
+        self.assertEqual(page.evaluate("window.getHomePlaybackState().selectionSource"), "daily")
+        # El buscador no se remonta al actualizar: lo escrito sobrevive.
+        self.assertEqual(field.input_value(), "hea")
 
     def test_home_shelf_furniture_compacts_and_labels_short_categories(
         self,

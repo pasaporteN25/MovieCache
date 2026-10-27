@@ -91,7 +91,10 @@ class HomeRandomTests(unittest.TestCase):
         self.assertIn("Elegir una obra", tape.get_attribute("aria-label"))
         # Not an editorial section: the shelf count stays at the real shelves.
         self.assertEqual(page.locator("#homeSections").get_attribute("data-bay-count"), "1")
-        source_before = page.locator("[data-playlist-source]").text_content()
+        # IP1: ya no hay tabla de programación; la fuente programada es el estado de Inicio.
+        source_before = page.evaluate("window.getHomePlaybackState().playlistSource")
+        daily_key_before = page.evaluate("window.getHomePlaybackState().selectedEntryKey")
+        self.assertEqual(page.locator("[data-playlist-source], [data-playlist-entry]").count(), 0)
 
         tape.click()
         self.assertEqual(self.spine_state(), "busy")
@@ -109,10 +112,16 @@ class HomeRandomTests(unittest.TestCase):
                 page.locator(".home-consulted-poster").get_attribute("data-consulted-key") or ""
             ).startswith("random:")
         )
-        # The draw never opens the dossier and never reprograms the table.
+        # The draw never opens the dossier and never reprograms the daily suggestion.
         self.assertEqual(page.locator("dialog[open]").count(), 0)
-        self.assertEqual(page.locator("[data-playlist-source]").text_content(), source_before)
-        self.assertEqual(page.locator('[data-playlist-entry][aria-selected="true"]').count(), 0)
+        state = page.evaluate("window.getHomePlaybackState()")
+        self.assertEqual(state["playlistSource"], source_before)
+        self.assertEqual(state["selectionSource"], "random")
+        self.assertNotEqual(state["selectedEntryKey"], daily_key_before)
+        self.assertEqual(
+            page.locator(".home-consulted-poster .spotlight-selector-heading").text_content(),
+            "Tu selección",
+        )
         self.assertEqual(
             page.locator("#homeSelectionAnnouncement").text_content(),
             f"Al azar: {first_title}, {'1995' if first_title == 'Heat' else '1988'}. Disponible.",

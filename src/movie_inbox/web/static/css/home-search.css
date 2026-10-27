@@ -20,7 +20,7 @@
 .hs-meta, .hs-source { font-size: 0.8rem; color: var(--text-secondary); }
 .hs-source { font-family: var(--font-label); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-cyan-soft); }
 .hs-note { flex-basis: 100%; font-size: 0.8rem; color: var(--text-danger-soft); }
-.hs-thumb { flex: 0 0 auto; width: 32px; height: 48px; object-fit: cover; border-radius: 2px; background: var(--surface-deep); }
+.hs-thumb { flex: 0 0 auto; width: 32px; height: 48px; object-fit: cover; border-radius: var(--radius-control); background: var(--surface-deep); }
 .hs-thumb-empty { display: inline-block; border: 1px solid var(--line); }
 .hs-state { flex: 0 0 auto; font-family: var(--font-label); font-size: 0.75rem; padding: 4px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-control); color: var(--text-soft); white-space: nowrap; }
 .hs-state-missing { color: var(--on-accent); background: var(--teal); border-color: var(--teal); font-weight: 700; }

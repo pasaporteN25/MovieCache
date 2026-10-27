@@ -6,8 +6,9 @@
   const layout = box('.spotlight-layout');
   const consoleBox = box('.spotlight-preview');
   const posters = [...document.querySelectorAll('.spotlight-selector')].map(n => n.getBoundingClientRect());
-  const table = document.querySelector('.spotlight-table-wrap');
-  const rows = [...document.querySelectorAll('[data-playlist-entry]')];
+  // IP1/IP2: mostrador = buscador (#homeSearchSlot) + un único póster + consola debajo.
+  const search = box('#homeSearchSlot');
+  const poster = posters[0];
   const well = box('#homeFurniture');
   const spine = box('.home-shelf-tape');
   const plate = box('.home-shelf-bay-plaque');
@@ -18,11 +19,13 @@
     consoleCount: document.querySelectorAll('.spotlight-preview').length,
     retiredConsoleCount: document.querySelectorAll('#homeShelfPreview').length,
     posterCount: posters.length,
-    posterWidthDifference: posters.length === 2 ? Math.abs(posters[0].width - posters[1].width) : null,
     consoleWidthDifference: layout && consoleBox ? Math.abs(consoleBox.width - layout.width + 48) : null,
-    rowCount: rows.length,
-    localTableScroll: table ? table.scrollHeight - table.clientHeight : 0,
-    rowsOverlapConsole: rows.length && consoleBox ? rows.at(-1).getBoundingClientRect().bottom > consoleBox.top : false,
+    searchFieldCount: document.querySelectorAll('#homeSearchSlot input[role="combobox"]').length,
+    searchWidth: search?.width,
+    searchBesidePoster: !narrow && search && poster ? search.right <= poster.left + 1 : null,
+    searchOverlapsPoster: search && poster ? search.left < poster.right && search.right > poster.left && search.top < poster.bottom && search.bottom > poster.top : false,
+    deskAboveConsole: consoleBox && poster ? consoleBox.top >= poster.bottom - 1 && (!search || consoleBox.top >= search.bottom - 1) : null,
+    retiredCount: document.querySelectorAll('.spotlight-table-wrap, [data-playlist-entry], .spotlight-date-control, [data-click="spotlight-select"]').length,
     spineWidth: spine?.width,
     spineHeight: spine?.height,
     spineTransform: spine ? style('.home-shelf-tape').transform : null,
