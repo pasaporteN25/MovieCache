@@ -4,7 +4,8 @@ Dirección elegida por el owner el 2026-10-26 (concepto B), todavía sin impleme
 Modo: Operate. Reemplaza la cabecera de Inicio descrita en
 `home-cartelera-winamp-v1.md` y redefine IP1 e IP2 del análisis
 `docs/analisis/inicio-busqueda-club-personas-2026-10-21.md` (§2.1 y §2.2). El modelo
-de personas (IP3 a IP6) no cambia.
+de personas (IP3 a IP6) no cambia. El plan de implementación por tareas está en
+`home-search-desk-v1-prompt.md`.
 
 ## Trabajo y audiencia
 

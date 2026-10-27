@@ -3623,6 +3623,7 @@ directamente de una sinopsis más completa. 6 tests en
 solo póster), sin implementar. IP3 a IP6 siguen pendientes de decisión del owner.
 Análisis: [`docs/analisis/inicio-busqueda-club-personas-2026-10-21.md`](docs/analisis/inicio-busqueda-club-personas-2026-10-21.md).
 Brief de IP1/IP2: [`docs/briefs/home-search-desk-v1.md`](docs/briefs/home-search-desk-v1.md); reemplaza §2.1 y §2.2 del análisis.
+Implementación en `feature/home-search-desk`: prompt por tareas y olas en [`docs/briefs/home-search-desk-v1-prompt.md`](docs/briefs/home-search-desk-v1-prompt.md). Recientes provisorios en `localStorage` (contrato C2).
 Prefijo `[IP]` (Inicio y Personas). IP1 e IP2 no dependen del modelo de personas.
 
 - [ ] **[IP1] Inicio como mostrador con un solo póster.** Cierre: sin carrusel izquierdo, sin autoplay y sin tabla de programación tipo Winamp; buscador a la izquierda y un único póster a la derecha (sugerencia del día, Al azar U8 y consultas de Club/VHS); estante VHS en la mitad inferior; la programación diaria queda sólo como fuente de sugerencias y las instantáneas de Hoy/Ayer se conservan sin migrar; PRODUCT.md y DESIGN.md actualizados; pruebas JS y de navegador de Inicio actualizadas y en verde.
