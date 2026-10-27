@@ -211,9 +211,9 @@ class RemovalMigrationTests(unittest.TestCase):
     def test_an_instance_from_before_the_record_gains_it_without_losing_anything(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "instance.db"
+            # v22: the last version before the record existed.
             with patch(
-                "movie_inbox.infrastructure.identity_repository.INSTANCE_SCHEMA_VERSION",
-                INSTANCE_SCHEMA_VERSION - 1,
+                "movie_inbox.infrastructure.identity_repository.INSTANCE_SCHEMA_VERSION", 22
             ):
                 SqliteIdentityRepository(path).initialize()
             with closing(sqlite3.connect(path)) as connection:

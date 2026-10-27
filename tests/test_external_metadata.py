@@ -464,7 +464,10 @@ class ExternalMetadataTests(unittest.TestCase):
 
         results = WikipediaAdapter()._search_language("Titanic", "en")
 
-        self.assertEqual(results[0]["title"], "Titanic (1997 film)")
+        self.assertEqual(results[0]["wikipedia_title"], "Titanic (1997 film)")
+        # [X12]: the article's "(1997 film)" is not part of the work's title.
+        self.assertEqual(results[0]["title"], "Titanic")
+        self.assertEqual(results[0]["year"], "1997")
         self.assertEqual(len(results), 2)
         self.assertEqual(fetch_json.call_count, 1)
 

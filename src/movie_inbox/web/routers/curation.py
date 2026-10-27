@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -10,9 +11,10 @@ from fastapi.responses import JSONResponse
 
 from movie_inbox.application.curation_history import CurationHistoryError
 from movie_inbox.application.curation_workflow import CurationWorkflowError, RemovalObserver
+from movie_inbox.application.identity_resolution_service import IdentityResolutionService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain.merge_review import MergeReviewError
-from movie_inbox.web.catalog_api import build_curation_payload, load_items
+from movie_inbox.web.catalog_api import build_curation_payload, catalog_service, load_items
 from movie_inbox.web.dependencies import (
     SessionCatalog,
     authorized_json,
@@ -45,6 +47,39 @@ def curation(request: Request) -> JSONResponse:
         return JSONResponse(build_curation_payload(rows))
     except CatalogRepositoryError as error:
         return repository_error_response(error)
+
+
+def _identity_service(request: Request) -> IdentityResolutionService:
+    """[X12 B] Resolution limited to the signed-in account's own sources.
+
+    The background loop covers every account; the button only ever touches the
+    catalogue of whoever pressed it.
+    """
+
+    catalog = session_catalog(request)
+    state = request.app.state
+    return IdentityResolutionService(
+        lambda: [catalog_service(Path(path)).repository for path in catalog.config.patterns],
+        state.identity_article_ids,
+        state.identity_release_years,
+        state.identity_attempts,
+    )
+
+
+@router.get("/api/curation/identity", dependencies=[Depends(require_token)])
+def identity_resolution_status(request: Request) -> JSONResponse:
+    require_ready_identity(request)
+    return JSONResponse({"pending": _identity_service(request).pending_count()})
+
+
+@router.post("/api/curation/identity/resolve")
+def resolve_identities(
+    request: Request,
+    _: dict[str, Any] = Depends(authorized_json),
+) -> JSONResponse:
+    """One batch of fifty. The page calls again while `pending` keeps falling."""
+
+    return JSONResponse(_identity_service(request).resolve_batch().to_dict())
 
 
 @router.get("/api/curation/history", dependencies=[Depends(require_token)])

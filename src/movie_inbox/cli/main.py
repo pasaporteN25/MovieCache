@@ -12,6 +12,7 @@ from movie_inbox.cli import (
     cache,
     database,
     enrich_catalog,
+    identity,
     images,
     imdb_dataset,
     import_catalog,
@@ -39,6 +40,10 @@ COMMANDS: dict[str, tuple[Command, str]] = {
     "db": (database.main, "Import, export and inspect SQLite catalogs."),
     "cache": (cache.main, "Inspect, prune or clear the image cache."),
     "images": (images.main, "Diagnose image coverage by cause, without downloading."),
+    "identity": (
+        identity.main,
+        "Fill missing Wikidata ids so curation recognizes the same work.",
+    ),
     "backup": (backup.main, "Create and verify persistent instance backups."),
     "search-lab": (search_lab.main, "Measure search quality without changing a catalog."),
     "pairing-pin": (

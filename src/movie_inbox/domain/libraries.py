@@ -15,11 +15,11 @@ from movie_inbox.domain.catalog import (
     canonical_url,
     external_urls,
     normalize_tags,
-    themoviedb_media_reference,
     title_match_keys_for_item,
 )
-from movie_inbox.domain.matching import explicit_kind
 from movie_inbox.domain.metadata import normalize_external_positive_id
+from movie_inbox.domain.work_identity import compare_works, explicit_kind
+from movie_inbox.domain.work_identity import tmdb_media_type as _tmdb_media_type
 
 LIBRARY_SCHEDULES = {"manual", "hourly", "daily"}
 LIBRARY_STATUSES = {
@@ -295,47 +295,4 @@ def _identity_completeness(record: Mapping[str, Any]) -> tuple[int, str]:
 
 
 def identity_matches_item(identity: Mapping[str, Any], item: Mapping[str, Any]) -> bool:
-    left_tmdb_id = normalize_external_positive_id(identity.get("tmdb_id"))
-    right_tmdb_id = normalize_external_positive_id(item.get("tmdb_id"))
-    if left_tmdb_id and right_tmdb_id:
-        if left_tmdb_id != right_tmdb_id:
-            return False
-        left_type = _tmdb_media_type(identity)
-        right_type = _tmdb_media_type(item)
-        return not left_type or not right_type or left_type == right_type
-    left_wikidata = str(identity.get("wikidata_id") or "").strip().upper()
-    right_wikidata = str(item.get("wikidata_id") or "").strip().upper()
-    if left_wikidata and left_wikidata == right_wikidata:
-        return True
-    left_mal_id = str(identity.get("mal_id") or "").strip()
-    right_mal_id = str(item.get("mal_id") or "").strip()
-    if left_mal_id and right_mal_id:
-        return left_mal_id == right_mal_id
-    if external_urls(identity) & external_urls(item):
-        return True
-    left_titles = set(title_match_keys_for_item(identity))
-    right_titles = set(title_match_keys_for_item(item))
-    left_year = str(identity.get("year") or "").strip()
-    right_year = str(item.get("year") or "").strip()
-    left_kind = explicit_kind(identity)
-    right_kind = explicit_kind(item)
-    return bool(
-        left_titles
-        and left_titles & right_titles
-        and left_year
-        and left_year == right_year
-        and (not left_kind or not right_kind or left_kind == right_kind)
-    )
-
-
-def _tmdb_media_type(item: Mapping[str, Any]) -> str:
-    for url_field in ("tmdb_url", "url"):
-        reference = themoviedb_media_reference(str(item.get(url_field) or ""))
-        if reference is not None:
-            return reference[0]
-    kind = explicit_kind(item)
-    if kind == "serie":
-        return "tv"
-    if kind in {"pelicula", "documental"}:
-        return "movie"
-    return ""
+    return compare_works(identity, item).is_same

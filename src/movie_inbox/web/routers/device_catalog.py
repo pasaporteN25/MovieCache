@@ -663,23 +663,24 @@ def _device_catalog_entries(
         raise _catalog_error(error) from error
     entries: list[DeviceCatalogItem] = []
     # [A1.4]: the key is derived from a persistent instance secret rather than
-    # from api_token, and from the source's position rather than its path.
-    # Rotating the token or relocating a catalogue are both normal operations
-    # and must not re-key every work in a paired client's local replica.
+    # from api_token, and never from the source's path. Rotating the token or
+    # relocating a catalogue are both normal operations and must not re-key
+    # every work in a paired client's local replica.
     secret = sync_secret(request)
     for row in rows:
         # Item ids are only unique within one source file, so the source still
-        # takes part in the key -- by position, which carries no path. The rows
-        # already hold that position as a public reference (`source-1`,
-        # `source-2`): resolving it as a path again never matched, and every
-        # work fell back to a single slot.
+        # takes part in the key -- by its durable uid ([X11]), not its position,
+        # which shifted every id when a source was added, removed or reordered.
+        # The rows hold the source as a public reference (`source-1`); resolving
+        # it as a path again never matched, and every work fell back to one slot.
         source_reference = str(row.get("_source_file") or "")
         catalog_item_id = str(row.get("id") or "")
         if source_reference not in catalog.references or not catalog_item_id:
             continue
+        source_uid = catalog.source_uids[source_reference]
         entries.append(
             DeviceCatalogItem(
-                opaque_item_id(secret, identity.catalog.id, source_reference, catalog_item_id),
+                opaque_item_id(secret, identity.catalog.id, source_uid, catalog_item_id),
                 source_reference,
                 catalog_item_id,
                 dict(row),

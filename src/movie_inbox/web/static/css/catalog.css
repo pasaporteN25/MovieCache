@@ -539,20 +539,6 @@
         border-color: var(--danger-border);
         color: var(--danger-ink);
       }
-      .duplicate-box {
-        background: var(--surface-control-muted);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-result);
-        display: grid;
-        gap: 8px;
-        grid-column: 1 / -1;
-        padding: 10px;
-      }
-      .duplicate-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
       .compare-box {
         background: var(--surface-control-muted);
         border: 1px solid var(--line);

@@ -4,6 +4,88 @@ Los cambios relevantes del proyecto se documentan en este archivo.
 
 ## [Sin publicar]
 
+- Cuenta: QR para conectar Android, listado de dispositivos y revocacion con confirmacion.
+
+### Antes de actualizar
+
+- **Hacé un backup: `instance.db` no vuelve atrás.** Pasa del esquema v23 al v25 apenas se
+  abre, y la 0.10.0 se niega a abrirlo después. Los catálogos (JSON y `movie-inbox.db`) no
+  cambian de formato.
+- **Los teléfonos apareados ven cambiar una vez el id de todas sus obras.** Un teléfono que
+  ya tenía una réplica tiene que volver a descargarla, y los cambios que no había subido
+  quedan sin obra a la que aplicarse: sincronizalo antes de actualizar.
+
+### Agregado
+
+- Las fichas que sólo tienen un enlace a Wikipedia reciben su id de Wikidata, y el año
+  si les falta [X12]. Es lo que permite reconocer la misma obra en dos idiomas. El
+  servidor lo hace solo y despacio, 50 fichas cada 5 minutos
+  (`--identity-resolution-interval-seconds`; `0` lo apaga). Para hacerlo de una vez:
+  el botón «Completar identidades» de Curaduría, que muestra cuántas faltan, o
+  `movie-inbox identity resolve <catálogo>`. Nunca pisa un campo con valor ni uno
+  bloqueado. Cada campo escrito queda registrado como dato de Wikidata. Un artículo
+  que Wikipedia devuelve sin id no se vuelve a consultar hasta dentro de un mes.
+
+### Cambiado
+
+- Colección reúne los filtros en un panel superpuesto. Podés preparar una selección
+  y aplicarla al confirmar; cancelar conserva la estantería VHS y sus filtros. En
+  móvil el panel ocupa la pantalla y mantiene visible la confirmación.
+
+- Los rótulos de las carteleras se centran sobre sus placas y usan la misma tipografía:
+  «Hoy/Ayer en cartel» para la programación y «Tu selección» para la obra consultada.
+- Los resultados guardados de búsqueda permiten seleccionar varias fichas y abrir el
+  comparador antes de unirlas; una pista muestra los duplicados ya detectados. La ficha
+  de edición reúne título, año y tipo en una cabecera y conserva el regreso a la contratapa.
+- Anterior y siguiente pasan de la ficha de edición a la contratapa [X12]: flechas
+  discretas a los costados de la caja, que se iluminan con el mouse o el foco, y también
+  ←/→ del teclado.
+- «Fecha vista» tiene un calendario propio en español (semana desde el lunes, «Hoy»,
+  «Ayer» y «Limpiar», navegable con el teclado), y también se puede escribir como
+  30/09/2026. Las fechas que todavía no llegaron no se pueden elegir. El puntaje se marca
+  con 10 estrellas: pasar el mouse muestra cómo quedaría, las flechas suben y bajan, del
+  1 al 9 se elige directo y Supr lo quita. La contratapa y «Mi registro» lo muestran con
+  estrellas chicas y la fecha escrita completa. Se guarda igual que antes: `YYYY-MM-DD`
+  y un entero de 0 a 10.
+
+### Corregido
+
+- La ficha de edición importa el formateador de tipo que usa su nueva cabecera, evitando
+  un error al abrir una obra desde la revisión de coincidencias de búsqueda.
+
+### Cambiado
+
+- El id con el que la API de dispositivos (`/api/v1/`) nombra cada obra ya no depende de
+  la posición de su fuente en la cuenta, sino de un id propio de esa fuente que se guarda
+  en `instance.db` [X11]. Agregar, quitar, reordenar o mover un archivo de catálogo ya no
+  cambia los ids de las obras de las demás fuentes.
+- Curaduría reconoce como la misma obra dos fichas que comparten un id externo aunque sus
+  enlaces y títulos difieran [X12]. Por ejemplo, el artículo de Wikipedia en inglés y el
+  en español de una misma película comparten el id de Wikidata. Lo mismo vale para IMDb y
+  FilmAffinity con enlaces en otro idioma o región. Cada caso dice si es «Misma obra»
+  (la confirma un id) o «Posible obra repetida», y explica por qué en frases. Los casos
+  confirmados aparecen primero.
+- Dos fichas con el mismo título donde falta el año ya no se ignoran siempre: se marcan
+  como posibles si algo independiente coincide (la dirección, una duración casi igual o
+  el mismo archivo). Si tienen ids distintos de la misma fuente, son obras distintas y no
+  aparecen: dos *Frankenstein* enriquecidas ya no se proponen como repetidas. Nada de
+  esto se une solo; la decisión sigue siendo de una persona.
+- Al unir o decidir un caso en Curaduría, la cola ya no vuelve al primer caso: queda
+  seleccionado el siguiente, con el foco y el scroll donde estaban. «Resolver
+  duplicados claros» sólo une los casos que son la misma obra, nunca los «posibles».
+  Las fichas de la cola muestran el título limpio y el tipo legible («Película»).
+- Los títulos que llegan de Wikipedia ya no arrastran el desambiguador del artículo:
+  «Kingdom of Heaven (film)» se guarda y se muestra como «Kingdom of Heaven». El nombre
+  del artículo se conserva aparte, y las fichas guardadas antes se muestran sin él.
+
+- La búsqueda de Colección reúne obras guardadas y referencias externas en una
+  lista de filas compactas ordenada por relevancia, con una sola paginación y la
+  procedencia identificada en cada resultado. La estantería vuelve al limpiar la consulta.
+- Las coincidencias que requieren revisión se comparan en la búsqueda con el motivo
+  de cada candidata; abrir una ficha guardada ya no lleva a la fuente externa.
+  Seguir buscando conserva los resultados y agregar una obra distinta requiere una
+  confirmación explícita.
+
 ## [0.10.0] - 2026-09-29
 
 ### Agregado

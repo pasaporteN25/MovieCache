@@ -8,13 +8,13 @@ from movie_inbox.domain.catalog import (
     has_external_link,
     linked_sources,
     normalize_item,
-    possible_duplicate_candidates,
     title_match_key,
     trusted_external_url,
 )
 from movie_inbox.domain.libraries import work_identity_key
 from movie_inbox.domain.matching import decide_match
 from movie_inbox.domain.search_strategy import SearchStrategy
+from movie_inbox.domain.work_identity import possible_duplicate_candidates
 
 
 class MatchingTests(unittest.TestCase):
@@ -84,7 +84,8 @@ class MatchingTests(unittest.TestCase):
             {"title": "Heat", "url": "https://imdb.com/title/tt0113277"},
         )
         self.assertTrue(decision.accepted)
-        self.assertEqual(decision.reason, "shared_external_url")
+        # [X12]: read as the IMDb id both links carry, not as two URL strings.
+        self.assertEqual(decision.reason, "shared_imdb_id")
 
     def test_shared_mal_id_is_strong_evidence_and_a_conflict_blocks_title_merge(self) -> None:
         shared = decide_match(

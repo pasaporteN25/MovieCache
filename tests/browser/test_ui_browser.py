@@ -745,9 +745,11 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertTrue(page.locator(".search-main").is_visible())
         self.assertNotIn("mode=", page.url)
 
+        page.locator("#openCollectionFilters").click()
         first_status = page.locator("#statusQuickFilters button").first
         first_status.click()
         selected_status = first_status.get_attribute("data-value")
+        page.locator("#applyCollectionFilters").click()
         self.assertIn(f"status={selected_status}", page.url)
 
         page.locator("#query").focus()
@@ -867,13 +869,13 @@ class BrowserInterfaceTests(unittest.TestCase):
         date_control.locator('[data-click="home-date-yesterday"]').click()
         page.wait_for_function(
             "document.querySelector('.spotlight-selector-heading span')?.textContent.trim() "
-            "=== 'Ayer'"
+            "=== 'Ayer en cartel'"
         )
         # CSS uppercases the label, so read the page text like the date above.
         consulted_poster = page.locator(".home-consulted-poster")
         self.assertEqual(
             consulted_poster.locator(".spotlight-selector-heading").text_content(),
-            "En consulta",
+            "Tu selección",
         )
 
     def test_home_typography_is_local_scoped_and_works_with_csp(self) -> None:
@@ -1488,7 +1490,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         console = page.locator('.spotlight-preview[data-selection-source="shelf:spine-variants"]')
         console.get_by_role("button", name="Abrir ficha", exact=True).click()
         page.wait_for_selector("#detailDrawer[open]")
-        self.assertIn("pelicula", page.locator("#detailDrawer").inner_text().lower())
+        self.assertIn("película", page.locator("#detailDrawer").inner_text().lower())
 
     def test_home_shelf_furniture_has_four_bays_real_overflow_and_wheel_limits(self) -> None:
         page = self.page
@@ -2413,7 +2415,7 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(page.locator("#detailDrawer").get_attribute("data-detail-mode"), "dossier")
         self.assertEqual(page.locator("#detailDrawer .vhs-back-cover").count(), 0)
         self.assertEqual(
-            page.evaluate("document.activeElement.hasAttribute('data-personal-watched-at')"),
+            page.evaluate("document.activeElement.hasAttribute('data-date-text')"),
             True,
         )
 
@@ -3394,6 +3396,88 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertIn("Heat", page.locator("#collectionAnchor").inner_text())
         self.assertFalse(page.locator("#collectionAnchor").is_hidden())
 
+    def test_search_unifies_saved_and_external_results_by_relevance(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+
+        def handle_search(route) -> None:
+            url = route.request.url
+            body: dict[str, Any] = {"results": []}
+            if "external=false" in url:
+                body = {
+                    "catalog": {
+                        "results": [
+                            {
+                                "id": "heat",
+                                "title": "Heat",
+                                "year": "1995",
+                                "kind": "pelicula",
+                                "_search": {"score": 100},
+                            }
+                        ]
+                    }
+                }
+            elif "source=wikipedia" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Heat: documental",
+                            "year": "2010",
+                            "source": "wikipedia",
+                            "url": "https://en.wikipedia.org/wiki/Heat",
+                            "_search": {"score": 65},
+                        }
+                    ]
+                }
+                body["results"].extend(
+                    {
+                        "title": f"Heat {number}",
+                        "source": "wikipedia",
+                        "url": f"https://example.com/heat/{number}",
+                        "_search": {"score": 40},
+                    }
+                    for number in range(5)
+                )
+            elif "source=imdb" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Heat",
+                            "year": "1995",
+                            "source": "imdb",
+                            "url": "https://www.imdb.com/title/tt0113277/",
+                            "_search": {"score": 100},
+                        }
+                    ]
+                }
+            route.fulfill(json=body)
+
+        page.route("**/api/search?*", handle_search)
+        page.locator("#catalogButton").click()
+        page.locator("#externalSource").check()
+        page.locator("#query").fill("Heat")
+        page.locator("#searchButton").click()
+        page.wait_for_function("!document.querySelector('#searchButton').disabled")
+        rows = page.locator(".unified-result-list article")
+        self.assertEqual(rows.count(), 6)
+        self.assertEqual(rows.nth(0).get_attribute("data-local-id"), "heat")
+        self.assertEqual(rows.nth(1).get_attribute("data-result-source"), "imdb")
+        self.assertEqual(rows.nth(2).get_attribute("data-result-source"), "wikipedia")
+        self.assertTrue(page.locator("#grid").is_hidden())
+        self.assertTrue(page.locator("#catalogMergeSection").is_hidden())
+        self.assertEqual(page.locator(".search-source-heading").count(), 0)
+        page.locator(".unified-load-more").click()
+        self.assertEqual(rows.count(), 8)
+        self.assertTrue(rows.nth(6).locator("h3").evaluate("el => document.activeElement === el"))
+        self.assertTrue(page.locator(".unified-load-more").is_hidden())
+        rows.nth(0).get_by_role("button", name="Abrir VHS").click()
+        page.wait_for_selector("#detailDrawer[open] .vhs-back-cover")
+        page.keyboard.press("Escape")
+        page.set_viewport_size({"width": 320, "height": 740})
+        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+        page.locator("#clearManualSearch").click()
+        self.assertTrue(page.locator("#grid").is_visible())
+
     def test_catalog_can_search_and_add_a_jikan_result(self) -> None:
         page = self.page
         self._open_and_wait_for_catalog(page)
@@ -3439,12 +3523,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator("#query").fill("Your Name")
         page.locator("#searchButton").click()
 
-        jikan_group = page.locator('[data-source-group="jikan"]')
+        jikan_group = page.locator('.external-result[data-result-source="jikan"]')
         jikan_group.get_by_role("heading", name="Kimi no Na wa.", exact=True).wait_for()
-        self.assertIn("no está afiliada a MyAnimeList", jikan_group.inner_text())
+        self.assertIn(
+            "no está afiliada a MyAnimeList", page.locator("#manualSearchResults").inner_text()
+        )
         jikan_group.get_by_role("button", name="Agregar").click()
         page.wait_for_function(
-            "[...document.querySelectorAll('[data-source-group=\"jikan\"] button')]"
+            "[...document.querySelectorAll('[data-result-source=\"jikan\"] button')]"
             ".some((button) => button.textContent === 'Agregado')"
         )
 
@@ -3452,6 +3538,112 @@ class BrowserInterfaceTests(unittest.TestCase):
         self.assertEqual(submitted[0]["source"], "jikan")
         self.assertEqual(submitted[0]["mal_id"], "32281")
         self.assertEqual(submitted[0]["myanimelist_url"], "https://myanimelist.net/anime/32281")
+
+    def test_external_rows_review_duplicate_without_repeating_search(self) -> None:
+        page = self.page
+        self._open_and_wait_for_catalog(page)
+        search_requests: list[str] = []
+        add_requests: list[dict[str, Any]] = []
+
+        def handle_search(route) -> None:
+            url = route.request.url
+            search_requests.append(url)
+            body: dict[str, Any]
+            if "external=true" in url and "source=wikipedia" in url:
+                body = {
+                    "results": [
+                        {
+                            "title": "Heat",
+                            "year": "1995",
+                            "kind": "pelicula",
+                            "source": "wikipedia",
+                            "url": "https://en.wikipedia.org/wiki/Heat_(1995_film)",
+                            "description": (
+                                "Una película de Michael Mann sobre dos hombres "
+                                "enfrentados por un robo en Los Ángeles."
+                            ),
+                        }
+                    ]
+                }
+            elif "external=true" in url:
+                body = {"results": []}
+            else:
+                body = {"catalog": {"results": []}}
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+        def handle_add(route) -> None:
+            payload = route.request.post_data_json
+            add_requests.append(payload)
+            if payload.get("action") == "force":
+                body = {"ok": True, "reason": "added"}
+            else:
+                body = {
+                    "ok": False,
+                    "reason": "possible_duplicate",
+                    "candidates": [
+                        {
+                            "id": "heat",
+                            "title": "Heat",
+                            "year": "1995",
+                            "kind": "pelicula",
+                            "reason": "exact_title_year",
+                            "source": "wikipedia",
+                        }
+                    ],
+                }
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+        page.route("**/api/search?*", handle_search)
+        page.route("**/api/add", handle_add)
+        page.locator("#catalogButton").click()
+        page.locator("#externalSource").check()
+        page.locator("#query").fill("Heat")
+        page.locator("#searchButton").click()
+
+        row = page.locator('.external-result[data-result-source="wikipedia"]')
+        row.get_by_role("heading", name="Heat", exact=True).wait_for()
+        self.assertLess(row.bounding_box()["height"], 220)
+        self.assertEqual(
+            page.locator("#manualSearchResults").evaluate(
+                "element => element.scrollWidth <= element.clientWidth"
+            ),
+            True,
+        )
+        row.get_by_role("link", name="Abrir en Wikipedia").wait_for()
+        page.set_viewport_size({"width": 320, "height": 740})
+        self.assertTrue(
+            row.locator(".result-summary").evaluate(
+                "element => element.scrollHeight <= element.clientHeight"
+            )
+        )
+        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+        page.set_viewport_size({"width": 1440, "height": 900})
+        add_button = row.get_by_role("button", name="Agregar a colección")
+        add_button.click()
+
+        review = page.locator("#duplicateReview")
+        review.get_by_role("heading", name="Revisá esta posible coincidencia").wait_for()
+        self.assertIn("título y año exactos", review.inner_text())
+        self.assertIn("Esta obra todavía no se agregó", review.inner_text())
+        self.assertEqual(
+            review.get_by_role("button", name="Abrir ficha guardada").get_attribute("data-id"),
+            "heat",
+        )
+        review.get_by_role("button", name="Abrir ficha guardada").click()
+        page.wait_for_selector("#detailDrawer[open]")
+        self.assertEqual(page.locator("#detailDrawer .drawer-title-main").text_content(), "Heat")
+        page.keyboard.press("Escape")
+        count_before_dismiss = len(search_requests)
+        review.get_by_role("button", name="Seguir buscando").click()
+        self.assertTrue(review.is_hidden())
+        self.assertEqual(len(search_requests), count_before_dismiss)
+        self.assertTrue(add_button.evaluate("element => document.activeElement === element"))
+
+        add_button.click()
+        review.locator("summary").click()
+        review.get_by_role("button", name="Agregar como obra distinta").click()
+        page.wait_for_function("document.querySelector('#duplicateReview').hidden")
+        self.assertEqual(add_requests[-1]["action"], "force")
 
     def test_jikan_cooldown_shows_labeled_offline_fallback_and_attribution(self) -> None:
         page = self.page
@@ -3501,9 +3693,10 @@ class BrowserInterfaceTests(unittest.TestCase):
         page.locator("#query").fill("Death Note")
         page.locator("#searchButton").click()
 
-        jikan_group = page.locator('[data-source-group="jikan"]')
+        jikan_group = page.locator('.external-result[data-result-source="anime_offline_database"]')
         jikan_group.get_by_role("heading", name="Death Note", exact=True).wait_for()
-        text = jikan_group.inner_text()
+        page.locator(".unified-sources summary").click()
+        text = page.locator("#manualSearchResults").inner_text()
         self.assertIn("Respaldo local", text)
         self.assertIn("Anime DB offline", text)
         self.assertIn("ODbL/DbCL", text)

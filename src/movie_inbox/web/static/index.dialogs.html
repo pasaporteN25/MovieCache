@@ -1,3 +1,34 @@
+    <dialog id="devicesDialog" class="member-dialog devices-dialog" aria-labelledby="devicesTitle">
+      <section class="member-dialog-surface">
+        <header class="member-dialog-header">
+          <h2 id="devicesTitle">Mis dispositivos</h2>
+          <button id="closeDevices" class="drawer-close" type="button">Cerrar</button>
+        </header>
+        <div class="devices-body">
+          <p>Tu catálogo también en el teléfono. Conectalo desde Movie Inbox para Android.</p>
+          <button id="generateDeviceQr" type="button">Conectar un teléfono</button>
+          <div id="deviceQrPanel" class="device-qr-panel" hidden>
+            <img id="deviceQr" alt="QR para conectar Android a tu cuenta" width="240" height="240">
+            <div>
+              <h3>Escaneá desde Android</h3>
+              <p id="deviceQrAccount"></p>
+              <p id="deviceQrExpiry" role="status"></p>
+              <p>El QR sirve una sola vez. Mostralo únicamente al teléfono que querés conectar.</p>
+            </div>
+          </div>
+          <p id="devicesFeedback" role="status" aria-live="polite"></p>
+          <div class="devices-list-heading"><h3>Teléfonos conectados</h3><button id="refreshDevices" class="quiet-action" type="button">Actualizar</button></div>
+          <p>Después de un mes sin sincronizar, el teléfono necesita conectarse de nuevo. Revocar el acceso conserva su copia local.</p>
+          <ul id="devicesList" class="devices-list"></ul>
+          <div id="revokeDeviceConfirm" class="device-revoke-confirm" hidden>
+            <p id="revokeDevicePrompt"></p>
+            <button id="cancelDeviceRevoke" class="quiet-action" type="button">Conservar acceso</button>
+            <button id="confirmDeviceRevoke" type="button">Revocar acceso</button>
+          </div>
+        </div>
+      </section>
+    </dialog>
+
     <dialog id="memberDialog" class="member-dialog" aria-labelledby="memberDialogTitle">
       <form id="memberForm" class="member-dialog-surface">
         <header class="member-dialog-header">

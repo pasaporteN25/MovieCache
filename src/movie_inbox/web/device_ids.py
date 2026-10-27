@@ -1,10 +1,12 @@
 """The opaque ids a paired device knows works by.
 
 [A1.4] fixed the derivation: a keyed hash of the account's catalogue, the
-position of the source a work lives in, and the work's own id, under a durable
-instance secret. It lives here rather than in the device catalogue router
-because [X5] needs it from routes that have nothing to do with that router --
-deleting or merging a work has to leave a record under the id a phone holds.
+source a work lives in, and the work's own id, under a durable instance secret.
+[X11] keyed the source on its durable uid rather than its position, so adding,
+removing or reordering an account's sources leaves every other source's ids
+alone. It lives here rather than in the device catalogue router because [X5]
+needs it from routes that have nothing to do with that router -- deleting or
+merging a work has to leave a record under the id a phone holds.
 """
 
 from __future__ import annotations
@@ -21,8 +23,8 @@ from movie_inbox.domain.identity import AuthenticatedIdentity
 from movie_inbox.web.dependencies import SessionCatalog
 
 
-def opaque_item_id(secret: bytes, catalog_id: str, source_slot: str, item_id: str) -> str:
-    message = "\x1f".join((catalog_id, source_slot, item_id)).encode("utf-8")
+def opaque_item_id(secret: bytes, catalog_id: str, source_uid: str, item_id: str) -> str:
+    message = "\x1f".join((catalog_id, source_uid, item_id)).encode("utf-8")
     digest = hmac.new(secret, message, hashlib.sha256).digest()[:24]
     return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
 
@@ -54,4 +56,4 @@ def device_id_for(
     reference = catalog.references_by_path.get(resolved)
     if not reference:
         return None
-    return opaque_item_id(secret, identity.catalog.id, reference, item_id)
+    return opaque_item_id(secret, identity.catalog.id, catalog.source_uids[reference], item_id)

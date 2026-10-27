@@ -621,6 +621,34 @@ class CurationWorkflowTests(unittest.TestCase):
             self.assertEqual(history["count"], 1)
             self.assertEqual(history["operations"][0]["action"], "merge_group")
 
+    def test_auto_resolve_never_merges_a_case_that_is_only_possible(self) -> None:
+        """[X12]: a title without a year, corroborated only by the director, is a
+        question for a person -- even when no field would conflict."""
+        with tempfile.TemporaryDirectory() as temporary:
+            catalog_path = Path(temporary) / "catalog.json"
+            repository = JsonCatalogRepository(catalog_path, normalize_item)
+            repository.write(
+                [
+                    normalize_item(
+                        {"id": "f-a", "title": "Frankenstein", "directors": ["James Whale"]}
+                    ),
+                    normalize_item(
+                        {"id": "f-b", "title": "Frankenstein", "directors": ["James Whale"]}
+                    ),
+                ]
+            )
+            workflow, _ = self.workflow(catalog_path)
+            items = [item.to_dict() for item in repository.read()]
+            for item in items:
+                item["_source_file"] = str(catalog_path)
+
+            result = workflow.auto_resolve_duplicates(
+                items, history_mode="persistent", session_id="session-a"
+            )
+
+            self.assertEqual((result["resolved"], result["needs_review"]), (0, 1))
+            self.assertEqual(len(repository.read()), 2)
+
     def test_auto_resolve_on_a_quartet_with_one_conflict_leaves_the_group_intact(
         self,
     ) -> None:

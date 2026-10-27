@@ -6,10 +6,16 @@ import { mergeSearchResult } from "../core/merge.js";
 import { showView } from "../core/router.js";
 import { findLinkForItem } from "../core/search-bridge.js";
 import { CATALOG_PAGE_SIZE, SEARCH_PAGE_SIZE, items, selectedExistingIdForSearch, setSelectedExistingIdForSearch } from "../core/state.js";
-import { collectionModeCopy, collectionSearchMessage, collectionSearchMode, comparisonSearchMessage, render, renderDatabaseMenu, setCatalogVisibleCount, setCollectionSearchMode, setRandomOrder, syncCollectionRoute } from "./catalog-grid.js";
-import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, oneEditApart, searchResult, showDuplicateChoice } from "./catalog-search-cards.js";
+import { collectionModeCopy, collectionSearchMessage, collectionSearchMode, comparisonSearchMessage, filteredItems, hasActiveCollectionFilters, render, renderDatabaseMenu, setCatalogVisibleCount, setCollectionSearchMode, setRandomOrder, syncCollectionRoute } from "./catalog-grid.js";
+import { duplicateHint, mergeSelectionBar } from "./merge-selection.js";
+import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, localSearchResult, oneEditApart, searchResult, showDuplicateChoice } from "./catalog-search-cards.js";
 
       export let manualResults = [];
+      export const completedExternalResults = new Map();
+
+      export function externalResultKey(result) {
+        return `${resultShelfSource(result)}|${candidateReference(result)}`;
+      }
 
       export let selectedManualIndex = null;
 
@@ -32,6 +38,12 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export let manualSourceVisibleCounts = {};
 
       export let catalogMergeVisibleCount = 6;
+      let unifiedVisibleCount = 6;
+      let localSearchState = "idle";
+
+      export function usesUnifiedSearch() {
+        return Boolean(activeQuery) && ["search", "add"].includes(collectionSearchMode);
+      }
 
       export let externalSourcesLastUsed = [];
 
@@ -111,8 +123,9 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export async function runSearch({ updateHistory = true } = {}) {
+        resetDuplicateReview();
         const requestedQuery = fields.query.value.trim();
-        fields.collectionUtilityMenu.open = false;
+        if (fields.advancedFiltersMenu.open) fields.advancedFiltersMenu.close();
         if (!requestedQuery) {
           clearManualSearch({ focus: false, updateHistory });
           return;
@@ -180,7 +193,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function setSearchState(state, message = "") {
-        fields.externalResultsJump.hidden = state === "idle" || collectionSearchMode !== "search" || !fields.externalSource.checked;
+        fields.externalResultsJump.hidden = true;
         const comparisonMode = ["compare", "link"].includes(collectionSearchMode);
         fields.collectionView.classList.toggle("has-search-results", Boolean(activeQuery) && state !== "idle");
         fields.searchContext.hidden = state !== "searching" && state !== "error" && !comparisonMode;
@@ -266,6 +279,9 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function replaceExternalSourceResults(source, results) {
+        const selectedKey = selectedManualIndex === null ? "" : externalResultKey(manualResults[selectedManualIndex] || {});
+        const duplicateIndex = fields.duplicateReview.dataset.index;
+        const duplicateKey = duplicateIndex === undefined ? "" : externalResultKey(manualResults[Number(duplicateIndex)] || {});
         const rows = (Array.isArray(results) ? results : []).map((result) => ({
           ...result,
           source: result.source || source,
@@ -274,6 +290,18 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         manualResults = manualResults
           .filter((result) => resultShelfSource(result) !== source)
           .concat(rows);
+        if (selectedKey) {
+          const nextIndex = manualResults.findIndex((result) => externalResultKey(result) === selectedKey);
+          selectedManualIndex = nextIndex < 0 ? null : nextIndex;
+        }
+        if (duplicateKey) {
+          const nextIndex = manualResults.findIndex((result) => externalResultKey(result) === duplicateKey);
+          if (nextIndex < 0) resetDuplicateReview();
+          else {
+            fields.duplicateReview.dataset.index = String(nextIndex);
+            fields.duplicateReview.querySelectorAll("[data-index]").forEach((button) => { button.dataset.index = String(nextIndex); });
+          }
+        }
         manualSourceVisibleCounts[source] = SEARCH_PAGE_SIZE;
         externalSourcesLastUsed = [...new Set(manualResults.map(resultShelfSource).filter(Boolean))];
         return rows;
@@ -317,6 +345,11 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           if (!isCurrentSearch(controller)) return;
           catalogMergeResults = payload.catalog?.results || [];
           catalogMergeVisibleCount = SEARCH_PAGE_SIZE;
+          localSearchState = "ready";
+          if (usesUnifiedSearch()) {
+            renderManualResults();
+            return;
+          }
           fields.catalogMergeSection.classList.add("active");
           fields.catalogMergeKicker.textContent = "Antes de agregar";
           fields.catalogMergeTitle.textContent = "Coincidencias en tu catálogo";
@@ -324,6 +357,11 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           renderCatalogMergeResults();
         } catch (error) {
           if (error.name === "AbortError" || !isCurrentSearch(controller)) return;
+          localSearchState = "error";
+          if (usesUnifiedSearch()) {
+            renderManualResults();
+            return;
+          }
           fields.catalogMergeSection.classList.add("active");
           fields.catalogMergeStatus.textContent = "No pudimos actualizar las coincidencias locales. Tu colección sigue disponible.";
           console.error("[catalog-viewer] local search failed", error);
@@ -393,6 +431,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export async function searchManual(source = "all", statusPrefix = "") {
         const query = fields.query.value.trim();
         if (query.length < 2) return;
+        resetDuplicateReview();
         const includeExternal = fields.externalSource.checked || ["add", "link"].includes(collectionSearchMode);
         fields.externalSource.checked = includeExternal;
         if (externalSearchController) externalSearchController.abort();
@@ -402,6 +441,9 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         manualSearchSource = source;
         manualResults = [];
         selectedManualIndex = null;
+        unifiedVisibleCount = SEARCH_PAGE_SIZE;
+        completedExternalResults.clear();
+        localSearchState = usesUnifiedSearch() ? "loading" : "idle";
         manualSourceVisibleCounts = {};
         externalSourcesAttempted = [...sources];
         externalSourcesLastUsed = [];
@@ -409,11 +451,11 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         sources.forEach((name) => {
           externalSourceSearchStates[name] = { status: "loading", count: 0, error: "" };
         });
-        fields.externalSearchSection.classList.toggle("active", includeExternal);
+        fields.externalSearchSection.classList.toggle("active", includeExternal || usesUnifiedSearch());
         fields.manualSearchStatus.textContent = statusPrefix || (includeExternal ? "Consultando fuentes…" : "");
         fields.manualSearchResults.innerHTML = "";
         setSearchBusy(true);
-        if (includeExternal) renderManualResults();
+        if (includeExternal || usesUnifiedSearch()) renderManualResults();
         setSearchState(
           "searching",
           collectionSearchMode === "search"
@@ -426,7 +468,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         );
         const effectiveQuery = effectiveSearchQuery(query);
         const tasks = [];
-        if (collectionSearchMode === "add") tasks.push(loadLocalSearchResults(effectiveQuery, controller));
+        if (usesUnifiedSearch()) tasks.push(loadLocalSearchResults(effectiveQuery, controller));
         sources.forEach((name) => tasks.push(loadExternalSourceResults(effectiveQuery, name, controller)));
         try {
           await Promise.allSettled(tasks);
@@ -440,13 +482,13 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
                 ? `Revisá las fuentes y las coincidencias locales antes de agregar “${query}”.`
                 : comparisonSearchMessage()
           );
-          if (includeExternal) renderManualResults();
+          if (includeExternal || usesUnifiedSearch()) renderManualResults();
           renderDatabaseMenu();
         } finally {
           if (externalSearchController === controller) {
             externalSearchController = null;
             setSearchBusy(false);
-            if (includeExternal) renderManualResults();
+            if (includeExternal || usesUnifiedSearch()) renderManualResults();
           }
         }
       }
@@ -454,6 +496,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       export async function retryExternalSource(source) {
         const query = fields.query.value.trim();
         if (!isExternalSourceConfigured(source) || !EXTERNAL_SEARCH_SOURCES.includes(source) || query.length < 2 || externalSearchController) return;
+        resetDuplicateReview();
         const controller = new AbortController();
         externalSearchController = controller;
         if (!externalSourcesAttempted.includes(source)) externalSourcesAttempted.push(source);
@@ -507,6 +550,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
         resetExternal = false,
         forceModeChange = false
       } = {}) {
+        resetDuplicateReview();
         const hadSearch = Boolean(activeQuery || fields.query.value.trim());
         if (["compare", "link"].includes(collectionSearchMode) && !forceModeChange) {
           fields.query.value = "";
@@ -517,7 +561,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           return;
         }
         const returnMode = collectionSearchMode === "add" ? "add" : "browse";
-        fields.collectionUtilityMenu.open = false;
+        if (fields.advancedFiltersMenu.open) fields.advancedFiltersMenu.close();
         if (externalSearchController) externalSearchController.abort();
         externalSearchController = null;
         setSearchBusy(false);
@@ -622,6 +666,12 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function renderManualResults() {
+        fields.collectionView.classList.toggle("has-unified-search", usesUnifiedSearch());
+        if (usesUnifiedSearch()) {
+          renderUnifiedResults();
+          return;
+        }
+        fields.externalSearchSection.querySelector("#externalSearchTitle").textContent = "Resultados externos";
         const grouped = Object.fromEntries(EXTERNAL_SEARCH_SOURCES.map((source) => [source, []]));
         manualResults.forEach((result, index) => {
           const shelf = resultShelfSource(result);
@@ -648,6 +698,53 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
             ${externalSourceAttribution(source, rows)}
           </section>`;
         }).join("");
+      }
+
+      export function unifiedResults() {
+        const allowedIds = new Set(filteredItems({ includeQuery: false }).map((item) => item.id));
+        const local = catalogMergeResults.filter((item) => allowedIds.has(item.id))
+          .map((result, index) => ({ result, index, local: true }));
+        const external = manualResults.map((result, index) => ({ result, index, local: false }));
+        return [...local, ...external].sort((left, right) => {
+          const score = Number(right.result._search?.score || 0) - Number(left.result._search?.score || 0);
+          if (score) return score;
+          if (left.local !== right.local) return left.local ? -1 : 1;
+          return `${displayTitle(left.result)}|${left.result.source}|${candidateReference(left.result)}`
+            .localeCompare(`${displayTitle(right.result)}|${right.result.source}|${candidateReference(right.result)}`, "es");
+        });
+      }
+
+      function renderUnifiedResults() {
+        const focused = fields.manualSearchResults.contains(document.activeElement) ? document.activeElement : null;
+        const focusRow = focused?.closest("article");
+        const focusKey = focusRow?.dataset.resultKey;
+        const focusId = focusRow?.dataset.localId;
+        const focusAction = focused?.dataset.click;
+        const sourcesOpen = Boolean(fields.manualSearchResults.querySelector(".unified-sources")?.open);
+        const rows = unifiedResults();
+        const visible = rows.slice(0, unifiedVisibleCount);
+        const localCount = rows.filter((row) => row.local).length;
+        const pending = externalSourcesAttempted.filter((source) => externalSourceSearchStates[source]?.status === "loading").length;
+        const failed = externalSourcesAttempted.filter((source) => ["error", "timeout", "cooldown"].includes(externalSourceSearchStates[source]?.status)).length;
+        fields.catalogMergeSection.classList.remove("active");
+        fields.externalSearchSection.classList.add("active");
+        fields.externalSearchSection.querySelector("#externalSearchTitle").textContent = "Resultados de búsqueda";
+        fields.manualSearchStatus.textContent = `${rows.length} resultados · ${localCount} en tu colección · por relevancia`;
+        const states = externalSourcesAttempted.map((source) => {
+          const state = externalSourceSearchStates[source] || {};
+          return `<div class="unified-source-state" data-source-state="${source}"><strong>${escapeHtml(EXTERNAL_SOURCE_LABELS[source][0])}</strong><span>${externalSourceStateLabel(state, state.count || 0)}</span>${["error", "timeout", "cooldown"].includes(state.status) ? externalSourceFeedback(source, state) : ""}${externalSourceNotice(source, state)}</div>`;
+        }).join("");
+        const notices = `${localSearchState === "error" ? '<p role="status">No pudimos consultar tu colección. Reintentá la búsqueda.</p>' : ""}${hasActiveCollectionFilters() ? '<p class="unified-filter-note">Los filtros de tu colección se aplican a las obras guardadas.</p>' : ""}`;
+        const empty = pending || localSearchState === "loading" ? "Buscando coincidencias…" : "No encontramos obras para esta búsqueda.";
+        const more = rows.length > unifiedVisibleCount ? `<button class="load-more unified-load-more" type="button" data-click="show-more-manual">Cargar ${Math.min(SEARCH_PAGE_SIZE, rows.length - unifiedVisibleCount)} más · ${visible.length} de ${rows.length}</button>` : "";
+        const attribution = externalSourcesAttempted.map((source) => externalSourceAttribution(source, manualResults.filter((result) => resultShelfSource(result) === source).map((result) => ({ result })))).join("");
+        fields.manualSearchResults.innerHTML = `${states ? `<details class="unified-sources"><summary>Fuentes consultadas${pending ? ` · ${pending} buscando` : ""}${failed ? ` · ${failed} incompletas` : ""}</summary><div>${states}</div></details>` : ""}${notices}${mergeSelectionBar()}${duplicateHint(visible.filter((row) => row.local).map((row) => row.result.id))}<div class="unified-result-list" aria-label="Resultados ordenados por relevancia">${visible.length ? visible.map(({ result, index, local }) => local ? localSearchResult(result, index) : searchResult(result, index)).join("") : `<p class="search-source-empty" role="status">${empty}</p>`}</div>${more}${attribution}`;
+        const sourcesDetails = fields.manualSearchResults.querySelector(".unified-sources");
+        if (sourcesDetails) sourcesDetails.open = sourcesOpen;
+        if (focusAction) {
+          const rowSelector = focusKey ? `[data-result-key="${CSS.escape(focusKey)}"] ` : focusId ? `[data-local-id="${CSS.escape(focusId)}"] ` : "";
+          fields.manualSearchResults.querySelector(`${rowSelector}[data-click="${CSS.escape(focusAction)}"]`)?.focus({ preventScroll: true });
+        } else if (focused?.tagName === "SUMMARY") sourcesDetails?.querySelector("summary")?.focus({ preventScroll: true });
       }
 
       export function externalSourceNotice(source, state) {
@@ -690,6 +787,13 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export function showMoreManualResults(source = "") {
+        if (usesUnifiedSearch()) {
+          const firstNew = unifiedVisibleCount;
+          unifiedVisibleCount += SEARCH_PAGE_SIZE;
+          renderManualResults();
+          fields.manualSearchResults.querySelectorAll(".unified-result-list article")[firstNew]?.querySelector("h3")?.focus({ preventScroll: true });
+          return;
+        }
         if (source) manualSourceVisibleCounts[source] = (manualSourceVisibleCounts[source] || SEARCH_PAGE_SIZE) + SEARCH_PAGE_SIZE;
         renderManualResults();
       }
@@ -761,11 +865,10 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export async function addSearchResult(index) {
-        const cards = [...fields.manualSearchResults.querySelectorAll("[data-index]")];
-        const button = cards.find((element) => Number(element.dataset.index) === index);
+        const button = fields.manualSearchResults.querySelector(`.external-result [data-click="add-result"][data-index="${index}"]`);
         if (!button) return;
         const targetId = selectedExistingIdForSearch;
-        const idleLabel = targetId ? "Combinar" : "Agregar";
+        const idleLabel = targetId ? "Combinar" : "Agregar a colección";
         let completed = false;
         button.disabled = true;
         button.textContent = targetId ? "Preparando..." : "Agregando...";
@@ -801,6 +904,7 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
           } else {
             button.textContent = "Agregado";
           }
+          completedExternalResults.set(externalResultKey(manualResults[index]), button.textContent);
           await load();
           if (payload.background_enrichment === "scheduled") {
             window.setTimeout(() => load(), 12000);
@@ -822,9 +926,32 @@ import { catalogMergeResult, externalSourceFeedback, externalSourceStateLabel, o
       }
 
       export async function forceAddSearchResult(index) {
-        await postAdd(manualResults[index], "force", "");
-        await load();
-        await runSearch();
+        const button = fields.duplicateReview.querySelector('[data-click="force-add"]');
+        if (button) button.disabled = true;
+        try {
+          const response = await postAdd(manualResults[index], "force", "");
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          resetDuplicateReview();
+          await load();
+          await runSearch();
+        } catch (error) {
+          console.error("[catalog-viewer] force add failed", error);
+          reportExternalResultProblem("No pudimos agregar la obra distinta. Reintentá desde esta revisión.");
+          if (button?.isConnected) button.disabled = false;
+        }
+      }
+
+      export function resetDuplicateReview() {
+        fields.duplicateReview.hidden = true;
+        fields.duplicateReview.innerHTML = "";
+        delete fields.duplicateReview.dataset.index;
+      }
+
+      export function dismissDuplicateReview() {
+        const index = fields.duplicateReview.dataset.index;
+        resetDuplicateReview();
+        fields.manualSearchResults.querySelector(`.external-result [data-click="add-result"][data-index="${index}"]`)
+          ?.focus({ preventScroll: true });
       }
 
       export async function postAdd(result, action, targetId) {

@@ -212,6 +212,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Delay between background image downloads.",
     )
     parser.add_argument(
+        "--identity-resolution-interval-seconds",
+        type=float,
+        default=300.0,
+        help=(
+            "Seconds between background lookups of the Wikidata id of entries that "
+            "only have a Wikipedia link (50 per pass). 0 turns it off."
+        ),
+    )
+    parser.add_argument(
         "--image-host",
         action="append",
         default=[],
@@ -247,6 +256,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--image-cache-total-mb must be at least --image-cache-max-mb")
     if not 0.25 <= args.image_cache_warm_interval_seconds <= 3600:
         parser.error("--image-cache-warm-interval-seconds must be between 0.25 and 3600")
+    if args.identity_resolution_interval_seconds and not (
+        30 <= args.identity_resolution_interval_seconds <= 86400
+    ):
+        parser.error("--identity-resolution-interval-seconds must be 0 or between 30 and 86400")
     if not 1 <= args.session_days <= 365:
         parser.error("--session-days must be between 1 and 365")
     try:
@@ -304,6 +317,7 @@ def main(argv: list[str] | None = None) -> int:
         image_cache_total_bytes=max(1, int(args.image_cache_total_mb * 1024 * 1024)),
         image_cache_warm=args.image_cache_warm_mode == "after-access",
         image_cache_warm_interval_seconds=args.image_cache_warm_interval_seconds,
+        identity_resolution_interval_seconds=args.identity_resolution_interval_seconds,
         image_allowed_hosts=tuple(dict.fromkeys([*DEFAULT_IMAGE_ALLOWED_HOSTS, *args.image_host])),
         library_allowed_roots=tuple(str(path.resolve()) for path in args.library_root),
         anime_offline_index=str(args.anime_offline_index.resolve())

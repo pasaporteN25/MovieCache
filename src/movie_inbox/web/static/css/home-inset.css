@@ -59,8 +59,8 @@ Este archivo reemplaza los estilos de carcasa/posición porcentual antiguos; no 
 #homeView .spotlight-layout { --home-poster-width: clamp(206px,13.6vw,274px); display: grid; grid-template-columns: var(--home-poster-width) minmax(0,1fr) var(--home-poster-width); gap: 16px; min-height: 484px; align-items: start; align-content: start; }
 #homeView .spotlight-selector { position: relative; min-width: 0; width: 100%; aspect-ratio: 274/436; align-self: start; background: #020d13; }
 #homeView .spotlight-selector::before { content: ''; position: absolute; inset: 0; background: url('/static/img/poster-marquee-frame-v1.png') center / 100% 107.4% no-repeat; pointer-events: none; box-shadow: inset 5px 5px 10px #000c, inset -5px -2px 6px #000c; }
-#homeView .spotlight-selector-heading { position: absolute; z-index: 2; top: 3%; left: 17%; width: 66%; height: 8%; display: grid; place-items: center; }
-#homeView .spotlight-selector-heading span { font: 400 16px/1 var(--font-home-plaque); color: #291c0c; text-transform: uppercase; }
+#homeView .spotlight-selector-heading { position: absolute; z-index: 2; top: 2.2%; left: 17%; width: 66%; height: 8%; display: grid; place-items: center; text-align: center; }
+#homeView .spotlight-selector-heading span { display: block; width: 100%; font: 600 clamp(13px, 1.05vw, 18px)/1 "Barlow Condensed", "Arial Narrow", sans-serif; letter-spacing: .065em; color: #291c0c; text-transform: uppercase; white-space: nowrap; }
 #homeView .spotlight-poster-card { position: absolute; inset: 16.8% 12.2% 12.2%; }
 #homeView .spotlight-poster-trigger { width: 100%; height: 100%; border: 0; padding: 0; background: #030809; display: block; }
 #homeView .spotlight-poster { width: 100%; height: 100%; object-fit: contain; display: block; }

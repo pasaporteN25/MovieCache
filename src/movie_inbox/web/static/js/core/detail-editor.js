@@ -19,10 +19,6 @@ export function renderDetailEditor(item, parts) {
       ${EDITOR_SECTIONS.map(([key, label]) => `<button type="button" data-click="detail-section" data-section="${key}" aria-controls="editor-${key}">${label}</button>`).join("")}
     </nav>
     <div class="vhs-editor-workspace">
-      <header class="vhs-editor-heading">
-        <button type="button" class="quiet-action" data-click="return-vhs-back">← Volver a la contratapa</button>
-        <div><h2>${escapeHtml(title)}</h2><p>${escapeHtml([item.year, item.kind].filter(Boolean).join(" · "))}</p></div>
-      </header>
       <div class="vhs-editor-content">
         <section data-editor-section="personal" id="editor-personal" aria-label="Mi registro">
           <div class="vhs-personal-layout"><div>

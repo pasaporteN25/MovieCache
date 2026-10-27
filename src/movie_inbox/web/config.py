@@ -57,6 +57,10 @@ class ViewerConfig:
     image_allowed_hosts: tuple[str, ...] = DEFAULT_IMAGE_ALLOWED_HOSTS
     library_allowed_roots: tuple[str, ...] = ()
     library_scheduler_poll_seconds: float = 15.0
+    # [X12 B]: seconds between background Wikidata lookups; 0 turns the loop
+    # off (the default here, so tests and embedded uses never reach the network;
+    # `serve` turns it on).
+    identity_resolution_interval_seconds: float = 0.0
     anime_offline_index: str = ""
     imdb_dataset_index: str = ""
     # [B2.4]: how Wikimedia can reach whoever runs this instance. Optional.

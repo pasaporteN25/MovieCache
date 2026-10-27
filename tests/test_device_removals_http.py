@@ -61,6 +61,7 @@ class _RemovalHttpCase(unittest.TestCase):
             write_path=str(self.catalog_path),
         )
         self.catalog_id = catalog.id
+        self.source_uid = catalog.sources[0].uid
         media = root / "media"
         media.mkdir()
         self.config = ViewerConfig(
@@ -128,7 +129,7 @@ class _RemovalHttpCase(unittest.TestCase):
         secret = self.client.app.state.identity_repository.instance_secret(  # type: ignore[attr-defined]
             DEVICE_SYNC_SECRET
         )
-        return opaque_item_id(secret.encode("utf-8"), self.catalog_id, "source-1", item_id)
+        return opaque_item_id(secret.encode("utf-8"), self.catalog_id, self.source_uid, item_id)
 
     def _ask_present(self, ids: list[str], present: set[str]) -> dict[str, RemovalStatus]:
         return self._service().statuses(self.catalog_id, ids, present)

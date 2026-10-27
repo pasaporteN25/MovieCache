@@ -7,6 +7,16 @@ Antes de trabajar, leé los contratos vigentes: `SDD.md`, `PRODUCT.md`, `DESIGN.
 `docs/roadmap.md`, `CHANGELOG.md` (`[Sin publicar]`), `tests/test_layering.py`.
 No son documentación decorativa.
 
+## Ramas y pull requests — decisión del owner, 2026-10-04
+
+Las directivas compartidas con Codex están en `AGENTS.md`. Ramas nuevas:
+`feature/nombre-del-feature` o `release/x.x.x`; preferir la release abierta para
+trabajo individual. No crear ramas `codex/`, `claude/` ni `feat/`. Las features
+entran en la release con merge commit; el PR de release va hacia `master`.
+Usar `.github/pull_request_template.md`, con la regla de ramas y una descripción.
+Para conservar el PR #3, su rama histórica es sólo un alias remoto sincronizado
+con `release/0.11.0`; no es una rama de trabajo. La excepción termina con ese PR.
+
 ## Comandos
 
 ```powershell
@@ -63,15 +73,17 @@ y los shims de import (`catalog_*.py`) ya no viven en `scripts/`: se movieron a
 contenedor Docker — ahí el camino es `movie-inbox <subcomando>`. La lógica nueva va
 siempre al paquete.
 
-## Reparto de trabajo entre agentes (desde 2026-09-07)
+## Reparto de trabajo entre agentes (desde 2026-09-07, revisado 2026-10-01)
 
-El trabajo corre en paralelo, dividido por especialidad:
+El trabajo corre en paralelo. Desde el 2026-10-01 el reparto ya no es por capa:
 
-- **Claude** — infraestructura, backend, modelo de datos, capas, contratos con fuentes
-  externas, migraciones y pruebas. Frentes propios: activación real de TMDb,
-  disponibilidad en streaming, charadas y dirección móvil
+- **Claude** — puede tomar cualquier frente que el owner le asigne de punta a punta,
+  frontend y diseño de interfaz incluidos (con Impeccable cuando corresponda). Sigue
+  siendo dueño de infraestructura, backend, modelo de datos, capas, contratos con
+  fuentes externas, migraciones y pruebas
   (`docs/analisis/streaming-charadas-movil-2026-09-07.md`).
-- **Codex** — dirección visual y frontend de presentación: [U2-P] y sus derivados.
+- **Codex** — su única preferencia es el diseño de imágenes (assets raster, marca), y
+  ni siquiera eso es absoluto: el owner puede asignarlo a otro.
 
 El cliente Android es otro repositorio, `../movieIndexAndroid`, con su propio tablero
 (decisión del owner del 2026-08-17). Acá sólo vive lo que ese cliente consume: la API

@@ -29,6 +29,10 @@ from movie_inbox.application.external_retirement import (
 )
 from movie_inbox.application.home_service import EditorialHomeService
 from movie_inbox.application.identity_repository import IdentityRepositoryError
+from movie_inbox.application.identity_resolution_service import (
+    IdentityResolutionScheduler,
+    IdentityResolutionService,
+)
 from movie_inbox.application.image_service import ImageService
 from movie_inbox.application.import_service import ImportService
 from movie_inbox.application.library_service import (
@@ -42,7 +46,7 @@ from movie_inbox.application.privacy_service import PrivacyService
 from movie_inbox.application.public_presentation_service import PublicPresentationService
 from movie_inbox.application.public_ratings_service import PublicRatingsService
 from movie_inbox.application.removal_service import RemovalService
-from movie_inbox.application.repository import CatalogRepositoryError
+from movie_inbox.application.repository import CatalogRepository, CatalogRepositoryError
 from movie_inbox.application.scanner_workflow import ScannerWorkflowService
 from movie_inbox.application.streaming_service import StreamingService
 from movie_inbox.domain.identity import AuthenticatedIdentity
@@ -52,6 +56,8 @@ from movie_inbox.external.image_sources import TmdbImageSource
 from movie_inbox.external.imdb import imdb_id_from_text
 from movie_inbox.external.imdb_dataset_source import ImdbDatasetSource
 from movie_inbox.external.tmdb import TmdbAdapter
+from movie_inbox.external.wikidata import fetch_wikidata_release_years
+from movie_inbox.external.wikipedia import fetch_wikidata_ids_for_articles
 from movie_inbox.infrastructure.charades_repository import SqliteCharadesRepository
 from movie_inbox.infrastructure.collection_repository import SqliteCollectionRepository
 from movie_inbox.infrastructure.curation_history import (
@@ -60,6 +66,7 @@ from movie_inbox.infrastructure.curation_history import (
 )
 from movie_inbox.infrastructure.external_catalog import configure_external_catalog
 from movie_inbox.infrastructure.home_snapshot_repository import SqliteHomeSnapshotRepository
+from movie_inbox.infrastructure.identity_attempt_repository import SqliteIdentityAttemptRepository
 from movie_inbox.infrastructure.identity_repository import SqliteIdentityRepository
 from movie_inbox.infrastructure.import_parsers import parse_import_content
 from movie_inbox.infrastructure.import_repository import SqliteImportDraftRepository
@@ -307,6 +314,33 @@ def create_app(config: ViewerConfig) -> FastAPI:
         library_service,
         poll_seconds=config.library_scheduler_poll_seconds,
     )
+
+    def identity_repositories() -> list[CatalogRepository]:
+        try:
+            accounts = identity_repository.list_accounts()
+        except IdentityRepositoryError:
+            return []
+        return [
+            catalog_service(Path(source.path)).repository
+            for _user, personal_catalog in accounts
+            for source in personal_catalog.sources
+            if Path(source.path).exists()
+        ]
+
+    identity_attempts = SqliteIdentityAttemptRepository(instance_db)
+    identity_scheduler = (
+        IdentityResolutionScheduler(
+            IdentityResolutionService(
+                identity_repositories,
+                fetch_wikidata_ids_for_articles,
+                fetch_wikidata_release_years,
+                identity_attempts,
+            ),
+            poll_seconds=config.identity_resolution_interval_seconds,
+        )
+        if config.identity_resolution_interval_seconds > 0
+        else None
+    )
     login_limiter = LoginAttemptLimiter()
     public_presentation_limiter = PublicReadLimiter()
     image_warmer = ImageCacheWarmer(config)
@@ -314,10 +348,14 @@ def create_app(config: ViewerConfig) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         library_scheduler.start()
+        if identity_scheduler is not None:
+            identity_scheduler.start()
         try:
             yield
         finally:
             library_scheduler.stop()
+            if identity_scheduler is not None:
+                identity_scheduler.stop()
             image_warmer.stop()
 
     app = FastAPI(
@@ -346,6 +384,11 @@ def create_app(config: ViewerConfig) -> FastAPI:
     app.state.availability_service = availability_service
     app.state.scanner_workflow = scanner_workflow
     app.state.library_scheduler = library_scheduler
+    # [X12 B] Kept on the app so the curation button resolves the same way the
+    # background loop does, and so tests can replace the network lookups.
+    app.state.identity_attempts = identity_attempts
+    app.state.identity_article_ids = fetch_wikidata_ids_for_articles
+    app.state.identity_release_years = fetch_wikidata_release_years
     app.state.image_warmer = image_warmer
     app.state.tmdb_retirement_service = tmdb_retirement_service
     app.state.streaming_service = streaming_service

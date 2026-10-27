@@ -23,6 +23,23 @@ def clean_title(value: str) -> str:
     return value
 
 
+# [X12]: Wikipedia names an article "Kingdom of Heaven (film)" or "Frankenstein
+# (película de 1931)" to tell it apart from others; that tail belongs to the
+# article, not to the work. Only a trailing parenthesis naming a kind of work
+# is dropped, so "(500) Days of Summer" or "Tora! Tora! Tora!" are untouched.
+_WIKIPEDIA_DISAMBIGUATOR = re.compile(
+    r"\s*\((?=[^()]*\b(?:film|movie|tv series|television series|miniseries|series|"
+    r"documentary|anime|animated|short|pel[ií]cula|serie|miniserie|documental|"
+    r"telefilme|cortometraje|largometraje)\b)[^()]*\)\s*$",
+    flags=re.IGNORECASE,
+)
+
+
+def strip_wikipedia_disambiguator(value: str) -> str:
+    stripped = _WIKIPEDIA_DISAMBIGUATOR.sub("", str(value or "")).strip()
+    return stripped or clean_whitespace(str(value or ""))
+
+
 def clean_release_title(value: str) -> str:
     value = clean_title(value)
     value = re.sub(r"\.[a-z0-9]{2,5}$", "", value, flags=re.IGNORECASE)

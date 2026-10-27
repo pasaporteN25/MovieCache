@@ -23,6 +23,7 @@ from movie_inbox.application.curation_workflow import CurationWorkflowService
 from movie_inbox.application.library_service import AvailabilityService
 from movie_inbox.application.repository import CatalogRepositoryError
 from movie_inbox.domain import catalog as domain
+from movie_inbox.domain import work_identity
 from movie_inbox.domain.metadata import (
     METADATA_FIELDS,
     normalize_metadata_sources,
@@ -167,7 +168,7 @@ def curation_workflow(
     return _CURATION_WORKFLOWS[key]
 
 
-annotate_duplicate_items = domain.annotate_duplicate_items
+annotate_duplicate_items = work_identity.annotate_duplicate_items
 canonical_url = domain.canonical_url
 external_urls = domain.external_urls
 has_external_link = domain.has_external_link

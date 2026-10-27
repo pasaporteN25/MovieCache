@@ -3,7 +3,7 @@ import { cachedImageSrc, card } from "../core/card.js";
 import { load, loadCatalog } from "../core/catalog-data.js";
 import { openDetail } from "../core/detail.js";
 import { fields } from "../core/fields.js";
-import { asList, escapeAttr, escapeHtml, formatDateTime, localFilesText, meta, normalizeText, sourceLabel } from "../core/format.js";
+import { asList, displayTitle, escapeAttr, escapeHtml, formatDateTime, kindLabel, localFilesText, meta, normalizeText, sourceLabel } from "../core/format.js";
 import { apiFetch } from "../core/http.js";
 import { mergeFieldLabel, openInternalMergeComparator } from "../core/merge.js";
 import { handleOperationFeedbackClick } from "../core/operation-feedback.js";
@@ -18,6 +18,11 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
       export let curationQueueQuery = "";
 
       export let selectedCurationCaseId = "";
+
+      // [X12 C2] Where the selection sat in the visible queue. When the selected
+      // case leaves -- merged, decided, deferred -- the one now at that position
+      // (the next case) takes its place, instead of jumping back to the top.
+      let selectedCurationIndex = 0;
 
       export let curationLoading = false;
 
@@ -54,13 +59,11 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
             scanner: curationCounts.scanner || 0,
             ...(payload.counts || {})
           });
-          const visible = visibleCurationCases();
-          if (!visible.some((entry) => entry.id === selectedCurationCaseId)) {
-            selectedCurationCaseId = visible[0]?.id || "";
-          }
           await loadCurationHistory();
           syncCurationCounts();
           renderCuration();
+          // Not awaited: the queue must not wait on a count for a side button.
+          loadIdentityPending();
           if (announce) setCurationFeedback("Bandeja actualizada", "success");
         } catch (error) {
           console.error("[catalog-viewer] curation load failed", error);
@@ -188,6 +191,81 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         }
       }
 
+      // [X12 B] Entries that only link a Wikipedia article get their Wikidata id
+      // looked up, fifty per request, so the same film in two languages meets in
+      // the queue. The server also does this slowly on its own; this is "now".
+      export let identityPending = 0;
+
+      export async function loadIdentityPending() {
+        try {
+          const response = await apiFetch("/api/curation/identity");
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+          identityPending = Number(payload.pending || 0);
+        } catch (error) {
+          console.error("[catalog-viewer] identity status failed", error);
+          identityPending = 0;
+        }
+        syncIdentityButton();
+      }
+
+      function syncIdentityButton() {
+        const button = fields.resolveIdentitiesCuration;
+        if (!button) return;
+        button.hidden = identityPending <= 0;
+        button.textContent = `Completar identidades (${identityPending})`;
+      }
+
+      export async function resolveIdentities() {
+        const button = fields.resolveIdentitiesCuration;
+        button.disabled = true;
+        const start = identityPending;
+        let resolved = 0;
+        let missing = 0;
+        let failed = false;
+        try {
+          for (let round = 0; round < 400; round += 1) {
+            setCurationFeedback(
+              `Completando identidades… ${Math.max(0, start - identityPending)} de ${start}`,
+              "working"
+            );
+            const response = await apiFetch("/api/curation/identity/resolve", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}"
+            });
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.reason || `HTTP ${response.status}`);
+            resolved += Number(payload.resolved || 0);
+            missing += Number(payload.missing || 0);
+            const before = identityPending;
+            identityPending = Number(payload.pending || 0);
+            if (Number(payload.failed || 0) && !Number(payload.resolved || 0)) failed = true;
+            // Stop when done, or when a round made no progress (Wikipedia not
+            // answering): the background loop picks it up later.
+            if (!identityPending || identityPending >= before || failed) break;
+          }
+          await loadCurationQueue();
+          const parts = [
+            `${resolved} ${resolved === 1 ? "ficha identificada" : "fichas identificadas"}`,
+            missing ? `${missing} sin identificador en Wikipedia` : "",
+            identityPending ? `${identityPending} quedan para más tarde` : ""
+          ].filter(Boolean);
+          setCurationFeedback(
+            failed && !resolved
+              ? "Wikipedia no respondió. Se vuelve a intentar sola más tarde."
+              : `${parts.join(" · ")}.`,
+            failed && !resolved ? "error" : "success"
+          );
+        } catch (error) {
+          console.error("[catalog-viewer] identity resolution failed", error);
+          setCurationFeedback("No se pudieron completar las identidades.", "error");
+        } finally {
+          button.disabled = false;
+          syncIdentityButton();
+        }
+      }
+
       export function syncCurationCounts() {
         fields.curationPendingCount.textContent = curationCounts.pending || 0;
         fields.curationDuplicateCount.textContent = curationCounts.duplicates || 0;
@@ -235,6 +313,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         if (filter) {
           curationFilter = filter.dataset.curationFilter || "pending";
           selectedCurationCaseId = "";
+          selectedCurationIndex = 0;
           renderCuration();
           return;
         }
@@ -331,8 +410,11 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         }
         const visible = visibleCurationCases();
         if (!visible.some((entry) => entry.id === selectedCurationCaseId)) {
-          selectedCurationCaseId = visible[0]?.id || "";
+          selectedCurationCaseId = visible[Math.min(selectedCurationIndex, visible.length - 1)]?.id || "";
         }
+        selectedCurationIndex = Math.max(0, visible.findIndex((entry) => entry.id === selectedCurationCaseId));
+        const queueScroll = fields.curationQueue.scrollTop;
+        const keepFocus = curationHoldsFocus();
         fields.inboxView.querySelectorAll("[data-curation-filter]").forEach((button) => {
           const active = button.dataset.curationFilter === curationFilter;
           button.classList.toggle("active", active);
@@ -352,14 +434,28 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
               curationFilter === "deferred" ? "No hay decisiones pospuestas" : "No quedan casos en esta cola",
               curationFilter === "pending" ? "La bandeja está al día." : "Probá otro filtro."
             );
+        // Re-rendering the list must not throw the reader back to its top.
+        fields.curationQueue.scrollTop = queueScroll;
+        fields.curationQueue.querySelector(".curation-queue-item.selected")?.scrollIntoView({ block: "nearest" });
         const selected = visible.find((entry) => entry.id === selectedCurationCaseId);
         fields.curationDetail.innerHTML = selected
           ? curationCaseDetail(selected)
           : curationEmptyState("Sin caso seleccionado", "La evidencia aparecerá cuando haya una decisión disponible.");
         renderScopeStrip(curationScopeStates());
+        if (keepFocus) focusSelectedCurationItem();
+      }
+
+      // [X12 C2] Re-rendering replaces the element that had the focus. If it
+      // was anywhere in the queue or the case -- or already lost to the page --
+      // it goes back to the selected case instead of falling to <body>.
+      function curationHoldsFocus() {
+        const active = document.activeElement;
+        if (!active || active === document.body) return !fields.inboxView.hidden;
+        return fields.curationQueue.contains(active) || fields.curationDetail.contains(active);
       }
 
       export function renderCurationHistory() {
+        const keepFocus = curationHoldsFocus();
         if (!curationHistory.some((entry) => entry.id === selectedCurationCaseId)) {
           selectedCurationCaseId = curationHistory[0]?.id || "";
         }
@@ -382,6 +478,7 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           ? curationHistoryDetail(selected)
           : curationEmptyState("Sin operación seleccionada", "Elegí una actividad para revisar su estado.");
         renderScopeStrip(curationScopeStates());
+        if (keepFocus) focusSelectedCurationItem();
       }
 
       export function curationHistoryItem(operation) {
@@ -446,14 +543,16 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
         const members = caseMembers(entry);
         const item = entry.type === "duplicate" ? members[0] : entry.primary;
         const selected = entry.id === selectedCurationCaseId;
-        const type = entry.type === "duplicate" ? "Duplicado" : "Sin referencia";
+        const type = entry.type !== "duplicate"
+          ? "Sin referencia"
+          : entry.level === "same" ? "Misma obra" : "Posible duplicado";
         return `<button class="curation-queue-item ${selected ? "selected" : ""}" type="button"
           data-curation-case="${escapeAttr(entry.id)}" aria-pressed="${selected}">
           ${curationThumb(item)}
           <span class="curation-queue-copy">
             <span class="curation-queue-type">${escapeHtml(type)}${entry.status === "deferred" ? " · Pospuesta" : ""}</span>
-            <strong>${escapeHtml(item.title || "Sin título")}</strong>
-            <small>${escapeHtml([item.year, item.kind].filter(Boolean).join(" · ") || "Sin año")}</small>
+            <strong>${escapeHtml(displayTitle(item) || "Sin título")}</strong>
+            <small>${escapeHtml([item.year, kindLabel(item.kind)].filter(Boolean).join(" · ") || "Sin año")}</small>
             ${entry.type === "duplicate"
               ? `<small class="curation-queue-duplicate-hint">${members.length} entradas conectadas</small>`
               : ""}
@@ -471,13 +570,16 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
       export function duplicateCurationDetail(entry) {
         const deferred = entry.status === "deferred";
         const members = caseMembers(entry);
+        // [X12 C1] "same": an external id already says so, and one look confirms
+        // it. "possible": only titles and corroboration, a real question.
+        const certain = entry.level === "same";
         return `
           <header class="curation-case-heading">
             <div>
-              <span class="curation-case-kicker">${deferred ? "Decisión pospuesta" : "Revisión necesaria"}</span>
-              <h3>¿Son la misma obra?</h3>
+              <span class="curation-case-kicker">${deferred ? "Decisión pospuesta" : !certain ? "Revisión necesaria" : entry.basis === "external_id" ? "Confirmada por un identificador externo" : "Mismo título y mismo año"}</span>
+              <h3>${certain ? "Son la misma obra" : "¿Son la misma obra?"}</h3>
             </div>
-            <span class="pill warning">${members.length} posibles duplicados</span>
+            <span class="pill ${certain ? "good" : "warning"}">${members.length} ${certain ? "fichas de la misma obra" : "posibles duplicados"}</span>
           </header>
           ${curationEvidence(entry.evidence)}
           <div class="curation-group" aria-label="${members.length} entradas del grupo">
@@ -529,8 +631,8 @@ import { curationCounts, items, setCurationCounts } from "../core/state.js";
           <div class="curation-record-main">
             ${curationThumb(item, true)}
             <div>
-              <h4>${escapeHtml(item.title || "Sin título")}</h4>
-              <div class="meta">${meta(item.year)}${meta(item.kind)}${meta(sourceLabel(item.source))}</div>
+              <h4>${escapeHtml(displayTitle(item) || "Sin título")}</h4>
+              <div class="meta">${meta(item.year)}${meta(kindLabel(item.kind))}${meta(sourceLabel(item.source))}</div>
               <div class="meta">${meta(item.added_at ? `Agregada ${formatDateTime(item.added_at)}` : "")}${meta(localFilesText(item))}</div>
               <div class="card-badges">
                 ${availabilityPill(item)}

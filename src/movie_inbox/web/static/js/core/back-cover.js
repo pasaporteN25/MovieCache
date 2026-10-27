@@ -1,4 +1,5 @@
-import { availabilityState, displayTitle, escapeAttr, escapeHtml, listText, normalizeRating } from "./format.js";
+import { longDate, ratingStarsRead } from "./personal-controls.js";
+import { availabilityState, displayTitle, escapeAttr, escapeHtml, kindLabel, listText, normalizeRating } from "./format.js";
 import { renderBackCoverImages } from "./back-cover-images.js";
 
 export const BACK_COVER_TEMPLATES = Object.freeze([
@@ -114,7 +115,7 @@ export function renderBackCover(item, { editable = false } = {}) {
             <section class="vhs-back-cover-facts" aria-label="Datos de la edición">
               <dl>
                 ${fact("Año", item?.year || "Sin dato")}
-                ${fact("Tipo", item?.kind || "Sin dato")}
+                ${fact("Tipo", kindLabel(item?.kind) || "Sin dato")}
                 ${fact("Duración", duration)}
                 ${fact("Géneros", genres)}
                 ${fact("Disponibilidad", availability.effective ? "Disponible" : "No disponible")}
@@ -140,8 +141,8 @@ export function renderBackCover(item, { editable = false } = {}) {
           </div>
           <dl>
             ${fact("Estado", watched ? "Vista" : "Pendiente")}
-            ${fact("Fecha", item?.watched_at || "Sin fecha")}
-            ${fact("Puntaje", rating ? `${rating}/10` : "Sin puntuar")}
+            ${fact("Fecha", longDate(item?.watched_at) || item?.watched_at || "Sin fecha")}
+            <div><dt>Puntaje</dt><dd>${ratingStarsRead(rating)}</dd></div>
           </dl>
           ${editable ? `<button class="vhs-edit-sticker" type="button" data-click="edit-vhs-dossier" aria-label="Movie Inbox · Editar ficha de ${escapeAttr(title)}"><img src="/static/img/brand/movie-inbox-sticker-256.webp" srcset="/static/img/brand/movie-inbox-sticker-256.webp 1x, /static/img/brand/movie-inbox-sticker-512.webp 2x" alt="Movie Inbox — Editar ficha" width="256" height="192"></button>` : ""}
         </section>

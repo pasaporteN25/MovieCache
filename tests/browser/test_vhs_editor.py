@@ -92,6 +92,79 @@ class VhsEditorTests(unittest.TestCase):
                 collapsed["full"],
             )
 
+    def test_rating_stars_and_spanish_date_picker_write_the_same_fields(self):
+        """[X12 E3/E4]: ten stars and a Spanish calendar in place of the browser's controls."""
+        page = self.page
+        self.open_case()
+        page.locator(".vhs-edit-sticker").click()
+        page.wait_for_selector("[data-rating-field]")
+        page.locator('[data-star="7"]').click()
+        self.assertEqual(page.locator("[data-personal-rating]").input_value(), "7")
+        self.assertEqual(page.locator('[data-star="7"]').get_attribute("aria-checked"), "true")
+        page.keyboard.press("ArrowRight")
+        self.assertEqual(page.locator("[data-personal-rating]").input_value(), "8")
+        page.keyboard.press("Delete")
+        self.assertEqual(page.locator("[data-personal-rating]").input_value(), "0")
+        page.keyboard.press("9")
+        self.assertEqual(page.locator("[data-personal-rating]").input_value(), "9")
+
+        page.locator("[data-date-toggle]").click()
+        page.wait_for_selector("[data-calendar]:not([hidden])")
+        months = [
+            "enero",
+            "febrero",
+            "marzo",
+            "abril",
+            "mayo",
+            "junio",
+            "julio",
+            "agosto",
+            "septiembre",
+            "octubre",
+            "noviembre",
+            "diciembre",
+        ]
+        head = page.locator(".vhs-calendar-head strong").inner_text().lower()
+        self.assertTrue(any(head.startswith(month) for month in months), head)
+        self.assertEqual(page.locator(".vhs-weekdays abbr").first.inner_text().lower(), "lu")
+        page.keyboard.press("Escape")
+        self.assertTrue(page.locator("[data-calendar]").is_hidden())
+        self.assertEqual(page.locator("#detailDrawer[open] .vhs-editor").count(), 1)
+        page.locator("[data-date-toggle]").click()
+        page.locator('[data-date-shortcut="yesterday"]').click()
+        yesterday = page.evaluate(
+            "(() => { const d = new Date(); d.setDate(d.getDate() - 1);"
+            " return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-'"
+            " + String(d.getDate()).padStart(2, '0'); })()"
+        )
+        self.assertEqual(page.locator("[data-personal-watched-at]").input_value(), yesterday)
+
+        page.locator("[data-editor-save]").click()
+        page.wait_for_function(
+            "document.querySelector('[data-editor-feedback]').textContent === 'Cambios guardados'"
+        )
+        headers = {"X-Movie-Inbox-Token": self.config.api_token}
+        items = page.request.get(self.base_url + "/api/items", headers=headers).json()["items"]
+        saved = next(item for item in items if item["id"] == "heat")
+        self.assertEqual((saved["rating"], saved["watched_at"]), (9, yesterday))
+
+    def test_back_cover_arrows_and_keys_move_between_works(self):
+        """[X12 E2]: previous / next live on the back cover, not in the editor."""
+        page = self.page
+        self.open_case()
+        first = page.locator(".vhs-back-cover").get_attribute("data-item-id")
+        self.assertGreater(page.locator(".vhs-side-arrow").count(), 0)
+        page.keyboard.press(
+            "ArrowRight" if page.locator(".vhs-side-arrow.is-next").count() else "ArrowLeft"
+        )
+        page.wait_for_function(
+            f"document.querySelector('.vhs-back-cover').dataset.itemId !== {first!r}"
+        )
+        page.locator(".vhs-edit-sticker").click()
+        page.wait_for_selector("[data-detail-form='personal']")
+        self.assertEqual(page.locator(".vhs-side-arrow").count(), 0)
+        self.assertEqual(page.locator(".drawer-back").count(), 1)
+
     def test_drafts_survive_sections_save_and_guard_return(self):
         page = self.page
         self.open_case()
@@ -118,11 +191,11 @@ class VhsEditorTests(unittest.TestCase):
         self.assertEqual(saved["directors"], ["Dirección de prueba"])
         self.assertEqual(saved["backdrop_image"], "https://example.test/frame.jpg")
         page.locator("[data-personal-review]").fill("Borrador pendiente")
-        page.get_by_role("button", name="Volver a la contratapa").click()
+        page.locator(".drawer-back").click()
         page.wait_for_selector("#unsavedDetailDialog[open]")
         page.locator("#keepEditingDetail").click()
         self.assertEqual(page.locator("[data-personal-review]").input_value(), "Borrador pendiente")
-        page.get_by_role("button", name="Volver a la contratapa").click()
+        page.locator(".drawer-back").click()
         page.locator("#discardDetailChanges").click()
         page.wait_for_selector('[data-detail-mode="back-cover"]')
         page.wait_for_function("document.activeElement.classList.contains('vhs-edit-sticker')")
@@ -187,7 +260,7 @@ class VhsEditorTests(unittest.TestCase):
         page.locator('[data-metadata-field="directors"]').fill("Dirección lenta")
         with page.expect_request("**/api/personal"):
             page.locator("[data-editor-save]").click()
-        self.assertTrue(page.locator('[data-click="detail-next"]').is_disabled())
+        self.assertTrue(page.locator(".drawer-back").is_disabled())
         self.assertTrue(page.locator("#closeDetail").is_disabled())
         page.evaluate("""async () => {
             const detail = await import('/static/js/core/detail.js');
@@ -195,7 +268,7 @@ class VhsEditorTests(unittest.TestCase):
             detail.openDetail('akira');
             detail.closeDetail();
         }""")
-        self.assertEqual(page.locator(".vhs-editor-heading h2").inner_text(), "Heat")
+        self.assertEqual(page.locator(".drawer-title-main").text_content(), "Heat")
         self.assertFalse(page.locator("#unsavedDetailDialog").is_visible())
         pending[0].fulfill(json={"ok": True})
         page.wait_for_function(
