@@ -712,6 +712,14 @@ class BrowserInterfaceTests(unittest.TestCase):
         )
         consulted_image = consulted.locator("[data-spotlight-image]")
         consulted_fallback = consulted.locator(".spotlight-poster-fallback")
+        # El póster recién pintado resuelve su carga real (rota) de forma asíncrona; se espera
+        # a que termine para que no pise los eventos sintéticos de abajo.
+        consulted_image.evaluate(
+            """img => img.complete || new Promise(resolve => {
+                img.addEventListener('load', resolve, {once: true});
+                img.addEventListener('error', resolve, {once: true});
+            })"""
+        )
         consulted_image.dispatch_event("load")
         self.assertTrue(consulted_fallback.is_hidden())
         consulted_image.dispatch_event("error")
